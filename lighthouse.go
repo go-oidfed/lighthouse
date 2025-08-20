@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/internal/version"
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 const entityConfigurationCachePeriod = 5 * time.Second
@@ -187,21 +187,20 @@ func (fed LightHouse) Start(conf ServerConf) {
 }
 
 // CreateSubordinateStatement returns an oidfed.EntityStatementPayload for the passed storage.SubordinateInfo
-func (fed LightHouse) CreateSubordinateStatement(subordinate *storage.SubordinateInfo) oidfed.EntityStatementPayload {
+func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateInfo) oidfed.EntityStatementPayload {
 	now := time.Now()
 	return oidfed.EntityStatementPayload{
 		Issuer:             fed.FederationEntity.EntityID,
-		Subject:            subordinate.EntityID,
+		Subject:            subordinate.Entity.EntityID,
 		IssuedAt:           unixtime.Unixtime{Time: now},
-		ExpiresAt:          unixtime.Unixtime{Time: now.Add(time.Duration(fed.SubordinateStatementLifetime) * time.Second)},
+		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime * time.Second)},
 		SourceEndpoint:     fed.Metadata.FederationEntity.FederationFetchEndpoint,
-		JWKS:               subordinate.JWKS,
+		JWKS:               subordinate.JWKS.JWKS(),
 		Metadata:           subordinate.Metadata,
 		MetadataPolicy:     fed.MetadataPolicies,
 		Constraints:        fed.Constraints,
 		CriticalExtensions: fed.CriticalExtensions,
 		MetadataPolicyCrit: fed.MetadataPolicyCrit,
-		TrustMarks:         subordinate.TrustMarks,
 		Extra:              utils.MergeMaps(true, fed.SubordinateStatementsConfig.Extra, subordinate.Extra),
 	}
 }

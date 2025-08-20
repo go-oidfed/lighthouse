@@ -7,6 +7,7 @@ import (
 	"github.com/go-oidfed/lib"
 
 	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 type enrollRequest struct {
@@ -45,7 +46,7 @@ func (fed *LightHouse) AddEnrollEndpoint(
 			}
 			if storedInfo != nil { // Already a subordinate
 				switch storedInfo.Status {
-				case storage.StatusActive:
+				case model.StatusActive:
 					// This is not necessarily needed, but we return a fetch response
 					payload := fed.CreateSubordinateStatement(storedInfo)
 					jwt, err := fed.SignEntityStatement(payload)
@@ -56,14 +57,14 @@ func (fed *LightHouse) AddEnrollEndpoint(
 					ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 					ctx.Status(fiber.StatusCreated)
 					return ctx.Send(jwt)
-				case storage.StatusPending:
+				case model.StatusPending:
 					ctx.Status(fiber.StatusAccepted)
 					return ctx.JSON(
 						oidfed.ErrorInvalidRequest(
 							"the enrollment needs to be approved by an administrator",
 						),
 					)
-				case storage.StatusBlocked:
+				case model.StatusBlocked:
 					ctx.Status(fiber.StatusForbidden)
 					return ctx.JSON(oidfed.ErrorInvalidRequest("the entity cannot enroll"))
 				default:
@@ -86,11 +87,13 @@ func (fed *LightHouse) AddEnrollEndpoint(
 				}
 			}
 
-			info := storage.SubordinateInfo{
-				JWKS:        entityConfig.JWKS,
-				EntityTypes: req.EntityTypes,
-				EntityID:    entityConfig.Subject,
-				Status:      storage.StatusActive,
+			info := model.SubordinateInfo{
+				JWKS: model.NewJWKS(entityConfig.JWKS),
+				Entity: model.Entity{
+					EntityTypes: model.NewEntityTypes(req.EntityTypes),
+					EntityID:    entityConfig.Subject,
+				},
+				Status: model.StatusActive,
 			}
 			if err = store.Write(
 				entityConfig.Subject, info,

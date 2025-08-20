@@ -8,19 +8,40 @@ import (
 )
 
 type storageConf struct {
-	DataDir     string      `yaml:"data_dir"`
-	BackendType backendType `yaml:"backend"`
+	BackendType backendType        `yaml:"backend"`
+	Driver      storage.DriverType `yaml:"driver"`
+	DataDir     string             `yaml:"data_dir"`
+	DSN         string             `yaml:"dsn"`
+	storage.DSNConf
+	Debug bool `yaml:"debug"`
 }
 
 func (c *storageConf) validate() error {
-	if c.DataDir == "" {
-		return errors.New("error in storage conf: data_dir must be specified")
+	if c.BackendType != "" {
+		return errors.New("backend types have been deprecated; please migrate to gorm")
 	}
-	return nil
+
+	if c.Driver == (storage.DriverSQLite) {
+		if c.DataDir == "" {
+			return errors.New("error in storage conf: data_dir must be specified")
+		}
+		return nil
+	}
+	var err error
+	if c.DSN == "" {
+		c.DSN, err = storage.DSN(c.Driver, c.DSNConf)
+	}
+	return err
 }
 
 var defaultStorageConf = storageConf{
-	BackendType: BackendTypeBadger,
+	Driver: storage.DriverSQLite,
+	DSNConf: storage.DSNConf{
+		User: "lighthouse",
+		Host: "localhost",
+		DB:   "lighthouse",
+	},
+	Debug: false,
 }
 
 type backendType string
@@ -28,43 +49,28 @@ type backendType string
 const (
 	BackendTypeJSON   backendType = "json"
 	BackendTypeBadger backendType = "badger"
+	BackendTypeGorm   backendType = "gorm"
 )
-
-// IsValid checks if the storage type is a known value
-func (bt backendType) IsValid() bool {
-	switch bt {
-	case BackendTypeJSON, BackendTypeBadger:
-		return true
-	default:
-		return false
-	}
-}
-
-// String returns the string representation
-func (bt backendType) String() string {
-	return string(bt)
-}
 
 // LoadStorageBackends loads and returns the storage backends for the passed Config
 func LoadStorageBackends(c storageConf) (
 	subordinateStorage storage.SubordinateStorageBackend,
 	trustMarkedEntitiesStorage storage.TrustMarkedEntitiesStorageBackend, err error,
 ) {
-	switch c.BackendType {
-	case BackendTypeJSON:
-		warehouse := storage.NewFileStorage(c.DataDir)
-		subordinateStorage = warehouse.SubordinateStorage()
-		trustMarkedEntitiesStorage = warehouse.TrustMarkedEntitiesStorage()
-	case BackendTypeBadger:
-		warehouse, err := storage.NewBadgerStorage(c.DataDir)
-		if err != nil {
-			return nil, nil, err
-		}
-		subordinateStorage = warehouse.SubordinateStorage()
-		trustMarkedEntitiesStorage = warehouse.TrustMarkedEntitiesStorage()
-	default:
-		return nil, nil, errors.Errorf("unknown storage backend type: %s", c.BackendType)
+	warehouse, err := storage.NewStorage(
+		storage.Config{
+			Driver:  c.Driver,
+			DSN:     c.DSN,
+			DataDir: c.DataDir,
+			Debug:   c.Debug,
+		},
+	)
+	if err != nil {
+		return nil, nil, err
 	}
+	subordinateStorage = warehouse.SubordinateStorage()
+	trustMarkedEntitiesStorage = warehouse.TrustMarkedEntitiesStorage()
+
 	log.Info("Loaded storage backend")
 	return
 }

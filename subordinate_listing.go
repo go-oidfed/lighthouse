@@ -9,6 +9,7 @@ import (
 	"github.com/go-oidfed/lib"
 
 	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddSubordinateListingEndpoint adds a subordinate listing endpoint
@@ -33,9 +34,9 @@ func (fed *LightHouse) AddSubordinateListingEndpoint(
 	)
 }
 
-func filterEntityType(info storage.SubordinateInfo, value any) bool {
+func filterEntityType(info model.SubordinateInfo, value any) bool {
 	v, ok := value.(string)
-	return ok && slices.Contains(info.EntityTypes, v)
+	return ok && slices.Contains(info.Entity.EntityTypes.ToStrings(), v)
 }
 
 func handleSubordinateListing(

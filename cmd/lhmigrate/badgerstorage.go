@@ -1,4 +1,7 @@
-package storage
+package main
+
+// Deprecated: BadgerStorage is deprecated and will be removed in a future release.
+// Use the GORM storage backend instead. See the README.md file for migration instructions.
 
 import (
 	"encoding/json"
@@ -8,9 +11,13 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // NewBadgerStorage creates a new BadgerStorage at the passed storage location
+//
+// Deprecated: Use the GORM storage backend instead. See the README.md file for migration instructions.
 func NewBadgerStorage(path string) (*BadgerStorage, error) {
 	storage := &BadgerStorage{Path: path}
 	err := storage.Load()
@@ -25,12 +32,27 @@ type BadgerStorage struct {
 }
 
 // SubordinateStorage gives a SubordinateBadgerStorage
-func (store *BadgerStorage) SubordinateStorage() *SubordinateBadgerStorage {
-	return &SubordinateBadgerStorage{
-		store: &BadgerSubStorage{
+func (store *BadgerStorage) SubordinateStorage() loadLegacySubordinateInfos {
+	return func() (infos []legacySubordinateInfo, err error) {
+		s := &BadgerSubStorage{
 			db:     store,
 			subKey: "subordinates",
-		},
+		}
+		err = s.Load()
+		if err != nil {
+			return nil, err
+		}
+		err = s.ReadIterator(
+			func(_, v []byte) error {
+				var info legacySubordinateInfo
+				if err = json.Unmarshal(v, &info); err != nil {
+					return err
+				}
+				infos = append(infos, info)
+				return nil
+			},
+		)
+		return
 	}
 }
 
@@ -102,7 +124,7 @@ func (store *BadgerSubStorage) key(key string) string {
 	return store.subKey + ":" + key
 }
 
-// Write writes a values to the sub-database
+// Write writes a value to the sub-database
 func (store *BadgerSubStorage) Write(key string, value any) error {
 	return store.db.Write(store.key(key), value)
 }
@@ -171,148 +193,6 @@ func (store *BadgerStorage) Load() error {
 	return nil
 }
 
-// SubordinateBadgerStorage is a type implementing the SubordinateStorageBackend interface
-type SubordinateBadgerStorage struct {
-	store *BadgerSubStorage
-}
-
-// Load implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Load() error {
-	return store.store.Load()
-}
-
-// Write implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Write(entityID string, info SubordinateInfo) error {
-	return store.store.Write(entityID, info)
-}
-
-// Delete implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Delete(entityID string) error {
-	return store.store.Delete(entityID)
-}
-
-// Read implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Read(entityID string) (*SubordinateInfo, error) {
-	var info SubordinateInfo
-	found, err := store.store.Read(entityID, &info)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
-	}
-	return &info, nil
-}
-
-// Block implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Block(entityID string) error {
-	return changeSubordinateStatus(entityID, StatusBlocked, store)
-}
-
-// Approve implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Approve(entityID string) error {
-	return changeSubordinateStatus(entityID, StatusActive, store)
-}
-
-// Subordinate implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Subordinate(entityID string) (*SubordinateInfo, error) {
-	return store.Read(entityID)
-}
-
-// Active implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Active() SubordinateStorageQuery {
-	return &BadgerSubordinateStorageQuery{
-		db: store,
-		filters: []func(info SubordinateInfo) bool{
-			func(info SubordinateInfo) bool {
-				return info.Status == StatusActive
-			},
-		},
-	}
-}
-
-// Blocked implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Blocked() SubordinateStorageQuery {
-	return &BadgerSubordinateStorageQuery{
-		db: store,
-		filters: []func(info SubordinateInfo) bool{
-			func(info SubordinateInfo) bool {
-				return info.Status == StatusBlocked
-			},
-		},
-	}
-}
-
-// Pending implements the SubordinateStorageBackend interface
-func (store *SubordinateBadgerStorage) Pending() SubordinateStorageQuery {
-	return &BadgerSubordinateStorageQuery{
-		db: store,
-		filters: []func(info SubordinateInfo) bool{
-			func(info SubordinateInfo) bool {
-				return info.Status == StatusPending
-			},
-		},
-	}
-}
-
-// All returns a SubordinateStorageQuery for all stored SubordinateInfos
-func (store *SubordinateBadgerStorage) All() SubordinateStorageQuery {
-	return &BadgerSubordinateStorageQuery{db: store}
-}
-
-// BadgerSubordinateStorageQuery is a type implementing the SubordinateStorageQuery interface for a
-// SubordinateBadgerStorage
-type BadgerSubordinateStorageQuery struct {
-	db      *SubordinateBadgerStorage
-	filters []func(info SubordinateInfo) bool
-}
-
-// Subordinate implements the SubordinateStorageQuery interface
-func (q BadgerSubordinateStorageQuery) Subordinate(entityID string) (*SubordinateInfo, error) {
-	return q.db.Read(entityID)
-}
-
-// Subordinates implements the SubordinateStorageQuery interface
-func (q BadgerSubordinateStorageQuery) Subordinates() (infos []SubordinateInfo, err error) {
-	err = q.db.store.ReadIterator(
-		func(_, v []byte) error {
-			var info SubordinateInfo
-			if err = json.Unmarshal(v, &info); err != nil {
-				return err
-			}
-			infos = append(infos, info)
-			return nil
-		},
-	)
-	return
-}
-
-// EntityIDs implements the SubordinateStorageQuery interface
-func (q BadgerSubordinateStorageQuery) EntityIDs() (ids []string, err error) {
-	err = q.db.store.ReadIterator(
-		func(_, v []byte) error {
-			var info SubordinateInfo
-			if err = json.Unmarshal(v, &info); err != nil {
-				return err
-			}
-			ids = append(ids, info.EntityID)
-			return nil
-		},
-	)
-	return
-}
-
-// AddFilter implements the SubordinateStorageQuery interface
-func (q *BadgerSubordinateStorageQuery) AddFilter(filter SubordinateStorageQueryFilter, value any) error {
-	q.filters = append(
-		q.filters, func(info SubordinateInfo) bool {
-			return filter(info, value)
-		},
-	)
-	return nil
-
-}
-
 // TrustMarkedEntitiesBadgerStorage is a type implementing the TrustMarkedEntitiesStorageBackend interface
 type TrustMarkedEntitiesBadgerStorage struct {
 	store *BadgerSubStorage
@@ -320,51 +200,51 @@ type TrustMarkedEntitiesBadgerStorage struct {
 
 // Block implements the TrustMarkedEntitiesStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) Block(trustMarkType, entityID string) error {
-	return store.write(trustMarkType, entityID, StatusBlocked)
+	return store.write(trustMarkType, entityID, model.StatusBlocked)
 }
 
 // Approve implements the TrustMarkedEntitiesStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) Approve(trustMarkType, entityID string) error {
-	return store.write(trustMarkType, entityID, StatusActive)
+	return store.write(trustMarkType, entityID, model.StatusActive)
 }
 
 // Request implements the TrustMarkedEntitiesStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) Request(trustMarkType, entityID string) error {
-	return store.write(trustMarkType, entityID, StatusPending)
+	return store.write(trustMarkType, entityID, model.StatusPending)
 }
 
 // TrustMarkedStatus implements the TrustMarkedEntitiesStorageBackend interface
-func (store *TrustMarkedEntitiesBadgerStorage) TrustMarkedStatus(trustMarkType, entityID string) (Status, error) {
-	var status Status
+func (store *TrustMarkedEntitiesBadgerStorage) TrustMarkedStatus(trustMarkType, entityID string) (model.Status, error) {
+	var status model.Status
 	var id string
 	k := store.key(trustMarkType, entityID)
 	found, err := store.store.Read(k, &status)
 	if err != nil {
 		found, e := store.store.Read(k, &id)
 		if e == nil && found {
-			return StatusActive, nil
+			return model.StatusActive, nil
 		}
 		return -1, err
 	}
 	if !found {
-		return StatusInactive, nil
+		return model.StatusInactive, nil
 	}
 	return status, nil
 }
 
 // Active implements the TrustMarkedEntitiesStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) Active(trustMarkType string) ([]string, error) {
-	return store.trustMarkedEntities(trustMarkType, StatusActive)
+	return store.trustMarkedEntities(trustMarkType, model.StatusActive)
 }
 
 // Blocked implements the TrustMarkedEntitiesStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) Blocked(trustMarkType string) ([]string, error) {
-	return store.trustMarkedEntities(trustMarkType, StatusBlocked)
+	return store.trustMarkedEntities(trustMarkType, model.StatusBlocked)
 }
 
 // Pending implements the TrustMarkedEntitiesStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) Pending(trustMarkType string) ([]string, error) {
-	return store.trustMarkedEntities(trustMarkType, StatusPending)
+	return store.trustMarkedEntities(trustMarkType, model.StatusPending)
 }
 
 func (*TrustMarkedEntitiesBadgerStorage) key(trustMarkType, entityID string) string {
@@ -377,7 +257,7 @@ func (store *TrustMarkedEntitiesBadgerStorage) Load() error {
 }
 
 // Write implements the TrustMarkedEntitiesStorageBackend interface
-func (store *TrustMarkedEntitiesBadgerStorage) write(trustMarkType, entityID string, status Status) error {
+func (store *TrustMarkedEntitiesBadgerStorage) write(trustMarkType, entityID string, status model.Status) error {
 	return store.store.Write(store.key(trustMarkType, entityID), status)
 }
 
@@ -387,18 +267,18 @@ func (store *TrustMarkedEntitiesBadgerStorage) Delete(trustMarkType, entityID st
 }
 
 func (store *TrustMarkedEntitiesBadgerStorage) trustMarkedEntities(
-	trustMarkType string, status Status,
+	trustMarkType string, status model.Status,
 ) (entityIDs []string, err error) {
 	err = store.store.ReadIterator(
 		func(k, v []byte) error {
 			var id string
-			var s Status
+			var s model.Status
 			if err = json.Unmarshal(v, &s); err != nil {
 				// try legacy storage format
 				if e := json.Unmarshal(v, &id); e != nil {
 					return err
 				}
-				s = StatusActive
+				s = model.StatusActive
 			} else {
 				id = strings.TrimPrefix(string(k), fmt.Sprintf("%s|", trustMarkType))
 			}
@@ -415,5 +295,5 @@ func (store *TrustMarkedEntitiesBadgerStorage) trustMarkedEntities(
 // HasTrustMark implements the TrustMarkedEntitiesStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) HasTrustMark(trustMarkType, entityID string) (bool, error) {
 	status, err := store.TrustMarkedStatus(trustMarkType, entityID)
-	return status == StatusActive, err
+	return status == model.StatusActive, err
 }

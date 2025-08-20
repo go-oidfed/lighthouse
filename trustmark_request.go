@@ -8,6 +8,7 @@ import (
 	"github.com/go-oidfed/lib"
 
 	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddTrustMarkRequestEndpoint adds an endpoint where entities can request to
@@ -59,16 +60,16 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			switch status {
-			case storage.StatusActive:
+			case model.StatusActive:
 				ctx.Status(fiber.StatusNoContent)
 				return nil
-			case storage.StatusBlocked:
+			case model.StatusBlocked:
 				ctx.Status(fiber.StatusForbidden)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("subject cannot obtain this trust mark"))
-			case storage.StatusPending:
+			case model.StatusPending:
 				ctx.Status(fiber.StatusAccepted)
 				return nil
-			case storage.StatusInactive:
+			case model.StatusInactive:
 				fallthrough
 			default:
 				if err = store.Request(trustMarkType, sub); err != nil {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 var subordinatesCmd = &cobra.Command{
@@ -89,10 +89,12 @@ func addSubordinate(cmd *cobra.Command, args []string) error {
 	if len(entityTypes) == 0 {
 		entityTypes = entityConfig.Metadata.GuessEntityTypes()
 	}
-	info := storage.SubordinateInfo{
-		JWKS:        entityConfig.JWKS,
-		EntityTypes: entityTypes,
-		EntityID:    entityConfig.Subject,
+	info := model.SubordinateInfo{
+		JWKS: model.NewJWKS(entityConfig.JWKS),
+		Entity: model.Entity{
+			EntityTypes: model.NewEntityTypes(entityTypes),
+			EntityID:    entityConfig.Subject,
+		},
 	}
 	if err = subordinateStorage.Write(
 		entityConfig.Subject, info,
@@ -147,7 +149,7 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 
 	pendingQ := subordinateStorage.Pending()
 	var pendingIDs []string
-	var pendingInfos []storage.SubordinateInfo
+	var pendingInfos []model.SubordinateInfo
 	var err error
 	if onlyIDs {
 		pendingIDs, err = pendingQ.EntityIDs()
@@ -187,7 +189,7 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			if err = promptInSubordinateRequest(infos.EntityID, str); err != nil {
+			if err = promptInSubordinateRequest(infos.Entity.EntityID, str); err != nil {
 				return err
 			}
 		}
@@ -203,7 +205,7 @@ func promptInSubordinateRequest(entityID, str string) error {
 	return subordinateStorage.Block(entityID)
 }
 
-func stringSubordinateInfo(info storage.SubordinateInfo) (string, error) {
+func stringSubordinateInfo(info model.SubordinateInfo) (string, error) {
 	data, err := json.Marshal(info)
 	if err != nil {
 		return "", err

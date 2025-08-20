@@ -1,5 +1,9 @@
 package storage
 
+import (
+	"github.com/go-oidfed/lighthouse/storage/model"
+)
+
 // TrustMarkedEntitiesStorageBackend is an interface to store information
 // about trust marked entities
 type TrustMarkedEntitiesStorageBackend interface {
@@ -13,7 +17,7 @@ type TrustMarkedEntitiesStorageBackend interface {
 	Request(trustMarkType, entityID string) error
 	// TrustMarkedStatus returns the Status for the trustMarkType
 	// entityID combination
-	TrustMarkedStatus(trustMarkType, entityID string) (Status, error)
+	TrustMarkedStatus(trustMarkType, entityID string) (model.Status, error)
 	// HasTrustMark checks if a certain entity has a certain trust mark or not
 	HasTrustMark(trustMarkType, entityID string) (bool, error)
 	// Active returns a list of entity ids that have a certain trust mark; if an

@@ -6,6 +6,7 @@ import (
 	"github.com/go-oidfed/lib"
 
 	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddEnrollRequestEndpoint adds an endpoint to request enrollment to this IA
@@ -39,20 +40,20 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 			}
 			if storedInfo != nil { // Already a subordinate
 				switch storedInfo.Status {
-				case storage.StatusActive:
+				case model.StatusActive:
 					ctx.Status(fiber.StatusNoContent)
 					return nil
-				case storage.StatusBlocked:
+				case model.StatusBlocked:
 					ctx.Status(fiber.StatusForbidden)
 					return ctx.JSON(
 						oidfed.ErrorInvalidRequest(
 							"the entity cannot enroll",
 						),
 					)
-				case storage.StatusPending:
+				case model.StatusPending:
 					ctx.Status(fiber.StatusAccepted)
 					return nil
-				case storage.StatusInactive:
+				case model.StatusInactive:
 				default:
 				}
 			}
@@ -65,11 +66,13 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 			if len(req.EntityTypes) == 0 {
 				req.EntityTypes = entityConfig.Metadata.GuessEntityTypes()
 			}
-			info := storage.SubordinateInfo{
-				JWKS:        entityConfig.JWKS,
-				EntityTypes: req.EntityTypes,
-				EntityID:    entityConfig.Subject,
-				Status:      storage.StatusPending,
+			info := model.SubordinateInfo{
+				JWKS: model.NewJWKS(entityConfig.JWKS),
+				Entity: model.Entity{
+					EntityTypes: model.NewEntityTypes(req.EntityTypes),
+					EntityID:    entityConfig.Subject,
+				},
+				Status: model.StatusPending,
 			}
 			if err = store.Write(
 				entityConfig.Subject, info,

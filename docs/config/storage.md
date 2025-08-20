@@ -58,3 +58,73 @@ The following configuration options are defined for the `badger` backend:
 <span class="badge badge-red" title="If this option is required or optional">required</span>
 
 The `data_dir` option sets the root directory where the badger data is stored on disk. 
+
+### `gorm`
+If `backend` is set to `gorm` the [GORM](https://gorm.io/) ORM mapper is used. GORM is a feature-rich ORM for Go, and this backend supports multiple database engines including SQLite, MySQL, and PostgreSQL. The data is stored in a database which can be accessed using standard database tools.
+
+??? file "config.yaml (SQLite)"
+
+    ```yaml
+    storage:
+        backend: gorm
+        data_dir: /path/to/data
+        database:
+            driver: sqlite
+            debug: false
+    ```
+
+??? file "config.yaml (MySQL)"
+
+    ```yaml
+    storage:
+        backend: gorm
+        database:
+            driver: mysql
+            dsn: "user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&parseTime=True&loc=Local"
+            debug: false
+    ```
+
+??? file "config.yaml (PostgreSQL)"
+
+    ```yaml
+    storage:
+        backend: gorm
+        database:
+            driver: postgres
+            dsn: "host=localhost user=postgres password=postgres dbname=lighthouse port=5432 sslmode=disable TimeZone=UTC"
+            debug: false
+    ```
+
+The following configuration options are defined for the `gorm` backend:
+
+#### `data_dir`
+<span class="badge badge-purple" title="Value Type">directory path</span>
+<span class="badge badge-red" title="If this option is required or optional">required for SQLite</span>
+
+The `data_dir` option sets the directory where the SQLite database file (`lighthouse.db`) will be stored. This option is only required when using the SQLite driver.
+
+#### `database.driver`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-orange" title="If this option is required or optional">optional</span>
+
+The `database.driver` option specifies which database driver to use. Supported values are:
+- `sqlite` (default): Uses SQLite as the database engine
+- `mysql`: Uses MySQL as the database engine
+- `postgres`: Uses PostgreSQL as the database engine
+
+#### `database.dsn`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-red" title="If this option is required or optional">required for MySQL and PostgreSQL</span>
+
+The `database.dsn` option specifies the Data Source Name (connection string) for the database. This option is required when using MySQL or PostgreSQL drivers.
+
+For MySQL, the DSN format is: `user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local`
+
+For PostgreSQL, the DSN format is: `host=localhost user=postgres password=postgres dbname=lighthouse port=5432 sslmode=disable TimeZone=UTC`
+
+#### `database.debug`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">false</span>
+<span class="badge badge-orange" title="If this option is required or optional">optional</span>
+
+The `database.debug` option enables debug logging for the database operations. This is useful for troubleshooting database issues.
