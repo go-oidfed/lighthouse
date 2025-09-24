@@ -1,11 +1,13 @@
 package config
 
 import (
+	"reflect"
 	"time"
 
 	"github.com/fatih/structs"
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/zachmann/go-utils/duration"
 	"gopkg.in/yaml.v3"
 
@@ -26,7 +28,7 @@ type Endpoints struct {
 	EnrollmentEndpoint        checkedEndpointConf     `yaml:"enroll"`
 	EnrollmentRequestEndpoint lighthouse.EndpointConf `yaml:"enroll_request"`
 	TrustMarkRequestEndpoint  lighthouse.EndpointConf `yaml:"trust_mark_request"`
-	EntityCollectionEndpoint  lighthouse.EndpointConf `yaml:"entity_collection"`
+	EntityCollectionEndpoint  collectionEndpointConf  `yaml:"entity_collection"`
 }
 
 type checkedEndpointConf struct {
@@ -43,6 +45,30 @@ type resolveEndpointConf struct {
 	lighthouse.EndpointConf `yaml:",inline"`
 	GracePeriod             duration.DurationOption `yaml:"grace_period"`
 	TimeElapsedGraceFactor  float64                 `yaml:"time_elapsed_grace_factor"`
+}
+
+// collectionEndpointConf holds configuration for the entity collection endpoint
+type collectionEndpointConf struct {
+	lighthouse.EndpointConf `yaml:",inline"`
+	AllowedTrustAnchors     []string                `yaml:"allowed_trust_anchors"`
+	Interval                duration.DurationOption `yaml:"interval"`
+	ConcurrencyLimit        int                     `yaml:"concurrency_limit"`
+}
+
+func (c *collectionEndpointConf) validate() error {
+	if c.Interval.Duration() == 0 {
+		if c.ConcurrencyLimit != 0 {
+			log.Warn(
+				"entity collection endpoint: concurrency limit is set" +
+					" but periodic collection is disabled (no interval set)",
+			)
+		}
+		return nil
+	}
+	if len(c.AllowedTrustAnchors) == 0 {
+		return errors.New("at least one allowed trust anchor must be specified if periodic collection is used")
+	}
+	return nil
 }
 
 type trustMarkEndpointConf struct {
@@ -102,8 +128,26 @@ var defaultEndpointConf = Endpoints{
 	},
 }
 
-func (e *Endpoints) verify() error {
+func (e *Endpoints) validate() error {
 	oidfed.ResolverCacheGracePeriod = e.ResolveEndpoint.GracePeriod.Duration()
 	oidfed.ResolverCacheLifetimeElapsedGraceFactor = e.ResolveEndpoint.TimeElapsedGraceFactor
+
+	v := reflect.ValueOf(e).Elem()
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		fieldVal := v.Field(i)
+
+		// Get addressable pointer to field if possible
+		if fieldVal.CanAddr() {
+			ptr := fieldVal.Addr().Interface()
+
+			if validator, ok := ptr.(configValidator); ok {
+				if err := validator.validate(); err != nil {
+					return errors.Errorf("validation failed for field '%s': %s", t.Field(i).Name, err.Error())
+				}
+			}
+		}
+	}
 	return nil
 }

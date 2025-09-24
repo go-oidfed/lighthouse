@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
@@ -155,7 +156,20 @@ func main() {
 		lh.AddEnrollRequestEndpoint(endpoint, subordinateStorage)
 	}
 	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() {
-		lh.AddEntityCollectionEndpoint(endpoint)
+		var collector oidfed.EntityCollector = &oidfed.SimpleEntityCollector{}
+		if endpoint.Interval.Duration() != 0 {
+			pec := &oidfed.PeriodicEntityCollector{
+				TrustAnchors: endpoint.AllowedTrustAnchors,
+				Interval:     endpoint.Interval.Duration(),
+				Concurrency:  endpoint.ConcurrencyLimit,
+				SortEntitiesComparisonFunc: func(a, b *oidfed.CollectedEntity) int {
+					return strings.Compare(a.EntityID, b.EntityID)
+				}, //TODO only sort if pagination is used
+			}
+			pec.Start()
+			collector = pec
+		}
+		lh.AddEntityCollectionEndpoint(endpoint.EndpointConf, collector, endpoint.AllowedTrustAnchors)
 	}
 	log.Info("Added Endpoints")
 

@@ -2,6 +2,7 @@ package lighthouse
 
 import (
 	"fmt"
+	slices2 "slices"
 
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/apimodel"
@@ -9,12 +10,12 @@ import (
 	"tideland.dev/go/slices"
 )
 
-// TODO allow limiting the collection endpoint to certain trust anchors
-
 const defaultPagingLimit = 100
 
 // AddEntityCollectionEndpoint adds an entity collection endpoint
-func (fed *LightHouse) AddEntityCollectionEndpoint(endpoint EndpointConf) {
+func (fed *LightHouse) AddEntityCollectionEndpoint(
+	endpoint EndpointConf, collector oidfed.EntityCollector, allowedTrustAnchors []string,
+) {
 	if fed.Metadata.FederationEntity.Extra == nil {
 		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
 	}
@@ -35,6 +36,12 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(endpoint EndpointConf) {
 			}
 			if req.TrustAnchor == "" {
 				req.TrustAnchor = fed.FederationEntity.EntityID
+			}
+			if len(allowedTrustAnchors) > 0 {
+				if !slices2.Contains(allowedTrustAnchors, req.TrustAnchor) {
+					ctx.Status(fiber.StatusNotFound)
+					return ctx.JSON(oidfed.ErrorInvalidTrustAnchor("trust anchor not allowed for this endpoint"))
+				}
 			}
 			if req.Limit != 0 {
 				ctx.Status(fiber.StatusBadRequest)
@@ -78,12 +85,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(endpoint EndpointConf) {
 					),
 				)
 			}
-			collector := oidfed.SimpleEntityCollector{}
-			entities := collector.CollectEntities(req)
-
-			res := oidfed.EntityCollectionResponse{
-				FederationEntities: entities,
-			}
+			res := collector.CollectEntities(req)
 			return ctx.JSON(res)
 		},
 	)

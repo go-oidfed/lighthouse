@@ -509,8 +509,8 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 - To use an external Endpoint.
 
 ## `entity_collection`
-Under the `entity_colleection` option the Federation Entity Collection Endpoint is configured. This is a 
-work-in-process extension draft, currently available at: https://zachmann.github.io/openid-federation-entity-collection/main.html
+Under the `entity_collection` option the Federation Entity Collection Endpoint is configured. This endpoint follows a 
+work-in-progress extension draft, currently available at: https://zachmann.github.io/openid-federation-entity-collection/main.html
 
 This endpoint is optional.
 
@@ -518,8 +518,13 @@ This endpoint is optional.
 
     ```yaml
     endpoints:
-        list:
-            path: /list
+        entity_collection:
+            path: /entity-collection
+            allowed_trust_anchors:
+              - https://ta.example.com
+              - https://ta2.example.com
+            interval: 8h
+            concurrency_limit: 4
     ```
 
 ### `path`
@@ -529,7 +534,7 @@ This endpoint is optional.
 The `path` option is used to set the url path under which the Entity Collection Endpoint is available. Unless `url` is 
 not set the full external url will be `<entity_id><path>`.
 
-If `path` is not set, LightHouse will not provide a Entity Collection Endpoint. To include an external Entity 
+If `path` is not set, LightHouse will not provide an Entity Collection Endpoint. To include an external Entity 
 Collection Endpoint in the Federation Metadata in the Entity Configuration set `url`.
 
 ### `url`
@@ -541,3 +546,30 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `allowed_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of strings</span>
+<span class="badge badge-orange" title="If this option is required or optional">required, if `interval` is set; otherwise optional</span>
+
+The `allowed_trust_anchors` option restricts which Trust Anchors can be used in requests against the Entity Collection 
+Endpoint. If provided, a request's `trust_anchor` parameter must match one of the configured entries; otherwise the 
+endpoint responds with an error.
+
+If `interval` is configured (see below), at least one `allowed_trust_anchors` entry must be provided to define which 
+Trust Anchors are periodically collected.
+
+### `interval`
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `interval` option enables periodic collection of entities from the configured Trust Anchors. When set, LightHouse 
+starts a background collector that collects entities for each Trust Anchor every `interval`.
+
+If `interval` is not set (default), the endpoint serves collection requests on demand without running a background collector.
+
+### `concurrency_limit`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `concurrency_limit` option controls how many periodic collection tasks can run in parallel when `interval` is set. 
+If `interval` is not set, providing `concurrency_limit` has no effect and will be ignored (a warning is logged).
