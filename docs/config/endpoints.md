@@ -525,6 +525,7 @@ This endpoint is optional.
               - https://ta2.example.com
             interval: 8h
             concurrency_limit: 4
+            pagination_limit: 512
     ```
 
 ### `path`
@@ -573,3 +574,17 @@ If `interval` is not set (default), the endpoint serves collection requests on d
 
 The `concurrency_limit` option controls how many periodic collection tasks can run in parallel when `interval` is set. 
 If `interval` is not set, providing `concurrency_limit` has no effect and will be ignored (a warning is logged).
+
+### `pagination_limit`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Enables pagination support for the Entity Collection Endpoint. When set to a positive integer, clients can use the
+`limit` and `from_entity_id` request parameters to page through results ordered by `entity_id`.
+
+
+The server enforces a maximum page size equal to the configured `pagination_limit`. When pagination is disabled
+(`pagination_limit` not set or `<= 0`), requests including `limit` or `from_entity_id` are rejected with
+`unsupported_parameter` errors.
+
+Pagination can be enabled independently of `interval`; it applies to both on-demand collection and periodic collection.

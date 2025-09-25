@@ -10,11 +10,10 @@ import (
 	"tideland.dev/go/slices"
 )
 
-const defaultPagingLimit = 100
-
 // AddEntityCollectionEndpoint adds an entity collection endpoint
 func (fed *LightHouse) AddEntityCollectionEndpoint(
-	endpoint EndpointConf, collector oidfed.EntityCollector, allowedTrustAnchors []string,
+	endpoint EndpointConf, collector oidfed.EntityCollector,
+	allowedTrustAnchors []string, paginationSupported bool,
 ) {
 	if fed.Metadata.FederationEntity.Extra == nil {
 		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
@@ -30,7 +29,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
 			}
-			if req.FromEntityID != "" {
+			if !paginationSupported && req.FromEntityID != "" {
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'from_entity_id' is not yet supported"))
 			}
@@ -43,7 +42,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 					return ctx.JSON(oidfed.ErrorInvalidTrustAnchor("trust anchor not allowed for this endpoint"))
 				}
 			}
-			if req.Limit != 0 {
+			if !paginationSupported && req.Limit != 0 {
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'limit' is not yet supported"))
 			}

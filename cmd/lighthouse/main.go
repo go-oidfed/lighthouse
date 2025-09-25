@@ -162,14 +162,19 @@ func main() {
 				TrustAnchors: endpoint.AllowedTrustAnchors,
 				Interval:     endpoint.Interval.Duration(),
 				Concurrency:  endpoint.ConcurrencyLimit,
-				SortEntitiesComparisonFunc: func(a, b *oidfed.CollectedEntity) int {
+			}
+			if endpoint.PaginationLimit > 0 {
+				pec.SortEntitiesComparisonFunc = func(a, b *oidfed.CollectedEntity) int {
 					return strings.Compare(a.EntityID, b.EntityID)
-				}, //TODO only sort if pagination is used
+				}
+				pec.PagingLimit = endpoint.PaginationLimit
 			}
 			pec.Start()
 			collector = pec
 		}
-		lh.AddEntityCollectionEndpoint(endpoint.EndpointConf, collector, endpoint.AllowedTrustAnchors)
+		lh.AddEntityCollectionEndpoint(
+			endpoint.EndpointConf, collector, endpoint.AllowedTrustAnchors, endpoint.PaginationLimit > 0,
+		)
 	}
 	log.Info("Added Endpoints")
 

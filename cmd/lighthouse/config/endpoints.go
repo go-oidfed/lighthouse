@@ -53,6 +53,7 @@ type collectionEndpointConf struct {
 	AllowedTrustAnchors     []string                `yaml:"allowed_trust_anchors"`
 	Interval                duration.DurationOption `yaml:"interval"`
 	ConcurrencyLimit        int                     `yaml:"concurrency_limit"`
+	PaginationLimit         int                     `yaml:"pagination_limit"`
 }
 
 func (c *collectionEndpointConf) validate() error {
