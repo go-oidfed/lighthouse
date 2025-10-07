@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/zachmann/go-utils/duration"
 	"gopkg.in/yaml.v3"
+	"tideland.dev/go/slices"
 
 	"github.com/go-oidfed/lighthouse"
 	"github.com/go-oidfed/lighthouse/internal/utils"
@@ -42,9 +43,36 @@ type fetchEndpointConf struct {
 }
 
 type resolveEndpointConf struct {
-	lighthouse.EndpointConf `yaml:",inline"`
-	GracePeriod             duration.DurationOption `yaml:"grace_period"`
-	TimeElapsedGraceFactor  float64                 `yaml:"time_elapsed_grace_factor"`
+	lighthouse.EndpointConf                `yaml:",inline"`
+	AllowedTrustAnchors                    []string                `yaml:"allowed_trust_anchors"`
+	UseEntityCollectionAllowedTrustAnchors bool                    `yaml:"use_entity_collection_allowed_trust_anchors"`
+	ProactiveResolver                      proactiveResolverConf   `yaml:"proactive_resolver"`
+	GracePeriod                            duration.DurationOption `yaml:"grace_period"`
+	TimeElapsedGraceFactor                 float64                 `yaml:"time_elapsed_grace_factor"`
+}
+
+type proactiveResolverConf struct {
+	Enabled          bool `yaml:"enabled"`
+	ConcurrencyLimit int  `yaml:"concurrency_limit"`
+	QueueSize        int  `yaml:"queue_size"`
+	ResponseStorage  struct {
+		Dir       string `yaml:"dir"`
+		StoreJSON bool   `yaml:"store_json"`
+		StoreJWT  bool   `yaml:"store_jwt"`
+	} `yaml:"response_storage"`
+}
+
+func (c *resolveEndpointConf) validate() error {
+	if c.ProactiveResolver.Enabled {
+		if c.ProactiveResolver.ResponseStorage.Dir == "" {
+			return errors.New("response storage directory must be specified if proactive resolver is used")
+		}
+		if !c.ProactiveResolver.ResponseStorage.StoreJSON && !c.
+			ProactiveResolver.ResponseStorage.StoreJWT {
+			return errors.New("at least one response storage format must be enabled if proactive resolver is used")
+		}
+	}
+	return nil
 }
 
 // collectionEndpointConf holds configuration for the entity collection endpoint
@@ -126,6 +154,17 @@ var defaultEndpointConf = Endpoints{
 	ResolveEndpoint: resolveEndpointConf{
 		GracePeriod:            duration.DurationOption(time.Hour),
 		TimeElapsedGraceFactor: 0.5,
+		ProactiveResolver: proactiveResolverConf{
+			ConcurrencyLimit: 64,
+			QueueSize:        10000,
+			ResponseStorage: struct {
+				Dir       string `yaml:"dir"`
+				StoreJSON bool   `yaml:"store_json"`
+				StoreJWT  bool   `yaml:"store_jwt"`
+			}{
+				StoreJWT: true,
+			},
+		},
 	},
 }
 
@@ -148,6 +187,37 @@ func (e *Endpoints) validate() error {
 					return errors.Errorf("validation failed for field '%s': %s", t.Field(i).Name, err.Error())
 				}
 			}
+		}
+	}
+
+	if e.ResolveEndpoint.ProactiveResolver.Enabled {
+		if !e.EntityCollectionEndpoint.IsSet() || e.EntityCollectionEndpoint.Interval.Duration() == 0 {
+			return errors.New("entity collection endpoint must be enabled and interval must be set if proactive resolver is enabled")
+		}
+		if e.ResolveEndpoint.UseEntityCollectionAllowedTrustAnchors {
+			e.ResolveEndpoint.AllowedTrustAnchors = e.EntityCollectionEndpoint.AllowedTrustAnchors
+		} else {
+			if notAllowed := slices.Subtract(
+				e.ResolveEndpoint.AllowedTrustAnchors, e.EntityCollectionEndpoint.AllowedTrustAnchors,
+			); len(notAllowed) > 0 {
+				return errors.Errorf(
+					"all the allowed trust anchors for the resolve endpoint"+
+						" must also be allowed for the entity collection"+
+						" endpoint if proactive resolver is used; the"+
+						" following trust anchors are not allowed for the"+
+						" entity collection endpoint but on the resolve"+
+						" endpoint"+
+						": %+q",
+					notAllowed,
+				)
+			}
+		}
+		if len(e.ResolveEndpoint.AllowedTrustAnchors) == 0 {
+			return errors.New(
+				"at least one allowed trust anchor must be" +
+					" specified for the resolve endpoint if proactive" +
+					" resolver is used",
+			)
 		}
 	}
 	return nil

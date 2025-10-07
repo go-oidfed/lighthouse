@@ -120,8 +120,24 @@ func main() {
 	if endpoint := c.Endpoints.ListEndpoint; endpoint.IsSet() {
 		lh.AddSubordinateListingEndpoint(endpoint, subordinateStorage, trustMarkedEntitiesStorage)
 	}
+	var proactiveResolver *oidfed.ProactiveResolver
 	if endpoint := c.Endpoints.ResolveEndpoint; endpoint.IsSet() {
-		lh.AddResolveEndpoint(endpoint.EndpointConf)
+		if endpoint.ProactiveResolver.Enabled {
+			proactiveResolver = &oidfed.ProactiveResolver{
+				EntityID: c.Federation.EntityID,
+				Store: oidfed.ResolveStore{
+					BaseDir:   endpoint.ProactiveResolver.ResponseStorage.Dir,
+					StoreJWT:  endpoint.ProactiveResolver.ResponseStorage.StoreJWT,
+					StoreJSON: endpoint.ProactiveResolver.ResponseStorage.StoreJSON,
+				},
+				Signer:      lh.ResolveResponseSigner(),
+				RefreshLead: endpoint.GracePeriod.Duration(),
+				Concurrency: endpoint.ProactiveResolver.ConcurrencyLimit,
+				QueueSize:   endpoint.ProactiveResolver.QueueSize,
+			}
+			proactiveResolver.Start()
+		}
+		lh.AddResolveEndpoint(endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver)
 	}
 	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
 		lh.AddTrustMarkStatusEndpoint(endpoint, trustMarkedEntitiesStorage)
@@ -168,6 +184,9 @@ func main() {
 					return strings.Compare(a.EntityID, b.EntityID)
 				}
 				pec.PagingLimit = endpoint.PaginationLimit
+			}
+			if proactiveResolver != nil {
+				pec.Handler = proactiveResolver
 			}
 			pec.Start()
 			collector = pec

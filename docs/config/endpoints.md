@@ -147,6 +147,108 @@ already has elapsed. How much time needs to already have elapsed is defined by t
     With a `time_elapsed_grace_factor=0.75` LightHouse would only trigger a refresh if also 75% of the lifetime 
     (45mins in this case) have been passed.
 
+### `allowed_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of strings</span>
+<span class="badge badge-green" title="If this option is required or optional">optional; required if `proactive_resolver.enabled`</span>
+
+Defines which Trust Anchors are permitted on the resolver.
+
+When `proactive_resolver.enabled` is set, at least one `allowed_trust_anchors` entry must be configured (unless
+[`use_entity_collection_allowed_trust_anchors`](#use_entity_collection_allowed_trust_anchors) is `true`). Each value
+should be the Entity ID of a Trust Anchor.
+
+### `use_entity_collection_allowed_trust_anchors`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+If set to `true`, the resolver reuses the Trust Anchors configured under [`entity_collection.allowed_trust_anchors`](#entity_collection).
+This is useful when the same set of Trust Anchors is used for both periodic entity collection and proactive resolver refreshes.
+
+If `true`, you do not need to configure `resolve.allowed_trust_anchors` separately.
+
+### `proactive_resolver`
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Enables and configures a background resolver that proactively refreshes cached statements used for resolution.
+
+If enabled, the following requirements apply:
+
+- [`entity_collection`](#entity_collection) must be enabled and `interval` must be set.
+- Either [`use_entity_collection_allowed_trust_anchors`](#use_entity_collection_allowed_trust_anchors) is `true`, or
+  [`allowed_trust_anchors`](#allowed_trust_anchors) must list at least one Trust Anchor.
+- [`response_storage.dir`](#dir) must be set, and at least one of [`store_json`](#store_json) or [`store_jwt`](#store_jwt) must be `true`.
+
+??? file "config.yaml"
+
+    ```yaml
+    endpoints:
+      entity_collection:
+        path: /entity-collection
+        allowed_trust_anchors:
+          - https://ta.example.com
+        interval: 8h
+      resolve:
+        path: /resolve
+        grace_period: 1h
+        use_entity_collection_allowed_trust_anchors: true
+        proactive_resolver:
+          enabled: true
+          concurrency_limit: 32
+          queue_size: 10000
+          response_storage:
+            dir: /var/lib/lighthouse/resolver
+            store_jwt: true
+    ```
+
+#### `enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Turns on the proactive resolver.
+
+#### `concurrency_limit`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">64</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Limits how many proactive refresh tasks may run in parallel.
+
+#### `queue_size`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">10000</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Maximum size of the internal queue holding pending refresh jobs.
+
+#### `response_storage`
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+<span class="badge badge-green" title="If this option is required or optional">required, if `proactive_resolver.enabled`</span>
+
+Configures how responses from the proactive resolver are persisted.
+
+##### `dir`
+<span class="badge badge-purple" title="Value Type">directory path</span>
+<span class="badge badge-green" title="If this option is required or optional">required, if `proactive_resolver.enabled`</span>
+
+Directory where the resolver stores responses. Must be set when the proactive resolver is enabled.
+
+##### `store_json`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Whether to store responses as parsed JSON.
+
+##### `store_jwt`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`true`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Whether to store responses as pre-signed JWTs.
+
 ## `trust_mark`
 Under the `trust_mark` option the Federation Trust Mark Endpoint is configured.
 
