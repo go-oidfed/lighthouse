@@ -6,7 +6,7 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.8.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.7.2-0.20251007073013-756bb91ff6f7
+	github.com/go-oidfed/lib v0.7.2-0.20251007100447-af9e162d146e
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/lestrrat-go/jwx/v3 v3.0.11
 	github.com/pkg/errors v0.9.1
@@ -51,7 +51,6 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/scylladb/go-set v1.0.3-0.20200225121959-cc7b2070d91e // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect

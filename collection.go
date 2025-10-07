@@ -84,7 +84,11 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 					),
 				)
 			}
-			res := collector.CollectEntities(req)
+			res, errRes := collector.CollectEntities(req)
+			if errRes != nil {
+				ctx.Status(errRes.Status)
+				return ctx.JSON(errRes)
+			}
 			return ctx.JSON(res)
 		},
 	)
