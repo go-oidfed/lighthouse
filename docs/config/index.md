@@ -27,7 +27,7 @@ The following is an example `config.yaml` file:
     server:
         port: 7672
     signing:
-        key_file: "/signing.key"
+        key_dir: "/keys"
     federation_data:
         entity_id: "https://ta.example.lh"
         authority_hints:
