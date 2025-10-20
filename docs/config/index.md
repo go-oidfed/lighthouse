@@ -56,6 +56,11 @@ The following is an example `config.yaml` file:
             path: "/list"
         resolve:
             path: "/resolve"
+        entity_collection:
+            path: "/entity-collection"
+            allowed_trust_anchors:
+                - https://ta.example.org
+            interval: 8h
         trust_mark:
             path: "/trustmark"
             trust_mark_specs:

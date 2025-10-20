@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
@@ -119,8 +120,24 @@ func main() {
 	if endpoint := c.Endpoints.ListEndpoint; endpoint.IsSet() {
 		lh.AddSubordinateListingEndpoint(endpoint, subordinateStorage, trustMarkedEntitiesStorage)
 	}
+	var proactiveResolver *oidfed.ProactiveResolver
 	if endpoint := c.Endpoints.ResolveEndpoint; endpoint.IsSet() {
-		lh.AddResolveEndpoint(endpoint.EndpointConf)
+		if endpoint.ProactiveResolver.Enabled {
+			proactiveResolver = &oidfed.ProactiveResolver{
+				EntityID: c.Federation.EntityID,
+				Store: oidfed.ResolveStore{
+					BaseDir:   endpoint.ProactiveResolver.ResponseStorage.Dir,
+					StoreJWT:  endpoint.ProactiveResolver.ResponseStorage.StoreJWT,
+					StoreJSON: endpoint.ProactiveResolver.ResponseStorage.StoreJSON,
+				},
+				Signer:      lh.ResolveResponseSigner(),
+				RefreshLead: endpoint.GracePeriod.Duration(),
+				Concurrency: endpoint.ProactiveResolver.ConcurrencyLimit,
+				QueueSize:   endpoint.ProactiveResolver.QueueSize,
+			}
+			proactiveResolver.Start()
+		}
+		lh.AddResolveEndpoint(endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver)
 	}
 	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
 		lh.AddTrustMarkStatusEndpoint(endpoint, trustMarkedEntitiesStorage)
@@ -155,7 +172,28 @@ func main() {
 		lh.AddEnrollRequestEndpoint(endpoint, subordinateStorage)
 	}
 	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() {
-		lh.AddEntityCollectionEndpoint(endpoint)
+		var collector oidfed.EntityCollector = &oidfed.SimpleEntityCollector{}
+		if endpoint.Interval.Duration() != 0 {
+			pec := &oidfed.PeriodicEntityCollector{
+				TrustAnchors: endpoint.AllowedTrustAnchors,
+				Interval:     endpoint.Interval.Duration(),
+				Concurrency:  endpoint.ConcurrencyLimit,
+			}
+			if endpoint.PaginationLimit > 0 {
+				pec.SortEntitiesComparisonFunc = func(a, b *oidfed.CollectedEntity) int {
+					return strings.Compare(a.EntityID, b.EntityID)
+				}
+				pec.PagingLimit = endpoint.PaginationLimit
+			}
+			if proactiveResolver != nil {
+				pec.Handler = proactiveResolver
+			}
+			pec.Start()
+			collector = pec
+		}
+		lh.AddEntityCollectionEndpoint(
+			endpoint.EndpointConf, collector, endpoint.AllowedTrustAnchors, endpoint.PaginationLimit > 0,
+		)
 	}
 	log.Info("Added Endpoints")
 
