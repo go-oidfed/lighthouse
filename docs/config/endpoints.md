@@ -147,6 +147,108 @@ already has elapsed. How much time needs to already have elapsed is defined by t
     With a `time_elapsed_grace_factor=0.75` LightHouse would only trigger a refresh if also 75% of the lifetime 
     (45mins in this case) have been passed.
 
+### `allowed_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of strings</span>
+<span class="badge badge-green" title="If this option is required or optional">optional; required if `proactive_resolver.enabled`</span>
+
+Defines which Trust Anchors are permitted on the resolver.
+
+When `proactive_resolver.enabled` is set, at least one `allowed_trust_anchors` entry must be configured (unless
+[`use_entity_collection_allowed_trust_anchors`](#use_entity_collection_allowed_trust_anchors) is `true`). Each value
+should be the Entity ID of a Trust Anchor.
+
+### `use_entity_collection_allowed_trust_anchors`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+If set to `true`, the resolver reuses the Trust Anchors configured under [`entity_collection.allowed_trust_anchors`](#entity_collection).
+This is useful when the same set of Trust Anchors is used for both periodic entity collection and proactive resolver refreshes.
+
+If `true`, you do not need to configure `resolve.allowed_trust_anchors` separately.
+
+### `proactive_resolver`
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Enables and configures a background resolver that proactively refreshes cached statements used for resolution.
+
+If enabled, the following requirements apply:
+
+- [`entity_collection`](#entity_collection) must be enabled and `interval` must be set.
+- Either [`use_entity_collection_allowed_trust_anchors`](#use_entity_collection_allowed_trust_anchors) is `true`, or
+  [`allowed_trust_anchors`](#allowed_trust_anchors) must list at least one Trust Anchor.
+- [`response_storage.dir`](#dir) must be set, and at least one of [`store_json`](#store_json) or [`store_jwt`](#store_jwt) must be `true`.
+
+??? file "config.yaml"
+
+    ```yaml
+    endpoints:
+      entity_collection:
+        path: /entity-collection
+        allowed_trust_anchors:
+          - https://ta.example.com
+        interval: 8h
+      resolve:
+        path: /resolve
+        grace_period: 1h
+        use_entity_collection_allowed_trust_anchors: true
+        proactive_resolver:
+          enabled: true
+          concurrency_limit: 32
+          queue_size: 10000
+          response_storage:
+            dir: /var/lib/lighthouse/resolver
+            store_jwt: true
+    ```
+
+#### `enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Turns on the proactive resolver.
+
+#### `concurrency_limit`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">64</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Limits how many proactive refresh tasks may run in parallel.
+
+#### `queue_size`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">10000</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Maximum size of the internal queue holding pending refresh jobs.
+
+#### `response_storage`
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+<span class="badge badge-green" title="If this option is required or optional">required, if `proactive_resolver.enabled`</span>
+
+Configures how responses from the proactive resolver are persisted.
+
+##### `dir`
+<span class="badge badge-purple" title="Value Type">directory path</span>
+<span class="badge badge-green" title="If this option is required or optional">required, if `proactive_resolver.enabled`</span>
+
+Directory where the resolver stores responses. Must be set when the proactive resolver is enabled.
+
+##### `store_json`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Whether to store responses as parsed JSON.
+
+##### `store_jwt`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`true`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Whether to store responses as pre-signed JWTs.
+
 ## `trust_mark`
 Under the `trust_mark` option the Federation Trust Mark Endpoint is configured.
 
@@ -509,8 +611,8 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 - To use an external Endpoint.
 
 ## `entity_collection`
-Under the `entity_colleection` option the Federation Entity Collection Endpoint is configured. This is a 
-work-in-process extension draft, currently available at: https://zachmann.github.io/openid-federation-entity-collection/main.html
+Under the `entity_collection` option the Federation Entity Collection Endpoint is configured. This endpoint follows a 
+work-in-progress extension draft, currently available at: https://zachmann.github.io/openid-federation-entity-collection/main.html
 
 This endpoint is optional.
 
@@ -518,8 +620,14 @@ This endpoint is optional.
 
     ```yaml
     endpoints:
-        list:
-            path: /list
+        entity_collection:
+            path: /entity-collection
+            allowed_trust_anchors:
+              - https://ta.example.com
+              - https://ta2.example.com
+            interval: 8h
+            concurrency_limit: 4
+            pagination_limit: 512
     ```
 
 ### `path`
@@ -529,7 +637,7 @@ This endpoint is optional.
 The `path` option is used to set the url path under which the Entity Collection Endpoint is available. Unless `url` is 
 not set the full external url will be `<entity_id><path>`.
 
-If `path` is not set, LightHouse will not provide a Entity Collection Endpoint. To include an external Entity 
+If `path` is not set, LightHouse will not provide an Entity Collection Endpoint. To include an external Entity 
 Collection Endpoint in the Federation Metadata in the Entity Configuration set `url`.
 
 ### `url`
@@ -541,3 +649,44 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `allowed_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of strings</span>
+<span class="badge badge-orange" title="If this option is required or optional">required, if `interval` is set; otherwise optional</span>
+
+The `allowed_trust_anchors` option restricts which Trust Anchors can be used in requests against the Entity Collection 
+Endpoint. If provided, a request's `trust_anchor` parameter must match one of the configured entries; otherwise the 
+endpoint responds with an error.
+
+If `interval` is configured (see below), at least one `allowed_trust_anchors` entry must be provided to define which 
+Trust Anchors are periodically collected.
+
+### `interval`
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `interval` option enables periodic collection of entities from the configured Trust Anchors. When set, LightHouse 
+starts a background collector that collects entities for each Trust Anchor every `interval`.
+
+If `interval` is not set (default), the endpoint serves collection requests on demand without running a background collector.
+
+### `concurrency_limit`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `concurrency_limit` option controls how many periodic collection tasks can run in parallel when `interval` is set. 
+If `interval` is not set, providing `concurrency_limit` has no effect and will be ignored (a warning is logged).
+
+### `pagination_limit`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Enables pagination support for the Entity Collection Endpoint. When set to a positive integer, clients can use the
+`limit` and `from_entity_id` request parameters to page through results ordered by `entity_id`.
+
+
+The server enforces a maximum page size equal to the configured `pagination_limit`. When pagination is disabled
+(`pagination_limit` not set or `<= 0`), requests including `limit` or `from_entity_id` are rejected with
+`unsupported_parameter` errors.
+
+Pagination can be enabled independently of `interval`; it applies to both on-demand collection and periodic collection.

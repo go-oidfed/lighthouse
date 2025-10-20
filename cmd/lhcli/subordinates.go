@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-oidfed/lib/jwx"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/zachmann/go-utils/fileutils"
 
 	"github.com/go-oidfed/lib"
 
@@ -49,10 +51,17 @@ var subordinatesManageRequestsCmd = &cobra.Command{
 
 var entityTypes []string
 var onlyIDs bool
+var jwksFile string
 
 func init() {
 	subordinatesAddCmd.Flags().StringArrayVarP(&entityTypes, "entity_type", "t", []string{}, "entity type")
 	subordinatesAddCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
+	subordinatesAddCmd.Flags().StringVarP(
+		&jwksFile, "jwks", "k",
+		"", "a file containing the entity's public key("+
+			"s) in the jwks format; used to verify that the entity's entity"+
+			" configuration is signed with a key from this set.",
+	)
 	subordinatesRemoveCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
 	subordinatesBlockCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
 	subordinatesManageRequestsCmd.Flags().StringVarP(
@@ -79,13 +88,37 @@ func addSubordinate(cmd *cobra.Command, args []string) error {
 	if err := subordinateStorage.Load(); err != nil {
 		return errors.Wrap(err, "failed to load subordinates from storage")
 	}
+	var entityJWKS jwx.JWKS
+	if jwksFile != "" {
+		data, err := fileutils.ReadFile(jwksFile)
+		if err != nil {
+			return errors.Wrap(err, "failed to read jwks file")
+		}
+		if err = json.Unmarshal(data, &entityJWKS); err != nil {
+			return errors.Wrap(err, "failed to unmarshal jwks file")
+		}
+	}
 
 	entityID := args[0]
 
-	entityConfig, err := oidfed.GetEntityConfiguration(entityID)
-	if err != nil {
-		return errors.Wrap(err, "failed to get entity configuration")
+	// We use a TrustResolver to obtain the entity configuration
+	// instead of simply fetching the entity configuration,
+	// because this will also verify the signature.
+	resolver := oidfed.TrustResolver{
+		TrustAnchors: oidfed.TrustAnchors{
+			{
+				EntityID: entityID,
+				JWKS:     entityJWKS,
+			},
+		},
+		StartingEntity: entityID,
+		Types:          entityTypes,
 	}
+	chains := resolver.ResolveToValidChainsWithoutVerifyingMetadata()
+	if len(chains) == 0 {
+		return errors.New("could not obtain or verify entity configuration")
+	}
+	entityConfig := chains[0][0]
 	if len(entityTypes) == 0 {
 		entityTypes = entityConfig.Metadata.GuessEntityTypes()
 	}
@@ -96,7 +129,7 @@ func addSubordinate(cmd *cobra.Command, args []string) error {
 			EntityID:    entityConfig.Subject,
 		},
 	}
-	if err = subordinateStorage.Write(
+	if err := subordinateStorage.Write(
 		entityConfig.Subject, info,
 	); err != nil {
 		return errors.Wrap(err, "failed to add subordinate to storage")

@@ -2,8 +2,7 @@ package config
 
 import (
 	"github.com/pkg/errors"
-
-	"github.com/go-oidfed/lighthouse/internal/utils/fileutils"
+	"github.com/zachmann/go-utils/fileutils"
 )
 
 type loggingConf struct {

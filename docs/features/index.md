@@ -7,7 +7,7 @@
     - [X] Evaluating Constraints
     - [X] Resolve Metadata
         - [X] Applying Metadata Policies  
-        - [ ] Applying Metadata from Superiors  
+        - [X] Applying Metadata from Superiors  
         - [X] Support for Custom Metadata Policy Operators 
     - [X] Resolve Endpoint
 - [X] Configure Trust
@@ -20,7 +20,7 @@
     - [X] Trust Mark Endpoint
     - [X] Trust Marked Entities Listing Endpoint                                
     - [ ] Trust Mark Status Endpoint   
-    - [ ] Federation Historical Keys Endpoint
+    - [X] Federation Historical Keys Endpoint
     - [X] Endpoint to automatically enroll entities
     - [X] Endpoint to request enrollment
     - [X] Endpoint to request to be entitled for a trust mark
@@ -35,9 +35,9 @@
 - [X] Endpoints supporting GET requests
 - [ ] Endpoints supporting POST requests
 - [ ] Endpoints supporting Client Authentication   
-- [ ] Automatic Key Rollover                      
+- [X] Automatic Key Rollover                      
 - [X] Entity Checks
     - [X] Automatic, configurable Checks for Enrollment                        
     - [X] Automatic, configurable Checks for Trust Mark Issuance  
 - [X] Automatically refresh trust marks in Entity Configuration  
-- [ ] Support for multiple signing keys
+- [X] Support for multiple signing keys

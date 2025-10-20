@@ -68,7 +68,7 @@ lighthouse/
         port: 7672
     signing:
         alg: ES256
-        key_file: "/data/signing/signing.key"
+        key_dir: "/data/signing"
     federation_data:
         entity_id: "https://lighthouse.example.com"
         federation_entity_metadata:

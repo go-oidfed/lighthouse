@@ -27,7 +27,7 @@ The following is an example `config.yaml` file:
     server:
         port: 7672
     signing:
-        key_file: "/signing.key"
+        key_dir: "/keys"
     federation_data:
         entity_id: "https://ta.example.lh"
         authority_hints:
@@ -56,6 +56,11 @@ The following is an example `config.yaml` file:
             path: "/list"
         resolve:
             path: "/resolve"
+        entity_collection:
+            path: "/entity-collection"
+            allowed_trust_anchors:
+                - https://ta.example.org
+            interval: 8h
         trust_mark:
             path: "/trustmark"
             trust_mark_specs:
@@ -97,6 +102,7 @@ The following is an example `config.yaml` file:
 - [:material-server-network: Server](server.md)
 - [:material-script-text: Logging](logging.md)
 - [:material-database: Storage](storage.md)
+- [:material-database-clock: Cache](cache.md)
 - [:material-signature-freehand: Signing](signing.md)
 - [:material-routes: Endpoints](endpoints.md)
 - [:simple-openid: Federation Data](federation_data.md)

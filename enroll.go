@@ -70,12 +70,20 @@ func (fed *LightHouse) AddEnrollEndpoint(
 				default:
 				}
 			}
-
-			entityConfig, err := oidfed.GetEntityConfiguration(req.Subject)
-			if err != nil {
-				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorInvalidRequest("could not obtain entity configuration"))
+			// We use a TrustResolver to obtain the entity configuration
+			// instead of simply fetching the entity configuration,
+			// because this will also verify the signature.
+			resolver := oidfed.TrustResolver{
+				TrustAnchors:   oidfed.NewTrustAnchorsFromEntityIDs(req.Subject),
+				StartingEntity: req.Subject,
+				Types:          req.EntityTypes,
 			}
+			chains := resolver.ResolveToValidChainsWithoutVerifyingMetadata()
+			if len(chains) == 0 {
+				ctx.Status(fiber.StatusBadRequest)
+				return ctx.JSON(oidfed.ErrorInvalidRequest("could not obtain or verify entity configuration"))
+			}
+			entityConfig := chains[0][0]
 			if len(req.EntityTypes) == 0 {
 				req.EntityTypes = entityConfig.Metadata.GuessEntityTypes()
 			}

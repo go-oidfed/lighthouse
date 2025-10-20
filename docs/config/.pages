@@ -3,6 +3,7 @@ arrange:
   - server.md
   - logging.md
   - storage.md
+  - cache.md
   - signing.md
   - endpoints.md
   - federation_data.md

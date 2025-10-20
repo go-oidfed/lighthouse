@@ -56,7 +56,8 @@ type LightHouse struct {
 	*oidfed.TrustMarkIssuer
 	*jwx.GeneralJWTSigner
 	SubordinateStatementsConfig
-	server *fiber.App
+	server     *fiber.App
+	serverConf ServerConf
 }
 
 // SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
@@ -83,6 +84,7 @@ var FiberServerConfig = fiber.Config{
 
 // NewLightHouse creates a new LightHouse
 func NewLightHouse(
+	serverConf ServerConf,
 	entityID string, authorityHints []string, metadata *oidfed.Metadata,
 	signer jwx.VersatileSigner, signingAlg jwa.SignatureAlgorithm,
 	configurationLifetime time.Duration,
@@ -108,6 +110,11 @@ func NewLightHouse(
 	if fed.Metadata.FederationEntity == nil {
 		fed.Metadata.FederationEntity = &oidfed.FederationEntityMetadata{}
 	}
+	if tps := serverConf.TrustedProxies; len(tps) > 0 {
+		FiberServerConfig.TrustedProxies = serverConf.TrustedProxies
+		FiberServerConfig.EnableTrustedProxyCheck = true
+	}
+	FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
 	server.Use(compress.New())
@@ -119,6 +126,7 @@ func NewLightHouse(
 		GeneralJWTSigner:            generalSigner,
 		SubordinateStatementsConfig: stmtConfig,
 		server:                      server,
+		serverConf:                  serverConf,
 	}
 	server.Get(
 		"/.well-known/openid-federation", func(ctx *fiber.Ctx) error {
@@ -159,7 +167,8 @@ func (fed LightHouse) Listen(addr string) error {
 	return fed.server.Listen(addr)
 }
 
-func (fed LightHouse) Start(conf ServerConf) {
+func (fed LightHouse) Start() {
+	conf := fed.serverConf
 	if !conf.TLS.Enabled {
 		log.WithField("port", conf.Port).Info("TLS is disabled starting http server")
 		log.WithError(fed.server.Listen(fmt.Sprintf(":%d", conf.Port))).Fatal()

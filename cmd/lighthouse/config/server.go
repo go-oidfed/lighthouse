@@ -5,5 +5,6 @@ import (
 )
 
 var defaultServerConf = lighthouse.ServerConf{
-	Port: 7672,
+	Port:              7672,
+	ForwardedIPHeader: "X-Forwarded-For",
 }

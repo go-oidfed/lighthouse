@@ -13,11 +13,13 @@ type signingConf struct {
 	KeyFile              string                 `yaml:"key_file"`
 	KeyDir               string                 `yaml:"key_dir"`
 	AutomaticKeyRollover jwx.RolloverConf       `yaml:"automatic_key_rollover"`
+	AutoGenerateKeys     bool                   `yaml:"auto_generate_keys"`
 }
 
 var defaultSigningConf = signingConf{
-	Alg:       "ES512",
-	RSAKeyLen: 2048,
+	Alg:              "ES512",
+	RSAKeyLen:        2048,
+	AutoGenerateKeys: true,
 	AutomaticKeyRollover: jwx.RolloverConf{
 		Enabled:  false,
 		Interval: 600000,

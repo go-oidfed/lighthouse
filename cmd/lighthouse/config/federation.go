@@ -8,8 +8,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/zachmann/go-utils/duration"
-
-	"github.com/go-oidfed/lighthouse/internal/utils/fileutils"
+	"github.com/zachmann/go-utils/fileutils"
 )
 
 type federationConf struct {

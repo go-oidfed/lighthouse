@@ -75,6 +75,24 @@ private signing key(s), as well as a key set for public keys.
         key_dir: /path/to/keys
     ```
 
+## `auto_generate_keys`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">true</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+When set to false, Lighthouse will not automatically generate a signing key at startup.
+If the required private key is not present in `key_dir`, Lighthouse will exit with an error instead of generating a new key.
+The expected filename is `federation_<alg>.pem`, for example `federation_ES512.pem`.
+
+??? file "config.yaml"
+
+    ```yaml
+    signing:
+        key_dir: /path/to/keys
+        alg: ES512
+        auto_generate_keys: false
+    ```
+
 ## `automatic_key_rollover`
 <span class="badge badge-purple" title="Value Type">object / mapping</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>

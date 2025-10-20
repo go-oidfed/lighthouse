@@ -67,3 +67,46 @@ The `cert` option is set to the tls `cert` file.
 <span class="badge badge-green" title="If this option is required or optional">required for TLS</span>
 
 The `key` option is set to the tls `key` file.
+
+## `trusted_proxies`
+<span class="badge badge-purple" title="Value Type">list of strings</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `trusted_proxies` option is used to configure a list of trusted proxies
+by IP address or network range (CIDR notation).
+
+If LightHouse runs behind some sort of proxy, like a load 
+balancer, then certain header information may be sent to LightHouse using 
+special `X-Forwarded-*` headers or the Forwarded header.
+For example, to forward the client's real IP address.
+
+If set, such header information is only used when the request comes via one 
+of the trusted proxies. If unset, the information is always read from the 
+headers, which might be spoofed.
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        trusted_proxies:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+            - "fc00::/7"
+    ```
+
+## `forwarded_ip_header`
+
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`X-Forwarded-For`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `forwarded_ip_header` option specifies which HTTP header to use for getting the client's real IP address when behind
+a proxy.
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        forwarded_ip_header: X-Real-IP
+    ```

@@ -219,6 +219,9 @@ func (store *TrustMarkedEntitiesBadgerStorage) TrustMarkedStatus(trustMarkType, 
 	var id string
 	k := store.key(trustMarkType, entityID)
 	found, err := store.store.Read(k, &status)
+	if !found {
+		return StatusInactive, nil
+	}
 	if err != nil {
 		found, e := store.store.Read(k, &id)
 		if e == nil && found {
