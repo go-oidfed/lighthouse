@@ -21,17 +21,20 @@ const (
 // SubordinateInfo holds information about a subordinate for storage
 // Table name is set to `subordinates` to replace legacy `subordinate_infos`.
 type SubordinateInfo struct {
-	gorm.Model
-	EntityID           string      `gorm:"uniqueIndex"`
-	Description        string      `gorm:"type:text"`
-	EntityTypes        EntityTypes `gorm:"many2many:subordinate_entity_types"`
-	JWKSID             uint
+	ID                 uint                            `gorm:"primarykey" json:"id"`
+	CreatedAt          int                             `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt          int                             `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt          gorm.DeletedAt                  `gorm:"index" json:"-"`
+	EntityID           string                          `gorm:"uniqueIndex" json:"entity_id"`
+	Description        string                          `gorm:"type:text" json:"description"`
+	EntityTypes        EntityTypes                     `gorm:"many2many:subordinate_entity_types" json:"entity_types"`
+	JWKSID             uint                            `json:"jwks_id"`
 	JWKS               JWKS                            `json:"jwks"`
-	Metadata           *oidfed.Metadata                `json:"metadata,omitempty" gorm:"serializer:json"`
-	MetadataPolicy     *oidfed.MetadataPolicies        `json:"metadata_policy,omitempty" gorm:"serializer:json"`
-	Constraints        *oidfed.ConstraintSpecification `json:"constraints,omitempty" gorm:"serializer:json"`
-	MetadataPolicyCrit PolicyOperators                 `json:"metadata_policy_crit,omitempty" gorm:"many2many:subordinates_policy_operators"`
-	Status             Status                          `json:"status" gorm:"index"`
+	Metadata           *oidfed.Metadata                `gorm:"serializer:json" json:"metadata,omitempty"`
+	MetadataPolicy     *oidfed.MetadataPolicies        `gorm:"serializer:json" json:"metadata_policies,omitempty"`
+	Constraints        *oidfed.ConstraintSpecification `gorm:"serializer:json" json:"constraints,omitempty"`
+	MetadataPolicyCrit PolicyOperators                 `gorm:"many2many:subordinates_policy_operators" json:"metadata_policy_crit,omitempty"`
+	Status             Status                          `gorm:"index" json:"status"`
 }
 
 func (SubordinateInfo) TableName() string { return "subordinates" }
@@ -40,8 +43,11 @@ func (SubordinateInfo) TableName() string { return "subordinates" }
 
 // PolicyOperator represents a policy operator in the database.
 type PolicyOperator struct {
-	gorm.Model
-	PolicyOperator string
+	ID             uint           `gorm:"primarykey" json:"id"`
+	CreatedAt      int            `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt      int            `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+	PolicyOperator string         `json:"policy_operator"`
 }
 
 // PolicyOperators is a collection of PolicyOperator objects.

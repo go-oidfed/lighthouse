@@ -55,7 +55,9 @@ const (
 // LoadStorageBackends loads and returns the storage backends for the passed Config
 func LoadStorageBackends(c storageConf) (
 	subordinateStorage storage.SubordinateStorageBackend,
-	trustMarkedEntitiesStorage storage.TrustMarkedEntitiesStorageBackend, err error,
+	trustMarkedEntitiesStorage storage.TrustMarkedEntitiesStorageBackend,
+	authorityHints storage.AuthorityHintsStore,
+	err error,
 ) {
 	warehouse, err := storage.NewStorage(
 		storage.Config{
@@ -66,10 +68,11 @@ func LoadStorageBackends(c storageConf) (
 		},
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	subordinateStorage = warehouse.SubordinateStorage()
 	trustMarkedEntitiesStorage = warehouse.TrustMarkedEntitiesStorage()
+	authorityHints = warehouse.AuthorityHintsStorage()
 
 	log.Info("Loaded storage backend")
 	return

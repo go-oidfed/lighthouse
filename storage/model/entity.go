@@ -6,8 +6,11 @@ import (
 
 // EntityType represents an entity type in the database.
 type EntityType struct {
-	gorm.Model
-	EntityType string `gorm:"uniqueIndex"`
+	ID         uint           `gorm:"primarykey" json:"id"`
+	CreatedAt  int            `json:"created_at"`
+	UpdatedAt  int            `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+	EntityType string         `gorm:"uniqueIndex" json:"entity_type"`
 }
 
 // EntityTypes is a collection of EntityType objects.

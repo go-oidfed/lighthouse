@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/go-oidfed/lighthouse"
+	"github.com/go-oidfed/lighthouse/api/adminapi"
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 	"github.com/go-oidfed/lighthouse/internal/logger"
 )
@@ -48,7 +49,8 @@ func main() {
 		}
 	}
 
-	subordinateStorage, trustMarkedEntitiesStorage, err := config.LoadStorageBackends(c.Storage)
+	subordinateStorage, trustMarkedEntitiesStorage, authorityHintsStorage,
+		err := config.LoadStorageBackends(c.Storage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,6 +79,7 @@ func main() {
 			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
 			// TODO read all of this from config or a storage backend
 		}, c.Federation.ExtraEntityConfigurationData,
+		adminapi.AdminAPIStorages{AuthorityHintsStore: authorityHintsStorage},
 	)
 	if err != nil {
 		panic(err)

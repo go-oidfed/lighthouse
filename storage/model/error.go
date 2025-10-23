@@ -17,3 +17,12 @@ func (e NotFoundError) Error() string {
 func NotFoundErrorFmt(format string, params ...any) NotFoundError {
 	return NotFoundError(fmt.Sprintf(format, params...))
 }
+
+// AlreadyExistsError signals a uniqueness/conflict violation
+type AlreadyExistsError string
+
+func (e AlreadyExistsError) Error() string { return string(e) }
+
+func AlreadyExistsErrorFmt(format string, params ...any) AlreadyExistsError {
+	return AlreadyExistsError(fmt.Sprintf(format, params...))
+}

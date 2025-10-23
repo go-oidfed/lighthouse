@@ -1,8 +1,6 @@
 package model
 
 import (
-	"time"
-
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"gorm.io/gorm"
@@ -10,17 +8,20 @@ import (
 
 // Key represents a single jwk.Key in the database
 type Key struct {
-	KID       string `gorm:"primaryKey;column:kid"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	JWK       jwk.Key `gorm:"serializer:json"`
-	JWKSID    uint    `gorm:"index"`
+	KID       string  `gorm:"primaryKey;column:kid" json:"kid"`
+	CreatedAt int     `json:"created_at"`
+	UpdatedAt int     `json:"updated_at"`
+	JWK       jwk.Key `gorm:"serializer:json" json:"jwk"`
+	JWKSID    uint    `gorm:"index" json:"jwks_id"`
 }
 
 // JWKS represents a set of Key, i.e. a jwk.Set in the database
 type JWKS struct {
-	gorm.Model
-	Keys []Key
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt int            `json:"created_at"`
+	UpdatedAt int            `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Keys      []Key          `json:"keys"`
 }
 
 // JWKS returns the keys as a jwx.JWKS

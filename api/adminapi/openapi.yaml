@@ -1,0 +1,4610 @@
+openapi: 3.0.2
+info:
+  title: Federation Admin
+  version: 0.1.0
+  description: >-
+    This API enables management of federated entity data and metadata within an OpenID Federation
+    environment.
+  license:
+    name: MIT License
+    url: https://opensource.org/licenses/MIT
+servers:
+  -
+    url: http://localhost:8765
+    description: Local development server
+externalDocs:
+  description: OpenID Federation 1.0 specification
+  url: https://openid.net/specs/openid-federation-1_0.html
+paths:
+  /subordinates:
+    get:
+      tags:
+        - Subordinates
+      parameters:
+        - name: entity_type
+          in: query
+          description: Optional filter by registered entity type
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Optional filter by subordinate status
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subordinate'
+          description: Successful response returning list of subordinates.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: listSubordinates
+      summary: List subordinates
+      description: Get a list of subordinates, optionally filtered by entity_type and/or status.
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddSubordinate'
+        required: true
+      tags:
+        - Subordinates
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subordinate'
+          description: Subordinate created successfully.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createSubordinate
+      summary: Create a subordinate
+  /api/v1/admin/entity-configuration:
+    get:
+      tags:
+        - Entity Configuration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+              examples:
+                entity_configuration:
+                  value:
+                    iss: https://example.org
+                    sub: https://example.org
+                    authority_hints:
+                      - https://authority.example.com
+                    metadata:
+                      federation_entity:
+                        federation_list_endpoint: https://example.org/list
+                        federation_fetch_endpoint: https://example.org/fetch
+                        federation_resolve_endpoint: https://example.org/resolve
+                        display_name: Example
+                        organization_name: Example Organization
+                        contacts:
+                          - support@example.org
+                    jwks:
+                      jwks:
+                        - kty: EC
+                          crv: P-256
+                          kid: '12345'
+                          x: o-7zraXK...
+                          y: Xr_wCzJ1...
+                          alg: ES256
+                    custom_claim: custom_value
+          description: >-
+            Successful response returning the entity configuration as it would also be returned from
+            the /.well-known/openid-federation endpoint but as JSON.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getEntityConfiguration
+      summary: Get the entity configuration JSON
+  /api/v1/admin/entity-configuration/additional-claims:
+    summary: Manage additional custom claims in the entity configuration.
+    description: >-
+      Endpoints to list, add, and update additional custom claims published in the entity configuration.
+    get:
+      tags:
+        - Entity Configuration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successful response returning all additional claims.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getAdditionalClaims
+      summary: List all additional claims
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalClaims'
+        required: true
+      tags:
+        - Entity Configuration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successfully updated the complete additional claims object.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateAdditionalClaims
+      summary: Update the complete additional claims structure
+      description: Use with care!
+    post:
+      requestBody:
+        description: Additional claims to be added (merged) into the entity configuration.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalClaims'
+        required: true
+      tags:
+        - Entity Configuration
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successfully added the provided additional claims.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addAdditionalClaims
+      summary: Add additional claims
+  /api/v1/admin/entity-configuration/additional-claims/{claim}:
+    summary: Manage a single additional claim in the entity configuration.
+    description: Get, update, or delete a single additional claim.
+    get:
+      tags:
+        - Entity Configuration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response returning the claim value.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getAdditionalClaim
+      summary: Get an additional claim value
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - Entity Configuration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated the claim value.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateAdditionalClaim
+      summary: Update an additional claim value
+    delete:
+      tags:
+        - Entity Configuration
+      responses:
+        '204':
+          description: Successfully deleted the additional claim.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteAdditionalClaim
+      summary: Delete an additional claim
+    parameters:
+      - $ref: '#/components/parameters/ClaimParam'
+  /api/v1/admin/entity-configuration/crit:
+    summary: Path used to manage the list of critical claims in the entity configuration.
+    description: >-
+      The REST endpoint/path used to list and create zero or more `CriticalClaim` entries published
+      in the entity configuration. This path contains a `GET`, `PUT`, and `POST` operation to perform
+      the list and create/update tasks, respectively.
+    get:
+      tags:
+        - Entity Configuration Critical Claims
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CriticalClaim'
+          description: Successful response - returns an array of `CriticalClaim` entries.
+      operationId: getEntityConfigurationCriticalClaims
+      summary: List all CriticalClaims in the entity configuration
+      description: Gets a list of all `CriticalClaim` entries published in the entity configuration.
+    put:
+      tags:
+        - Entity Configuration Critical Claims
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CriticalClaim'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CriticalClaim'
+          description: Successful response - returns an array of `CriticalClaim` entries.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+      operationId: setEntityConfigurationCriticalClaims
+      summary: Create or Update Critical Claims in the entity configuration
+    post:
+      tags:
+        - Entity Configuration Critical Claims
+      requestBody:
+        description: A new `CriticalClaim` to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriticalClaim'
+        required: true
+      responses:
+        '201':
+          description: Successful response.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+      operationId: createEntityConfigurationCriticalClaim
+      summary: Create a CriticalClaim in the entity configuration
+      description: Creates a new instance of a `CriticalClaim` in the entity configuration.
+  /api/v1/admin/entity-configuration/crit/{claim}:
+    summary: Path used to manage a single CriticalClaim in the entity configuration.
+    description: Manage a single critical claim entry in the entity configuration.
+    delete:
+      tags:
+        - Entity Configuration Critical Claims
+      responses:
+        '204':
+          description: Successful response.
+      operationId: deleteEntityConfigurationCriticalClaim
+      summary: Delete a CriticalClaim from the entity configuration
+      description: Deletes an existing `CriticalClaim` from the entity configuration.
+    parameters:
+      - name: claim
+        description: The `CriticalClaim` to be deleted.
+        schema:
+          $ref: '#/components/schemas/CriticalClaim'
+        in: path
+  /api/v1/admin/entity-configuration/trust-marks:
+    summary: Path used to manage trust marks in the entity configuration.
+    description: >-
+      Endpoints to list and create trust marks. To create a trust mark one must either provide
+      `trust_mark_type` and `trust_mark_issuer` or the `trust_mark` (as a JWT). Adding a trust mark
+      can result in a conflict if the trust mark type was already added.
+    get:
+      tags:
+        - Entity Configuration Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMark'
+          description: Successful response - returns an array of trust marks. Each entry includes id, trust_mark_type, trust_mark_issuer, trust_mark.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: listEntityConfigurationTrustMarks
+      summary: List trust marks in the entity configuration
+    post:
+      requestBody:
+        description: Create a trust mark. Provide either `trust_mark_type` and `trust_mark_issuer`, or `trust_mark` (JWT).
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMark'
+            examples:
+              by_type_and_issuer:
+                value:
+                  trust_mark_type: https://example.org/trust-mark-types/op
+                  trust_mark_issuer: https://issuer.example.org
+              by_jwt:
+                value:
+                  trust_mark: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        required: true
+      tags:
+        - Entity Configuration Trust Marks
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMark'
+          description: Successful response - returns the created trust mark.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createEntityConfigurationTrustMark
+      summary: Create a trust mark in the entity configuration
+  /api/v1/admin/entity-configuration/trust-marks/{trustMarkID}:
+    summary: Path used to manage a single trust mark in the entity configuration.
+    description: Get, update, or delete a single trust mark.
+    get:
+      tags:
+        - Entity Configuration Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMark'
+          description: Successful response - returns a single trust mark.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getEntityConfigurationTrustMark
+      summary: Get a trust mark
+    put:
+      requestBody:
+        description: Update a trust mark. Only `trust_mark_issuer` and/or `trust_mark` can be updated.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTrustMark'
+            examples:
+              update_issuer:
+                value:
+                  trust_mark_issuer: https://new-issuer.example.org
+              update_jwt:
+                value:
+                  trust_mark: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        required: true
+      tags:
+        - Entity Configuration Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMark'
+          description: Successful response - returns the updated trust mark.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateEntityConfigurationTrustMark
+      summary: Update a trust mark
+    delete:
+      tags:
+        - Entity Configuration Trust Marks
+      responses:
+        '204':
+          description: Successful response. Trust mark deleted.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteEntityConfigurationTrustMark
+      summary: Delete a trust mark
+    parameters:
+      - $ref: '#/components/parameters/TrustMarkIDParam'
+  /subordinates/lifetime:
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifetimeSeconds'
+          description: Successful response returning the general subordinate lifetime in seconds.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralSubordinateLifetime
+      summary: Get general subordinate lifetime
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifetimeSeconds'
+        required: true
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifetimeSeconds'
+          description: Successfully updated the general subordinate lifetime in seconds.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateGeneralSubordinateLifetime
+      summary: Update general subordinate lifetime
+  /api/v1/admin/entity-configuration/lifetime:
+    get:
+      tags:
+        - Entity Configuration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifetimeSeconds'
+          description: Successful response returning the entity-configuration lifetime in seconds.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getEntityConfigurationLifetime
+      summary: Get entity configuration lifetime
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifetimeSeconds'
+        required: true
+      tags:
+        - Entity Configuration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifetimeSeconds'
+          description: Successfully updated the entity-configuration lifetime in seconds.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateEntityConfigurationLifetime
+      summary: Update entity configuration lifetime
+  /api/v1/admin/entity-configuration/authority-hints:
+    summary: Path used to manage the list of authority hints.
+    description: >-
+      The REST endpoint/path used to list and create zero or more `AuthorityHint` entities.  This path
+      contains a `GET` and `POST` operation to perform the list and create tasks, respectively.
+    get:
+      tags:
+        - Authority Hints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuthorityHint'
+          description: Successful response - returns an array of `AuthorityHint` entities.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getAuthorityHints
+      summary: List all AuthorityHints
+      description: Gets a list of all `AuthorityHint` entities.
+    post:
+      requestBody:
+        description: A new `AuthorityHint` to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddAuthorityHint'
+        required: true
+      tags:
+        - Authority Hints
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorityHint'
+          description: Successful response.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createAuthorityHint
+      summary: Create an AuthorityHint
+      description: Creates a new instance of an `AuthorityHint`.
+  /api/v1/admin/entity-configuration/authority-hints/{authorityHintID}:
+    summary: Path used to manage a single AuthorityHint.
+    description: >-
+      The REST endpoint/path used to get, update, and delete single instances of an `AuthorityHint`. 
+      This path contains `GET`, `PUT`, and `DELETE` operations used to perform the get, update, and
+      delete tasks, respectively.
+    get:
+      tags:
+        - Authority Hints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorityHint'
+          description: Successful response - returns a single `AuthorityHint`.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getAuthorityHint
+      summary: Get an AuthorityHint
+      description: Gets the details of a single instance of an `AuthorityHint`.
+    put:
+      requestBody:
+        description: Updated `AuthorityHint` information.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddAuthorityHint'
+        required: true
+      tags:
+        - Authority Hints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorityHint'
+          description: Successful response.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateAuthorityHint
+      summary: Update an AuthorityHint
+      description: Updates an existing `AuthorityHint`.
+    delete:
+      tags:
+        - Authority Hints
+      responses:
+        '204':
+          description: Successful response.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteAuthorityHint
+      summary: Delete an AuthorityHint
+      description: Deletes an existing `AuthorityHint`.
+    parameters:
+      - $ref: '#/components/parameters/AuthorityHintIDParam'
+  /api/v1/admin/entity-configuration/keys:
+    summary: Path used to manage keys
+    get:
+      summary: Get public signing keys
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwksResponse'
+          description: Successful response returning the public signing keys.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getKeys
+    post:
+      summary: Create a new key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKey'
+        required: false
+      tags:
+        - Keys
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedJWK'
+          description: Key created successfully.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createKey
+  /api/v1/admin/entity-configuration/keys/{kid}:
+    post:
+      tags:
+        - Keys
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedJWK'
+          description: Successfully rotated key.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: rotateKey
+      summary: Rotate Key
+      description: The key identified by kid should be rotated, i.e. it is revoked and a new key is created.
+    delete:
+      tags:
+        - Keys
+      parameters:
+        - name: reason
+          description: The reason why this key must be revoked.
+          schema:
+            type: string
+          in: query
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricalJWK'
+          description: Successfully revoked key.
+        '204':
+          description: Successfully revoked key.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: revokeKey
+      summary: Revoke a key
+    parameters:
+      - $ref: '#/components/parameters/KidParam'
+  /api/v1/admin/entity-configuration/metadata/{entityType}/{claim}:
+    get:
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getMetadataClaim
+      summary: Gets the value of a single metadata claim for an entity type.
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated claim value.
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully created the claim.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeMetadataClaim
+      summary: Create or update a metadata claim.
+    delete:
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '204':
+          description: Successfully deleted claim.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteMetadataClaim
+      summary: Deletes the metadata claim for this entity type.
+    parameters:
+      - $ref: '#/components/parameters/EntityTypeParam'
+      - $ref: '#/components/parameters/ClaimParam'
+  /api/v1/admin/entity-configuration/metadata/{entityType}:
+    get:
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadata'
+              examples:
+                Federation Entity:
+                  value:
+                    federation_collection_endpoint: https://example.com/discover
+                    federation_fetch_endpoint: https://example.com/fetch
+                    federation_list_endpoint: https://example.com/list
+                    federation_resolve_endpoint: https://example.com/resolve
+                    display_name: Example Federation
+          description: Successful response
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getEntityTypedMetadata
+      summary: Get all Metadata claims for an entity type
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadata'
+        required: true
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadata'
+          description: Successfully updated metadata for entity type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeEntityTypedMetadata
+      summary: Create or update (all) metadata for an entity type.
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadata'
+        required: true
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadata'
+          description: Successfully added the claims to the entity type's metadata.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addMetadataClaims
+      summary: Adds the posted metadata claims to the entity type's metadata.
+    delete:
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '204':
+          description: Successfully deleted metadata for entity type.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteEntityTypedMetadata
+      summary: Deletes all metadata for the entity type.
+    parameters:
+      - $ref: '#/components/parameters/EntityTypeParam'
+  /api/v1/admin/entity-configuration/metadata:
+    get:
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metadata'
+          description: Successful response
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getEntityConfigurationMetadata
+      summary: Gets the metadata published in the entity configuration
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Metadata'
+        required: true
+      tags:
+        - Entity Configuration Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metadata'
+          description: Successful response
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateEntityConfigurationMetadata
+      summary: Updates the complete metadata structure.
+      description: Use with care!
+  /subordinates/additional-claims:
+    summary: Manage general additional custom claims for subordinates.
+    description: >-
+      Endpoints to list, add, and update general additional custom claims applied to subordinate entities.
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successful response returning all general additional claims for subordinates.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralAdditionalClaims
+      summary: List all general additional claims
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalClaims'
+        required: true
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successfully updated the complete general additional claims object.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateGeneralAdditionalClaims
+      summary: Update the complete general additional claims structure
+      description: Use with care!
+    post:
+      requestBody:
+        description: Additional claims to be added (merged) into the general subordinate claims.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalClaims'
+        required: true
+      tags:
+        - Subordinates
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successfully added the provided general additional claims.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addGeneralAdditionalClaims
+      summary: Add general additional claims
+  /subordinates/additional-claims/{claim}:
+    summary: Manage a single general additional claim for subordinates.
+    description: Get, update, or delete a single general additional claim.
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response returning the claim value.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralAdditionalClaim
+      summary: Get a general additional claim value
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated the claim value.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateGeneralAdditionalClaim
+      summary: Update a general additional claim value
+    delete:
+      tags:
+        - Subordinates
+      responses:
+        '204':
+          description: Successfully deleted the general additional claim.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteGeneralAdditionalClaim
+      summary: Delete a general additional claim
+    parameters:
+      - $ref: '#/components/parameters/ClaimParam'
+  /subordinates/{subordinateID}/additional-claims:
+    summary: Manage subordinate-specific additional custom claims.
+    description: Endpoints to list, add, and update additional custom claims for a specific subordinate.
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successful response returning all subordinate-specific additional claims.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateAdditionalClaims
+      summary: List subordinate-specific additional claims
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalClaims'
+        required: true
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successfully updated the complete subordinate-specific additional claims object.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateSubordinateAdditionalClaims
+      summary: Update subordinate-specific additional claims
+      description: Use with care!
+    post:
+      tags:
+        - Subordinates
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successfully copied general subordinate additional claims to this subordinate.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: copyGeneralAdditionalClaimsToSubordinate
+      summary: Copy general additional claims to this subordinate
+      description: Copies the general subordinate additional claims and sets them specifically for this subordinate.
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/{subordinateID}/additional-claims/{claim}:
+    summary: Manage a single subordinate-specific additional claim.
+    description: Get, update, or delete a single subordinate-specific additional claim.
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response returning the claim value.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateAdditionalClaim
+      summary: Get a subordinate additional claim value
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated the claim value.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateSubordinateAdditionalClaim
+      summary: Update a subordinate additional claim value
+    delete:
+      tags:
+        - Subordinates
+      responses:
+        '204':
+          description: Successfully deleted the subordinate additional claim.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateAdditionalClaim
+      summary: Delete a subordinate additional claim
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+      - $ref: '#/components/parameters/ClaimParam'
+  /subordinates/{subordinateID}/statement:
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+              examples:
+                subordinate_statement:
+                  value:
+                    iss: https://example.org
+                    sub: https://op.example.com
+                    exp: 1568397247
+                    iat: 1568310847
+                    jwks:
+                      keys:
+                        - e: AQAB
+                          kid: dEEtRjlzY3djcENuT01wOGxrZlkxb3RIQVJlMTY0...
+                          kty: RSA
+                          n: x97YKqc9Cs-DNtFrQ7_vhXoH9bwkDWW6En2jJ044yH...
+                    metadata_policy:
+                      openid_provider:
+                        subject_types_supported:
+                          value:
+                            - pairwise
+                        token_endpoint_auth_methods_supported:
+                          default:
+                            - private_key_jwt
+                          subset_of:
+                            - private_key_jwt
+                            - client_secret_jwt
+                          superset_of:
+                            - private_key_jwt
+          description: Successful response returning the subordinate statement as JSON.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateStatement
+      summary: Get subordinate statement JSON
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+  /api/v1/admin/trust-marks/types:
+    summary: Path used to manage the list of trust mark types.
+    description: >-
+      The REST endpoint/path used to list and create zero or more `TrustMarkType` entities. This path
+      contains a `GET` and `POST` operation to perform the list and create tasks, respectively.
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkType'
+          description: Successful response - returns an array of `TrustMarkType` entities.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkTypes
+      summary: List all TrustMarkTypes
+      description: Gets a list of all `TrustMarkType` entities.
+    post:
+      requestBody:
+        description: A new `TrustMarkType` to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkType'
+        required: true
+      tags:
+        - Federation Trust Marks
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkType'
+          description: Successful response - returns the created `TrustMarkType`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createTrustMarkType
+      summary: Create a TrustMarkType
+      description: Creates a new instance of a `TrustMarkType`.
+  /api/v1/admin/trust-marks/types/{trustMarkTypeID}:
+    summary: Path used to manage a single TrustMarkType.
+    description: >-
+      The REST endpoint/path used to get, update, and delete single instances of a `TrustMarkType`. 
+      This path contains `GET`, `PUT`, and `DELETE` operations used to perform the get, update, and
+      delete tasks, respectively.
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkType'
+          description: Successful response - returns a single `TrustMarkType`.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkType
+      summary: Get a TrustMarkType
+      description: Gets the details of a single instance of a `TrustMarkType`.
+    put:
+      requestBody:
+        description: Updated `TrustMarkType` information.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkType'
+        required: true
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkType'
+          description: Successful response - returns the updated `TrustMarkType`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateTrustMarkType
+      summary: Update a TrustMarkType
+      description: Updates an existing `TrustMarkType`.
+    delete:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '204':
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteTrustMarkType
+      summary: Delete a TrustMarkType
+      description: Deletes an existing `TrustMarkType`.
+    parameters:
+      - $ref: '#/components/parameters/TrustMarkTypeIDParam'
+  /api/v1/admin/trust-marks/types/{trustMarkTypeID}/issuers:
+    summary: Path used to manage the list of issuers for a trust mark type.
+    description: >-
+      The REST endpoint/path used to list, set, add, and delete issuers for a trust mark type.
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: Successful response - returns an array of issuer strings.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkTypeIssuers
+      summary: List all issuers for a TrustMarkType
+    put:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: Successfully set the list of issuers for the trust mark type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setTrustMarkTypeIssuers
+      summary: Set issuers list for a TrustMarkType
+    post:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: Successfully added issuer to the trust mark type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addTrustMarkTypeIssuer
+      summary: Add an issuer to a TrustMarkType
+    parameters:
+      - $ref: '#/components/parameters/TrustMarkTypeIDParam'
+  /api/v1/admin/trust-marks/types/{trustMarkTypeID}/issuers/{issuer}:
+    delete:
+      tags:
+        - Federation Trust Marks
+      parameters:
+        - $ref: '#/components/parameters/TrustMarkTypeIDParam'
+        - $ref: '#/components/parameters/IssuerParam'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: Successfully deleted issuer for the trust mark type. Response contains updated list.
+        '204':
+          description: Successfully deleted issuer for the trust mark type.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteTrustMarkTypeIssuer
+      summary: Delete an issuer for a TrustMarkType
+  /api/v1/admin/trust-marks/issuance-spec:
+    summary: Path used to manage issuance specifications for trust mark types.
+    description: >-
+      The REST endpoint/path used to list and create zero or more `TrustMarkSpec` entities. This path
+      contains a `GET` and `POST` operation to perform the list and create tasks, respectively.
+    get:
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkSpec'
+          description: Successful response - returns an array of `TrustMarkSpec` entities.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkIssuanceSpecs
+      summary: List all TrustMarkSpecs
+      description: Gets a list of all `TrustMarkSpec` entities.
+    post:
+      requestBody:
+        description: A new `TrustMarkSpec` to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkSpec'
+        required: true
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSpec'
+          description: Successful response - returns the created `TrustMarkSpec`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createTrustMarkIssuanceSpec
+      summary: Create a TrustMarkSpec
+      description: Creates a new instance of a `TrustMarkSpec`.
+  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}:
+    summary: Path used to manage a single TrustMarkSpec.
+    description: >-
+      The REST endpoint/path used to get, update, and delete single instances of a `TrustMarkSpec`.
+      This path contains `GET`, `PUT`, and `DELETE` operations used to perform the get, update, and
+      delete tasks, respectively.
+    get:
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSpec'
+          description: Successful response - returns a single `TrustMarkSpec`.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkIssuanceSpec
+      summary: Get a TrustMarkSpec
+      description: Gets the details of a single instance of a `TrustMarkSpec`.
+    put:
+      requestBody:
+        description: Updated `TrustMarkSpec` information.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkSpec'
+        required: true
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSpec'
+          description: Successful response - returns the updated `TrustMarkSpec`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateTrustMarkIssuanceSpec
+      summary: Update a TrustMarkSpec
+      description: Updates an existing `TrustMarkSpec`.
+    patch:
+      requestBody:
+        description: Partial `TrustMarkSpec` fields to update.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchTrustMarkSpec'
+        required: true
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSpec'
+          description: Successful response - returns the patched `TrustMarkSpec`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: patchTrustMarkIssuanceSpec
+      summary: Patch a TrustMarkSpec
+      description: Partially updates fields of an existing `TrustMarkSpec`.
+    delete:
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '204':
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteTrustMarkIssuanceSpec
+      summary: Delete a TrustMarkSpec
+      description: Deletes an existing `TrustMarkSpec`.
+    parameters:
+      - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects:
+    summary: Manage subjects for a TrustMarkSpec.
+    description: List and create subjects eligible for issuance under a TrustMarkSpec.
+    get:
+      tags:
+        - Trust Mark Issuance
+      parameters:
+        - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+        - name: status
+          in: query
+          required: false
+          description: Optional filter for subject status.
+          schema:
+            type: string
+          examples:
+            active:
+              summary: Active
+              value: active
+            inactive:
+              summary: Inactive
+              value: inactive
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkSubject'
+          description: Successful response - returns an array of `TrustMarkSubject`.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: listTrustMarkSubjects
+      summary: List TrustMarkSubjects
+      description: Gets a list of `TrustMarkSubject` for the specified TrustMarkSpec.
+    post:
+      requestBody:
+        description: A new `TrustMarkSubject` to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkSubject'
+        required: true
+      tags:
+        - Trust Mark Issuance
+      parameters:
+        - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSubject'
+          description: Successful response - returns the created `TrustMarkSubject`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createTrustMarkSubject
+      summary: Create a TrustMarkSubject
+      description: Creates a new instance of a `TrustMarkSubject`.
+  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}:
+    summary: Manage a single TrustMarkSubject.
+    description: Get, update, patch, or delete a single `TrustMarkSubject`.
+    get:
+      tags:
+        - Trust Mark Issuance
+      parameters:
+        - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+        - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSubject'
+          description: Successful response - returns a single `TrustMarkSubject`.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkSubject
+      summary: Get a TrustMarkSubject
+      description: Gets the details of a single instance of a `TrustMarkSubject`.
+    put:
+      requestBody:
+        description: Updated `TrustMarkSubject` information.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkSubject'
+        required: true
+      tags:
+        - Trust Mark Issuance
+      parameters:
+        - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+        - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSubject'
+          description: Successful response - returns the updated `TrustMarkSubject`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateTrustMarkSubject
+      summary: Update a TrustMarkSubject
+      description: Updates an existing `TrustMarkSubject`.
+    delete:
+      tags:
+        - Trust Mark Issuance
+      parameters:
+        - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+        - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+      responses:
+        '204':
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteTrustMarkSubject
+      summary: Delete a TrustMarkSubject
+      description: Deletes an existing `TrustMarkSubject`.
+  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/status:
+    put:
+      tags:
+        - Trust Mark Issuance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrustMarkSubjectStatus'
+        required: true
+      parameters:
+        - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+        - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkSubject'
+          description: Successfully changed TrustMarkSubject status.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeTrustMarkSubjectStatus
+      summary: Change TrustMarkSubject status
+  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims:
+    summary: Manage subject-specific additional custom claims.
+    description: Endpoints to list and update additional custom claims for a specific TrustMarkSubject.
+    get:
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successful response returning all subject-specific additional claims.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkSubjectAdditionalClaims
+      summary: List subject-specific additional claims
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdditionalClaims'
+        required: true
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdditionalClaims'
+          description: Successfully updated the complete subject-specific additional claims object.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateTrustMarkSubjectAdditionalClaims
+      summary: Update subject-specific additional claims
+    parameters:
+      - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+      - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims/{claim}:
+    summary: Manage a single subject-specific additional claim.
+    description: Get, update, or delete a single subject-specific additional claim.
+    get:
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response returning the claim value.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkSubjectAdditionalClaim
+      summary: Get a subject additional claim value
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated the claim value.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateTrustMarkSubjectAdditionalClaim
+      summary: Update a subject additional claim value
+    delete:
+      tags:
+        - Trust Mark Issuance
+      responses:
+        '204':
+          description: Successfully deleted the subject additional claim.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteTrustMarkSubjectAdditionalClaim
+      summary: Delete a subject additional claim
+    parameters:
+      - $ref: '#/components/parameters/TrustMarkSpecIDParam'
+      - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+      - $ref: '#/components/parameters/ClaimParam'
+  /api/v1/admin/trust-marks/type/{trustMarkTypeID}/owner:
+    summary: Path used to manage the single owner of a trust mark type.
+    description: Manage the single TrustMarkOwner associated with a trust mark type (or none).
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkOwner'
+          description: Successful response - returns the `TrustMarkOwner`.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getTrustMarkOwner
+      summary: Get trust mark type owner
+    put:
+      requestBody:
+        description: Updated `TrustMarkOwner` information.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkOwner'
+        required: true
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkOwner'
+          description: Successful response - returns the updated `TrustMarkOwner`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateTrustMarkOwner
+      summary: Update trust mark type owner
+    post:
+      requestBody:
+        description: A new `TrustMarkOwner` to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkOwner'
+        required: true
+      tags:
+        - Federation Trust Marks
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkOwner'
+          description: Successful response - returns the created `TrustMarkOwner`.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: createTrustMarkOwner
+      summary: Create trust mark type owner
+    delete:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '204':
+          description: Successful response. Owner deleted.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteTrustMarkOwner
+      summary: Delete trust mark type owner
+    parameters:
+      - name: trustMarkTypeID
+        description: A unique identifier for a `TrustMarkType`.
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/metadata-policies/{entityType}/{claim}/{operator}:
+    get:
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralMetadataPolicyOperator
+      summary: Gets the value of a single metadata policy operator for a claim.
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated operator value.
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully created the operator value.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeGeneralMetadataPolicyOperator
+      summary: Create or update a metadata policy operator value.
+    delete:
+      tags:
+        - General Metadata Policies
+      responses:
+        '204':
+          description: Successfully deleted operator value.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteGeneralMetadataPolicyOperator
+      summary: Deletes the metadata policy operator value for this claim.
+    parameters:
+      - $ref: '#/components/parameters/EntityTypeParam'
+      - $ref: '#/components/parameters/ClaimParam'
+      - $ref: '#/components/parameters/OperatorParam'
+  /subordinates/metadata-policies/{entityType}/{claim}:
+    get:
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicyEntry'
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralMetadataPolicyClaim
+      summary: Get all metadata policy operators for a claim for an entity type.
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataPolicyEntry'
+        required: true
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicyEntry'
+          description: Successfully updated metadata policy entry for claim.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeGeneralMetadataPolicyClaim
+      summary: Create or update the metadata policy entry for a claim.
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataPolicyEntry'
+        required: true
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicyEntry'
+          description: Successfully added operators to the claim's metadata policy entry.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addGeneralMetadataPolicyOperators
+      summary: Adds the posted operators to the claim's metadata policy entry.
+    delete:
+      tags:
+        - General Metadata Policies
+      responses:
+        '204':
+          description: Successfully deleted metadata policy entry for claim.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteGeneralMetadataPolicyClaim
+      summary: Deletes all metadata policy operators for the claim.
+    parameters:
+      - $ref: '#/components/parameters/EntityTypeParam'
+      - $ref: '#/components/parameters/ClaimParam'
+  /subordinates/metadata-policies/{entityType}:
+    get:
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+          description: Successful response
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralEntityTypedMetadataPolicy
+      summary: Get all metadata policy claims for an entity type
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+        required: true
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+          description: Successfully updated metadata policies for entity type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeGeneralEntityTypedMetadataPolicy
+      summary: Create or update all metadata policies for an entity type.
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+        required: true
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+          description: Successfully added the claims to the entity type's metadata policies.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addGeneralMetadataPolicyClaims
+      summary: Adds the posted metadata policy claims to the entity type's policies.
+    delete:
+      tags:
+        - General Metadata Policies
+      responses:
+        '204':
+          description: Successfully deleted metadata policies for entity type.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteGeneralEntityTypedMetadataPolicy
+      summary: Deletes all metadata policies for the entity type.
+    parameters:
+      - examples:
+          federation_entity:
+            value: federation_entity
+        name: entityType
+        description: The metadata entity type
+        schema:
+          type: string
+        in: path
+        required: true
+  /subordinates/metadata-policies:
+    get:
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicy'
+          description: Successful response
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralMetadataPolicies
+      summary: Get general metadata policies published in the entity statement
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataPolicy'
+        required: true
+      tags:
+        - General Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicy'
+          description: Successful response
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateGeneralMetadataPolicies
+      summary: Update the complete general metadata policies structure.
+      description: Use with care!
+  /subordinates/{subordinateID}:
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateDetails'
+          description: Successful response returning subordinate details.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateDetails
+      summary: Get subordinate details
+    delete:
+      tags:
+        - Subordinates
+      responses:
+        '204':
+          description: Subordinate deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinate
+      summary: Delete a subordinate
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/{subordinateID}/status:
+    put:
+      tags:
+        - Subordinates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubordinateStatus'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subordinate'
+          description: Successfully changed subordinate status.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeSubordinateStatus
+      summary: Change subordinate status
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+  /subordinates/{subordinateID}/history:
+    get:
+      tags:
+        - Subordinates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateHistory'
+              examples:
+                example_history:
+                  value:
+                    events:
+                      - timestamp: 1724242320
+                        type: created
+                        status: active
+                        message: Subordinate registered
+                        actor: admin@example.org
+                      - timestamp: 1725184800
+                        type: jwk_added
+                        message: Added signing key
+                        actor: admin@example.org
+                      - timestamp: 1726392600
+                        type: metadata_updated
+                        message: Updated OP metadata
+                        actor: admin@example.org
+          description: Successful response returning the subordinate's event history.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateHistory
+      summary: Get subordinate event history
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+  /subordinates/{subordinateID}/jwks:
+    get:
+      tags:
+        - Subordinate Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+          description: Successful response returning the subordinate's JWKS.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateJWKS
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Jwks'
+        required: true
+      tags:
+        - Subordinate Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+          description: Successfully updated subordinate's jwks.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setSubordinateJWKS
+      summary: Create or update the subordinate's jwks
+    post:
+      tags:
+        - Subordinate Keys
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Jwk'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+          description: Successfully added JWK to subordinate's jwks
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+      operationId: addSubordinateJWK
+      summary: Add a jwk to the subordinate's jwks
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+  /subordinates/constraints:
+    get:
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Constraints'
+          description: Successful response
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralConstraints
+      summary: Get general constraints published in the entity statement
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Constraints'
+        required: true
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Constraints'
+          description: Successful response
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateGeneralConstraints
+      summary: Update the complete general constraints structure.
+      description: Use with care!
+  /subordinates/{subordinateID}/constraints:
+    get:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Constraints'
+          description: Successful response
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateConstraints
+      summary: Get subordinate-specific constraints published in the entity statement
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Constraints'
+        required: true
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Constraints'
+          description: Successful response
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateSubordinateConstraints
+      summary: Update the subordinate-specific constraints structure.
+    post:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Constraints'
+          description: Successfully copied general constraints to subordinate.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: copyGeneralConstraintsToSubordinate
+      summary: Copy general constraints to this subordinate.
+      description: Copies the general constraints and sets them specifically for this subordinate.
+    delete:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '204':
+          description: Successfully deleted all constraints for the subordinate.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateConstraints
+      summary: Deletes all subordinate-specific constraints.
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+  /subordinates/constraints/max-path-length:
+    get:
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: integer
+                nullable: true
+          description: Successful response returning max_path_length.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralMaxPathLength
+      summary: Get general max_path_length constraint
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              minimum: 0
+        required: true
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: integer
+          description: Successfully updated max_path_length.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setGeneralMaxPathLength
+      summary: Set general max_path_length constraint
+    delete:
+      tags:
+        - General Constraints
+      responses:
+        '204':
+          description: Successfully deleted max_path_length constraint.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteGeneralMaxPathLength
+      summary: Delete general max_path_length constraint
+  /subordinates/constraints/naming-constraints:
+    get:
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamingConstraints'
+          description: Successful response returning naming_constraints.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralNamingConstraints
+      summary: Get general naming_constraints
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NamingConstraints'
+        required: true
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamingConstraints'
+          description: Successfully updated naming_constraints.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setGeneralNamingConstraints
+      summary: Set general naming_constraints
+    delete:
+      tags:
+        - General Constraints
+      responses:
+        '204':
+          description: Successfully deleted naming_constraints.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteGeneralNamingConstraints
+      summary: Delete general naming_constraints
+  /subordinates/constraints/allowed-entity-types:
+    get:
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEntityTypes'
+          description: Successful response returning allowed entity types.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getGeneralAllowedEntityTypes
+      summary: Get general allowed entity types
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllowedEntityTypes'
+        required: true
+      tags:
+        - General Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEntityTypes'
+          description: Successfully updated allowed entity types.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setGeneralAllowedEntityTypes
+      summary: Set general allowed entity types
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypeIdentifier'
+        required: true
+      tags:
+        - General Constraints
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEntityTypes'
+          description: Successfully added allowed entity type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addGeneralAllowedEntityType
+      summary: Add general allowed entity type
+  /subordinates/constraints/allowed-entity-types/{entityType}:
+    delete:
+      tags:
+        - General Constraints
+      parameters:
+        - name: entityType
+          description: The entity type to remove
+          schema:
+            type: string
+          in: path
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: Successfully deleted allowed entity type. Response contains updated list.
+        '204':
+          description: Successfully deleted allowed entity type.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteGeneralAllowedEntityType
+      summary: Delete general allowed entity type
+  /subordinates/{subordinateID}/constraints/max-path-length:
+    get:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: integer
+                nullable: true
+          description: Successful response returning subordinate max_path_length.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateMaxPathLength
+      summary: Get subordinate max_path_length constraint
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              minimum: 0
+        required: true
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: integer
+          description: Successfully updated subordinate max_path_length.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setSubordinateMaxPathLength
+      summary: Set subordinate max_path_length constraint
+    delete:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '204':
+          description: Successfully deleted subordinate max_path_length constraint.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateMaxPathLength
+      summary: Delete subordinate max_path_length constraint
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/{subordinateID}/constraints/naming-constraints:
+    get:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamingConstraints'
+          description: Successful response returning subordinate naming_constraints.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateNamingConstraints
+      summary: Get subordinate naming_constraints
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NamingConstraints'
+        required: true
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamingConstraints'
+          description: Successfully updated subordinate naming_constraints.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setSubordinateNamingConstraints
+      summary: Set subordinate naming_constraints
+    delete:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '204':
+          description: Successfully deleted subordinate naming_constraints.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateNamingConstraints
+      summary: Delete subordinate naming_constraints
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/{subordinateID}/constraints/allowed-entity-types:
+    get:
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEntityTypes'
+          description: Successful response returning subordinate allowed entity types.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateAllowedEntityTypes
+      summary: Get subordinate allowed entity types
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllowedEntityTypes'
+        required: true
+      tags:
+        - Subordinate Constraints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: Successfully updated subordinate allowed entity types.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: setSubordinateAllowedEntityTypes
+      summary: Set subordinate allowed entity types
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypeIdentifier'
+        required: true
+      tags:
+        - Subordinate Constraints
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEntityTypes'
+          description: Successfully added subordinate allowed entity type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addSubordinateAllowedEntityType
+      summary: Add subordinate allowed entity type
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/{subordinateID}/constraints/allowed-entity-types/{entityType}:
+    delete:
+      tags:
+        - Subordinate Constraints
+      parameters:
+        - name: subordinateID
+          description: The id of the subordinate
+          schema:
+            $ref: '#/components/schemas/InternalID'
+          in: path
+          required: true
+        - name: entityType
+          description: The entity type to remove
+          schema:
+            type: string
+          in: path
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: Successfully deleted subordinate allowed entity type. Response contains updated list.
+        '204':
+          description: Successfully deleted subordinate allowed entity type.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateAllowedEntityType
+      summary: Delete subordinate allowed entity type
+  /subordinates/metadata-policies-crit: { }
+  /subordinates/{subordinateID}/metadata/{entityType}/{claim}:
+    get:
+      tags:
+        - Subordinate Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateMetadataClaim
+      summary: Gets the value of a single subordinate specific metadata claim for an entity type.
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - Subordinate Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated claim value.
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully created the claim.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeSubordinateMetadataClaim
+      summary: Create or update a subordinate specific metadata claim.
+    delete:
+      tags:
+        - Subordinate Metadata
+      responses:
+        '204':
+          description: Successfully deleted claim.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateMetadataClaim
+      summary: Deletes the subordinate specific metadata claim for this entity type.
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+      - $ref: '#/components/parameters/EntityTypeParam'
+      - $ref: '#/components/parameters/ClaimParam'
+  /subordinates/{subordinateID}/metadata/{entityType}:
+    get:
+      tags:
+        - Subordinate Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadata'
+              examples:
+                Federation Entity:
+                  value:
+                    federation_collection_endpoint: https://example.com/discover
+                    federation_fetch_endpoint: https://example.com/fetch
+                    federation_list_endpoint: https://example.com/list
+                    federation_resolve_endpoint: https://example.com/resolve
+                    display_name: Example Federation
+          description: Successful response
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateEntityTypedMetadata
+      summary: Get all subordinate-specific metadata claims for an entity type
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadata'
+        required: true
+      tags:
+        - Subordinate Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadata'
+          description: Successfully updated metadata for entity type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeSubordinateEntityTypedMetadata
+      summary: Create or update all subordinate-specific metadata for an entity type.
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadata'
+        required: true
+      tags:
+        - Subordinate Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadata'
+          description: Successfully added the claims to the entity type's metadata.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addSubordinateMetadataClaims
+      summary: Adds the posted metadata claims to the subordinate specific entity type's metadata.
+    delete:
+      tags:
+        - Subordinate Metadata
+      responses:
+        '204':
+          description: Successfully deleted metadata for entity type.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateEntityTypedMetadata
+      summary: Deletes all subordinate specific metadata for the entity type.
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+      - $ref: '#/components/parameters/EntityTypeParam'
+  /subordinates/{subordinateID}/metadata:
+    get:
+      tags:
+        - Subordinate Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metadata'
+          description: Successful response
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateMetadata
+      summary: Get subordinate-specific metadata published in the entity statement
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Metadata'
+        required: true
+      tags:
+        - Subordinate Metadata
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metadata'
+          description: Successful response
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateSubordinateMetadata
+      summary: Update the complete subordinate-specific metadata structure.
+      description: Use with care!
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}/{operator}:
+    get:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateMetadataPolicyOperator
+      summary: Gets the value of a single metadata policy operator for a subordinate-specific claim.
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnyValue'
+        required: true
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully updated operator value.
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+          description: Successfully created the operator value.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeSubordinateMetadataPolicyOperator
+      summary: Create or update a subordinate-specific metadata policy operator value.
+    delete:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '204':
+          description: Successfully deleted operator value.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateMetadataPolicyOperator
+      summary: Deletes the subordinate-specific metadata policy operator value for this claim.
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+      - $ref: '#/components/parameters/EntityTypeParam'
+      - $ref: '#/components/parameters/ClaimParam'
+      - $ref: '#/components/parameters/OperatorParam'
+  /subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}:
+    get:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicyEntry'
+          description: Successful response.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateMetadataPolicyClaim
+      summary: Get all metadata policy operators for a subordinate-specific claim for an entity type.
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataPolicyEntry'
+        required: true
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicyEntry'
+          description: Successfully updated metadata policy entry for claim.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeSubordinateMetadataPolicyClaim
+      summary: Create or update the subordinate-specific metadata policy entry for a claim.
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataPolicyEntry'
+        required: true
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicyEntry'
+          description: Successfully added operators to the claim's metadata policy entry.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addSubordinateMetadataPolicyOperators
+      summary: Adds the posted operators to the subordinate-specific claim's metadata policy entry.
+    delete:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '204':
+          description: Successfully deleted metadata policy entry for claim.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateMetadataPolicyClaim
+      summary: Deletes all subordinate-specific metadata policy operators for the claim.
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+      - examples:
+          federation_entity:
+            value: federation_entity
+        name: entityType
+        description: The metadata entity type
+        schema:
+          type: string
+        in: path
+        required: true
+      - examples:
+          Display Name:
+            value: display_name
+        name: claim
+        description: The metadata claim name
+        schema:
+          type: string
+        in: path
+        required: true
+  /subordinates/{subordinateID}/metadata-policies/{entityType}:
+    get:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+          description: Successful response
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateEntityTypedMetadataPolicy
+      summary: Get all subordinate-specific metadata policy claims for an entity type
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+        required: true
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+          description: Successfully updated metadata policies for entity type.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: changeSubordinateEntityTypedMetadataPolicy
+      summary: Create or update all subordinate-specific metadata policies for an entity type.
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+        required: true
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+          description: Successfully added the claims to the entity type's metadata policies.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addSubordinateMetadataPolicyClaims
+      summary: Adds the posted metadata policy claims to the subordinate-specific entity type's policies.
+    delete:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '204':
+          description: Successfully deleted metadata policies for entity type.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateEntityTypedMetadataPolicy
+      summary: Deletes all subordinate-specific metadata policies for the entity type.
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+      - $ref: '#/components/parameters/EntityTypeParam'
+  /subordinates/{subordinateID}/metadata-policies:
+    get:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicy'
+          description: Successful response
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getSubordinateMetadataPolicies
+      summary: Get subordinate-specific metadata policies published in the entity statement
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataPolicy'
+        required: true
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicy'
+          description: Successful response
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateSubordinateMetadataPolicies
+      summary: Update the complete subordinate-specific metadata policies structure.
+      description: Use with care!
+    post:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataPolicy'
+          description: Successfully copied general metadata policies to subordinate.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: copyGeneralMetadataPoliciesToSubordinate
+      summary: Copy general metadata policies to this subordinate.
+      description: Copies the general metadata policies and sets them specifically for this subordinate.
+    delete:
+      tags:
+        - Subordinate Metadata Policies
+      responses:
+        '204':
+          description: Successfully deleted all metadata policies for the subordinate.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deleteSubordinateMetadataPolicies
+      summary: Deletes all subordinate-specific metadata policies.
+    parameters:
+      - name: subordinateID
+        description: The id of the subordinate
+        schema:
+          $ref: '#/components/schemas/InternalID'
+        in: path
+        required: true
+  /subordinates/{subordinateID}/jwks/{kid}:
+    delete:
+      tags:
+        - Subordinate Keys
+      parameters:
+        - name: subordinateID
+          description: The id of the subordinate
+          in: path
+          required: true
+        - name: kid
+          description: The key ID (kid) of the key to delete
+          schema:
+            type: string
+          in: path
+          required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+          description: >-
+            Successfully deleted the key from the subordinate's jwks. Response contains the
+            updated jwks.
+        '204':
+          description: Successfully deleted key from subordinate's jwks.
+      operationId: deleteSubordinateJWK
+      summary: Deletes a JWK from the subordinate's jwks
+  /subordinates/crit:
+    summary: Path used to manage the list of critical claims.
+    description: >-
+      The REST endpoint/path used to list and create zero or more `CriticalClaim` entities.  This path
+      contains a `GET` and `POST` operation to perform the list and create tasks, respectively.
+    get:
+      tags:
+        - Subordinate Critical Claims
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CriticalClaim'
+          description: Successful response - returns an array of `CriticalClaim` entities.
+      operationId: getCriticalClaims
+      summary: List all CriticalClaims
+      description: Gets a list of all `CriticalClaim` entities.
+    put:
+      tags:
+        - Subordinate Critical Claims
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CriticalClaim'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CriticalClaim'
+          description: Successful response - returns an array of `CriticalClaim` entities.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+      operationId: setCriticalClaims
+      summary: Create or Update Critical Claims
+    post:
+      tags:
+        - Subordinate Critical Claims
+      requestBody:
+        description: A new `CriticalClaim` to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriticalClaim'
+        required: true
+      responses:
+        '201':
+          description: Successful response.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+      operationId: createCriticalClaim
+      summary: Create a CriticalClaim
+      description: Creates a new instance of a `CriticalClaim`.
+  /subordinates/crit/{claim}:
+    summary: Path used to manage a single CriticalClaim.
+    description: Manage a single critical claim entry.
+    delete:
+      tags:
+        - Subordinate Critical Claims
+      responses:
+        '204':
+          description: Successful response.
+      operationId: deleteCriticalClaim
+      summary: Delete a CriticalClaim
+      description: Deletes an existing `CriticalClaim`.
+    parameters:
+      - name: claim
+        description: The `CriticalClaim` to be deleted.
+        schema:
+          $ref: '#/components/schemas/CriticalClaim'
+        in: path
+  /subordinates/metadata-policy-crit:
+    summary: Path used to manage the list of critical metadata policy operators.
+    description: >-
+      The REST endpoint/path used to list and create zero or more critical metadata policy operator
+      entries. This path contains `GET`, `PUT`, and `POST` operations to perform list and create/update
+      tasks, respectively.
+    get:
+      tags:
+        - Subordinate Critical Metadata Policies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetadataPolicyOperatorName'
+          description: Successful response - returns an array of critical metadata policy operators.
+      operationId: getCriticalMetadataPolicyOperators
+      summary: List all critical metadata policy operators
+      description: Gets a list of all critical metadata policy operator names.
+    put:
+      tags:
+        - Subordinate Critical Metadata Policies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/MetadataPolicyOperatorName'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MetadataPolicyOperatorName'
+          description: Successful response - returns an array of critical metadata policy operators.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+      operationId: setCriticalMetadataPolicyOperators
+      summary: Create or Update critical metadata policy operators
+    post:
+      tags:
+        - Subordinate Critical Metadata Policies
+      requestBody:
+        description: A new critical metadata policy operator to be created.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataPolicyOperatorName'
+        required: true
+      responses:
+        '201':
+          description: Successful response.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+      operationId: createCriticalMetadataPolicyOperator
+      summary: Create a critical metadata policy operator
+      description: Creates a new critical metadata policy operator entry.
+  /subordinates/metadata-policy-crit/{operator}:
+    summary: Path used to manage a single critical metadata policy operator.
+    description: Manage a single critical metadata policy operator entry.
+    delete:
+      tags:
+        - Subordinate Critical Metadata Policies
+      responses:
+        '204':
+          description: Successful response.
+      operationId: deleteCriticalMetadataPolicyOperator
+      summary: Delete a critical metadata policy operator
+      description: Deletes an existing critical metadata policy operator entry.
+    parameters:
+      - name: operator
+        description: The critical metadata policy operator to be deleted.
+        schema:
+          $ref: '#/components/schemas/MetadataPolicyOperatorName'
+        in: path
+        required: true
+components:
+  schemas:
+    AnyValue:
+      description: Any JSON value. This intentionally permits any type.
+      type: object
+      additionalProperties: true
+    ErrorResponse:
+      title: Root Type for ErrorResponse
+      description: Standard error response with code and description.
+      required:
+        - error
+      type: object
+      properties:
+        error:
+          type: string
+        error_description:
+          type: string
+      example:
+        error: not found
+        error_description: resource not found
+    EntityID:
+      format: uri
+      description: The Entity ID of the Entity.
+      type: string
+      example: https://entity.oidfed.org
+    InternalID:
+      oneOf:
+        -
+          type: string
+        -
+          type: integer
+    AuthorityHint:
+      description: The Entity ID of a superior
+      required:
+        - id
+        - entity_id
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: Internal identifier for this AuthorityHint.
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID of the superior.
+        description:
+          type: string
+          description: Optional human-readable description for this AuthorityHint.
+    AddAuthorityHint:
+      title: Root Type for AddAuthorityHint
+      description: Data to add an authority hint
+      required:
+        - entity_id
+      type: object
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+        description:
+          type: string
+          description: Optional human-readable description for this AuthorityHint.
+      example:
+        entity_id: https://authority.example.com
+    SignatureAlgorithm:
+      description: The signature algorithm to use in JOSE/JWA format
+      enum:
+        - HS256
+        - HS384
+        - HS512
+        - RS256
+        - RS384
+        - RS512
+        - ES256
+        - ES384
+        - ES512
+        - PS256
+        - PS384
+        - PS512
+      type: string
+      example: ES512
+    RevokeKey:
+      type: object
+      properties:
+        reason:
+          description: The reason for revoking the key.
+          type: string
+    JwksResponse:
+      required:
+        - jwks
+      type: object
+      properties:
+        jwks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagedJWK'
+    Jwk:
+      required:
+        - kid
+        - kty
+      type: object
+      properties:
+        kty:
+          description: The key type (e.g., EC).
+          type: string
+          example: EC
+        crv:
+          nullable: true
+          description: The elliptic curve used (only for EC keys).
+          type: string
+          example: P-256
+        kid:
+          description: The key ID.
+          type: string
+          example: '12345'
+        x:
+          nullable: true
+          description: The X coordinate for EC keys (optional).
+          type: string
+          example: o-7zraXKDaoBte2PsuTXo-MSLzsyWdAElNptGgI4aH8
+        'y':
+          nullable: true
+          description: The Y coordinate for EC keys (optional).
+          type: string
+          example: Xr_wCzJ1XnsgAIV5qHruzSwaNnwy87UjmevVklTpIv8
+        'n':
+          nullable: true
+          description: The modulus for RSA keys.
+          type: string
+          example: modulus_value
+        e:
+          nullable: true
+          description: The exponent for RSA keys.
+          type: string
+          example: AQAB
+        alg:
+          nullable: true
+          $ref: '#/components/schemas/SignatureAlgorithm'
+          description: The algorithm associated with the key.
+          example: ES256
+        use:
+          nullable: true
+          description: The intended use of the key (e.g., sig, enc).
+          type: string
+          example: sig
+        x5u:
+          nullable: true
+          format: uri
+          description: A URL that points to an X.509 public key certificate or certificate chain.
+          type: string
+          example: https://example.com/cert.pem
+        x5c:
+          nullable: true
+          description: The X.509 certificate chain.
+          type: array
+          items:
+            description: A base64-encoded string representing an X.509 certificate.
+            type: string
+            example: MIICoTCCAYkCAQ...
+        x5t:
+          nullable: true
+          description: The SHA-1 thumbprint of the X.509 certificate.
+          type: string
+          example: dGhpcyBpcyBqdXN0IGEgdGh1bWJwcmludA
+        x5tS256:
+          nullable: true
+          description: The SHA-256 thumbprint of the X.509 certificate.
+          type: string
+          example: sM4KhEI1Y2Sb6-EVr6tJabmJuoP-ZE...
+      example:
+        alg: ES512
+        crv: P-521
+        kid: LxIDw8zAmgI2OjsXMS_QKyiPaR7GH1QVw3sIaUlWWy0
+        kty: EC
+        use: sig
+        x: AJgCXH_ugrh2AgOgNaD2h4ho36fobGDvUn5BzWOGAEF--sfRW6bT5gHx_kNh6ajnVCbPdOn3kfx6fCX306MmfmNb
+        'y': AON1eYFPmxeFkNYD04Ar6rToYruV8_btso-iXAkLRpOBrLeICdjxUuyPnFpOHmRbyoqih7tla2Nwo1dle8JJKEC8
+    ManagedJWK:
+      allOf:
+        -
+          $ref: '#/components/schemas/Jwk'
+        -
+          type: object
+          properties:
+            kms:
+              description: The Key Management System
+              type: string
+              example: filesystem
+            kms_key_ref:
+              description: The KMS Key reference (the id of the key in the KMS) if supported
+              type: string
+              example: my-key
+            iat:
+              nullable: true
+              description: The timestamp when the JWK was created.
+              type: integer
+              example: '1756449710'
+            exp:
+              description: The time when the key expires and will not be valid anymore.
+              type: integer
+              example: '1756536110'
+    HistoricalJWK:
+      description: A previously active key that has been revoked.
+      type: object
+      allOf:
+        -
+          type: object
+        -
+          $ref: '#/components/schemas/ManagedJWK'
+        -
+          $ref: '#/components/schemas/Revoked'
+    Revoked:
+      title: Root Type for Revoked
+      description: JSON object that contains the properties of the revocation
+      required:
+        - revoked_at
+      type: object
+      properties:
+        revoked_at:
+          description: Time when the key was revoked or must be considered revoked
+          type: integer
+          example: |
+            123972495172
+        reason:
+          description: String that identifies the reason for the key revocation
+          type: string
+          example: compromised
+      example:
+        revoked_at: 123972495172
+        reason: compromised
+    CreateKey:
+      title: Root Type for CreateKey
+      description: Request payload to create a new signing key.
+      required: []
+      type: object
+      properties:
+        kms:
+          description: The Key Management System to use. The KMS needs to be supported and configured.
+          type: string
+        alg:
+          $ref: '#/components/schemas/SignatureAlgorithm'
+          description: The signing algorithm for which a key should be created
+        kms_key_ref:
+          description: >-
+            A reference to the key in the Key Management System. Might not be supported by every
+            KMS.
+          type: string
+      example:
+        kms: filesystem
+        alg: ES512
+    EntityTypedMetadata:
+      description: Metadata for one Entity Type
+      type: object
+      allOf:
+        -
+          type: object
+        -
+          $ref: '#/components/schemas/CommonMetadata'
+    CommonMetadata:
+      description: Metadata Claims that can be used with any Entity Type
+      type: object
+      properties:
+        organization_name:
+          description: >-
+            A human-readable name representing the organization owning this Entity. If the owner
+            is a physical person, this MAY be, for example, the person's name.
+          type: string
+        display_name:
+          description: A human-readable name of the Entity to be presented to the End-User.
+          type: string
+        description:
+          description: A human-readable brief description of this Entity presentable to the End-User.
+          type: string
+        keywords:
+          description: >-
+            JSON array with one or more strings representing search keywords, tags, categories, or
+            labels that apply to this Entity.
+          type: array
+          items:
+            type: string
+        contacts:
+          description: >-
+            JSON array with one or more strings representing contact persons at the Entity. These
+            MAY contain names, e-mail addresses, descriptions, phone numbers, etc.
+          type: array
+          items:
+            type: string
+        logo_uri:
+          format: uri
+          description: >-
+            A URL that points to the logo of this Entity. The file containing the logo SHOULD be
+            published in a format that can be viewed via the web.
+          type: string
+        policy_uri:
+          format: uri
+          description: URL of the documentation of conditions and policies relevant to this Entity.
+          type: string
+        information_uri:
+          format: uri
+          description: >-
+            URL for documentation of additional information about this Entity viewable by the
+            End-User.
+          type: string
+        organization_uri:
+          format: uri
+          description: URL of a Web page for the organization owning this Entity.
+          type: string
+    Metadata:
+      description: ' JSON object that declares roles that the Entity plays - its Entity Types - and that contains metadata for those Entity Types. Each member name of the JSON object is an Entity Type Identifier, and each value MUST be a JSON object containing metadata parameters according to the metadata schema of the Entity Type.'
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/EntityTypedMetadata'
+    MetadataPolicyOperatorName:
+      description: The name of a metadata policy operator
+      type: string
+      example: subset_of
+    MetadataPolicyEntry:
+      title: Root Type for MetadataPolicyEntry
+      description: >-
+        An entry for a metadata policy for a single claim. Can have multiple policy operators (and
+        values).
+      type: object
+      example:
+        subset_of:
+          - foo
+          - bar
+    EntityTypedMetadataPolicy:
+      title: Root Type for EntityTypedMetadataPolicy
+      description: >-
+        A type for expressing metadata policies for a single entity type. Keys are claim names and
+        values are MetadataPolicyEntry.
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/MetadataPolicyEntry'
+      example:
+        scope:
+          superset_of:
+            - openid
+            - profile
+            - email
+    MetadataPolicy:
+      description: >-
+        A type for expressing metadata policies for an entity. Keys are entity types and values are
+        EntityTypedMetadataPolicy.
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/EntityTypedMetadataPolicy'
+      example:
+        openid_provider:
+          scope:
+            superset_of:
+              - openid
+              - profile
+              - email
+    Jwks:
+      required:
+        - jwks
+      type: object
+      properties:
+        jwks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Jwk'
+    Constraints:
+      description: >-
+        A set of constraints applied to subordinate entities. Additional parameters MAY be defined.
+      type: object
+      properties:
+        max_path_length:
+          description: >-
+            Integer specifying the maximum number of Intermediate Entities between the Entity setting
+            the constraint and the Trust Chain subject.
+          type: integer
+          minimum: 0
+        naming_constraints:
+          description: >-
+            Restrictions on the URIs of the Entity Identifiers of Subordinate Entities.
+          $ref: '#/components/schemas/NamingConstraints'
+        allowed_entity_types:
+          description: >-
+            Entity Type Identifiers that Subordinate Entities are allowed to have.
+          $ref: '#/components/schemas/AllowedEntityTypes'
+      example:
+        max_path_length: 2
+        naming_constraints:
+          permitted:
+            - .example.com
+          excluded:
+            - east.example.com
+        allowed_entity_types:
+          - openid_provider
+          - openid_relying_party
+    NamingConstraints:
+      description: >-
+        Restrictions on the URIs of the Entity Identifiers of Subordinate Entities. Defined as
+        permitted and excluded URI name subtrees.
+      type: object
+      properties:
+        permitted:
+          $ref: '#/components/schemas/NamingSubtrees'
+        excluded:
+          $ref: '#/components/schemas/NamingSubtrees'
+    NamingSubtrees:
+      description: A list of naming subtrees.
+      type: array
+      items:
+        type: string
+    NamingSubtree:
+      description: A naming subtree entry.
+      type: string
+    AllowedEntityTypes:
+      description: A list of allowed entity type identifiers.
+      type: array
+      items:
+        $ref: '#/components/schemas/EntityTypeIdentifier'
+    EntityTypeIdentifier:
+      description: An entity type identifier.
+      type: string
+    LifetimeSeconds:
+      description: Lifetime value in seconds.
+      type: integer
+      minimum: 0
+      example: 86400
+    AdditionalClaims:
+      description: Arbitrary additional custom claims published in the entity configuration.
+      type: object
+      additionalProperties: {}
+    Subordinate:
+      description: Information about a subordinate entity.
+      required:
+        - id
+        - entity_id
+        - status
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: The internal identifier of the subordinate.
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID (identifier) of the subordinate.
+        status:
+          description: Current status of the subordinate.
+          type: string
+          example: active
+        description:
+          type: string
+          description: Optional human-readable description for this Subordinate.
+        registered_entity_types:
+          description: Entity types the subordinate is registered for.
+          type: array
+          items:
+            type: string
+          example:
+            - openid_provider
+            - openid_relying_party
+      example:
+        id: id
+        entity_id: https://subordinate.example.com
+        status: active
+        registered_entity_types:
+          - openid_provider
+          - openid_relying_party
+    AddSubordinate:
+      description: Data to add/register a subordinate entity.
+      required:
+        - entity_id
+      type: object
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID (identifier) of the subordinate.
+        registered_entity_types:
+          description: Entity types the subordinate is registered for.
+          type: array
+          items:
+            type: string
+        jwks:
+          $ref: '#/components/schemas/Jwks'
+          description: The subordinate's JWKS.
+      example:
+        entity_id: https://subordinate.example.com
+        registered_entity_types:
+          - openid_provider
+          - openid_relying_party
+    SubordinateDetails:
+      description: Subordinate entity including managed data from the subordinate API.
+      required:
+        - id
+        - entity_id
+        - status
+        - jwks
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: The internal identifier of the subordinate.
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID (identifier) of the subordinate.
+        status:
+          description: Current status of the subordinate.
+          type: string
+          example: active
+        registered_entity_types:
+          description: Entity types the subordinate is registered for.
+          type: array
+          items:
+            type: string
+        jwks:
+          $ref: '#/components/schemas/Jwks'
+          description: The subordinate's JWKS.
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+          description: Subordinate-specific metadata.
+        metadata_policies:
+          $ref: '#/components/schemas/MetadataPolicy'
+          description: Subordinate-specific metadata policies.
+        constraints:
+          $ref: '#/components/schemas/Constraints'
+          description: Subordinate-specific constraints.
+        additional_claims:
+          $ref: '#/components/schemas/AdditionalClaims'
+          description: Subordinate-specific additional custom claims.
+      example:
+        id: id
+        entity_id: https://subordinate.example.com
+        status: active
+        registered_entity_types:
+          - openid_provider
+        jwks:
+          jwks:
+            - kty: EC
+              crv: P-256
+              kid: 'sub-12345'
+              x: o-7zraXKDaoBte2PsuTXo-MSLzsyWdAElNptGgI4aH8
+              y: Xr_wCzJ1XnsgAIV5qHruzSwaNnwy87UjmevVklTpIv8
+              alg: ES256
+        metadata:
+          federation_entity:
+            organization_name: Example
+        metadata_policies:
+          openid_provider:
+            scope:
+              superset_of:
+                - openid
+                - profile
+                - email
+        constraints:
+          max_path_length: 2
+        additional_claims:
+          custom_claim: custom_value
+    CriticalClaim:
+      description: A critical claim that must be understood and processed.
+      type: string
+    SubordinateStatus:
+      description: New status to set for a subordinate.
+      required:
+        - status
+      type: object
+      properties:
+        status:
+          type: string
+          description: The status value to set.
+          example: active
+    SubordinateHistory:
+      description: History of events related to a subordinate.
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubordinateEvent'
+    SubordinateEvent:
+      description: A single event in subordinate history.
+      type: object
+      required:
+        - timestamp
+        - type
+      properties:
+        timestamp:
+          type: integer
+          description: Unix timestamp (seconds since epoch) when the event occurred.
+        type:
+          type: string
+          description: The type/category of the event (e.g., created, deleted, jwk_added).
+        status:
+          type: string
+          description: Subordinate status at the time of the event, if applicable.
+          nullable: true
+        message:
+          type: string
+          description: Optional descriptive message.
+          nullable: true
+        actor:
+          type: string
+          description: Optional identifier for the actor performing the event.
+          nullable: true
+    TrustMarkOwner:
+      description: Owner of a trust mark type.
+      required:
+        - entity_id
+        - jwks
+      type: object
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID of the owner.
+        jwks:
+          $ref: '#/components/schemas/Jwks'
+          description: The JWKS of the owner.
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkOwner.
+      example:
+        entity_id: https://owner.example.org
+        jwks:
+          jwks:
+            - kty: EC
+              crv: P-256
+              kid: 'owner-12345'
+              x: o-7zraXKDaoBte2PsuTXo-MSLzsyWdAElNptGgI4aH8
+              y: Xr_wCzJ1XnsgAIV5qHruzSwaNnwy87UjmevVklTpIv8
+              alg: ES256
+    AddTrustMarkOwner:
+      description: Data to add a trust mark owner.
+      required:
+        - entity_id
+        - jwks
+      type: object
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID of the owner.
+        jwks:
+          $ref: '#/components/schemas/Jwks'
+          description: The JWKS of the owner.
+    TrustMarkType:
+      description: A trust mark type definition.
+      required:
+        - id
+        - trust_mark_type
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: Internal identifier for this TrustMarkType.
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkType.
+      example:
+        id: id
+        trust_mark_type: https://example.org/trust_mark_type
+    AddTrustMarkType:
+      description: Data to add a trust mark type.
+      required:
+        - trust_mark_type
+      type: object
+      properties:
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+        trust_mark_issuers:
+          description: Issuers authorized for this trust mark type.
+          type: array
+          items:
+            type: string
+        trust_mark_owner:
+          description: Optional owner to set for this trust mark type.
+          $ref: '#/components/schemas/AddTrustMarkOwner'
+    TrustMark:
+      description: A trust mark entry.
+      required:
+        - id
+        - trust_mark_type
+        - trust_mark_issuer
+        - trust_mark
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: Internal identifier for this trust mark.
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+        trust_mark_issuer:
+          type: string
+          description: The issuer of the trust mark.
+        trust_mark:
+          type: string
+          description: The trust mark JWT.
+    AddTrustMark:
+      description: Data to add or update a trust mark.
+      type: object
+      properties:
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+        trust_mark_issuer:
+          type: string
+          description: The issuer of the trust mark.
+        trust_mark:
+          type: string
+          description: The trust mark JWT.
+    UpdateTrustMark:
+      description: Data to update a trust mark.
+      type: object
+      properties:
+        trust_mark_issuer:
+          type: string
+          description: The issuer of the trust mark.
+        trust_mark:
+          type: string
+          description: The trust mark JWT.
+    TrustMarkSpec:
+      description: Specification describing a trust mark type that can be issued.
+      type: object
+      required:
+        - id
+        - trust_mark_type
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: Internal identifier for this TrustMarkSpec.
+          readOnly: true
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+          example: https://example.org/trust-marks/foobar
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkSpec.
+        lifetime:
+          type: integer
+          minimum: 0
+          description: Lifetime of the trust mark, in seconds.
+          example: 86400
+        ref:
+          type: string
+          format: uri
+          description: URL reference with details about the trust mark type.
+          example: https://example.org/specs/trust-marks/foobar
+        logo_uri:
+          type: string
+          format: uri
+          description: URL to the logo associated with this trust mark type.
+          example: https://example.org/assets/foobar-logo.png
+        delegation_jwt:
+          type: string
+          description: The delegation JWT issued by the trust mark owner if this trust mark uses delegation.
+        additional_claims:
+          $ref: '#/components/schemas/AdditionalClaims'
+          description: Additional custom claims to include in the trust mark.
+    AddTrustMarkSpec:
+      description: Data to create or update a TrustMarkSpec.
+      type: object
+      required:
+        - trust_mark_type
+      properties:
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+          example: https://example.org/trust-marks/foobar
+        lifetime:
+          type: integer
+          minimum: 0
+          description: Lifetime of the trust mark, in seconds.
+          example: 86400
+        ref:
+          type: string
+          format: uri
+          description: URL reference with details about the trust mark type.
+          example: https://example.org/specs/trust-marks/foobar
+        logo_uri:
+          type: string
+          format: uri
+          description: URL to the logo associated with this trust mark type.
+          example: https://example.org/assets/foobar-logo.png
+        delegation_jwt:
+          type: string
+          description: The delegation JWT issued by the trust mark owner if this trust mark uses delegation.
+        additional_claims:
+          $ref: '#/components/schemas/AdditionalClaims'
+          description: Additional custom claims to include in the trust mark.
+    PatchTrustMarkSpec:
+      description: Partial fields to update on a TrustMarkSpec.
+      type: object
+      properties:
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+          example: https://example.org/trust-marks/foobar
+        lifetime:
+          type: integer
+          minimum: 0
+          description: Lifetime of the trust mark, in seconds.
+          example: 86400
+        ref:
+          type: string
+          format: uri
+          description: URL reference with details about the trust mark type.
+          example: https://example.org/specs/trust-marks/foobar
+        logo_uri:
+          type: string
+          format: uri
+          description: URL to the logo associated with this trust mark type.
+          example: https://example.org/assets/foobar-logo.png
+        delegation_jwt:
+          type: string
+          description: The delegation JWT issued by the trust mark owner if this trust mark uses delegation.
+        additional_claims:
+          $ref: '#/components/schemas/AdditionalClaims'
+          description: Additional custom claims to include in the trust mark.
+    TrustMarkSubject:
+      description: Subject eligible for a specific trust mark issuance.
+      type: object
+      required:
+        - id
+        - entity_id
+        - status
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: Internal identifier for this TrustMarkSubject.
+          readOnly: true
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID (identifier) of the subject.
+        status:
+          type: string
+          description: Current status of the subject.
+          example: active
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkSubject.
+        additional_claims:
+          $ref: '#/components/schemas/AdditionalClaims'
+          description: Additional custom claims to include for this subject's trust mark.
+    AddTrustMarkSubject:
+      description: Data to create or update a TrustMarkSubject.
+      type: object
+      required:
+        - entity_id
+        - status
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID (identifier) of the subject.
+        status:
+          type: string
+          description: Current status of the subject.
+          example: active
+        additional_claims:
+          $ref: '#/components/schemas/AdditionalClaims'
+          description: Additional custom claims to include for this subject's trust mark.
+    PatchTrustMarkSubject:
+      description: Partial fields to update on a TrustMarkSubject.
+      type: object
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID (identifier) of the subject.
+        status:
+          type: string
+          description: Current status of the subject.
+          example: active
+        additional_claims:
+          $ref: '#/components/schemas/AdditionalClaims'
+          description: Additional custom claims to include for this subject's trust mark.
+    TrustMarkSubjectStatus:
+      description: New status to set for a TrustMarkSubject.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: The status value to set.
+  responses:
+    BadRequestError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing parameter:
+              value:
+                error: invalid_request
+                error_description: parameter 'foobar' is missing
+      description: Invalid request parameters
+    UnauthorizedError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: Authentication information is missing or invalid
+    ForbiddenError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The user does not have permission to perform the requested operation
+    ServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            server error:
+              value:
+                error: server_error
+                error_description: foobar
+      description: Internal server error
+    NotFoundError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            not found:
+              value:
+                error: not_found
+                error_description: foobar was not found
+      description: The requested resource was not found
+  parameters:
+    SubordinateIDParam:
+      name: subordinateID
+      in: path
+      required: true
+      description: The id of the subordinate
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+    EntityTypeParam:
+      name: entityType
+      in: path
+      required: true
+      description: The metadata entity type
+      schema:
+        type: string
+      examples:
+        federationEntity:
+          summary: Federation Entity
+          value: federation_entity
+        openidProvider:
+          summary: OpenID Provider
+          value: openid_provider
+    ClaimParam:
+      name: claim
+      in: path
+      required: true
+      description: The metadata claim name
+      schema:
+        type: string
+      examples:
+        displayName:
+          summary: Display Name
+          value: display_name
+    OperatorParam:
+      name: operator
+      in: path
+      required: true
+      description: The metadata policy operator name
+      schema:
+        $ref: '#/components/schemas/MetadataPolicyOperatorName'
+      examples:
+        subsetOf:
+          summary: Subset Of
+          value: subset_of
+        value:
+          summary: Value
+          value: value
+        add:
+          summary: Add
+          value: add
+    KidParam:
+      name: kid
+      in: path
+      required: true
+      description: The Key ID (kid)
+      schema:
+        type: string
+      example: xcXdyJ2_7cOd05QIqfpdrb3j5-mYFw8dqdcqzEh0lUw
+    TrustMarkTypeIDParam:
+      name: trustMarkTypeID
+      in: path
+      required: true
+      description: A unique identifier for a TrustMarkType
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+    TrustMarkIDParam:
+      name: trustMarkID
+      in: path
+      required: true
+      description: A unique identifier for a Trust Mark
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+    TrustMarkSpecIDParam:
+      name: trustMarkSpecID
+      in: path
+      required: true
+      description: A unique identifier for a TrustMarkSpec
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+    TrustMarkSubjectIDParam:
+      name: trustMarkSubjectID
+      in: path
+      required: true
+      description: A unique identifier for a TrustMarkSubject
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+    AuthorityHintIDParam:
+      name: authorityHintID
+      in: path
+      required: true
+      description: A unique identifier for an AuthorityHint
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+    IssuerParam:
+      name: issuer
+      in: path
+      required: true
+      description: The issuer string for a trust mark type
+      schema:
+        type: string
+      example: https://tmi.example.com
+tags:
+  -
+    name: Entity Configuration
+    description: Endpoints related to the entity configuration document.
+  -
+    name: Authority Hints
+    description: Manage authority hints for the entity configuration.
+  -
+    name: Keys
+    description: Manage federation signing keys.
+  -
+    name: Entity Configuration Trust Marks
+    description: Manage Trust Marks published in the entity configuration.
+  -
+    name: Entity Configuration Metadata
+    description: Manage metadata claims published in the entity configuration.
+  -
+    name: Entity Configuration Critical Claims
+    description: Manage critical claims published in the entity configuration.
+  -
+    name: General Metadata Policies
+    description: Manage general metadata policies applied to entities.
+  -
+    name: General Constraints
+    description: Manage general constraints applied to subordinate entities.
+  -
+    name: Subordinates
+    description: Manage subordinate entities.
+  -
+    name: Subordinate Keys
+    description: Manage keys associated with subordinate entities.
+  -
+    name: Subordinate Metadata
+    description: Manage metadata claims for subordinate entities.
+  -
+    name: Subordinate Metadata Policies
+    description: Manage metadata policies for subordinate entities.
+  -
+    name: Subordinate Constraints
+    description: Manage constraints specific to subordinate entities.
+  -
+    name: Subordinate Critical Claims
+    description: Manage subordinate critical claims.
+  -
+    name: Subordinate Critical Metadata Policies
+    description: Manage subordinate critical metadata policy operators.
+  -
+    name: Federation Trust Marks
+    description: Manage trust marks in the federation.
+  -
+    name: Trust Mark Issuance
+    description: Manage issuance of trust marks.

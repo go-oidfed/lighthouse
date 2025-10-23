@@ -7,17 +7,23 @@ import (
 // SubordinateAdditionalClaim stores one additional claim for a subordinate.
 // value is stored as JSON; claim name is indexed; crit marks if claim is critical.
 type SubordinateAdditionalClaim struct {
-	gorm.Model
-	SubordinateID uint   `gorm:"index"`
-	Claim         string `gorm:"index"`
-	Value         any    `gorm:"serializer:json"`
-	Crit          bool   `gorm:"index"`
+	ID            uint           `gorm:"primarykey" json:"id"`
+	CreatedAt     int            `json:"created_at"`
+	UpdatedAt     int            `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	SubordinateID uint           `gorm:"index" json:"subordinate_id"`
+	Claim         string         `gorm:"index" json:"claim"`
+	Value         any            `gorm:"serializer:json" json:"value"`
+	Crit          bool           `gorm:"index" json:"crit"`
 }
 
 // EntityConfigurationAdditionalClaim stores one additional claim for the entity configuration.
 type EntityConfigurationAdditionalClaim struct {
-	gorm.Model
-	Claim string `gorm:"index,unique"`
-	Value any    `gorm:"serializer:json"`
-	Crit  bool   `gorm:"index"`
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt int            `json:"created_at"`
+	UpdatedAt int            `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Claim     string         `gorm:"index,unique" json:"claim"`
+	Value     any            `gorm:"serializer:json" json:"value"`
+	Crit      bool           `gorm:"index" json:"crit"`
 }

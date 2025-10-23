@@ -59,6 +59,11 @@ func (s *Storage) TrustMarkedEntitiesStorage() *TrustMarkedEntitiesStorage {
 	return &TrustMarkedEntitiesStorage{db: s.db}
 }
 
+// AuthorityHintsStorage returns a AuthorityHintsStorage
+func (s *Storage) AuthorityHintsStorage() *AuthorityHintsStorage {
+	return &AuthorityHintsStorage{db: s.db}
+}
+
 // SubordinateStorage implements the SubordinateStorageBackend interface
 type SubordinateStorage struct {
 	db *gorm.DB

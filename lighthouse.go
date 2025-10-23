@@ -22,6 +22,7 @@ import (
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/unixtime"
 
+	"github.com/go-oidfed/lighthouse/api/adminapi"
 	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/internal/version"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -89,6 +90,7 @@ func NewLightHouse(
 	signer jwx.VersatileSigner, signingAlg jwa.SignatureAlgorithm,
 	configurationLifetime time.Duration,
 	stmtConfig SubordinateStatementsConfig, extra map[string]any,
+	storages adminapi.AdminAPIStorages,
 ) (
 	*LightHouse,
 	error,
@@ -120,6 +122,9 @@ func NewLightHouse(
 	server.Use(compress.New())
 	server.Use(logger.New())
 	server.Use(requestid.New())
+	if err = adminapi.Register(server.Group("/api/v1/admin"), fed.EntityID, storages); err != nil {
+		return nil, err
+	}
 	entity := &LightHouse{
 		FederationEntity:            fed,
 		TrustMarkIssuer:             oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
