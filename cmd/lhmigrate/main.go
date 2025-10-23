@@ -161,17 +161,13 @@ func migrateSubordinates(subordinates []legacySubordinateInfo) error {
 		if !dryRun {
 			if err := destBackend.SubordinateStorage().Write(
 				sub.EntityID, model.SubordinateInfo{
-					Entity: model.Entity{
-						EntityID:    sub.EntityID,
-						EntityTypes: model.NewEntityTypes(sub.EntityTypes),
-					},
+					EntityID:           sub.EntityID,
+					EntityTypes:        model.NewEntityTypes(sub.EntityTypes),
 					JWKS:               model.NewJWKS(sub.JWKS),
 					Metadata:           sub.Metadata,
 					MetadataPolicy:     sub.MetadataPolicy,
 					Constraints:        sub.Constraints,
-					CriticalExtensions: model.NewCritExtensions(sub.CriticalExtensions),
 					MetadataPolicyCrit: model.NewPolicyOperators(sub.MetadataPolicyCrit),
-					Extra:              sub.Extra,
 					Status:             sub.Status,
 				},
 			); err != nil {

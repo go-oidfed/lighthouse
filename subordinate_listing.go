@@ -36,7 +36,7 @@ func (fed *LightHouse) AddSubordinateListingEndpoint(
 
 func filterEntityType(info model.SubordinateInfo, value any) bool {
 	v, ok := value.(string)
-	return ok && slices.Contains(info.Entity.EntityTypes.ToStrings(), v)
+	return ok && slices.Contains(info.EntityTypes.ToStrings(), v)
 }
 
 func handleSubordinateListing(

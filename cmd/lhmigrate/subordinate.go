@@ -17,9 +17,7 @@ type legacySubordinateInfo struct {
 	Metadata           *oidfed.Metadata                `json:"metadata,omitempty" gorm:"serializer:json"`
 	MetadataPolicy     *oidfed.MetadataPolicies        `json:"metadata_policy,omitempty" gorm:"serializer:json"`
 	Constraints        *oidfed.ConstraintSpecification `json:"constraints,omitempty" gorm:"serializer:json"`
-	CriticalExtensions []string                        `json:"crit,omitempty"`
 	MetadataPolicyCrit []oidfed.PolicyOperatorName     `json:"metadata_policy_crit,omitempty"`
-	Extra              map[string]interface{}          `json:"-" gorm:"serializer:json"`
 	Status             model.Status                    `json:"status"`
 }
 

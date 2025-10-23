@@ -67,12 +67,10 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 				req.EntityTypes = entityConfig.Metadata.GuessEntityTypes()
 			}
 			info := model.SubordinateInfo{
-				JWKS: model.NewJWKS(entityConfig.JWKS),
-				Entity: model.Entity{
-					EntityTypes: model.NewEntityTypes(req.EntityTypes),
-					EntityID:    entityConfig.Subject,
-				},
-				Status: model.StatusPending,
+				JWKS:        model.NewJWKS(entityConfig.JWKS),
+				EntityID:    entityConfig.Subject,
+				EntityTypes: model.NewEntityTypes(req.EntityTypes),
+				Status:      model.StatusPending,
 			}
 			if err = store.Write(
 				entityConfig.Subject, info,

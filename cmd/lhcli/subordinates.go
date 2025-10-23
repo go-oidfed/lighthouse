@@ -123,11 +123,9 @@ func addSubordinate(cmd *cobra.Command, args []string) error {
 		entityTypes = entityConfig.Metadata.GuessEntityTypes()
 	}
 	info := model.SubordinateInfo{
-		JWKS: model.NewJWKS(entityConfig.JWKS),
-		Entity: model.Entity{
-			EntityTypes: model.NewEntityTypes(entityTypes),
-			EntityID:    entityConfig.Subject,
-		},
+		JWKS:        model.NewJWKS(entityConfig.JWKS),
+		EntityID:    entityConfig.Subject,
+		EntityTypes: model.NewEntityTypes(entityTypes),
 	}
 	if err := subordinateStorage.Write(
 		entityConfig.Subject, info,
@@ -222,7 +220,7 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			if err = promptInSubordinateRequest(infos.Entity.EntityID, str); err != nil {
+			if err = promptInSubordinateRequest(infos.EntityID, str); err != nil {
 				return err
 			}
 		}

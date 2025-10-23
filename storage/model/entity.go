@@ -4,14 +4,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// Entity represents a federation entity with a unique identifier and associated entity types.
-// It is used as a base model for entities in the database.
-type Entity struct {
-	gorm.Model
-	EntityID    string      `gorm:"uniqueIndex"`
-	EntityTypes EntityTypes `gorm:"many2many:entity_types_mapping"`
-}
-
 // EntityType represents an entity type in the database.
 type EntityType struct {
 	gorm.Model

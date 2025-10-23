@@ -96,12 +96,10 @@ func (fed *LightHouse) AddEnrollEndpoint(
 			}
 
 			info := model.SubordinateInfo{
-				JWKS: model.NewJWKS(entityConfig.JWKS),
-				Entity: model.Entity{
-					EntityTypes: model.NewEntityTypes(req.EntityTypes),
-					EntityID:    entityConfig.Subject,
-				},
-				Status: model.StatusActive,
+				JWKS:        model.NewJWKS(entityConfig.JWKS),
+				EntityID:    entityConfig.Subject,
+				EntityTypes: model.NewEntityTypes(req.EntityTypes),
+				Status:      model.StatusActive,
 			}
 			if err = store.Write(
 				entityConfig.Subject, info,

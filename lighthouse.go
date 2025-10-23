@@ -200,7 +200,7 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateI
 	now := time.Now()
 	return oidfed.EntityStatementPayload{
 		Issuer:             fed.FederationEntity.EntityID,
-		Subject:            subordinate.Entity.EntityID,
+		Subject:            subordinate.EntityID,
 		IssuedAt:           unixtime.Unixtime{Time: now},
 		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime * time.Second)},
 		SourceEndpoint:     fed.Metadata.FederationEntity.FederationFetchEndpoint,
@@ -210,6 +210,6 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateI
 		Constraints:        fed.Constraints,
 		CriticalExtensions: fed.CriticalExtensions,
 		MetadataPolicyCrit: fed.MetadataPolicyCrit,
-		Extra:              utils.MergeMaps(true, fed.SubordinateStatementsConfig.Extra, subordinate.Extra),
+		Extra:              utils.MergeMaps(true, fed.SubordinateStatementsConfig.Extra, map[string]any{}),
 	}
 }

@@ -17,14 +17,21 @@ type Storage struct {
 
 var models = []any{
 	&model.SubordinateInfo{},
-	&model.TrustMarkedEntity{},
-	&model.Entity{},
+	&model.SubordinateEvent{},
 	&model.Key{},
 	&model.JWKS{},
 	&model.PolicyOperator{},
-	&model.CritExtension{},
-	&model.TrustMarkInstance{},
+	&model.IssuedTrustMarkInstance{},
 	&model.TrustMarkType{},
+	&model.TrustMarkOwner{},
+	&model.TrustMarkTypeIssuer{},
+	&model.TrustMarkSpec{},
+	&model.TrustMarkSubject{},
+	&model.PublishedTrustMark{},
+	&model.HistoricalKey{},
+	&model.AuthorityHint{},
+	&model.SubordinateAdditionalClaim{},
+	&model.EntityConfigurationAdditionalClaim{},
 }
 
 // NewStorage creates a new GORM-based storage
@@ -62,11 +69,11 @@ func (s *SubordinateStorage) Write(_ string, info model.SubordinateInfo) error {
 	return s.db.Transaction(
 		func(tx *gorm.DB) error {
 			// First, check if entity types already exist and use those instead
-			for i, entityType := range info.Entity.EntityTypes {
+			for i, entityType := range info.EntityTypes {
 				var existingType model.EntityType
 				if err := tx.Where("entity_type = ?", entityType.EntityType).First(&existingType).Error; err == nil {
 					// If found, use the existing entity type
-					info.Entity.EntityTypes[i] = existingType
+					info.EntityTypes[i] = existingType
 				}
 			}
 
@@ -200,7 +207,7 @@ func (q *GormSubordinateStorageQuery) EntityIDs() (entityIDs []string, err error
 	}
 	entityIDs = make([]string, len(infos))
 	for i, info := range infos {
-		entityIDs[i] = info.Entity.EntityID
+		entityIDs[i] = info.EntityID
 	}
 	return
 }
@@ -237,7 +244,7 @@ func (s *TrustMarkedEntitiesStorage) Request(trustMarkType, entityID string) err
 
 // TrustMarkedStatus returns the status of a trust mark for an entity
 func (s *TrustMarkedEntitiesStorage) TrustMarkedStatus(trustMarkType, entityID string) (model.Status, error) {
-	var entity model.TrustMarkedEntity
+	var entity model.TrustMarkSubject
 	err := s.db.Where("trust_mark_type = ? AND entity_id = ?", trustMarkType, entityID).First(&entity).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -268,7 +275,7 @@ func (s *TrustMarkedEntitiesStorage) Pending(trustMarkType string) ([]string, er
 func (s *TrustMarkedEntitiesStorage) Delete(trustMarkType, entityID string) error {
 	err := s.db.Where(
 		"trust_mark_type = ? AND entity_id = ?", trustMarkType, entityID,
-	).Delete(&model.TrustMarkedEntity{}).Error
+	).Delete(&model.TrustMarkSubject{}).Error
 	if err != nil {
 		return errors.Wrap(err, "failed to delete trust marked entity")
 	}
@@ -284,7 +291,7 @@ func (s *TrustMarkedEntitiesStorage) Load() error {
 // HasTrustMark checks if an entity has an active trust mark
 func (s *TrustMarkedEntitiesStorage) HasTrustMark(trustMarkType, entityID string) (bool, error) {
 	var count int64
-	if err := s.db.Model(&model.TrustMarkedEntity{}).
+	if err := s.db.Model(&model.TrustMarkSubject{}).
 		Where("trust_mark_type = ? AND entity_id = ? AND status = ?", trustMarkType, entityID, model.StatusActive).
 		Count(&count).Error; err != nil {
 		return false, errors.Wrap(err, "failed to check if entity has trust mark")
@@ -297,25 +304,17 @@ func (s *TrustMarkedEntitiesStorage) HasTrustMark(trustMarkType, entityID string
 func (s *TrustMarkedEntitiesStorage) writeStatus(trustMarkType, entityID string, status model.Status) error {
 	return s.db.Transaction(
 		func(tx *gorm.DB) error {
-			var dbTrustMarkType model.TrustMarkType
-			var dbEntity model.Entity
-			if err := tx.Where("trust_mark_type = ?", trustMarkType).First(&dbTrustMarkType).Error; err != nil {
+			var dbTrustMarkSpec model.TrustMarkSpec
+			if err := tx.Where("trust_mark_type = ?", trustMarkType).First(&dbTrustMarkSpec).Error; err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return model.NotFoundErrorFmt("unknown trust mark type: %s", trustMarkType)
 				}
 				return err
 			}
 
-			if err := tx.Where("entity_id = ?", entityID).First(&dbEntity).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return model.NotFoundErrorFmt("unknown entity: %s", entityID)
-				}
-				return err
-			}
-
-			entity := model.TrustMarkedEntity{
-				TrustMarkTypeID: dbTrustMarkType.ID,
-				EntityDBID:      dbEntity.ID,
+			entity := model.TrustMarkSubject{
+				TrustMarkSpecID: dbTrustMarkSpec.ID,
+				EntityID:        entityID,
 				Status:          status,
 			}
 			return tx.Clauses(clause.OnConflict{DoUpdates: clause.AssignmentColumns([]string{"status"})}).Create(&entity).Error
@@ -328,7 +327,7 @@ func (s *TrustMarkedEntitiesStorage) trustMarkedEntities(trustMarkType string, s
 	[]string, error,
 ) {
 	var entityIDs []string
-	query := s.db.Model(&model.TrustMarkedEntity{}).Where("status = ?", status)
+	query := s.db.Model(&model.TrustMarkSubject{}).Where("status = ?", status)
 
 	if trustMarkType != "" {
 		query = query.Where("trust_mark_type = ?", trustMarkType)

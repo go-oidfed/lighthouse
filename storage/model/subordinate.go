@@ -19,53 +19,24 @@ const (
 )
 
 // SubordinateInfo holds information about a subordinate for storage
+// Table name is set to `subordinates` to replace legacy `subordinate_infos`.
 type SubordinateInfo struct {
 	gorm.Model
-	EntityDBID         uint   `gorm:"uniqueIndex"`
-	Entity             Entity `gorm:"foreignKey:EntityDBID"`
+	EntityID           string      `gorm:"uniqueIndex"`
+	Description        string      `gorm:"type:text"`
+	EntityTypes        EntityTypes `gorm:"many2many:subordinate_entity_types"`
 	JWKSID             uint
 	JWKS               JWKS                            `json:"jwks"`
 	Metadata           *oidfed.Metadata                `json:"metadata,omitempty" gorm:"serializer:json"`
 	MetadataPolicy     *oidfed.MetadataPolicies        `json:"metadata_policy,omitempty" gorm:"serializer:json"`
 	Constraints        *oidfed.ConstraintSpecification `json:"constraints,omitempty" gorm:"serializer:json"`
-	CriticalExtensions CritExtensions                  `json:"crit,omitempty" gorm:"many2many:subordinates_crit_extensions"`
 	MetadataPolicyCrit PolicyOperators                 `json:"metadata_policy_crit,omitempty" gorm:"many2many:subordinates_policy_operators"`
-	Extra              map[string]interface{}          `json:"-" gorm:"serializer:json"`
 	Status             Status                          `json:"status" gorm:"index"`
 }
 
-// CritExtension represents a critical extension in the database
-type CritExtension struct {
-	gorm.Model
-	CritExtension string
-}
+func (SubordinateInfo) TableName() string { return "subordinates" }
 
-// CritExtensions is a collection of CritExtension objects.
-// This type provides methods for working with multiple crit extensions
-// together.
-type CritExtensions []CritExtension
-
-// NewCritExtensions creates a new CritExtensions collection from a slice of
-// strings. Each string is converted to an CritExtension object.
-func NewCritExtensions(extensions []string) CritExtensions {
-	critExtensions := make(CritExtensions, len(extensions))
-	for i, t := range extensions {
-		critExtensions[i] = CritExtension{
-			CritExtension: t,
-		}
-	}
-	return critExtensions
-}
-
-// ToStrings converts a CritExtensions collection to a slice of strings.
-// Each CritExtension  is extracted into the resulting slice.
-func (et CritExtensions) ToStrings() []string {
-	result := make([]string, len(et))
-	for i, t := range et {
-		result[i] = t.CritExtension
-	}
-	return result
-}
+// Removed CritExtensions and subordinate_crit_extensions per db-fixes.
 
 // PolicyOperator represents a policy operator in the database.
 type PolicyOperator struct {
