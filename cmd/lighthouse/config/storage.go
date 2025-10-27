@@ -57,6 +57,8 @@ func LoadStorageBackends(c storageConf) (
 	subordinateStorage storage.SubordinateStorageBackend,
 	trustMarkedEntitiesStorage storage.TrustMarkedEntitiesStorageBackend,
 	authorityHints storage.AuthorityHintsStore,
+	additionalClaims storage.AdditionalClaimsStore,
+	kv *storage.KeyValueStorage,
 	err error,
 ) {
 	warehouse, err := storage.NewStorage(
@@ -68,11 +70,13 @@ func LoadStorageBackends(c storageConf) (
 		},
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	subordinateStorage = warehouse.SubordinateStorage()
 	trustMarkedEntitiesStorage = warehouse.TrustMarkedEntitiesStorage()
 	authorityHints = warehouse.AuthorityHintsStorage()
+	additionalClaims = warehouse.AdditionalClaimsStorage()
+	kv = warehouse.KeyValue()
 
 	log.Info("Loaded storage backend")
 	return

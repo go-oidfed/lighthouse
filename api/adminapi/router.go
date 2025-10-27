@@ -15,7 +15,9 @@ var assets embed.FS
 
 // AdminAPIStorages is a struct for holding storage backends for admin API endpoints.
 type AdminAPIStorages struct {
-	AuthorityHintsStore storage.AuthorityHintsStore
+	AuthorityHintsStore   storage.AuthorityHintsStore
+	AdditionalClaimsStore storage.AdditionalClaimsStore
+	KV                    *storage.KeyValueStorage
 }
 
 // Register mounts all admin API routes under the provided group.
@@ -45,7 +47,7 @@ func Register(r fiber.Router, serverURL string, storages AdminAPIStorages) error
 		},
 	)
 	// Entity Configuration
-	registerEntityConfiguration(r)
+	registerEntityConfiguration(r, storages.AdditionalClaimsStore, storages.KV)
 	// Authority Hints
 	registerAuthorityHints(r, storages.AuthorityHintsStore)
 	// Keys
@@ -62,7 +64,6 @@ func Register(r fiber.Router, serverURL string, storages AdminAPIStorages) error
 	registerSubordinateMetadataPolicies(r)
 	registerSubordinateConstraints(r)
 	registerSubordinateKeys(r)
-	registerSubordinateCrit(r)
 	registerSubordinateMetadataPolicyCrit(r)
 	// Trust Mark Types and Issuance
 	registerTrustMarkTypes(r)

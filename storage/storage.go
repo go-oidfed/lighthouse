@@ -20,6 +20,7 @@ var models = []any{
 	&model.SubordinateEvent{},
 	&model.Key{},
 	&model.JWKS{},
+	&model.KeyValue{},
 	&model.PolicyOperator{},
 	&model.IssuedTrustMarkInstance{},
 	&model.TrustMarkType{},

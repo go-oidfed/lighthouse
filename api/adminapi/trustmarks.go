@@ -59,10 +59,10 @@ func registerTrustMarkIssuance(r fiber.Router) {
 	r.Put(base+"/:trustMarkSubjectID/status", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
 	r.Get(base+"/:trustMarkSubjectID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
 	r.Put(base+"/:trustMarkSubjectID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	r.Get(base+"/:trustMarkSubjectID/additional-claims/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	r.Put(base+"/:trustMarkSubjectID/additional-claims/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	r.Get(base+"/:trustMarkSubjectID/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	r.Put(base+"/:trustMarkSubjectID/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
 	r.Delete(
-		base+"/:trustMarkSubjectID/additional-claims/:claim",
+		base+"/:trustMarkSubjectID/additional-claims/:additionalClaimsID",
 		func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) },
 	)
 }

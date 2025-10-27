@@ -9,8 +9,7 @@ info:
     name: MIT License
     url: https://opensource.org/licenses/MIT
 servers:
-  -
-    url: http://localhost:8765
+  - url: http://localhost:8765
     description: Local development server
 externalDocs:
   description: OpenID Federation 1.0 specification
@@ -113,8 +112,7 @@ paths:
       summary: Get the entity configuration JSON
   /api/v1/admin/entity-configuration/additional-claims:
     summary: Manage additional custom claims in the entity configuration.
-    description: >-
-      Endpoints to list, add, and update additional custom claims published in the entity configuration.
+    description: Endpoints to list, add, and update additional custom claims published in the entity configuration.
     get:
       tags:
         - Entity Configuration
@@ -124,7 +122,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdditionalClaims'
-          description: Successful response returning all additional claims.
+          description: Successful response returning all additional claim rows.
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getAdditionalClaims
@@ -134,7 +132,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AdditionalClaims'
+              type: array
+              items:
+                $ref: '#/components/schemas/AddAdditionalClaim'
         required: true
       tags:
         - Entity Configuration
@@ -144,21 +144,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdditionalClaims'
-          description: Successfully updated the complete additional claims object.
+          description: Successfully replaced all additional claim rows.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: updateAdditionalClaims
-      summary: Update the complete additional claims structure
+      summary: Replace the complete additional claims
       description: Use with care!
     post:
       requestBody:
-        description: Additional claims to be added (merged) into the entity configuration.
+        description: Additional claim to be added to the entity configuration.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AdditionalClaims'
+              $ref: '#/components/schemas/AddAdditionalClaim'
         required: true
       tags:
         - Entity Configuration
@@ -167,17 +167,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdditionalClaims'
-          description: Successfully added the provided additional claims.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successfully merged the provided additional claim rows.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: addAdditionalClaims
-      summary: Add additional claims
-  /api/v1/admin/entity-configuration/additional-claims/{claim}:
+      summary: Merge additional claim rows
+  /api/v1/admin/entity-configuration/additional-claims/{additionalClaimsID}:
     summary: Manage a single additional claim in the entity configuration.
     description: Get, update, or delete a single additional claim.
+    parameters:
+      - $ref: '#/components/parameters/AdditionalClaimID'
     get:
       tags:
         - Entity Configuration
@@ -186,20 +188,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successful response returning the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successful response returning the additional claim row.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getAdditionalClaim
-      summary: Get an additional claim value
+      summary: Get an additional claim row
     put:
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnyValue'
+              $ref: '#/components/schemas/AddAdditionalClaim'
         required: true
       tags:
         - Entity Configuration
@@ -208,8 +210,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successfully updated the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successfully updated the additional claim row.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -217,7 +219,7 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: updateAdditionalClaim
-      summary: Update an additional claim value
+      summary: Update an additional claim row
     delete:
       tags:
         - Entity Configuration
@@ -230,89 +232,7 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: deleteAdditionalClaim
       summary: Delete an additional claim
-    parameters:
-      - $ref: '#/components/parameters/ClaimParam'
-  /api/v1/admin/entity-configuration/crit:
-    summary: Path used to manage the list of critical claims in the entity configuration.
-    description: >-
-      The REST endpoint/path used to list and create zero or more `CriticalClaim` entries published
-      in the entity configuration. This path contains a `GET`, `PUT`, and `POST` operation to perform
-      the list and create/update tasks, respectively.
-    get:
-      tags:
-        - Entity Configuration Critical Claims
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CriticalClaim'
-          description: Successful response - returns an array of `CriticalClaim` entries.
-      operationId: getEntityConfigurationCriticalClaims
-      summary: List all CriticalClaims in the entity configuration
-      description: Gets a list of all `CriticalClaim` entries published in the entity configuration.
-    put:
-      tags:
-        - Entity Configuration Critical Claims
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/CriticalClaim'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CriticalClaim'
-          description: Successful response - returns an array of `CriticalClaim` entries.
-        '400':
-          $ref: '#/components/responses/BadRequestError'
-      operationId: setEntityConfigurationCriticalClaims
-      summary: Create or Update Critical Claims in the entity configuration
-    post:
-      tags:
-        - Entity Configuration Critical Claims
-      requestBody:
-        description: A new `CriticalClaim` to be created.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CriticalClaim'
-        required: true
-      responses:
-        '201':
-          description: Successful response.
-        '400':
-          $ref: '#/components/responses/BadRequestError'
-      operationId: createEntityConfigurationCriticalClaim
-      summary: Create a CriticalClaim in the entity configuration
-      description: Creates a new instance of a `CriticalClaim` in the entity configuration.
-  /api/v1/admin/entity-configuration/crit/{claim}:
-    summary: Path used to manage a single CriticalClaim in the entity configuration.
-    description: Manage a single critical claim entry in the entity configuration.
-    delete:
-      tags:
-        - Entity Configuration Critical Claims
-      responses:
-        '204':
-          description: Successful response.
-      operationId: deleteEntityConfigurationCriticalClaim
-      summary: Delete a CriticalClaim from the entity configuration
-      description: Deletes an existing `CriticalClaim` from the entity configuration.
-    parameters:
-      - name: claim
-        description: The `CriticalClaim` to be deleted.
-        schema:
-          $ref: '#/components/schemas/CriticalClaim'
-        in: path
+  # Removed critical-claims endpoints; crit is part of additional-claims rows
   /api/v1/admin/entity-configuration/trust-marks:
     summary: Path used to manage trust marks in the entity configuration.
     description: >-
@@ -940,9 +860,11 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: addGeneralAdditionalClaims
       summary: Add general additional claims
-  /subordinates/additional-claims/{claim}:
+  /subordinates/additional-claims/{additionalClaimsID}:
     summary: Manage a single general additional claim for subordinates.
     description: Get, update, or delete a single general additional claim.
+    parameters:
+      - $ref: '#/components/parameters/AdditionalClaimID'
     get:
       tags:
         - Subordinates
@@ -951,20 +873,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successful response returning the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successful response returning the claim row.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getGeneralAdditionalClaim
-      summary: Get a general additional claim value
+      summary: Get a general additional claim row
     put:
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnyValue'
+              $ref: '#/components/schemas/AddAdditionalClaim'
         required: true
       tags:
         - Subordinates
@@ -973,8 +895,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successfully updated the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successfully updated the claim row.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -982,7 +904,7 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: updateGeneralAdditionalClaim
-      summary: Update a general additional claim value
+      summary: Update a general additional claim row
     delete:
       tags:
         - Subordinates
@@ -995,11 +917,11 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: deleteGeneralAdditionalClaim
       summary: Delete a general additional claim
-    parameters:
-      - $ref: '#/components/parameters/ClaimParam'
+
   /subordinates/{subordinateID}/additional-claims:
     summary: Manage subordinate-specific additional custom claims.
-    description: Endpoints to list, add, and update additional custom claims for a specific subordinate.
+    description:
+      Endpoints to list, add, and update additional custom claims (rows: claim, value, crit) for a specific subordinate.
     get:
       tags:
         - Subordinates
@@ -1009,7 +931,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdditionalClaims'
-          description: Successful response returning all subordinate-specific additional claims.
+          description: Successful response returning all subordinate-specific additional claim rows.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
@@ -1021,7 +943,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AdditionalClaims'
+              type: array
+              items:
+                $ref: '#/components/schemas/AdditionalClaim'
         required: true
       tags:
         - Subordinates
@@ -1031,7 +955,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdditionalClaims'
-          description: Successfully updated the complete subordinate-specific additional claims object.
+          description: Successfully replaced all subordinate-specific additional claim rows.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -1044,20 +968,27 @@ paths:
     post:
       tags:
         - Subordinates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddAdditionalClaim'
+        required: true
       responses:
         '201':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdditionalClaims'
-          description: Successfully copied general subordinate additional claims to this subordinate.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successfully merged the provided subordinate-specific additional claim rows.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
-      operationId: copyGeneralAdditionalClaimsToSubordinate
-      summary: Copy general additional claims to this subordinate
-      description: Copies the general subordinate additional claims and sets them specifically for this subordinate.
+      operationId: addSubordinateAdditionalClaims
+      summary: Add an additional claim for a subordinate
     parameters:
       - name: subordinateID
         description: The id of the subordinate
@@ -1065,7 +996,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/additional-claims/{claim}:
+  /subordinates/{subordinateID}/additional-claims/{additionalClaimsID}:
     summary: Manage a single subordinate-specific additional claim.
     description: Get, update, or delete a single subordinate-specific additional claim.
     get:
@@ -1076,20 +1007,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successful response returning the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successful response returning the claim row.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getSubordinateAdditionalClaim
-      summary: Get a subordinate additional claim value
+      summary: Get a subordinate additional claim row
     put:
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnyValue'
+              $ref: '#/components/schemas/AddAdditionalClaim'
+
         required: true
       tags:
         - Subordinates
@@ -1098,8 +1030,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successfully updated the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successfully updated the claim row.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -1107,7 +1039,7 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: updateSubordinateAdditionalClaim
-      summary: Update a subordinate additional claim value
+      summary: Update a subordinate additional claim row
     delete:
       tags:
         - Subordinates
@@ -1122,7 +1054,12 @@ paths:
       summary: Delete a subordinate additional claim
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
-      - $ref: '#/components/parameters/ClaimParam'
+      - name: additionalClaimsID
+        in: path
+        required: true
+        description: The ID of the subordinate-specific additional claim row.
+        schema:
+          type: integer
   /subordinates/{subordinateID}/statement:
     get:
       tags:
@@ -1719,7 +1656,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TrustMarkSpecIDParam'
       - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
-  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims/{claim}:
+  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims/{additionalClaimsID}:
     summary: Manage a single subject-specific additional claim.
     description: Get, update, or delete a single subject-specific additional claim.
     get:
@@ -1730,20 +1667,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successful response returning the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successful response returning the claim row.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getTrustMarkSubjectAdditionalClaim
-      summary: Get a subject additional claim value
+      summary: Get a subject additional claim row
     put:
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AnyValue'
+              $ref: '#/components/schemas/AddAdditionalClaim'
         required: true
       tags:
         - Trust Mark Issuance
@@ -1752,8 +1689,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnyValue'
-          description: Successfully updated the claim value.
+                $ref: '#/components/schemas/AdditionalClaim'
+          description: Successfully updated the claim row.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -1761,7 +1698,7 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: updateTrustMarkSubjectAdditionalClaim
-      summary: Update a subject additional claim value
+      summary: Update a subject additional claim row
     delete:
       tags:
         - Trust Mark Issuance
@@ -1777,7 +1714,12 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TrustMarkSpecIDParam'
       - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
-      - $ref: '#/components/parameters/ClaimParam'
+      - name: additionalClaimsID
+        in: path
+        required: true
+        description: The ID of the subject-specific additional claim row.
+        schema:
+          type: integer
   /api/v1/admin/trust-marks/type/{trustMarkTypeID}/owner:
     summary: Path used to manage the single owner of a trust mark type.
     description: Manage the single TrustMarkOwner associated with a trust mark type (or none).
@@ -3327,86 +3269,7 @@ paths:
           description: Successfully deleted key from subordinate's jwks.
       operationId: deleteSubordinateJWK
       summary: Deletes a JWK from the subordinate's jwks
-  /subordinates/crit:
-    summary: Path used to manage the list of critical claims.
-    description: >-
-      The REST endpoint/path used to list and create zero or more `CriticalClaim` entities.  This path
-      contains a `GET` and `POST` operation to perform the list and create tasks, respectively.
-    get:
-      tags:
-        - Subordinate Critical Claims
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CriticalClaim'
-          description: Successful response - returns an array of `CriticalClaim` entities.
-      operationId: getCriticalClaims
-      summary: List all CriticalClaims
-      description: Gets a list of all `CriticalClaim` entities.
-    put:
-      tags:
-        - Subordinate Critical Claims
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                $ref: '#/components/schemas/CriticalClaim'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CriticalClaim'
-          description: Successful response - returns an array of `CriticalClaim` entities.
-        '400':
-          $ref: '#/components/responses/BadRequestError'
-      operationId: setCriticalClaims
-      summary: Create or Update Critical Claims
-    post:
-      tags:
-        - Subordinate Critical Claims
-      requestBody:
-        description: A new `CriticalClaim` to be created.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CriticalClaim'
-        required: true
-      responses:
-        '201':
-          description: Successful response.
-        '400':
-          $ref: '#/components/responses/BadRequestError'
-      operationId: createCriticalClaim
-      summary: Create a CriticalClaim
-      description: Creates a new instance of a `CriticalClaim`.
-  /subordinates/crit/{claim}:
-    summary: Path used to manage a single CriticalClaim.
-    description: Manage a single critical claim entry.
-    delete:
-      tags:
-        - Subordinate Critical Claims
-      responses:
-        '204':
-          description: Successful response.
-      operationId: deleteCriticalClaim
-      summary: Delete a CriticalClaim
-      description: Deletes an existing `CriticalClaim`.
-    parameters:
-      - name: claim
-        description: The `CriticalClaim` to be deleted.
-        schema:
-          $ref: '#/components/schemas/CriticalClaim'
-        in: path
+  # Removed subordinate crit endpoints; crit is part of additional-claims rows
   /subordinates/metadata-policy-crit:
     summary: Path used to manage the list of critical metadata policy operators.
     description: >-
@@ -3516,10 +3379,8 @@ components:
       example: https://entity.oidfed.org
     InternalID:
       oneOf:
-        -
-          type: string
-        -
-          type: integer
+        - type: string
+        - type: integer
     AuthorityHint:
       description: The Entity ID of a superior
       required:
@@ -3665,10 +3526,8 @@ components:
         'y': AON1eYFPmxeFkNYD04Ar6rToYruV8_btso-iXAkLRpOBrLeICdjxUuyPnFpOHmRbyoqih7tla2Nwo1dle8JJKEC8
     ManagedJWK:
       allOf:
-        -
-          $ref: '#/components/schemas/Jwk'
-        -
-          type: object
+        - $ref: '#/components/schemas/Jwk'
+        - type: object
           properties:
             kms:
               description: The Key Management System
@@ -3691,12 +3550,9 @@ components:
       description: A previously active key that has been revoked.
       type: object
       allOf:
-        -
-          type: object
-        -
-          $ref: '#/components/schemas/ManagedJWK'
-        -
-          $ref: '#/components/schemas/Revoked'
+        - type: object
+        - $ref: '#/components/schemas/ManagedJWK'
+        - $ref: '#/components/schemas/Revoked'
     Revoked:
       title: Root Type for Revoked
       description: JSON object that contains the properties of the revocation
@@ -3719,7 +3575,7 @@ components:
     CreateKey:
       title: Root Type for CreateKey
       description: Request payload to create a new signing key.
-      required: []
+      required: [ ]
       type: object
       properties:
         kms:
@@ -3740,10 +3596,8 @@ components:
       description: Metadata for one Entity Type
       type: object
       allOf:
-        -
-          type: object
-        -
-          $ref: '#/components/schemas/CommonMetadata'
+        - type: object
+        - $ref: '#/components/schemas/CommonMetadata'
     CommonMetadata:
       description: Metadata Claims that can be used with any Entity Type
       type: object
@@ -3910,9 +3764,41 @@ components:
       minimum: 0
       example: 86400
     AdditionalClaims:
-      description: Arbitrary additional custom claims published in the entity configuration.
+      description: A list of AdditionalClaim.
+      type: array
+      items:
+        $ref: '#/components/schemas/AdditionalClaim'
+    AdditionalClaim:
+      description: A single additional custom claim consisting of claim name, value, and crit flag.
+      required:
+        - id
+        - claim
+        - value
       type: object
-      additionalProperties: {}
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: Internal identifier for this additional claim row
+        claim:
+          type: string
+          description: The claim name
+        value:
+          description: The claim value (arbitrary JSON)
+        crit:
+          type: boolean
+          description: Whether the claim is critical
+    AddAdditionalClaim:
+      description: Fields that can be updated for an additional claim.
+      type: object
+      properties:
+        claim:
+          type: string
+          description: The claim name
+        value:
+          description: The claim value (arbitrary JSON)
+        crit:
+          type: boolean
+          description: Whether the claim is critical
     Subordinate:
       description: Information about a subordinate entity.
       required:
@@ -4414,6 +4300,20 @@ components:
                 error_description: foobar was not found
       description: The requested resource was not found
   parameters:
+    AdditionalClaimID:
+      name: additionalClaimID
+      description: The ID of the additional claim.
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      in: path
+      required: true
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
     SubordinateIDParam:
       name: subordinateID
       in: path
@@ -4557,54 +4457,33 @@ components:
         type: string
       example: https://tmi.example.com
 tags:
-  -
-    name: Entity Configuration
+  - name: Entity Configuration
     description: Endpoints related to the entity configuration document.
-  -
-    name: Authority Hints
+  - name: Authority Hints
     description: Manage authority hints for the entity configuration.
-  -
-    name: Keys
+  - name: Keys
     description: Manage federation signing keys.
-  -
-    name: Entity Configuration Trust Marks
+  - name: Entity Configuration Trust Marks
     description: Manage Trust Marks published in the entity configuration.
-  -
-    name: Entity Configuration Metadata
+  - name: Entity Configuration Metadata
     description: Manage metadata claims published in the entity configuration.
-  -
-    name: Entity Configuration Critical Claims
-    description: Manage critical claims published in the entity configuration.
-  -
-    name: General Metadata Policies
+  - name: General Metadata Policies
     description: Manage general metadata policies applied to entities.
-  -
-    name: General Constraints
+  - name: General Constraints
     description: Manage general constraints applied to subordinate entities.
-  -
-    name: Subordinates
+  - name: Subordinates
     description: Manage subordinate entities.
-  -
-    name: Subordinate Keys
+  - name: Subordinate Keys
     description: Manage keys associated with subordinate entities.
-  -
-    name: Subordinate Metadata
+  - name: Subordinate Metadata
     description: Manage metadata claims for subordinate entities.
-  -
-    name: Subordinate Metadata Policies
+  - name: Subordinate Metadata Policies
     description: Manage metadata policies for subordinate entities.
-  -
-    name: Subordinate Constraints
+  - name: Subordinate Constraints
     description: Manage constraints specific to subordinate entities.
-  -
-    name: Subordinate Critical Claims
-    description: Manage subordinate critical claims.
-  -
-    name: Subordinate Critical Metadata Policies
+  - name: Subordinate Critical Metadata Policies
     description: Manage subordinate critical metadata policy operators.
-  -
-    name: Federation Trust Marks
+  - name: Federation Trust Marks
     description: Manage trust marks in the federation.
-  -
-    name: Trust Mark Issuance
+  - name: Trust Mark Issuance
     description: Manage issuance of trust marks.

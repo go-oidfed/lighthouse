@@ -15,10 +15,10 @@ func registerSubordinates(r fiber.Router) {
 	// Subordinate additional claims
 	g.Get("/:subordinateID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
 	g.Put("/:subordinateID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	g.Get("/:subordinateID/additional-claims/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	g.Put("/:subordinateID/additional-claims/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	g.Get("/:subordinateID/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	g.Put("/:subordinateID/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
 	g.Delete(
-		"/:subordinateID/additional-claims/:claim",
+		"/:subordinateID/additional-claims/:additionalClaimsID",
 		func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) },
 	)
 }
@@ -89,13 +89,7 @@ func registerSubordinateKeys(r fiber.Router) {
 	g.Delete("/:kid", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
 }
 
-func registerSubordinateCrit(r fiber.Router) {
-	g := r.Group("/subordinates/crit")
-	g.Get("/", func(c *fiber.Ctx) error { return c.JSON([]string{}) })
-	g.Put("/", func(c *fiber.Ctx) error { return c.JSON([]string{}) })
-	g.Post("/", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusCreated) })
-	g.Delete("/:claim", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
-}
+// Subordinate crit is managed via the additional-claims endpoints; no separate crit endpoints
 
 func registerSubordinateMetadataPolicyCrit(r fiber.Router) {
 	g := r.Group("/subordinates/metadata-policy-crit")

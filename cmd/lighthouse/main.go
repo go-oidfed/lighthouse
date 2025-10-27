@@ -49,7 +49,7 @@ func main() {
 		}
 	}
 
-	subordinateStorage, trustMarkedEntitiesStorage, authorityHintsStorage,
+	subordinateStorage, trustMarkedEntitiesStorage, authorityHintsStorage, additionalClaimsStorage, kv,
 		err := config.LoadStorageBackends(c.Storage)
 	if err != nil {
 		log.Fatal(err)
@@ -79,7 +79,11 @@ func main() {
 			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
 			// TODO read all of this from config or a storage backend
 		}, c.Federation.ExtraEntityConfigurationData,
-		adminapi.AdminAPIStorages{AuthorityHintsStore: authorityHintsStorage},
+		adminapi.AdminAPIStorages{
+			AuthorityHintsStore:   authorityHintsStorage,
+			AdditionalClaimsStore: additionalClaimsStorage,
+			KV:                    kv,
+		},
 	)
 	if err != nil {
 		panic(err)
