@@ -8,16 +8,15 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddSubordinateListingEndpoint adds a subordinate listing endpoint
 func (fed *LightHouse) AddSubordinateListingEndpoint(
-	endpoint EndpointConf, store storage.SubordinateStorageBackend,
-	trustMarkStore storage.TrustMarkedEntitiesStorageBackend,
+	endpoint EndpointConf, store model.SubordinateStorageBackend,
+	trustMarkStore model.TrustMarkedEntitiesStorageBackend,
 ) {
-	fed.Metadata.FederationEntity.FederationListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.FederationListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}
@@ -41,8 +40,8 @@ func filterEntityType(info model.SubordinateInfo, value any) bool {
 
 func handleSubordinateListing(
 	ctx *fiber.Ctx, entityType string, trustMarked bool, trustMarkType string,
-	intermediate bool, q storage.SubordinateStorageQuery, trustMarkedEntitiesStorage storage.
-		TrustMarkedEntitiesStorageBackend,
+	intermediate bool, q model.SubordinateStorageQuery,
+	trustMarkedEntitiesStorage model.TrustMarkedEntitiesStorageBackend,
 ) error {
 	if intermediate {
 		ctx.Status(fiber.StatusBadRequest)

@@ -6,12 +6,12 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddFetchEndpoint adds a fetch endpoint
-func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store storage.SubordinateStorageBackend) {
-	fed.Metadata.FederationEntity.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.SubordinateStorageBackend) {
+	fed.fedMetadata.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}

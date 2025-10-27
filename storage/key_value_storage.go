@@ -12,7 +12,7 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-// KeyValueStorage implements model.KeyValueAccessor using GORM.
+// KeyValueStorage implements model.KeyValueStore using GORM.
 type KeyValueStorage struct {
 	db *gorm.DB
 }

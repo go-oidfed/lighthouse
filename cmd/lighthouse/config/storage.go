@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 type storageConf struct {
@@ -53,31 +54,17 @@ const (
 )
 
 // LoadStorageBackends loads and returns the storage backends for the passed Config
-func LoadStorageBackends(c storageConf) (
-	subordinateStorage storage.SubordinateStorageBackend,
-	trustMarkedEntitiesStorage storage.TrustMarkedEntitiesStorageBackend,
-	authorityHints storage.AuthorityHintsStore,
-	additionalClaims storage.AdditionalClaimsStore,
-	kv *storage.KeyValueStorage,
-	err error,
-) {
-	warehouse, err := storage.NewStorage(
-		storage.Config{
-			Driver:  c.Driver,
-			DSN:     c.DSN,
-			DataDir: c.DataDir,
-			Debug:   c.Debug,
-		},
-	)
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
+func LoadStorageBackends(c storageConf) (model.Backends, error) {
+	cfg := storage.Config{
+		Driver:  c.Driver,
+		DSN:     c.DSN,
+		DataDir: c.DataDir,
+		Debug:   c.Debug,
 	}
-	subordinateStorage = warehouse.SubordinateStorage()
-	trustMarkedEntitiesStorage = warehouse.TrustMarkedEntitiesStorage()
-	authorityHints = warehouse.AuthorityHintsStorage()
-	additionalClaims = warehouse.AdditionalClaimsStorage()
-	kv = warehouse.KeyValue()
-
+	backs, err := storage.LoadStorageBackends(cfg)
+	if err != nil {
+		return model.Backends{}, err
+	}
 	log.Info("Loaded storage backend")
-	return
+	return backs, nil
 }

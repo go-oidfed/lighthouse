@@ -37,15 +37,22 @@ type KeyValue struct {
 	Value datatypes.JSON `json:"value"`
 }
 
-// KeyValueAccessor defines common operations for key-value storage.
+// KeyValueStore defines common operations for key-value storage.
 // Implementations may apply additional semantics (e.g., default scope) but
 // should honor the uniqueness of (scope,key) and JSON-serialized values.
-type KeyValueAccessor interface {
+type KeyValueStore interface {
 	// Get retrieves the value for a (scope, key). Returns (nil, nil) if not found.
 	Get(scope, key string) (datatypes.JSON, error)
 
+	// GetAs retrieves and unmarshals the value for (scope, key) into out.
+	// out must be a pointer to the target type. Returns (false, nil) if not found.
+	GetAs(scope, key string, out any) (bool, error)
+
 	// Set stores/replaces the value for a (scope, key).
 	Set(scope, key string, value datatypes.JSON) error
+
+	// SetAny marshals v to JSON and stores it at (scope, key).
+	SetAny(scope, key string, v any) error
 
 	// Delete removes the entry for a (scope, key). No error if missing.
 	Delete(scope, key string) error

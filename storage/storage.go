@@ -136,7 +136,7 @@ func (s *SubordinateStorage) Subordinate(entityID string) (*model.SubordinateInf
 }
 
 // Active returns a query for active subordinates
-func (s *SubordinateStorage) Active() SubordinateStorageQuery {
+func (s *SubordinateStorage) Active() model.SubordinateStorageQuery {
 	return &GormSubordinateStorageQuery{
 		db:     s.db,
 		status: model.StatusActive,
@@ -144,7 +144,7 @@ func (s *SubordinateStorage) Active() SubordinateStorageQuery {
 }
 
 // Blocked returns a query for blocked subordinates
-func (s *SubordinateStorage) Blocked() SubordinateStorageQuery {
+func (s *SubordinateStorage) Blocked() model.SubordinateStorageQuery {
 	return &GormSubordinateStorageQuery{
 		db:     s.db,
 		status: model.StatusBlocked,
@@ -152,7 +152,7 @@ func (s *SubordinateStorage) Blocked() SubordinateStorageQuery {
 }
 
 // Pending returns a query for pending subordinates
-func (s *SubordinateStorage) Pending() SubordinateStorageQuery {
+func (s *SubordinateStorage) Pending() model.SubordinateStorageQuery {
 	return &GormSubordinateStorageQuery{
 		db:     s.db,
 		status: model.StatusPending,
@@ -219,7 +219,7 @@ func (q *GormSubordinateStorageQuery) EntityIDs() (entityIDs []string, err error
 }
 
 // AddFilter adds a filter to the query
-func (q *GormSubordinateStorageQuery) AddFilter(filter SubordinateStorageQueryFilter, value any) error {
+func (q *GormSubordinateStorageQuery) AddFilter(filter model.SubordinateStorageQueryFilter, value any) error {
 	q.filters = append(
 		q.filters, func(info model.SubordinateInfo) bool {
 			return filter(info, value)

@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	slices2 "tideland.dev/go/slices"
 
-	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -61,7 +60,7 @@ func (store *FileStorage) SubordinateStorage() loadLegacySubordinateInfos {
 }
 
 // TrustMarkedEntitiesStorage returns a file-based TrustMarkedEntitiesStorageBackend
-func (store *FileStorage) TrustMarkedEntitiesStorage() storage.TrustMarkedEntitiesStorageBackend {
+func (store *FileStorage) TrustMarkedEntitiesStorage() model.TrustMarkedEntitiesStorageBackend {
 	return trustMarkedEntitiesFileStorage{store.files["trust_marked_entities"]}
 }
 

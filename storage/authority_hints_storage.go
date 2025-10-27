@@ -10,18 +10,10 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-// AuthorityHintsStorage provides CRUD access to AuthorityHint records.
+// AuthorityHintsStorage provides CRUD access to AuthorityHint records
+// implementing model.AuthorityHintStore.
 type AuthorityHintsStorage struct {
 	db *gorm.DB
-}
-
-// AuthorityHintsStore is the abstraction used by handlers.
-type AuthorityHintsStore interface {
-	List() ([]model.AuthorityHint, error)
-	Create(hint model.AddAuthorityHint) (*model.AuthorityHint, error)
-	Get(ident string) (*model.AuthorityHint, error)
-	Update(ident string, update model.AddAuthorityHint) (*model.AuthorityHint, error)
-	Delete(ident string) error
 }
 
 func (s *AuthorityHintsStorage) List() ([]model.AuthorityHint, error) {

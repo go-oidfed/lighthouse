@@ -23,7 +23,7 @@ var (
 	verbose            bool
 	dryRun             bool
 	sourceSubordinates loadLegacySubordinateInfos
-	sourceTrustMark    storage.TrustMarkedEntitiesStorageBackend
+	sourceTrustMark    model.TrustMarkedEntitiesStorageBackend
 	destBackend        *storage.Storage
 )
 

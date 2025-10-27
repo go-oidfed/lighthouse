@@ -9,23 +9,7 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-// AdditionalClaimsStore abstracts CRUD for entity configuration additional claims.
-type AdditionalClaimsStore interface {
-	// List returns all additional claims as rows.
-	List() ([]model.EntityConfigurationAdditionalClaim, error)
-	// Set replaces the complete set of additional claims.
-	Set(items []model.AddAdditionalClaim) ([]model.EntityConfigurationAdditionalClaim, error)
-	// Create inserts a provided claim and returns the resulting row.
-	Create(item model.AddAdditionalClaim) (*model.EntityConfigurationAdditionalClaim, error)
-	// Get returns a single row by either numeric ID or claim name.
-	Get(ident string) (*model.EntityConfigurationAdditionalClaim, error)
-	// Update updates value/crit for the row identified by numeric ID or claim name.
-	Update(ident string, item model.AddAdditionalClaim) (*model.EntityConfigurationAdditionalClaim, error)
-	// Delete removes a single row identified by numeric ID or claim name.
-	Delete(ident string) error
-}
-
-// AdditionalClaimsStorage is the GORM implementation for AdditionalClaimsStore.
+// AdditionalClaimsStorage is the GORM implementation for model.AdditionalClaimsStore.
 type AdditionalClaimsStorage struct {
 	db *gorm.DB
 }

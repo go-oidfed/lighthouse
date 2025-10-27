@@ -11,7 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/go-oidfed/lighthouse"
-	"github.com/go-oidfed/lighthouse/api/adminapi"
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 	"github.com/go-oidfed/lighthouse/internal/logger"
 )
@@ -49,41 +48,23 @@ func main() {
 		}
 	}
 
-	subordinateStorage, trustMarkedEntitiesStorage, authorityHintsStorage, additionalClaimsStorage, kv,
-		err := config.LoadStorageBackends(c.Storage)
+	backs, err := config.LoadStorageBackends(c.Storage)
 	if err != nil {
 		log.Fatal(err)
 	}
+	subordinateStorage := backs.Subordinates
+	trustMarkedEntitiesStorage := backs.TrustMarks
 
 	lh, err := lighthouse.NewLightHouse(
 		config.Get().Server,
-		c.Federation.EntityID, c.Federation.AuthorityHints,
-		&oidfed.Metadata{
-			FederationEntity: &oidfed.FederationEntityMetadata{
-				Extra:            c.Federation.Metadata.ExtraFederationEntityMetadata,
-				DisplayName:      c.Federation.Metadata.DisplayName,
-				Description:      c.Federation.Metadata.Description,
-				Keywords:         c.Federation.Metadata.Keywords,
-				Contacts:         c.Federation.Metadata.Contacts,
-				LogoURI:          c.Federation.Metadata.LogoURI,
-				PolicyURI:        c.Federation.Metadata.PolicyURI,
-				InformationURI:   c.Federation.Metadata.InformationURI,
-				OrganizationName: c.Federation.Metadata.OrganizationName,
-				OrganizationURI:  c.Federation.Metadata.OrganizationURI,
-			},
-		},
+		c.Federation.EntityID,
 		keys.Federation(), c.Signing.Algorithm,
-		c.Federation.ConfigurationLifetime.Duration(),
 		lighthouse.SubordinateStatementsConfig{
 			MetadataPolicies:             nil,
 			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
 			// TODO read all of this from config or a storage backend
-		}, c.Federation.ExtraEntityConfigurationData,
-		adminapi.AdminAPIStorages{
-			AuthorityHintsStore:   authorityHintsStorage,
-			AdditionalClaimsStore: additionalClaimsStorage,
-			KV:                    kv,
 		},
+		backs,
 	)
 	if err != nil {
 		panic(err)
@@ -93,9 +74,9 @@ func main() {
 	lh.Constraints = c.Federation.Constraints
 	lh.CriticalExtensions = c.Federation.CriticalExtensions
 	lh.MetadataPolicyCrit = c.Federation.MetadataPolicyCrit
-	lh.TrustMarks = c.Federation.TrustMarks
-	lh.TrustMarkIssuers = c.Federation.TrustMarkIssuers
-	lh.TrustMarkOwners = c.Federation.TrustMarkOwners
+	// lh.TrustMarks = c.Federation.TrustMarks
+	// lh.TrustMarkIssuers = c.Federation.TrustMarkIssuers
+	// lh.TrustMarkOwners = c.Federation.TrustMarkOwners
 
 	var trustMarkCheckerMap map[string]lighthouse.EntityChecker
 	if specLen := len(c.Endpoints.TrustMarkEndpoint.TrustMarkSpecs); specLen > 0 {

@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -18,13 +17,13 @@ type enrollRequest struct {
 // AddEnrollEndpoint adds an endpoint to enroll to this IA/TA
 func (fed *LightHouse) AddEnrollEndpoint(
 	endpoint EndpointConf,
-	store storage.SubordinateStorageBackend,
+	store model.SubordinateStorageBackend,
 	checker EntityChecker,
 ) {
-	if fed.Metadata.FederationEntity.Extra == nil {
-		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
+	if fed.fedMetadata.Extra == nil {
+		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.Metadata.FederationEntity.Extra["federation_enroll_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.Extra["federation_enroll_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}

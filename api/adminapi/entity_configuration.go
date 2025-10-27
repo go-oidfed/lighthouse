@@ -9,12 +9,11 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/go-oidfed/lighthouse/storage"
 	smodel "github.com/go-oidfed/lighthouse/storage/model"
 )
 
 func registerEntityConfiguration(
-	r fiber.Router, addClaimsStore storage.AdditionalClaimsStore, kv *storage.KeyValueStorage,
+	r fiber.Router, addClaimsStore smodel.AdditionalClaimsStore, kv smodel.KeyValueStore,
 ) {
 	g := r.Group("/entity-configuration")
 	g.Get(
@@ -149,7 +148,9 @@ func registerEntityConfiguration(
 			if seconds < 0 {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("lifetime must be non-negative"))
 			}
-			if err := kv.SetAny(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyLifetime, seconds); err != nil {
+			if err := kv.SetAny(
+				smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyLifetime, seconds,
+			); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			return c.JSON(seconds)
@@ -157,6 +158,35 @@ func registerEntityConfiguration(
 	)
 
 	// Metadata
+	g.Get(
+		"/metadata", func(c *fiber.Ctx) error {
+			rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if rawAll == nil {
+				return c.JSON(fiber.Map{})
+			}
+			var meta oidfed.Metadata
+			if err := json.Unmarshal(rawAll, &meta); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
+			}
+			return c.JSON(meta)
+		},
+	)
+	g.Put(
+		"/metadata", func(c *fiber.Ctx) error {
+			var meta oidfed.Metadata
+			if err := c.BodyParser(&meta); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			buf, _ := json.Marshal(meta)
+			if err := kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(meta)
+		},
+	)
 	g.Get(
 		"/metadata/:entityType/:claim", func(c *fiber.Ctx) error {
 			entityType := c.Params("entityType")

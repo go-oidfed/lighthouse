@@ -15,7 +15,7 @@ import (
 func (fed *LightHouse) AddResolveEndpoint(
 	endpoint EndpointConf, allowedTrustAnchors []string, proactiveResolver *oidfed.ProactiveResolver,
 ) {
-	fed.Metadata.FederationEntity.FederationResolveEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.FederationResolveEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}
@@ -77,7 +77,7 @@ func (fed *LightHouse) AddResolveEndpoint(
 					}
 				}
 			}
-			res, err := createResolveResponse(ctx, fed.FederationEntity.EntityID, req)
+			res, err := createResolveResponse(ctx, fed.FederationEntity.EntityID(), req)
 			if err != nil {
 				return err
 			}

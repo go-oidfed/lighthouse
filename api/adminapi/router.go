@@ -7,21 +7,14 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 //go:embed swagger.html openapi.yaml
 var assets embed.FS
 
-// AdminAPIStorages is a struct for holding storage backends for admin API endpoints.
-type AdminAPIStorages struct {
-	AuthorityHintsStore   storage.AuthorityHintsStore
-	AdditionalClaimsStore storage.AdditionalClaimsStore
-	KV                    *storage.KeyValueStorage
-}
-
 // Register mounts all admin API routes under the provided group.
-func Register(r fiber.Router, serverURL string, storages AdminAPIStorages) error {
+func Register(r fiber.Router, serverURL string, storages model.Backends) error {
 	openapiRaw, err := assets.ReadFile("openapi.yaml")
 	if err != nil {
 		return errors.Wrap(err, "adminapi: failed to read openapi.yaml")
@@ -47,9 +40,9 @@ func Register(r fiber.Router, serverURL string, storages AdminAPIStorages) error
 		},
 	)
 	// Entity Configuration
-	registerEntityConfiguration(r, storages.AdditionalClaimsStore, storages.KV)
+	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV)
 	// Authority Hints
-	registerAuthorityHints(r, storages.AuthorityHintsStore)
+	registerAuthorityHints(r, storages.AuthorityHints)
 	// Keys
 	registerKeys(r)
 	// Entity Configuration Trust Marks

@@ -13,6 +13,7 @@ import (
 func (fed *LightHouse) AddHistoricalKeysEndpoint(
 	endpoint EndpointConf, historyFnc func() jwx.JWKS,
 ) {
+	fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}

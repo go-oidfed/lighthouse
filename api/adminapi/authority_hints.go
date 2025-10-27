@@ -6,12 +6,11 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // registerAuthorityHints wires handlers using an AuthorityHintsStore abstraction.
-func registerAuthorityHints(r fiber.Router, store storage.AuthorityHintsStore) {
+func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 	g := r.Group("/entity-configuration/authority-hints")
 
 	g.Get(

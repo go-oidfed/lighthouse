@@ -18,3 +18,12 @@ type AddAuthorityHint struct {
 	EntityID    string `json:"entity_id"`
 	Description string `json:"description"`
 }
+
+// AuthorityHintsStore is the abstraction used by handlers.
+type AuthorityHintsStore interface {
+	List() ([]AuthorityHint, error)
+	Create(hint AddAuthorityHint) (*AuthorityHint, error)
+	Get(ident string) (*AuthorityHint, error)
+	Update(ident string, update AddAuthorityHint) (*AuthorityHint, error)
+	Delete(ident string) error
+}

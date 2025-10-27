@@ -10,6 +10,8 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // DriverType represents the type of database driver
@@ -113,4 +115,19 @@ func Connect(cfg Config) (*gorm.DB, error) {
 			Logger: logger.Default.LogMode(logMode),
 		},
 	)
+}
+
+// LoadStorageBackends initializes a warehouse and returns grouped backends.
+func LoadStorageBackends(cfg Config) (model.Backends, error) {
+	warehouse, err := NewStorage(cfg)
+	if err != nil {
+		return model.Backends{}, err
+	}
+	return model.Backends{
+		Subordinates:     warehouse.SubordinateStorage(),
+		TrustMarks:       warehouse.TrustMarkedEntitiesStorage(),
+		AuthorityHints:   warehouse.AuthorityHintsStorage(),
+		AdditionalClaims: warehouse.AdditionalClaimsStorage(),
+		KV:               warehouse.KeyValue(),
+	}, nil
 }

@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -15,12 +14,12 @@ import (
 // be entitled for a trust mark
 func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 	endpoint EndpointConf,
-	store storage.TrustMarkedEntitiesStorageBackend,
+	store model.TrustMarkedEntitiesStorageBackend,
 ) {
-	if fed.Metadata.FederationEntity.Extra == nil {
-		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
+	if fed.fedMetadata.Extra == nil {
+		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.Metadata.FederationEntity.Extra["federation_trust_mark_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.Extra["federation_trust_mark_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}
