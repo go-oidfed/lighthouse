@@ -3,6 +3,7 @@ package adminapi
 import (
 	"embed"
 
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -14,7 +15,7 @@ import (
 var assets embed.FS
 
 // Register mounts all admin API routes under the provided group.
-func Register(r fiber.Router, serverURL string, storages model.Backends) error {
+func Register(r fiber.Router, serverURL string, storages model.Backends, fedEntity oidfed.FederationEntity) error {
 	openapiRaw, err := assets.ReadFile("openapi.yaml")
 	if err != nil {
 		return errors.Wrap(err, "adminapi: failed to read openapi.yaml")
@@ -40,7 +41,7 @@ func Register(r fiber.Router, serverURL string, storages model.Backends) error {
 		},
 	)
 	// Entity Configuration
-	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV)
+	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV, fedEntity)
 	// Authority Hints
 	registerAuthorityHints(r, storages.AuthorityHints)
 	// Keys

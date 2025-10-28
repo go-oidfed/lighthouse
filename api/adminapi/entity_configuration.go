@@ -14,17 +14,16 @@ import (
 
 func registerEntityConfiguration(
 	r fiber.Router, addClaimsStore smodel.AdditionalClaimsStore, kv smodel.KeyValueStore,
+	fedEntity oidfed.FederationEntity,
 ) {
 	g := r.Group("/entity-configuration")
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
-			//TODO
-			return c.JSON(
-				fiber.Map{
-					"status": "ok",
-					"note":   "placeholder entity configuration",
-				},
-			)
+			payload, err := fedEntity.EntityConfigurationPayload()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(payload)
 		},
 	)
 

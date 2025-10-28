@@ -180,9 +180,6 @@ func NewLightHouse(
 	server.Use(compress.New())
 	server.Use(logger.New())
 	server.Use(requestid.New())
-	if err := adminapi.Register(server.Group("/api/v1/admin"), entityID, storages); err != nil {
-		return nil, err
-	}
 	entity := &LightHouse{
 		TrustMarkIssuer:             oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
 		GeneralJWTSigner:            generalSigner,
@@ -290,6 +287,11 @@ func NewLightHouse(
 			return ctx.Send(jwt)
 		},
 	)
+	if err := adminapi.Register(
+		server.Group("/api/v1/admin"), entityID, storages, entity.FederationEntity,
+	); err != nil {
+		return nil, err
+	}
 	return entity, nil
 }
 

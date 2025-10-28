@@ -52,8 +52,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	subordinateStorage := backs.Subordinates
-	trustMarkedEntitiesStorage := backs.TrustMarks
 
 	lh, err := lighthouse.NewLightHouse(
 		config.Get().Server,
@@ -103,10 +101,10 @@ func main() {
 	log.Println("Initialized Entity")
 
 	if endpoint := c.Endpoints.FetchEndpoint; endpoint.IsSet() {
-		lh.AddFetchEndpoint(endpoint.EndpointConf, subordinateStorage)
+		lh.AddFetchEndpoint(endpoint.EndpointConf, backs.Subordinates)
 	}
 	if endpoint := c.Endpoints.ListEndpoint; endpoint.IsSet() {
-		lh.AddSubordinateListingEndpoint(endpoint, subordinateStorage, trustMarkedEntitiesStorage)
+		lh.AddSubordinateListingEndpoint(endpoint, backs.Subordinates, backs.TrustMarks)
 	}
 	var proactiveResolver *oidfed.ProactiveResolver
 	if endpoint := c.Endpoints.ResolveEndpoint; endpoint.IsSet() {
@@ -128,16 +126,16 @@ func main() {
 		lh.AddResolveEndpoint(endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver)
 	}
 	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkStatusEndpoint(endpoint, trustMarkedEntitiesStorage)
+		lh.AddTrustMarkStatusEndpoint(endpoint, backs.TrustMarks)
 	}
 	if endpoint := c.Endpoints.TrustMarkedEntitiesListingEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, trustMarkedEntitiesStorage)
+		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarks)
 	}
 	if endpoint := c.Endpoints.TrustMarkEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkEndpoint(endpoint.EndpointConf, trustMarkedEntitiesStorage, trustMarkCheckerMap)
+		lh.AddTrustMarkEndpoint(endpoint.EndpointConf, backs.TrustMarks, trustMarkCheckerMap)
 	}
 	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkRequestEndpoint(endpoint, trustMarkedEntitiesStorage)
+		lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks)
 	}
 	if endpoint := c.Endpoints.HistoricalKeysEndpoint; endpoint.IsSet() {
 		lh.AddHistoricalKeysEndpoint(
@@ -154,10 +152,10 @@ func main() {
 				panic(err)
 			}
 		}
-		lh.AddEnrollEndpoint(endpoint.EndpointConf, subordinateStorage, checker)
+		lh.AddEnrollEndpoint(endpoint.EndpointConf, backs.Subordinates, checker)
 	}
 	if endpoint := c.Endpoints.EnrollmentRequestEndpoint; endpoint.IsSet() {
-		lh.AddEnrollRequestEndpoint(endpoint, subordinateStorage)
+		lh.AddEnrollRequestEndpoint(endpoint, backs.Subordinates)
 	}
 	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() {
 		var collector oidfed.EntityCollector = &oidfed.SimpleEntityCollector{}
