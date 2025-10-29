@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
+	oidfed "github.com/go-oidfed/lib"
 	"gorm.io/gorm"
 )
 
@@ -97,6 +98,9 @@ type TrustMarkTypesStore interface {
 	Get(ident string) (*TrustMarkType, error)
 	Update(ident string, req AddTrustMarkType) (*TrustMarkType, error)
 	Delete(ident string) error
+	// Aggregates
+	OwnersByType() (oidfed.TrustMarkOwners, error)
+	IssuersByType() (oidfed.AllowedTrustMarkIssuers, error)
 
 	// Issuers
 	ListIssuers(ident string) ([]TrustMarkIssuer, error)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -459,6 +460,46 @@ func (s *TrustMarkTypesStorage) Delete(ident string) error {
 		return errors.Wrap(err, "trust_mark_types: delete failed")
 	}
 	return nil
+}
+
+// OwnersByType returns a map of trust_mark_type -> TrustMarkOwner for all types that have an owner.
+func (s *TrustMarkTypesStorage) OwnersByType() (oidfed.TrustMarkOwners, error) {
+	var types []model.TrustMarkType
+	if err := s.db.Where("owner_id IS NOT NULL").Find(&types).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_types: list owners by type failed")
+	}
+	out := make(oidfed.TrustMarkOwners, len(types))
+	for _, t := range types {
+		var owner model.TrustMarkOwner
+		if err := s.db.First(&owner, *t.OwnerID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// Skip missing owner rows gracefully
+				continue
+			}
+			return nil, errors.Wrap(err, "trust_mark_types: get owner failed")
+		}
+		out[t.TrustMarkType] = oidfed.TrustMarkOwnerSpec{
+			ID:   owner.EntityID,
+			JWKS: owner.JWKS.JWKS(),
+		}
+	}
+	return out, nil
+}
+
+// IssuersByType returns a map of trust_mark_type -> []issuer (entity IDs) for all types.
+func (s *TrustMarkTypesStorage) IssuersByType() (oidfed.AllowedTrustMarkIssuers, error) {
+	// Load all type-issuer relations with preloads
+	var rels []model.TrustMarkTypeIssuer
+	if err := s.db.Preload("TrustMarkType").Preload("Issuer").Find(&rels).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_types: list issuers by type failed")
+	}
+	out := make(oidfed.AllowedTrustMarkIssuers)
+	for _, r := range rels {
+		typ := r.TrustMarkType.TrustMarkType
+		iss := r.Issuer.Issuer
+		out[typ] = append(out[typ], iss)
+	}
+	return out, nil
 }
 
 // Issuers management

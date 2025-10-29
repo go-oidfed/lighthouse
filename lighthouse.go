@@ -246,9 +246,13 @@ func NewLightHouse(
 		EntityStatementSigner: func() (*jwx.EntityStatementSigner, error) {
 			return generalSigner.EntityStatementSigner(), nil
 		},
-		TrustMarks:       nil, //TODO
-		TrustMarkIssuers: nil, //TODO
-		TrustMarkOwners:  nil, //TODO
+		TrustMarks: nil, //TODO
+		TrustMarkIssuers: func() (oidfed.AllowedTrustMarkIssuers, error) {
+			return storages.TrustMarkTypes.IssuersByType()
+		},
+		TrustMarkOwners: func() (oidfed.TrustMarkOwners, error) {
+			return storages.TrustMarkTypes.OwnersByType()
+		},
 		Extra: func() (map[string]any, []string, error) {
 			extra, crits, err := getEntityConfigurationAdditionalClaimsFromDB(storages.AdditionalClaims)
 			if err != nil {
