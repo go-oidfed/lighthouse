@@ -60,7 +60,10 @@ func Register(r fiber.Router, serverURL string, storages model.Backends, fedEnti
 	registerSubordinateKeys(r)
 	registerSubordinateMetadataPolicyCrit(r)
 	// Trust Mark Types and Issuance
-	registerTrustMarkTypes(r)
+	registerTrustMarkTypes(r, storages.TrustMarkTypes)
+	// Global Owners and Issuers
+	registerTrustMarkOwners(r, storages.TrustMarkOwners, storages.TrustMarkTypes)
+	registerTrustMarkIssuers(r, storages.TrustMarkIssuers, storages.TrustMarkTypes)
 	registerTrustMarkIssuance(r)
 	return nil
 }

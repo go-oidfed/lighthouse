@@ -1,6 +1,8 @@
 package adminapi
 
-import "github.com/gofiber/fiber/v2"
+import (
+	"github.com/gofiber/fiber/v2"
+)
 
 func registerEntityTrustMarks(r fiber.Router) {
 	g := r.Group("/entity-configuration/trust-marks")

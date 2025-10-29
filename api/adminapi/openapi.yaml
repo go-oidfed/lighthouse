@@ -1229,8 +1229,8 @@ paths:
               schema:
                 type: array
                 items:
-                  type: string
-          description: Successful response - returns an array of issuer strings.
+                  $ref: '#/components/schemas/TrustMarkIssuer'
+          description: Successful response - returns an array of issuer objects.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
@@ -1246,7 +1246,7 @@ paths:
             schema:
               type: array
               items:
-                type: string
+                $ref: '#/components/schemas/AddTrustMarkIssuer'
         required: true
       responses:
         '200':
@@ -1255,7 +1255,7 @@ paths:
               schema:
                 type: array
                 items:
-                  type: string
+                  $ref: '#/components/schemas/TrustMarkIssuer'
           description: Successfully set the list of issuers for the trust mark type.
         '400':
           $ref: '#/components/responses/BadRequestError'
@@ -1272,7 +1272,17 @@ paths:
         content:
           application/json:
             schema:
-              type: string
+              $ref: '#/components/schemas/AddTrustMarkIssuer'
+            examples:
+              Link existing Issuer:
+                value:
+                  issuer_id: 99
+                description: Link an existing Issuer to the TrustMarkType.
+              Create new Issuer:
+                value:
+                  issuer: https://issuer.example.org
+                  description: Trusted Issuer Inc.
+                description: Create a new Issuer for the TrustMarkType.
         required: true
       responses:
         '201':
@@ -1281,7 +1291,7 @@ paths:
               schema:
                 type: array
                 items:
-                  type: string
+                  $ref: '#/components/schemas/TrustMarkIssuer'
           description: Successfully added issuer to the trust mark type.
         '400':
           $ref: '#/components/responses/BadRequestError'
@@ -1293,13 +1303,13 @@ paths:
       summary: Add an issuer to a TrustMarkType
     parameters:
       - $ref: '#/components/parameters/TrustMarkTypeIDParam'
-  /api/v1/admin/trust-marks/types/{trustMarkTypeID}/issuers/{issuer}:
+  /api/v1/admin/trust-marks/types/{trustMarkTypeID}/issuers/{issuerID}:
     delete:
       tags:
         - Federation Trust Marks
       parameters:
         - $ref: '#/components/parameters/TrustMarkTypeIDParam'
-        - $ref: '#/components/parameters/IssuerParam'
+        - $ref: '#/components/parameters/IssuerIDParam'
       responses:
         '200':
           content:
@@ -1307,7 +1317,7 @@ paths:
               schema:
                 type: array
                 items:
-                  type: string
+                  $ref: '#/components/schemas/TrustMarkIssuer'
           description: Successfully deleted issuer for the trust mark type. Response contains updated list.
         '204':
           description: Successfully deleted issuer for the trust mark type.
@@ -1317,6 +1327,308 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: deleteTrustMarkTypeIssuer
       summary: Delete an issuer for a TrustMarkType
+  /api/v1/admin/trust-marks/owners:
+    summary: Path used to manage global trust mark owners.
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkOwner'
+          description: Successful response - returns all owners.
+    post:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkOwnerCreate'
+          required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkOwner'
+          description: Created owner.
+    
+  /api/v1/admin/trust-marks/owners/{ownerID}:
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkOwner'
+          description: Owner.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    put:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkOwnerCreate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkOwner'
+          description: Updated owner.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    parameters:
+      - $ref: '#/components/parameters/OwnerIDParam'
+  /api/v1/admin/trust-marks/owners/{ownerID}/types:
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkType'
+          description: Successful response - returns an array of linked TrustMarkType entities.
+      operationId: listOwnerTypes
+      summary: List trust mark types linked to owner
+    put:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/InternalID'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkType'
+          description: Successfully replaced the list of TrustMarkTypes linked to the owner.
+      operationId: setOwnerTypes
+      summary: Replace owner’s trust mark type links
+    post:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InternalID'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkType'
+          description: Successfully added the TrustMarkType link to the owner. Response contains updated list.
+      operationId: addOwnerType
+      summary: Add a trust mark type link to owner
+    parameters:
+      - $ref: '#/components/parameters/OwnerIDParam'
+  /api/v1/admin/trust-marks/owners/{ownerID}/types/{trustMarkTypeID}:
+    delete:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '204':
+          description: Successfully unlinked the TrustMarkType from the owner.
+      operationId: unlinkOwnerType
+      summary: Unlink a trust mark type from owner
+    parameters:
+      - $ref: '#/components/parameters/OwnerIDParam'
+      - $ref: '#/components/parameters/TrustMarkTypeIDParam'
+  /api/v1/admin/trust-marks/issuers:
+    summary: Path used to manage global trust mark issuers.
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkIssuer'
+    post:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkIssuerCreate'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkIssuer'
+  /api/v1/admin/trust-marks/issuers/{issuerID}:
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkIssuer'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    put:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMarkIssuerCreate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMarkIssuer'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    parameters:
+      - $ref: '#/components/parameters/IssuerIDParam'
+        examples:
+          numericID:
+            summary: Numeric ID
+            value: 42
+          uuid:
+            summary: UUID
+            value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+  /api/v1/admin/trust-marks/issuers/{issuerID}/types:
+    get:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkType'
+          description: Successful response - returns an array of linked TrustMarkType entities.
+      operationId: listIssuerTypes
+      summary: List trust mark types linked to issuer
+    put:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/InternalID'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkType'
+          description: Successfully replaced the list of TrustMarkTypes linked to the issuer.
+      operationId: setIssuerTypes
+      summary: Replace issuer’s trust mark type links
+    post:
+      tags:
+        - Federation Trust Marks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InternalID'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustMarkType'
+          description: Successfully added the TrustMarkType link to the issuer. Response contains updated list.
+      operationId: addIssuerType
+      summary: Add a trust mark type link to issuer
+    parameters:
+      - $ref: '#/components/parameters/IssuerIDParam'
+        examples:
+          numericID:
+            summary: Numeric ID
+            value: 42
+          uuid:
+            summary: UUID
+            value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+  /api/v1/admin/trust-marks/issuers/{issuerID}/types/{trustMarkTypeID}:
+    delete:
+      tags:
+        - Federation Trust Marks
+      responses:
+        '204':
+          description: Successfully unlinked the TrustMarkType from the issuer.
+      operationId: unlinkIssuerType
+      summary: Unlink a trust mark type from issuer
+    parameters:
+      - $ref: '#/components/parameters/IssuerIDParam'
+        examples:
+          numericID:
+            summary: Numeric ID
+            value: 42
+          uuid:
+            summary: UUID
+            value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+      - $ref: '#/components/parameters/TrustMarkTypeIDParam'
   /api/v1/admin/trust-marks/issuance-spec:
     summary: Path used to manage issuance specifications for trust mark types.
     description: >-
@@ -1720,7 +2032,7 @@ paths:
         description: The ID of the subject-specific additional claim row.
         schema:
           type: integer
-  /api/v1/admin/trust-marks/type/{trustMarkTypeID}/owner:
+  /api/v1/admin/trust-marks/types/{trustMarkTypeID}/owner:
     summary: Path used to manage the single owner of a trust mark type.
     description: Manage the single TrustMarkOwner associated with a trust mark type (or none).
     get:
@@ -1745,7 +2057,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustMarkOwner'
+              $ref: '#/components/schemas/AddTrustMarkOwnerCreate'
         required: true
       tags:
         - Federation Trust Marks
@@ -1771,6 +2083,23 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AddTrustMarkOwner'
+            examples:
+              Link existing Owner:
+                value:
+                  owner_id: 29
+                description: Link an existing Trust Mark Owner to the trust mark type.
+              Create new Owner:
+                value:
+                  entity_id: https://owner.example.org
+                  jwks:
+                    jwks:
+                      - kty: EC
+                        crv: P-256
+                        kid: 'owner-12345'
+                        x: o-7zraXKDaoBte2PsuTXo-MSLzsyWdAElNptGgI4aH8
+                        y: Xr_wCzJ1XnsgAIV5qHruzSwaNnwy87UjmevVklTpIv8
+                        alg: ES256
+                description: Create a new Trust Mark Owner.
         required: true
       tags:
         - Federation Trust Marks
@@ -3997,11 +4326,44 @@ components:
               y: Xr_wCzJ1XnsgAIV5qHruzSwaNnwy87UjmevVklTpIv8
               alg: ES256
     AddTrustMarkOwner:
-      description: Data to add a trust mark owner.
+      description: Data to add or link a trust mark owner.
+      oneOf:
+        - type: object
+          required:
+            - owner_id
+          properties:
+            owner_id:
+              $ref: '#/components/schemas/InternalID'
+              description: Reference to an existing global owner (internal id).
+          example:
+            owner_id: 42
+        - type: object
+          required:
+            - entity_id
+            - jwks
+          properties:
+            entity_id:
+              $ref: '#/components/schemas/EntityID'
+              description: The Entity ID of the owner.
+            jwks:
+              $ref: '#/components/schemas/Jwks'
+              description: The JWKS of the owner.
+          example:
+            entity_id: https://owner.example.org
+            jwks:
+              jwks:
+                - kty: EC
+                  crv: P-256
+                  kid: 'owner-12345'
+                  x: o-7zraXKDaoBte2PsuTXo-MSLzsyWdAElNptGgI4aH8
+                  y: Xr_wCzJ1XnsgAIV5qHruzSwaNnwy87UjmevVklTpIv8
+                  alg: ES256
+    AddTrustMarkOwnerCreate:
+      description: Data to create a new trust mark owner.
+      type: object
       required:
         - entity_id
         - jwks
-      type: object
       properties:
         entity_id:
           $ref: '#/components/schemas/EntityID'
@@ -4009,6 +4371,16 @@ components:
         jwks:
           $ref: '#/components/schemas/Jwks'
           description: The JWKS of the owner.
+      example:
+        entity_id: https://owner.example.org
+        jwks:
+          jwks:
+            - kty: EC
+              crv: P-256
+              kid: 'owner-12345'
+              x: o-7zraXKDaoBte2PsuTXo-MSLzsyWdAElNptGgI4aH8
+              y: Xr_wCzJ1XnsgAIV5qHruzSwaNnwy87UjmevVklTpIv8
+              alg: ES256
     TrustMarkType:
       description: A trust mark type definition.
       required:
@@ -4041,7 +4413,7 @@ components:
           description: Issuers authorized for this trust mark type.
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/AddTrustMarkIssuer'
         trust_mark_owner:
           description: Optional owner to set for this trust mark type.
           $ref: '#/components/schemas/AddTrustMarkOwner'
@@ -4253,6 +4625,64 @@ components:
         status:
           type: string
           description: The status value to set.
+
+    TrustMarkIssuer:
+      description: A trust mark issuer object.
+      required:
+        - id
+        - issuer
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/InternalID'
+          description: Internal identifier for this issuer record.
+        issuer:
+          type: string
+          description: The issuer identifier (Entity ID).
+        description:
+          type: string
+          description: Optional human-readable description for this issuer.
+      example:
+        id: 1
+        issuer: https://issuer.example.org
+        description: Example issuer
+    AddTrustMarkIssuer:
+      description: Data to add or link a trust mark issuer.
+      oneOf:
+        - type: object
+          required:
+            - issuer_id
+          properties:
+            issuer_id:
+              $ref: '#/components/schemas/InternalID'
+              description: Reference to an existing global issuer (internal id).
+        - type: object
+          required:
+            - issuer
+          properties:
+            issuer:
+              type: string
+              description: The issuer identifier (Entity ID).
+            description:
+              type: string
+              description: Optional human-readable description for this issuer.
+
+    AddTrustMarkIssuerCreate:
+      description: Data to create a new trust mark issuer.
+      type: object
+      required:
+        - issuer
+      properties:
+        issuer:
+          type: string
+          description: The issuer identifier (Entity ID).
+        description:
+          type: string
+          description: Optional human-readable description for this issuer.
+      example:
+        issuer: https://issuer.example.org
+        description: Trusted Issuer Inc.
+
   responses:
     BadRequestError:
       content:
@@ -4456,6 +4886,34 @@ components:
       schema:
         type: string
       example: https://tmi.example.com
+    OwnerIDParam:
+      name: ownerID
+      in: path
+      required: true
+      description: The internal ID of the trust mark owner
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
+    IssuerIDParam:
+      name: issuerID
+      in: path
+      required: true
+      description: The internal ID of the trust mark issuer
+      schema:
+        $ref: '#/components/schemas/InternalID'
+      examples:
+        numericID:
+          summary: Numeric ID
+          value: 42
+        uuid:
+          summary: UUID
+          value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
 tags:
   - name: Entity Configuration
     description: Endpoints related to the entity configuration document.

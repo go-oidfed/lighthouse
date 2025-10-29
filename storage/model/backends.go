@@ -7,6 +7,9 @@ type Backends struct {
 	Subordinates     SubordinateStorageBackend
 	TrustMarks       TrustMarkedEntitiesStorageBackend
 	AuthorityHints   AuthorityHintsStore
+	TrustMarkTypes   TrustMarkTypesStore
+	TrustMarkOwners  TrustMarkOwnersStore
+	TrustMarkIssuers TrustMarkIssuersStore
 	AdditionalClaims AdditionalClaimsStore
 	KV               KeyValueStore
 }

@@ -127,6 +127,9 @@ func LoadStorageBackends(cfg Config) (model.Backends, error) {
 		Subordinates:     warehouse.SubordinateStorage(),
 		TrustMarks:       warehouse.TrustMarkedEntitiesStorage(),
 		AuthorityHints:   warehouse.AuthorityHintsStorage(),
+		TrustMarkTypes:   warehouse.TrustMarkTypesStorage(),
+		TrustMarkOwners:  warehouse.TrustMarkOwnersStorage(),
+		TrustMarkIssuers: warehouse.TrustMarkIssuersStorage(),
 		AdditionalClaims: warehouse.AdditionalClaimsStorage(),
 		KV:               warehouse.KeyValue(),
 	}, nil
