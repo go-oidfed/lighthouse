@@ -68,13 +68,6 @@ func Register(r fiber.Router, serverURL string, storages model.Backends, fedEnti
 	return nil
 }
 
-type openAPIServers struct {
-	Servers []struct {
-		URL         string `yaml:"url"`
-		Description string `yaml:"description,omitempty"`
-	} `yaml:"servers"`
-}
-
 func updateOpenAPIServers(doc []byte, serverURL string) []byte {
 	if len(serverURL) == 0 {
 		return doc
