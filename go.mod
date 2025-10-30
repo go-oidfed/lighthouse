@@ -6,11 +6,11 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.8.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.7.2-0.20251020132443-4b68b51f9b2d
+	github.com/go-oidfed/lib v0.8.1
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/lestrrat-go/jwx/v3 v3.0.12
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.14.1
+	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.10.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
@@ -29,7 +29,8 @@ require (
 	github.com/TwiN/gocache/v2 v2.4.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
+	github.com/clipperhouse/stringish v0.1.1 // indirect
+	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/coreos/go-oidc/v3 v3.16.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/dgraph-io/ristretto/v2 v2.2.0 // indirect
@@ -69,7 +70,7 @@ require (
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.67.0 // indirect
+	github.com/valyala/fasthttp v1.68.0 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
@@ -77,7 +78,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/exp v0.0.0-20251017212417-90e834f514db // indirect
+	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
