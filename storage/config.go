@@ -83,6 +83,17 @@ type Config struct {
 	DataDir string `yaml:"data_dir"`
 	// Debug enables debug logging
 	Debug bool `yaml:"debug"`
+	// UsersHash defines parameters for hashing admin user passwords
+	UsersHash Argon2idParams
+}
+
+// Argon2idParams configures Argon2id hashing parameters
+type Argon2idParams struct {
+	Time        uint32
+	MemoryKiB   uint32
+	Parallelism uint8
+	KeyLen      uint32
+	SaltLen     uint32
 }
 
 // Connect establishes a connection to the database based on the configuration
@@ -132,5 +143,6 @@ func LoadStorageBackends(cfg Config) (model.Backends, error) {
 		TrustMarkIssuers: warehouse.TrustMarkIssuersStorage(),
 		AdditionalClaims: warehouse.AdditionalClaimsStorage(),
 		KV:               warehouse.KeyValue(),
+		Users:            warehouse.UsersStorage(),
 	}, nil
 }

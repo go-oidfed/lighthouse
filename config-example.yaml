@@ -13,6 +13,21 @@ federation_data:
 storage:
   backend: json
   data_dir: "/data"
+
+api:
+  admin:
+    enabled: true
+    users_enabled: true
+    # Port for admin API. 0 means serve on main server.
+    port: 0
+    # Admin users password hashing parameters (Argon2id). Defaults shown below.
+    password_hashing:
+      time: 1
+      memory_kib: 65536
+      parallelism: 4
+      key_len: 64
+      salt_len: 32
+
 endpoints:
   fetch:
     path: "/fetch"

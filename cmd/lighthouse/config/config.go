@@ -20,6 +20,7 @@ type Config struct {
 	Signing    signingConf           `yaml:"signing"`
 	Endpoints  Endpoints             `yaml:"endpoints"`
 	Federation federationConf        `yaml:"federation_data"`
+	API        apiConf               `yaml:"api"`
 }
 
 type configValidator interface {
@@ -59,6 +60,7 @@ var c = Config{
 	Signing:    defaultSigningConf,
 	Endpoints:  defaultEndpointConf,
 	Federation: defaultFederationConf,
+	API:        defaultAPIConf,
 }
 
 // Get returns the Config

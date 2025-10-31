@@ -12,4 +12,5 @@ type Backends struct {
 	TrustMarkIssuers TrustMarkIssuersStore
 	AdditionalClaims AdditionalClaimsStore
 	KV               KeyValueStore
+	Users            UsersStore
 }

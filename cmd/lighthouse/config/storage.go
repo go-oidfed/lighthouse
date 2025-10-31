@@ -17,6 +17,8 @@ type storageConf struct {
 	Debug bool `yaml:"debug"`
 }
 
+// users hashing parameters moved under api.admin.users_hash
+
 func (c *storageConf) validate() error {
 	if c.BackendType != "" {
 		return errors.New("backend types have been deprecated; please migrate to gorm")

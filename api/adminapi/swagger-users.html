@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Federation Admin API</title>
+  <title>Admin Users API</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
   <style>
     html, body { margin: 0; padding: 0; height: 100%; }
@@ -12,19 +12,21 @@
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
   <script>
-    function renderUsersLink() {
+    // Link to main docs for convenience
+    function renderLink() {
       const link = document.createElement('div');
       link.style.cssText = 'position:fixed;top:10px;right:10px;z-index:1000;background:#f5f5f5;padding:6px 10px;border-radius:6px;border:1px solid #ddd;font-family: sans-serif;';
-      link.innerHTML = '<a href="docs/users">Users API Docs</a>';
+      link.innerHTML = '<a href="../docs">Back to Admin API Docs</a>';
       document.body.appendChild(link);
     }
   </script>
+  
 </head>
-<body onload="renderUsersLink()">
+<body onload="renderLink()">
   <div id="swagger-ui"></div>
   <script>
     window.ui = SwaggerUIBundle({
-      url: 'openapi.yaml',
+      url: '../openapi-users.yaml',
       dom_id: '#swagger-ui',
       presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
       layout: 'BaseLayout',
@@ -34,3 +36,4 @@
   </script>
   </body>
 </html>
+

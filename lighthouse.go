@@ -58,10 +58,10 @@ type LightHouse struct {
 	*oidfed.TrustMarkIssuer
 	*jwx.GeneralJWTSigner
 	SubordinateStatementsConfig
-	server                            *fiber.App
-	serverConf                        ServerConf
-	fedMetadata                       oidfed.FederationEntityMetadata
-	entityConfigurationCritExtensions []string
+	server         *fiber.App
+	adminAPIServer *fiber.App
+	serverConf     ServerConf
+	fedMetadata    oidfed.FederationEntityMetadata
 }
 
 // SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
@@ -165,6 +165,7 @@ func NewLightHouse(
 	signer jwx.VersatileSigner, signingAlg jwa.SignatureAlgorithm,
 	stmtConfig SubordinateStatementsConfig,
 	storages model.Backends,
+	admin AdminAPIOptions,
 ) (
 	*LightHouse,
 	error,
@@ -291,10 +292,30 @@ func NewLightHouse(
 			return ctx.Send(jwt)
 		},
 	)
-	if err := adminapi.Register(
-		server.Group("/api/v1/admin"), entityID, storages, entity.FederationEntity,
-	); err != nil {
-		return nil, err
+	// Initialize Admin API according to options
+	if admin.Enabled {
+		if admin.Port > 0 && admin.Port != serverConf.Port {
+			// Separate admin server
+			adminApp := fiber.New(FiberServerConfig)
+			adminApp.Use(recover.New())
+			adminApp.Use(compress.New())
+			adminApp.Use(logger.New())
+			adminApp.Use(requestid.New())
+			entity.adminAPIServer = adminApp
+			entity.serverConf.AdminAPIPort = admin.Port
+		} else {
+			// Mount on main server
+			entity.adminAPIServer = server
+		}
+		if err := adminapi.Register(
+			entity.adminAPIServer.Group("/api/v1/admin"), entityID, storages,
+			entity.FederationEntity, &adminapi.Options{
+				UsersEnabled: admin.UsersEnabled,
+				Port:         admin.Port,
+			},
+		); err != nil {
+			return nil, err
+		}
 	}
 	return entity, nil
 }
@@ -312,9 +333,15 @@ func (fed LightHouse) Listen(addr string) error {
 
 func (fed LightHouse) Start() {
 	conf := fed.serverConf
+	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
+		log.WithField("port", conf.AdminAPIPort).Info("starting admin api server")
+		go func() {
+			log.WithError(fed.adminAPIServer.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort))).Fatal()
+		}()
+	}
 	if !conf.TLS.Enabled {
 		log.WithField("port", conf.Port).Info("TLS is disabled starting http server")
-		log.WithError(fed.server.Listen(fmt.Sprintf(":%d", conf.Port))).Fatal()
+		log.WithError(fed.server.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.Port))).Fatal()
 	}
 	// TLS enabled
 	if conf.TLS.RedirectHTTP {
@@ -330,12 +357,12 @@ func (fed LightHouse) Start() {
 		)
 		log.Info("TLS and http redirect enabled, starting redirect server on port 80")
 		go func() {
-			log.WithError(httpServer.Listen(":80")).Fatal()
+			log.WithError(httpServer.Listen(conf.IPListen + ":80")).Fatal()
 		}()
 	}
 	time.Sleep(time.Millisecond) // This is just for a more pretty output with the tls header printed after the http one
 	log.Info("TLS enabled, starting https server on port 443")
-	log.WithError(fed.server.ListenTLS(":443", conf.TLS.Cert, conf.TLS.Key)).Fatal()
+	log.WithError(fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key)).Fatal()
 }
 
 // CreateSubordinateStatement returns an oidfed.EntityStatementPayload for the passed storage.SubordinateInfo
@@ -355,4 +382,12 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateI
 		MetadataPolicyCrit: fed.MetadataPolicyCrit,
 		Extra:              utils.MergeMaps(true, fed.SubordinateStatementsConfig.Extra, map[string]any{}),
 	}
+}
+
+// AdminAPIOptions controls initialization of the admin API.
+type AdminAPIOptions struct {
+	Enabled      bool
+	UsersEnabled bool
+	// Port: 0 mounts on main server under /api/v1/admin; >0 starts a separate server on this port
+	Port int
 }

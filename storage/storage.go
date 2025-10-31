@@ -4,17 +4,19 @@ import (
 	"fmt"
 	"strconv"
 
-	oidfed "github.com/go-oidfed/lib"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	oidfed "github.com/go-oidfed/lib"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // Storage is a GORM-based storage implementation
 type Storage struct {
-	db *gorm.DB
+	db         *gorm.DB
+	userParams Argon2idParams
 }
 
 var models = []any{
@@ -36,6 +38,7 @@ var models = []any{
 	&model.AuthorityHint{},
 	&model.SubordinateAdditionalClaim{},
 	&model.EntityConfigurationAdditionalClaim{},
+	&model.User{},
 }
 
 // NewStorage creates a new GORM-based storage
@@ -50,7 +53,16 @@ func NewStorage(config Config) (*Storage, error) {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 
-	return &Storage{db: db}, nil
+	// Fill user hash params with defaults if zero values
+	params := config.UsersHash
+	if params.Time == 0 {
+		params = defaultArgon2idParams()
+	}
+
+	return &Storage{
+		db:         db,
+		userParams: params,
+	}, nil
 }
 
 // SubordinateStorage returns a SubordinateStorageBackend
@@ -82,6 +94,8 @@ func (s *Storage) TrustMarkOwnersStorage() *TrustMarkOwnersStorage {
 func (s *Storage) TrustMarkIssuersStorage() *TrustMarkIssuersStorage {
 	return &TrustMarkIssuersStorage{db: s.db}
 }
+
+// Users storage is implemented in users_storage.go
 
 // SubordinateStorage implements the SubordinateStorageBackend interface
 type SubordinateStorage struct {

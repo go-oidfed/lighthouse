@@ -13,6 +13,7 @@ import (
 	"github.com/go-oidfed/lighthouse"
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 	"github.com/go-oidfed/lighthouse/internal/logger"
+	"github.com/go-oidfed/lighthouse/storage"
 )
 
 func main() {
@@ -48,7 +49,15 @@ func main() {
 		}
 	}
 
-	backs, err := config.LoadStorageBackends(c.Storage)
+	// Build storage with user hash params coming from api.admin.users_hash
+	storageCfg := storage.Config{
+		Driver:    c.Storage.Driver,
+		DSN:       c.Storage.DSN,
+		DataDir:   c.Storage.DataDir,
+		Debug:     c.Storage.Debug,
+		UsersHash: c.API.Admin.Argon2idParams,
+	}
+	backs, err := storage.LoadStorageBackends(storageCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,6 +72,11 @@ func main() {
 			// TODO read all of this from config or a storage backend
 		},
 		backs,
+		lighthouse.AdminAPIOptions{
+			Enabled:      c.API.Admin.Enabled,
+			UsersEnabled: c.API.Admin.UsersEnabled,
+			Port:         c.API.Admin.Port,
+		},
 	)
 	if err != nil {
 		panic(err)
