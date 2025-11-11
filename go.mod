@@ -1,12 +1,12 @@
 module github.com/go-oidfed/lighthouse
 
-go 1.24.4
+go 1.25.1
 
 require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.8.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.8.1
+	github.com/go-oidfed/lib v0.8.2
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/lestrrat-go/jwx/v3 v3.0.12
 	github.com/pkg/errors v0.9.1
@@ -14,7 +14,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.10.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	github.com/zachmann/go-utils v0.0.0-20250930110126-c5ff4cbcb3d3
+	github.com/zachmann/go-utils v0.0.0-20251110102534-86c6793a17ed
 	gopkg.in/yaml.v3 v3.0.1
 	tideland.dev/go/slices v0.2.0
 )
