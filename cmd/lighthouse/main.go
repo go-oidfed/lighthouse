@@ -27,7 +27,10 @@ func main() {
 	if redisAddr := c.Caching.RedisAddr; redisAddr != "" {
 		if err := cache.UseRedisCache(
 			&redis.Options{
-				Addr: redisAddr,
+				Addr:     redisAddr,
+				Username: c.Caching.Username,
+				Password: c.Caching.Password,
+				DB:       c.Caching.RedisDB,
 			},
 		); err != nil {
 			log.WithError(err).Fatal("could not init redis cache")
