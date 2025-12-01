@@ -167,7 +167,24 @@ func (fed LightHouse) Listen(addr string) error {
 	return fed.server.Listen(addr)
 }
 
+func (fed LightHouse) banner() {
+	banner := ` #                             #     #                             
+ #       #  ####  #    # ##### #     #  ####  #    #  ####  ###### 
+ #       # #    # #    #   #   #     # #    # #    # #      #      
+ #       # #      ######   #   ####### #    # #    #  ####  #####  
+ #       # #  ### #    #   #   #     # #    # #    #      # #      
+ #       # #    # #    #   #   #     # #    # #    # #    # #      
+ ####### #  ####  #    #   #   #     #  ####   ####   ####  ###### 
+`
+	bannerWidth := 68
+	vLen := len(version.VERSION)
+	paddingLen := (bannerWidth - vLen) / 2
+	fmt.Printf("%s\n%s\n\n", banner, strings.Repeat(" ", paddingLen)+version.VERSION)
+}
+
 func (fed LightHouse) Start() {
+	fed.banner()
+
 	conf := fed.serverConf
 	if !conf.TLS.Enabled {
 		log.WithField("port", conf.Port).Info("TLS is disabled starting http server")
