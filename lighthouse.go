@@ -202,7 +202,7 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *storage.Subordinat
 		Issuer:             fed.FederationEntity.EntityID,
 		Subject:            subordinate.EntityID,
 		IssuedAt:           unixtime.Unixtime{Time: now},
-		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime * time.Second)},
+		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime)},
 		SourceEndpoint:     fed.Metadata.FederationEntity.FederationFetchEndpoint,
 		JWKS:               subordinate.JWKS,
 		Metadata:           subordinate.Metadata,
