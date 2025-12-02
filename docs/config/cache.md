@@ -69,3 +69,34 @@ Redis instance with other applications.
       redis_addr: "localhost:6379"
       redis_db: 1
     ```
+
+## `disabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Disables caching entirely when set to `true`. Lighthouse uses a no-op cache and does not persist or reuse responses.
+
+!!! warning
+
+    This has serious performance implications. Only disable caching for testing / debuging!
+
+??? file "config.yaml"
+
+    ```yaml
+    cache:
+      disabled: true
+    ```
+
+## `max_lifetime`
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Sets the maximum lifetime for cached entries. When configured, this upper bound controls how long items may remain 
+in the cache before they are considered expired and refreshed. If unset or `0`, no upper limit is used.
+
+??? file "config.yaml"
+
+    ```yaml
+    cache:
+      max_lifetime: "6h"
+    ```
