@@ -23,3 +23,80 @@ Typical formats:
     cache:
       redis_addr: "localhost:6379"
     ```
+
+## `username`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Sets the Redis ACL username used to authenticate to the server.
+Leave empty when Redis is configured without ACL users.
+
+??? file "config.yaml"
+
+    ```yaml
+    cache:
+      redis_addr: "localhost:6379"
+      username: "app-user"
+    ```
+
+## `password`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Sets the password for Redis authentication. Used with or without `username`
+depending on your Redis setup.
+
+??? file "config.yaml"
+
+    ```yaml
+    cache:
+      redis_addr: "localhost:6379"
+      password: "s3cr3t-pass"
+    ```
+
+## `redis_db`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Selects the Redis logical database index to use. Defaults to `0` if not
+set. Common deployments use `0`; choose another index when sharing a
+Redis instance with other applications.
+
+??? file "config.yaml"
+
+    ```yaml
+    cache:
+      redis_addr: "localhost:6379"
+      redis_db: 1
+    ```
+
+## `disabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Disables caching entirely when set to `true`. Lighthouse uses a no-op cache and does not persist or reuse responses.
+
+!!! warning
+
+    This has serious performance implications. Only disable caching for testing / debuging!
+
+??? file "config.yaml"
+
+    ```yaml
+    cache:
+      disabled: true
+    ```
+
+## `max_lifetime`
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Sets the maximum lifetime for cached entries. When configured, this upper bound controls how long items may remain 
+in the cache before they are considered expired and refreshed. If unset or `0`, no upper limit is used.
+
+??? file "config.yaml"
+
+    ```yaml
+    cache:
+      max_lifetime: "6h"
+    ```

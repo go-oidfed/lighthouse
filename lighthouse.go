@@ -1,6 +1,7 @@
 package lighthouse
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
+	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -18,10 +22,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/go-oidfed/lib"
-	"github.com/go-oidfed/lib/cache"
-	"github.com/go-oidfed/lib/unixtime"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
 	"github.com/go-oidfed/lighthouse/internal/utils"
@@ -62,6 +62,8 @@ type LightHouse struct {
 	adminAPIServer *fiber.App
 	serverConf     ServerConf
 	fedMetadata    oidfed.FederationEntityMetadata
+	LogoBanner     bool
+	VersionBanner  bool
 }
 
 // SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
@@ -187,6 +189,8 @@ func NewLightHouse(
 		SubordinateStatementsConfig: stmtConfig,
 		server:                      server,
 		serverConf:                  serverConf,
+		LogoBanner:                  true,
+		VersionBanner:               true,
 	}
 
 	entity.FederationEntity = &oidfed.DynamicFederationEntity{
@@ -331,7 +335,25 @@ func (fed LightHouse) Listen(addr string) error {
 	return fed.server.Listen(addr)
 }
 
+//go:embed banner.txt
+var bannerTxt string
+
+func (fed LightHouse) banner() {
+	bannerWidth := 0
+	if fed.LogoBanner {
+		bannerWidth = 104
+		fmt.Println(bannerTxt)
+	}
+	if fed.VersionBanner {
+		fmt.Println(version.Banner(bannerWidth))
+	} else {
+		log.WithField("version", version.VERSION).Info("Starting lighthouse")
+	}
+}
+
 func (fed LightHouse) Start() {
+	fed.banner()
+
 	conf := fed.serverConf
 	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
 		log.WithField("port", conf.AdminAPIPort).Info("starting admin api server")
@@ -372,7 +394,7 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateI
 		Issuer:             fed.FederationEntity.EntityID(),
 		Subject:            subordinate.EntityID,
 		IssuedAt:           unixtime.Unixtime{Time: now},
-		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime * time.Second)},
+		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime)},
 		SourceEndpoint:     fed.fedMetadata.FederationFetchEndpoint,
 		JWKS:               subordinate.JWKS.JWKS(),
 		Metadata:           subordinate.Metadata,

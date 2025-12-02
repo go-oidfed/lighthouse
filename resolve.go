@@ -81,7 +81,12 @@ func (fed *LightHouse) AddResolveEndpoint(
 			if err != nil {
 				return err
 			}
-			return writeResponse(ctx, res)
+			if res != nil {
+				return writeResponse(ctx, res)
+			}
+			// we are here only if createResolveResponse returned send an
+			// error (ctx.JSON(Error)), but that was successful.
+			return nil
 		},
 	)
 }

@@ -25,15 +25,24 @@ func main() {
 	logger.Init()
 	log.Info("Loaded Config")
 	c := config.Get()
-	if redisAddr := c.Caching.RedisAddr; redisAddr != "" {
+
+	if c.Caching.Disabled {
+		cache.UseNoopCache()
+	} else if redisAddr := c.Caching.RedisAddr; redisAddr != "" {
 		if err := cache.UseRedisCache(
 			&redis.Options{
-				Addr: redisAddr,
+				Addr:     redisAddr,
+				Username: c.Caching.Username,
+				Password: c.Caching.Password,
+				DB:       c.Caching.RedisDB,
 			},
 		); err != nil {
 			log.WithError(err).Fatal("could not init redis cache")
 		}
 		log.Info("Loaded Redis Cache")
+	}
+	if c.Caching.MaxLifetime.Duration() != 0 {
+		cache.SetMaxLifetime(c.Caching.MaxLifetime.Duration())
 	}
 	err := initKey()
 	if err != nil {
@@ -81,6 +90,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	lh.LogoBanner = c.Logging.Banner.Logo
+	lh.VersionBanner = c.Logging.Banner.Version
 
 	lh.MetadataPolicies = c.Federation.MetadataPolicy
 	lh.Constraints = c.Federation.Constraints

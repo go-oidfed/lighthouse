@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
 )
@@ -12,7 +12,7 @@ type signingConf struct {
 	RSAKeyLen            int                    `yaml:"rsa_key_len"`
 	KeyFile              string                 `yaml:"key_file"`
 	KeyDir               string                 `yaml:"key_dir"`
-	AutomaticKeyRollover jwx.RolloverConf       `yaml:"automatic_key_rollover"`
+	AutomaticKeyRollover kms.KeyRotationConfig  `yaml:"automatic_key_rollover"`
 	AutoGenerateKeys     bool                   `yaml:"auto_generate_keys"`
 }
 
@@ -20,7 +20,7 @@ var defaultSigningConf = signingConf{
 	Alg:              "ES512",
 	RSAKeyLen:        2048,
 	AutoGenerateKeys: true,
-	AutomaticKeyRollover: jwx.RolloverConf{
+	AutomaticKeyRollover: kms.KeyRotationConfig{
 		Enabled:  false,
 		Interval: 600000,
 	},
