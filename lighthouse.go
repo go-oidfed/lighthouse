@@ -1,14 +1,18 @@
 package lighthouse
 
 import (
+	_ "embed"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
+	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -17,10 +21,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/go-oidfed/lib"
-	"github.com/go-oidfed/lib/cache"
-	"github.com/go-oidfed/lib/unixtime"
 
 	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/internal/version"
@@ -56,8 +56,10 @@ type LightHouse struct {
 	*oidfed.TrustMarkIssuer
 	*jwx.GeneralJWTSigner
 	SubordinateStatementsConfig
-	server     *fiber.App
-	serverConf ServerConf
+	server        *fiber.App
+	serverConf    ServerConf
+	LogoBanner    bool
+	VersionBanner bool
 }
 
 // SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
@@ -127,6 +129,8 @@ func NewLightHouse(
 		SubordinateStatementsConfig: stmtConfig,
 		server:                      server,
 		serverConf:                  serverConf,
+		LogoBanner:                  true,
+		VersionBanner:               true,
 	}
 	server.Get(
 		"/.well-known/openid-federation", func(ctx *fiber.Ctx) error {
@@ -167,19 +171,20 @@ func (fed LightHouse) Listen(addr string) error {
 	return fed.server.Listen(addr)
 }
 
+//go:embed banner.txt
+var bannerTxt string
+
 func (fed LightHouse) banner() {
-	banner := ` #                             #     #                             
- #       #  ####  #    # ##### #     #  ####  #    #  ####  ###### 
- #       # #    # #    #   #   #     # #    # #    # #      #      
- #       # #      ######   #   ####### #    # #    #  ####  #####  
- #       # #  ### #    #   #   #     # #    # #    #      # #      
- #       # #    # #    #   #   #     # #    # #    # #    # #      
- ####### #  ####  #    #   #   #     #  ####   ####   ####  ###### 
-`
-	bannerWidth := 68
-	vLen := len(version.VERSION)
-	paddingLen := (bannerWidth - vLen) / 2
-	fmt.Printf("%s\n%s\n\n", banner, strings.Repeat(" ", paddingLen)+version.VERSION)
+	bannerWidth := 0
+	if fed.LogoBanner {
+		bannerWidth = 104
+		fmt.Println(bannerTxt)
+	}
+	if fed.VersionBanner {
+		fmt.Println(version.Banner(bannerWidth))
+	} else {
+		log.WithField("version", version.VERSION).Info("Starting lighthouse")
+	}
 }
 
 func (fed LightHouse) Start() {

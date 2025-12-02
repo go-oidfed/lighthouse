@@ -84,6 +84,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	lh.LogoBanner = c.Logging.Banner.Logo
+	lh.VersionBanner = c.Logging.Banner.Version
 
 	lh.MetadataPolicies = c.Federation.MetadataPolicy
 	lh.Constraints = c.Federation.Constraints

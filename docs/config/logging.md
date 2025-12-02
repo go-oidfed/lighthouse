@@ -104,3 +104,36 @@ The `dir` option is used to specify the directory where smart error log
 files should be stored.
 If not set and smart logging is enabled, smart error logs are placed in the 
 same directory as the regular internal log file.
+
+## `banner`
+<span class="badge badge-purple" title="Value Type">object</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Under the `banner` option, startup banners can be enabled or disabled.
+The logo banner is an ANSI art; the version banner is rendered as an
+ASCII-art representation of the current Lighthouse version.
+
+??? file "config.yaml"
+
+    ```yaml
+    logging:
+        banner:
+            logo: false
+            version: false
+    ```
+
+The following options are available:
+
+### `logo`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`true`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `logo` option controls printing of the Lighthouse logo banner on startup.
+
+### `version`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`true`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `version` option controls printing of the version banner on startup.
