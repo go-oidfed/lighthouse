@@ -1,111 +1,170 @@
 ---
-icon: material/database-sync
+icon: material/walk
 ---
 
-# Storage Migration
+# Migration to LightHouse 0.20.0
 
-This document describes how to migrate data from one storage backend to another in Lighthouse.
+This page covers how to migrate to LightHouse >= 0.20.0.
+LightHouse 0.20.0 is a major release with significant changes, including 
+key management and storage backends.
 
-## Migration Tool
+!!! warning
+    You cannot directly upgrade from LightHouse <0.20.0 to 0.20.0.
 
-Lighthouse includes a migration tool called `lhmigrate` that can migrate data from JSON or Badger storage to the new GORM-based storage. The tool is designed to be simple to use and provides a way to migrate all your data without losing any information.
+    You MUST migrate your deployment.
 
-### Building the Migration Tool
+We still try to make it as easy as possible to migrate your deployment.
 
-To build the migration tool, run the following command from the root of the Lighthouse repository:
+## Understanding the Changes in LightHouse 0.20.0
+The main addition in LightHouse 0.20.0 is an http admin API. This admin API 
+allows admins of LightHouse to manage almost all aspects of LightHouse via 
+this API. This has several implications. The following is a list of changes 
+that are relevant:
+
+- LightHouse now has an admin API, which allows management of LightHouse via 
+  HTTP requests.
+- The storage backend (database) is now driven by a SQL database.
+    - Different databases are supported: SQLite, MySQL, and PostgreSQL.
+    - To keep existing data, you must migrate your database to the new backend.
+- The key management has been changed.
+    - LightHouse supports private keys on the filesystem or in an HSM.
+        - Existing keys can be migrated to the new filesystem KMS.
+    - LightHouse can manage public keys on the filesystem or in the database 
+      (default is database).
+- The configuration file is not backwards compatible with previous versions.
+    - Some options might have been renamed or removed.
+    - You must migrate your configuration file to the latest format.
+    - Several of the options can now be configured via the admin API, but 
+      have been removed from the configuration file.
+        - There is a migration tool to read a config file and update 
+          LightHouse via the admin API.
+    - Most of the options can now be configured via environment variables.
+
+## Build the tool
+
+From the repository root:
 
 ```bash
 go build -o lhmigrate ./cmd/lhmigrate
 ```
 
-### Using the Migration Tool
+## Signing keys
 
-The migration tool supports migrating from JSON or Badger storage to any of the supported GORM database backends (SQLite, MySQL, or PostgreSQL).
+The key migrations live under the `keys` command (alias: `signing`). There are two subcommands:
 
-#### Basic Usage
+- `public`: Migrate legacy public key storage (JWKS + rotation history) to the new filesystem public store.
+- `kms`: Migrate legacy private key files (`<type>_<alg>.pem`) to the filesystem KMS and align the public keys.
 
-```bash
-./lhmigrate migrate --source-type=json --source-dir=/path/to/source/data --dest-type=sqlite --dest-dir=/path/to/destination/data
-```
+### Key type identifiers
 
-#### Command-line Options
+Use `-type` to choose the key group. For federation signing keys, `-type federation` (default) is typically used.
 
-- `--source-type`: The source storage type (json or badger)
-- `--source-dir`: The source data directory
-- `--dest-type`: The destination database type (sqlite, mysql, or postgres)
-- `--dest-dir`: The destination data directory (for sqlite)
-- `--dest-dsn`: The destination DSN (for mysql and postgres)
-- `--verbose`: Enable verbose logging
-- `--dry-run`: Perform a dry run without writing to destination
-
-#### Migration Examples
-
-##### Migrating from JSON to SQLite
+### Public key migration
 
 ```bash
-./lhmigrate migrate --source-type=json --source-dir=/path/to/json/data --dest-type=sqlite --dest-dir=/path/to/sqlite/data
+./lhmigrate keys public -src <legacy_dir> -dst <dest_dir> -type <typeID>
 ```
 
-##### Migrating from Badger to MySQL
+Flags:
+
+- `-src`: Path to legacy public key storage directory (required)
+- `-dst`: Destination directory for the new filesystem public key storage (default: same as `-src`)
+- `-type`: Key type identifier (default: `federation`)
+- `-v`: Verbose logging
+
+Example:
 
 ```bash
-./lhmigrate migrate --source-type=badger --source-dir=/path/to/badger/data --dest-type=mysql --dest-dsn="user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&parseTime=True&loc=Local"
+./lhmigrate keys public \
+  -src /var/lib/lighthouse/legacy-keys \
+  -dst /var/lib/lighthouse/keys \
+  -type federation
 ```
 
-##### Migrating from JSON to PostgreSQL
+### KMS (private key) migration
+
+Expected legacy layout: one PEM per algorithm in `-src`, named `<type>_<alg>.pem` (e.g., `federation_ES256.pem`).
 
 ```bash
-./lhmigrate migrate --source-type=json --source-dir=/path/to/json/data --dest-type=postgres --dest-dsn="host=localhost user=postgres password=postgres dbname=lighthouse port=5432 sslmode=disable TimeZone=UTC"
+./lhmigrate keys kms -src <legacy_dir> -dst <dest_dir> -type <typeID> -algs <list> [options]
 ```
 
-##### Performing a Dry Run
+Flags:
 
-To test the migration without actually writing to the destination, use the `--dry-run` flag:
+- `-src`: Path to legacy key files directory (required)
+- `-dst`: Destination directory for filesystem KMS and public store (default: same as `-src`)
+- `-type`: Key type identifier (default: `federation`)
+- `-algs`: Comma‑separated list of algorithms (e.g., `ES256,RS256`) (required)
+- `-default`: Default algorithm to mark active after migration (optional)
+- `-generate-missing`: Generate missing keys in destination if not present (optional)
+- `-rsa-len`: RSA key length when generating (default: `4096`)
+- `-v`: Verbose logging
+
+Examples:
 
 ```bash
-./lhmigrate migrate --source-type=json --source-dir=/path/to/json/data --dest-type=sqlite --dest-dir=/path/to/sqlite/data --dry-run
+# Migrate ES256 and RS256 keys
+./lhmigrate keys kms \
+  -src /var/lib/lighthouse/legacy-keys \
+  -dst /var/lib/lighthouse/keys \
+  -type federation \
+  -algs ES256,RS256
+
+# Migrate ES256 and set it as default
+./lhmigrate keys kms \
+  -src /var/lib/lighthouse/legacy-keys \
+  -dst /var/lib/lighthouse/keys \
+  -type federation \
+  -algs ES256 \
+  -default ES256
+
+# Generate missing keys in destination
+./lhmigrate keys kms \
+  -src /var/lib/lighthouse/legacy-keys \
+  -dst /var/lib/lighthouse/keys \
+  -type federation \
+  -algs RS256 \
+  -generate-missing -rsa-len 4096
 ```
 
-### Migration Process
+## Data (DB) migration
 
-The migration tool performs the following steps:
+The `db` subcommand will migrate legacy storage (e.g., JSON/Badger) to the new GORM‑based storage backends. This is not implemented yet.
 
-1. Loads the source storage (JSON or Badger)
-2. Initializes the destination storage (SQLite, MySQL, or PostgreSQL)
-3. Migrates all subordinate entities (active, blocked, and pending)
-4. Migrates all trust marked entities (active, blocked, and pending)
+Planned CLI (subject to change):
 
-The tool will display progress information as it migrates the data, showing how many entities are being migrated and their status.
-
-### After Migration
-
-After migrating your data, you should update your Lighthouse configuration to use the new storage backend. For example, if you migrated to SQLite, your configuration would look like:
-
-```yaml
-storage:
-    backend: gorm
-    data_dir: /path/to/sqlite/data
-    database:
-        driver: sqlite
-        debug: false
+```bash
+./lhmigrate db \
+  --source-type <json|badger> \
+  --source-dir /path/to/source \
+  --dest-type <sqlite|mysql|postgres> \
+  [--dest-dir /path/to/sqlite] \
+  [--dest-dsn "dsn for mysql/postgres"] \
+  [--dry-run] [-v]
 ```
 
-Or if you migrated to MySQL:
+Status: Not implemented yet; running this subcommand prints a clear message and exits.
 
-```yaml
-storage:
-    backend: gorm
-    database:
-        driver: mysql
-        dsn: "user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&parseTime=True&loc=Local"
-        debug: false
+## Config migration
+
+The `config` subcommand will assist with migrating or updating configuration files to the latest format. This is not implemented yet.
+
+Planned CLI (subject to change):
+
+```bash
+./lhmigrate config --in config.yaml [--out updated.yaml] [-v]
 ```
+
+Status: Not implemented yet; running this subcommand prints a clear message and exits.
+
+## After migration
+
+- Make sure Lighthouse points to the migrated key/data locations in your deployment.
+- Back up your migrated directories and/or database.
+- Validate signatures and application behavior in your environment.
 
 ## Troubleshooting
 
-If you encounter any issues during migration, try the following:
-
-1. Use the `--verbose` flag to get more detailed logging
-2. Perform a dry run first to check for any potential issues
-3. Make sure you have backup copies of your data before migration
-4. Check that the destination database is accessible and has the correct permissions
+- Use `-v` to enable verbose logging for key migrations.
+- Check file permissions and paths for both source and destination.
+- Verify algorithm names (`ES256`, `RS256`, etc.) are correct for KMS migration.

@@ -11,7 +11,7 @@ import (
 
 // AddHistoricalKeysEndpoint adds the federation historical keys endpoint
 func (fed *LightHouse) AddHistoricalKeysEndpoint(
-	endpoint EndpointConf, historyFnc func() jwx.JWKS,
+	endpoint EndpointConf, historyFnc func() (jwx.JWKS, error),
 ) {
 	fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
@@ -20,11 +20,16 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(
 	signer := fed.GeneralJWTSigner.Typed(oidfedconst.JWTTypeJWKS)
 	fed.server.Get(
 		endpoint.Path, func(ctx *fiber.Ctx) error {
+			keys, err := historyFnc()
+			if err != nil {
+				ctx.Status(fiber.StatusInternalServerError)
+				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+			}
 			jwt, err := signer.JWT(
 				map[string]any{
-					"iss":  fed.FederationEntity.EntityID,
+					"iss":  fed.FederationEntity.EntityID(),
 					"iat":  unixtime.Now(),
-					"keys": historyFnc(),
+					"keys": keys,
 				},
 			)
 			if err != nil {

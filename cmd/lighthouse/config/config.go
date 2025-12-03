@@ -17,7 +17,7 @@ type Config struct {
 	Logging    loggingConf           `yaml:"logging"`
 	Storage    storageConf           `yaml:"storage"`
 	Caching    cachingConf           `yaml:"cache"`
-	Signing    signingConf           `yaml:"signing"`
+	Signing    SigningConf           `yaml:"signing"`
 	Endpoints  Endpoints             `yaml:"endpoints"`
 	Federation federationConf        `yaml:"federation_data"`
 	API        apiConf               `yaml:"api"`
@@ -46,10 +46,11 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
-	if c.Signing.AutomaticKeyRollover.Interval < c.Federation.ConfigurationLifetime {
-		c.Signing.AutomaticKeyRollover.Interval = c.Federation.ConfigurationLifetime
-	}
-	c.Signing.AutomaticKeyRollover.KeepHistory = c.Endpoints.HistoricalKeysEndpoint.IsSet()
+	// TODO make sure that this check is still applied,
+	//  but interval will also be configurable through the api
+	// if c.Signing.KeyRotation.Interval < c.Federation.ConfigurationLifetime {
+	// 	c.Signing.KeyRotation.Interval = c.Federation.ConfigurationLifetime
+	// }
 	return nil
 }
 

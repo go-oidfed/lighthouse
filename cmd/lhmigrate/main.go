@@ -1,266 +1,337 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 
+	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
+	log "github.com/sirupsen/logrus"
 
-	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
-	"github.com/go-oidfed/lighthouse/storage"
-	"github.com/go-oidfed/lighthouse/storage/model"
+	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
+	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 )
 
-var (
-	sourceType         string
-	sourceDir          string
-	destType           string
-	destDir            string
-	destDSN            string
-	verbose            bool
-	dryRun             bool
-	sourceSubordinates loadLegacySubordinateInfos
-	sourceTrustMark    model.TrustMarkedEntitiesStorageBackend
-	destBackend        *storage.Storage
-)
+func usage() {
+	_, _ = fmt.Fprintf(os.Stderr, "lhmigrate: migrate legacy data and keys to new formats\n")
+	_, _ = fmt.Fprintf(os.Stderr, "\n")
+	_, _ = fmt.Fprintf(os.Stderr, "Subcommands:\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  keys     Migrate signing keys (subcommands: public, kms) [alias: signing]\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  db       Migrate legacy storage data to GORM-based database (NOT IMPLEMENTED)\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  config   Migrate or update configuration to new format (NOT IMPLEMENTED)\n")
+	_, _ = fmt.Fprintf(os.Stderr, "\n")
+	_, _ = fmt.Fprintf(os.Stderr, "Use 'lhmigrate <subcommand> -h' for help on a subcommand.\n")
+}
+
+func publicCmd(args []string) int {
+	fs := flag.NewFlagSet("public", flag.ExitOnError)
+	var (
+		src    = fs.String("src", "", "Path to legacy public key storage directory")
+		dst    = fs.String("dst", "", "Destination directory for filesystem public key storage")
+		typeID = fs.String(
+			"type", "federation", "Key type identifier (e.g., "+
+				"'federation')",
+		)
+		v = fs.Bool("v", false, "Verbose logging")
+	)
+	fs.Usage = func() {
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys public -src <legacy_dir> -dst <dest_dir> -type <typeID>\n")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *v {
+		log.SetLevel(log.DebugLevel)
+	}
+	if *src == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "-src is required")
+		fs.Usage()
+		return 2
+	}
+	if *dst == "" {
+		*dst = *src
+	}
+	if *typeID == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "-type is required")
+		fs.Usage()
+		return 2
+	}
+	log.WithFields(
+		log.Fields{
+			"src":  *src,
+			"dst":  *dst,
+			"type": *typeID,
+		},
+	).Info("migrating public key storage")
+
+	// Build source legacy storage wrapper
+	legacy := &public.LegacyPublicKeyStorage{
+		Dir:    *src,
+		TypeID: *typeID,
+	}
+	if err := legacy.Load(); err != nil {
+		log.WithError(err).Error("failed to load legacy public key storage")
+		return 1
+	}
+
+	// Create destination filesystem storage and populate from legacy
+	if _, err := public.NewFilesystemPublicKeyStorageFromStorage(*dst, *typeID, legacy); err != nil {
+		log.WithError(err).Error("public key migration failed")
+		return 1
+	}
+	log.Info("public key migration completed")
+	return 0
+}
+
+func parseAlgs(list string) ([]jwa.SignatureAlgorithm, error) {
+	if strings.TrimSpace(list) == "" {
+		return nil, nil
+	}
+	parts := strings.Split(list, ",")
+	out := make([]jwa.SignatureAlgorithm, 0, len(parts))
+	for _, p := range parts {
+		a := strings.TrimSpace(p)
+		if a == "" {
+			continue
+		}
+		alg, found := jwa.LookupSignatureAlgorithm(a)
+		if !found {
+			return nil, errors.Errorf("invalid algorithm '%s'", a)
+		}
+		out = append(out, alg)
+	}
+	return out, nil
+}
+
+func kmsCmd(args []string) int {
+	fs := flag.NewFlagSet("kms", flag.ExitOnError)
+	var (
+		src      = fs.String("src", "", "Path to legacy key files directory (containing <type>_<alg>.pem)")
+		dst      = fs.String("dst", "", "Destination directory for filesystem KMS and public storage")
+		typeID   = fs.String("type", "federation", "Key type identifier (e.g., 'federation')")
+		algsStr  = fs.String("algs", "", "Comma-separated list of algorithms to migrate (e.g., ES256,RS256)")
+		defAlg   = fs.String("default", "", "Default algorithm (optional)")
+		generate = fs.Bool("generate-missing", false, "Generate missing keys in destination if not present")
+		rsaLen   = fs.Int("rsa-len", 4096, "RSA key length when generating (if enabled)")
+		v        = fs.Bool("v", false, "Verbose logging")
+	)
+	fs.Usage = func() {
+		_, _ = fmt.Fprintf(
+			os.Stderr, "Usage: lhmigrate keys kms -src <legacy_dir> -dst <dest_dir> -type <typeID> -algs <list> [options]\n",
+		)
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *v {
+		log.SetLevel(log.DebugLevel)
+	}
+	if *src == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "-src is required")
+		fs.Usage()
+		return 2
+	}
+	if *dst == "" {
+		*dst = *src
+	}
+	if *typeID == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "-type is required")
+		fs.Usage()
+		return 2
+	}
+	algs, err := parseAlgs(*algsStr)
+	if err != nil || len(algs) == 0 {
+		_, _ = fmt.Fprintln(os.Stderr, "-algs is required and must be a comma-separated list (e.g., ES256,RS256)")
+		fs.Usage()
+		return 2
+	}
+	var defaultAlg jwa.SignatureAlgorithm
+	if a := strings.TrimSpace(*defAlg); a != "" {
+		alg, found := jwa.LookupSignatureAlgorithm(a)
+		if !found {
+			_, _ = fmt.Fprintf(os.Stderr, "invalid -default algorithm: %s\n", a)
+			return 2
+		}
+		defaultAlg = alg
+	}
+	log.WithFields(
+		log.Fields{
+			"src":      *src,
+			"dst":      *dst,
+			"type":     *typeID,
+			"algs":     *algsStr,
+			"default":  defaultAlg.String(),
+			"generate": *generate,
+		},
+	).Info("migrating KMS")
+
+	// Prepare legacy KMS source
+	legacyKMS := &kms.LegacyFilesystemKMS{
+		Dir:    *src,
+		TypeID: *typeID,
+		Algs:   algs,
+	}
+	if err = legacyKMS.Load(); err != nil {
+		log.WithError(err).Error("failed to load legacy KMS")
+		return 1
+	}
+
+	// Prepare destination public key storage (migrated from legacy public store at src)
+	dstPKS, err := public.NewFilesystemPublicKeyStorageFromStorage(
+		*dst, *typeID, &public.LegacyPublicKeyStorage{
+			Dir:    *src,
+			TypeID: *typeID,
+		},
+	)
+	if err != nil {
+		log.WithError(err).Error("failed to migrate public key storage for KMS")
+		return 1
+	}
+
+	// Configure destination filesystem KMS
+	cfg := kms.FilesystemKMSConfig{
+		KMSConfig: kms.KMSConfig{
+			GenerateKeys: *generate,
+			Algs:         algs,
+			DefaultAlg:   defaultAlg,
+			RSAKeyLen:    *rsaLen,
+			// KeyRotation not needed for migration
+		},
+		Dir:    *dst,
+		TypeID: *typeID,
+	}
+
+	if _, err = kms.NewFilesystemKMSFromBasic(legacyKMS, cfg, dstPKS); err != nil {
+		log.WithError(err).Error("KMS migration failed")
+		return 1
+	}
+	log.Info("KMS migration completed")
+	return 0
+}
+
+// keysCmd dispatches to key-related subcommands (public, kms).
+func keysCmd(args []string) int {
+	if len(args) < 1 {
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
+		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history)\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
+		return 2
+	}
+	sub := args[0]
+	switch sub {
+	case "public":
+		return publicCmd(args[1:])
+	case "kms":
+		return kmsCmd(args[1:])
+	case "-h", "--help", "help":
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
+		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history)\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
+		return 0
+	default:
+		_, _ = fmt.Fprintf(os.Stderr, "unknown keys subcommand: %s\n", sub)
+		_, _ = fmt.Fprintf(os.Stderr, "Use 'lhmigrate keys <public|kms> -h' for help.\n")
+		return 2
+	}
+}
+
+// dbCmd is a stub for future database migration support.
+// It currently parses common flags and reports that the feature is not implemented.
+func dbCmd(args []string) int {
+	fs := flag.NewFlagSet("db", flag.ExitOnError)
+	var (
+		srcType  = fs.String("source-type", "", "Source storage type (e.g., json, badger)")
+		srcDir   = fs.String("source-dir", "", "Source data directory")
+		destType = fs.String("dest-type", "", "Destination database type (e.g., sqlite, mysql, postgres)")
+		destDir  = fs.String("dest-dir", "", "Destination data directory (for sqlite)")
+		destDSN  = fs.String("dest-dsn", "", "Destination DSN (for mysql/postgres)")
+		dryRun   = fs.Bool("dry-run", false, "Perform a dry run without writing to destination")
+		v        = fs.Bool("v", false, "Verbose logging")
+	)
+	fs.Usage = func() {
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate db --source-type=<json|badger> --source-dir=<dir> --dest-type=<sqlite|mysql|postgres> [--dest-dir=<dir>|--dest-dsn=<dsn>] [--dry-run] [--v]\n")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *v {
+		log.SetLevel(log.DebugLevel)
+	}
+	// Minimal validation to help users before we return the placeholder error.
+	if *srcType == "" || *srcDir == "" || *destType == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "--source-type, --source-dir, and --dest-type are required")
+		fs.Usage()
+		return 2
+	}
+	// Log intent and return not implemented.
+	log.WithFields(log.Fields{
+		"source-type": *srcType,
+		"source-dir":  *srcDir,
+		"dest-type":   *destType,
+		"dest-dir":    *destDir,
+		"dest-dsn":    *destDSN,
+		"dry-run":     *dryRun,
+	}).Info("db migration requested")
+	_, _ = fmt.Fprintln(os.Stderr, "db migration is not implemented yet")
+	return 3
+}
+
+// configCmd is a stub for future configuration migration support.
+// It currently parses common flags and reports that the feature is not implemented.
+func configCmd(args []string) int {
+	fs := flag.NewFlagSet("config", flag.ExitOnError)
+	var (
+		in  = fs.String("in", "", "Path to existing configuration file")
+		out = fs.String("out", "", "Path to write updated configuration")
+		v   = fs.Bool("v", false, "Verbose logging")
+	)
+	fs.Usage = func() {
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate config --in=<config.yaml> [--out=<updated.yaml>] [--v]\n")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *v {
+		log.SetLevel(log.DebugLevel)
+	}
+	if *in == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "--in is required")
+		fs.Usage()
+		return 2
+	}
+	log.WithFields(log.Fields{
+		"in":  *in,
+		"out": *out,
+	}).Info("config migration requested")
+	_, _ = fmt.Fprintln(os.Stderr, "config migration is not implemented yet")
+	return 3
+}
 
 func main() {
-	rootCmd := &cobra.Command{
-		Use:   "lhmigrate",
-		Short: "Lighthouse Storage Migration Tool",
-		Long:  "A tool to migrate data between different Lighthouse storage backends",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if verbose {
-				logrus.SetLevel(logrus.DebugLevel)
-			}
-			return nil
-		},
+	if len(os.Args) < 2 {
+		usage()
+		os.Exit(2)
 	}
-
-	migrateCmd := &cobra.Command{
-		Use:   "migrate",
-		Short: "Migrate data from one storage backend to another",
-		Long:  "Migrate data from one storage backend to another (json/badger to gorm)",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Validate source type
-			if sourceType != "json" && sourceType != "badger" {
-				return errors.New("source-type must be either 'json' or 'badger'")
-			}
-
-			destDriver := storage.DriverType(destType)
-			// Validate destination type
-			switch destDriver {
-			case storage.DriverSQLite, storage.DriverMySQL, storage.DriverPostgres:
-				break
-			default:
-				return errors.Errorf("dest-type must be one of %+v", storage.SupportedDrivers)
-			}
-
-			// Validate source directory
-			if sourceDir == "" {
-				return errors.New("source-dir is required")
-			}
-
-			// Validate destination directory for SQLite
-			if destDriver == storage.DriverSQLite && destDir == "" && destDSN == "" {
-				return errors.New("dest-dir is required for sqlite")
-			}
-
-			// Validate DSN for MySQL and PostgreSQL
-			if (destDriver == storage.DriverMySQL || destDriver == storage.DriverPostgres) && destDSN == "" {
-				return errors.New("dest-dsn is required for mysql and postgres")
-			}
-
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Initialize source storage
-			var err error
-			switch sourceType {
-			case string(config.BackendTypeJSON):
-				warehouse := NewFileStorage(sourceDir)
-				sourceSubordinates = warehouse.SubordinateStorage()
-				sourceTrustMark = warehouse.TrustMarkedEntitiesStorage()
-			case string(config.BackendTypeBadger):
-				warehouse, err := NewBadgerStorage(sourceDir)
-				if err != nil {
-					return errors.Wrap(err, "failed to initialize badger storage")
-				}
-				sourceSubordinates = warehouse.SubordinateStorage()
-				sourceTrustMark = warehouse.TrustMarkedEntitiesStorage()
-			}
-
-			// Load source storage
-			subordinates, err := sourceSubordinates()
-			if err != nil {
-				return errors.Wrap(err, "failed to load source subordinate storage")
-			}
-			if err = sourceTrustMark.Load(); err != nil {
-				return errors.Wrap(err, "failed to load source trust mark storage")
-			}
-
-			// Initialize destination storage
-			if !dryRun {
-				dbConfig := storage.Config{
-					Driver:  storage.DriverType(destType),
-					DSN:     destDSN,
-					DataDir: destDir,
-					Debug:   verbose,
-				}
-
-				destBackend, err = storage.NewStorage(dbConfig)
-				if err != nil {
-					return errors.Wrap(err, "failed to initialize destination storage")
-				}
-			}
-
-			// Perform migration
-			if err = migrateSubordinates(subordinates); err != nil {
-				return errors.Wrap(err, "failed to migrate subordinates")
-			}
-
-			if err = migrateTrustMarks(); err != nil {
-				return errors.Wrap(err, "failed to migrate trust marks")
-			}
-
-			fmt.Println("Migration completed successfully!")
-			return nil
-		},
+	sub := os.Args[1]
+	var code int
+	switch sub {
+	case "keys", "signing":
+		code = keysCmd(os.Args[2:])
+	case "db":
+		code = dbCmd(os.Args[2:])
+	case "config":
+		code = configCmd(os.Args[2:])
+	case "-h", "--help", "help":
+		usage()
+		code = 0
+	default:
+		_, _ = fmt.Fprintf(os.Stderr, "unknown subcommand: %s\n\n", sub)
+		usage()
+		code = 2
 	}
-
-	// Add flags to migrate command
-	migrateCmd.Flags().StringVar(&sourceType, "source-type", "", "Source storage type (json or badger)")
-	migrateCmd.Flags().StringVar(&sourceDir, "source-dir", "", "Source data directory")
-	migrateCmd.Flags().StringVar(
-		&destType, "dest-type", "sqlite", "Destination database type (sqlite, mysql, or postgres)",
-	)
-	migrateCmd.Flags().StringVar(&destDir, "dest-dir", "", "Destination data directory (for sqlite)")
-	migrateCmd.Flags().StringVar(&destDSN, "dest-dsn", "", "Destination DSN (for mysql and postgres)")
-	migrateCmd.Flags().BoolVar(&verbose, "verbose", false, "Enable verbose logging")
-	migrateCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Perform a dry run without writing to destination")
-
-	// Mark required flags
-	migrateCmd.MarkFlagRequired("source-type")
-	migrateCmd.MarkFlagRequired("source-dir")
-
-	rootCmd.AddCommand(migrateCmd)
-
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
-func migrateSubordinates(subordinates []legacySubordinateInfo) error {
-	fmt.Printf("Found %d subordinates\n", len(subordinates))
-	for _, sub := range subordinates {
-		fmt.Printf("Migrating subordinate: %s\n", sub.EntityID)
-		if !dryRun {
-			if err := destBackend.SubordinateStorage().Write(
-				sub.EntityID, model.SubordinateInfo{
-					EntityID:           sub.EntityID,
-					EntityTypes:        model.NewEntityTypes(sub.EntityTypes),
-					JWKS:               model.NewJWKS(sub.JWKS),
-					Metadata:           sub.Metadata,
-					MetadataPolicy:     sub.MetadataPolicy,
-					Constraints:        sub.Constraints,
-					MetadataPolicyCrit: model.NewPolicyOperators(sub.MetadataPolicyCrit),
-					Status:             sub.Status,
-				},
-			); err != nil {
-				return errors.Wrapf(err, "failed to write subordinate %s", sub.EntityID)
-			}
-		}
-	}
-	return nil
-}
-
-func migrateTrustMarks() error {
-	// Get all trust mark types
-	// This is a bit tricky since we don't have a direct way to get all trust mark types
-	// We'll use a workaround by checking the source directory for JSON files
-	trustMarkTypes := []string{}
-
-	if sourceType == "json" {
-		// For JSON storage, we can look at the trust_marks directory
-		trustMarksDir := filepath.Join(sourceDir, "trust_marks")
-		if _, err := os.Stat(trustMarksDir); err == nil {
-			entries, err := os.ReadDir(trustMarksDir)
-			if err != nil {
-				return errors.Wrap(err, "failed to read trust_marks directory")
-			}
-
-			for _, entry := range entries {
-				if !entry.IsDir() && filepath.Ext(entry.Name()) == ".json" {
-					trustMarkType := filepath.Base(entry.Name())
-					trustMarkType = trustMarkType[:len(trustMarkType)-5] // Remove .json extension
-					trustMarkTypes = append(trustMarkTypes, trustMarkType)
-				}
-			}
-		}
-	} else {
-		// For Badger, we'll need to use an empty string to get all trust marks
-		trustMarkTypes = append(trustMarkTypes, "")
-	}
-
-	// If we couldn't find any trust mark types, use an empty string to get all
-	if len(trustMarkTypes) == 0 {
-		trustMarkTypes = append(trustMarkTypes, "")
-	}
-
-	// Process each trust mark type
-	for _, trustMarkType := range trustMarkTypes {
-		// Get active entities
-		activeEntities, err := sourceTrustMark.Active(trustMarkType)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get active entities for trust mark %s", trustMarkType)
-		}
-
-		fmt.Printf("Found %d active entities for trust mark type %s\n", len(activeEntities), trustMarkType)
-		for _, entityID := range activeEntities {
-			fmt.Printf("Migrating active trust mark: %s for entity %s\n", trustMarkType, entityID)
-			if !dryRun {
-				if err := destBackend.TrustMarkedEntitiesStorage().Approve(trustMarkType, entityID); err != nil {
-					return errors.Wrapf(err, "failed to approve trust mark %s for entity %s", trustMarkType, entityID)
-				}
-			}
-		}
-
-		// Get blocked entities
-		blockedEntities, err := sourceTrustMark.Blocked(trustMarkType)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get blocked entities for trust mark %s", trustMarkType)
-		}
-
-		fmt.Printf("Found %d blocked entities for trust mark type %s\n", len(blockedEntities), trustMarkType)
-		for _, entityID := range blockedEntities {
-			fmt.Printf("Migrating blocked trust mark: %s for entity %s\n", trustMarkType, entityID)
-			if !dryRun {
-				if err := destBackend.TrustMarkedEntitiesStorage().Block(trustMarkType, entityID); err != nil {
-					return errors.Wrapf(err, "failed to block trust mark %s for entity %s", trustMarkType, entityID)
-				}
-			}
-		}
-
-		// Get pending entities
-		pendingEntities, err := sourceTrustMark.Pending(trustMarkType)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get pending entities for trust mark %s", trustMarkType)
-		}
-
-		fmt.Printf("Found %d pending entities for trust mark type %s\n", len(pendingEntities), trustMarkType)
-		for _, entityID := range pendingEntities {
-			fmt.Printf("Migrating pending trust mark: %s for entity %s\n", trustMarkType, entityID)
-			if !dryRun {
-				if err := destBackend.TrustMarkedEntitiesStorage().Request(trustMarkType, entityID); err != nil {
-					return errors.Wrapf(err, "failed to request trust mark %s for entity %s", trustMarkType, entityID)
-				}
-			}
-		}
-	}
-
-	return nil
+	os.Exit(code)
 }

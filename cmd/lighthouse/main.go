@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
@@ -44,37 +45,43 @@ func main() {
 	if c.Caching.MaxLifetime.Duration() != 0 {
 		cache.SetMaxLifetime(c.Caching.MaxLifetime.Duration())
 	}
-	err := initKey()
+
+	// Build storage with user hash params coming from api.admin.users_hash
+	backs, err := storage.LoadStorageBackends(
+		storage.Config{
+			Driver:    c.Storage.Driver,
+			DSN:       c.Storage.DSN,
+			DataDir:   c.Storage.DataDir,
+			Debug:     c.Storage.Debug,
+			UsersHash: c.API.Admin.Argon2idParams,
+		},
+	)
 	if err != nil {
+		log.Fatal(err)
+	}
+
+	signingConf := c.Signing
+	signingConf.KeyRotation.EntityConfigurationLifetimeFunc = func() (time.Duration, error) {
+		return storage.GetEntityConfigurationLifetime(backs.KV)
+	}
+
+	if err = initKey(signingConf); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Loaded signing key")
-	for _, tmc := range c.Federation.TrustMarks {
-		if err = tmc.Verify(
-			c.Federation.EntityID, c.Endpoints.TrustMarkEndpoint.ValidateURL(c.Federation.EntityID),
-			jwx.NewTrustMarkSigner(keys.Federation()),
-		); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	// Build storage with user hash params coming from api.admin.users_hash
-	storageCfg := storage.Config{
-		Driver:    c.Storage.Driver,
-		DSN:       c.Storage.DSN,
-		DataDir:   c.Storage.DataDir,
-		Debug:     c.Storage.Debug,
-		UsersHash: c.API.Admin.Argon2idParams,
-	}
-	backs, err := storage.LoadStorageBackends(storageCfg)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// for _, tmc := range c.Federation.TrustMarks {
+	// 	if err = tmc.Verify(
+	// 		c.Federation.EntityID, c.Endpoints.TrustMarkEndpoint.ValidateURL(c.Federation.EntityID),
+	// 		jwx.NewTrustMarkSigner(keys.Federation()),
+	// 	); err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// }
 
 	lh, err := lighthouse.NewLightHouse(
 		config.Get().Server,
 		c.Federation.EntityID,
-		keys.Federation(), c.Signing.Algorithm,
+		versatileSigner(), c.Signing.Algorithm,
 		lighthouse.SubordinateStatementsConfig{
 			MetadataPolicies:             nil,
 			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
@@ -164,8 +171,25 @@ func main() {
 	}
 	if endpoint := c.Endpoints.HistoricalKeysEndpoint; endpoint.IsSet() {
 		lh.AddHistoricalKeysEndpoint(
-			endpoint, func() jwx.JWKS {
-				return keys.History(jwx.KeyStorageTypeFederation)
+			endpoint, func() (jwx.JWKS, error) {
+				kmsHistory, err := kmsManagedPKs.GetHistorical()
+				if err != nil {
+					return jwx.JWKS{}, err
+				}
+				apiHistory, err := apiManagedPKs.GetHistorical()
+				if err != nil {
+					return jwx.JWKS{}, err
+				}
+				allEntries := append(kmsHistory, apiHistory...)
+				set := jwx.NewJWKS()
+				for _, k := range allEntries {
+					kk, err := k.JWK()
+					if err != nil {
+						return jwx.JWKS{}, err
+					}
+					_ = set.AddKey(kk)
+				}
+				return set, nil
 			},
 		)
 	}

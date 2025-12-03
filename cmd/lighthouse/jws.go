@@ -1,43 +1,112 @@
 package main
 
 import (
-	"path/filepath"
-
 	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
+	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/pkg/errors"
-	"github.com/zachmann/go-utils/fileutils"
 
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 )
 
-var keys *jwx.KeyStorage
+var apiManagedPKs public.PublicKeyStorage
+var kmsManagedPKs public.PublicKeyStorage
+var basicKeys kms.BasicKeyManagementSystem
+var keys kms.KeyManagementSystem
 
-func initKey() (err error) {
-	c := config.Get().Signing
-
-	// If auto-generation is disabled, ensure the expected key file exists
-	if !c.AutoGenerateKeys {
-		keyFilename := "federation_" + c.Alg + ".pem"
-		keyPath := filepath.Join(c.KeyDir, keyFilename)
-		if !fileutils.FileExists(keyPath) {
-			return errors.Errorf(
-				"signing.auto_generate_keys is false, "+
-					"but required key not found: %s. Provide an existing key or enable auto generation.", keyPath,
-			)
+func initKey(c config.SigningConf) (err error) {
+	switch c.PKBackend {
+	case config.PKBackendFilesystem:
+		kmsManagedPKs = &public.FilesystemPublicKeyStorage{
+			Dir:    c.FileSystemBackend.KeyDir,
+			TypeID: "federation",
 		}
+		apiManagedPKs = &public.FilesystemPublicKeyStorage{
+			Dir:    c.FileSystemBackend.KeyDir,
+			TypeID: "api",
+		}
+	case config.PKBackendDatabase:
+		// TODO: implement
+		return errors.New("PKBackendDatabase not yet implemented")
+	default:
+		return errors.Errorf("signing.pk_backend %s not supported", c.PKBackend)
 	}
-
-	keys, err = jwx.NewKeyStorage(
-		c.KeyDir, map[string]jwx.KeyStorageConfig{
-			jwx.KeyStorageTypeFederation: {
-				Algorithm:    c.Alg,
-				RSAKeyLen:    c.RSAKeyLen,
-				RolloverConf: c.AutomaticKeyRollover,
-			},
-		},
-	)
-	if err != nil {
+	if err = kmsManagedPKs.Load(); err != nil {
 		return
 	}
-	return keys.Load()
+	switch c.KMS {
+	case config.KMSFilesystem:
+		if c.FileSystemBackend.KeyFile != "" {
+			basicKeys = &kms.SingleSigningKeyFile{
+				Alg:  c.Algorithm,
+				Path: c.FileSystemBackend.KeyFile,
+			}
+		} else {
+			keys = kms.NewSingleAlgFilesystemKMS(
+				c.Algorithm, kms.FilesystemKMSConfig{
+					KMSConfig: kms.KMSConfig{
+						GenerateKeys: c.AutoGenerateKeys,
+						RSAKeyLen:    c.RSAKeyLen,
+						KeyRotation:  c.KeyRotation,
+					},
+					Dir:    c.FileSystemBackend.KeyDir,
+					TypeID: "federation",
+				}, kmsManagedPKs,
+			)
+		}
+	case config.KMSPKCS11:
+		keys = kms.NewSingleAlgPKCS11KMS(
+			c.Algorithm, kms.PKCS11KMSConfig{
+				KMSConfig: kms.KMSConfig{
+					GenerateKeys: c.AutoGenerateKeys,
+					RSAKeyLen:    c.RSAKeyLen,
+					KeyRotation:  c.KeyRotation,
+				},
+				TypeID:      "federation",
+				ModulePath:  c.PKCS11Backend.ModulePath,
+				TokenLabel:  c.PKCS11Backend.TokenLabel,
+				TokenSerial: c.PKCS11Backend.TokenSerial,
+				Pin:         c.PKCS11Backend.Pin,
+				LabelPrefix: c.PKCS11Backend.LabelPrefix,
+				ExtraLabels: c.PKCS11Backend.ExtraLabels,
+			}, kmsManagedPKs,
+		)
+	default:
+		return errors.Errorf("signing.kms %s not supported", c.KMS)
+	}
+	if keys != nil {
+		basicKeys = keys
+	}
+	if err = errors.Wrap(basicKeys.Load(), "could not load kms"); err != nil {
+		return
+	}
+	if keys != nil && c.KeyRotation.Enabled {
+		return errors.Wrap(keys.StartAutomaticRotation(), "could not start automatic key rotation")
+	}
+	return
+}
+
+func versatileSigner() jwx.VersatileSigner {
+	return kms.KMSToVersatileSignerWithJWKSFunc(
+		basicKeys, func() (jwx.JWKS, error) {
+			kmsHistory, err := kmsManagedPKs.GetValid()
+			if err != nil {
+				return jwx.JWKS{}, err
+			}
+			apiHistory, err := apiManagedPKs.GetValid()
+			if err != nil {
+				return jwx.JWKS{}, err
+			}
+			allEntries := append(kmsHistory, apiHistory...)
+			set := jwx.NewJWKS()
+			for _, k := range allEntries {
+				kk, err := k.JWK()
+				if err != nil {
+					return jwx.JWKS{}, err
+				}
+				_ = set.AddKey(kk)
+			}
+			return set, nil
+		},
+	)
 }
