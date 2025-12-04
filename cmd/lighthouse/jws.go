@@ -14,7 +14,9 @@ var kmsManagedPKs public.PublicKeyStorage
 var basicKeys kms.BasicKeyManagementSystem
 var keys kms.KeyManagementSystem
 
-func initKey(c config.SigningConf) (err error) {
+func initKey(c config.SigningConf, dbStorageFnc func(string) public.PublicKeyStorage) (
+	err error,
+) {
 	switch c.PKBackend {
 	case config.PKBackendFilesystem:
 		kmsManagedPKs = &public.FilesystemPublicKeyStorage{
@@ -26,12 +28,15 @@ func initKey(c config.SigningConf) (err error) {
 			TypeID: "api",
 		}
 	case config.PKBackendDatabase:
-		// TODO: implement
-		return errors.New("PKBackendDatabase not yet implemented")
+		kmsManagedPKs = dbStorageFnc("federation")
+		apiManagedPKs = dbStorageFnc("api")
 	default:
 		return errors.Errorf("signing.pk_backend %s not supported", c.PKBackend)
 	}
 	if err = kmsManagedPKs.Load(); err != nil {
+		return
+	}
+	if err = apiManagedPKs.Load(); err != nil {
 		return
 	}
 	switch c.KMS {

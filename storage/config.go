@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/pkg/errors"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -144,5 +145,8 @@ func LoadStorageBackends(cfg Config) (model.Backends, error) {
 		AdditionalClaims: warehouse.AdditionalClaimsStorage(),
 		KV:               warehouse.KeyValue(),
 		Users:            warehouse.UsersStorage(),
+		PKStorages: func(s string) public.PublicKeyStorage {
+			return NewDBPublicKeyStorage(warehouse.db, s)
+		},
 	}, nil
 }

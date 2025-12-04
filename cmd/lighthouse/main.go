@@ -65,7 +65,7 @@ func main() {
 		return storage.GetEntityConfigurationLifetime(backs.KV)
 	}
 
-	if err = initKey(signingConf); err != nil {
+	if err = initKey(signingConf, backs.PKStorages); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Loaded signing key")

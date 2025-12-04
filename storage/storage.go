@@ -95,6 +95,11 @@ func (s *Storage) TrustMarkIssuersStorage() *TrustMarkIssuersStorage {
 	return &TrustMarkIssuersStorage{db: s.db}
 }
 
+// DBPublicKeyStorage returns a DBPublicKeyStorage
+func (s *Storage) DBPublicKeyStorage(typeID string) *DBPublicKeyStorage {
+	return NewDBPublicKeyStorage(s.db, typeID)
+}
+
 // Users storage is implemented in users_storage.go
 
 // SubordinateStorage implements the SubordinateStorageBackend interface
