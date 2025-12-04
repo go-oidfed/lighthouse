@@ -15,7 +15,7 @@ externalDocs:
   description: OpenID Federation 1.0 specification
   url: https://openid.net/specs/openid-federation-1_0.html
 paths:
-  /subordinates:
+  /api/v1/admin/subordinates:
     get:
       tags:
         - Subordinates
@@ -351,7 +351,7 @@ paths:
       summary: Delete a trust mark
     parameters:
       - $ref: '#/components/parameters/TrustMarkIDParam'
-  /subordinates/lifetime:
+  /api/v1/admin/subordinates/lifetime:
     get:
       tags:
         - Subordinates
@@ -796,7 +796,7 @@ paths:
       operationId: updateEntityConfigurationMetadata
       summary: Updates the complete metadata structure.
       description: Use with care!
-  /subordinates/additional-claims:
+  /api/v1/admin/subordinates/additional-claims:
     summary: Manage general additional custom claims for subordinates.
     description: >-
       Endpoints to list, add, and update general additional custom claims applied to subordinate entities.
@@ -860,7 +860,7 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: addGeneralAdditionalClaims
       summary: Add general additional claims
-  /subordinates/additional-claims/{additionalClaimsID}:
+  /api/v1/admin/subordinates/additional-claims/{additionalClaimsID}:
     summary: Manage a single general additional claim for subordinates.
     description: Get, update, or delete a single general additional claim.
     parameters:
@@ -918,7 +918,7 @@ paths:
       operationId: deleteGeneralAdditionalClaim
       summary: Delete a general additional claim
 
-  /subordinates/{subordinateID}/additional-claims:
+  /api/v1/admin/subordinates/{subordinateID}/additional-claims:
     summary: Manage subordinate-specific additional custom claims.
     description:
       Endpoints to list, add, and update additional custom claims (rows: claim, value, crit) for a specific subordinate.
@@ -996,7 +996,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/additional-claims/{additionalClaimsID}:
+  /api/v1/admin/subordinates/{subordinateID}/additional-claims/{additionalClaimsID}:
     summary: Manage a single subordinate-specific additional claim.
     description: Get, update, or delete a single subordinate-specific additional claim.
     get:
@@ -1060,7 +1060,7 @@ paths:
         description: The ID of the subordinate-specific additional claim row.
         schema:
           type: integer
-  /subordinates/{subordinateID}/statement:
+  /api/v1/admin/subordinates/{subordinateID}/statement:
     get:
       tags:
         - Subordinates
@@ -2137,7 +2137,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/metadata-policies/{entityType}/{claim}/{operator}:
+  /api/v1/admin/subordinates/metadata-policies/{entityType}/{claim}/{operator}:
     get:
       tags:
         - General Metadata Policies
@@ -2198,7 +2198,7 @@ paths:
       - $ref: '#/components/parameters/EntityTypeParam'
       - $ref: '#/components/parameters/ClaimParam'
       - $ref: '#/components/parameters/OperatorParam'
-  /subordinates/metadata-policies/{entityType}/{claim}:
+  /api/v1/admin/subordinates/metadata-policies/{entityType}/{claim}:
     get:
       tags:
         - General Metadata Policies
@@ -2272,7 +2272,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/EntityTypeParam'
       - $ref: '#/components/parameters/ClaimParam'
-  /subordinates/metadata-policies/{entityType}:
+  /api/v1/admin/subordinates/metadata-policies/{entityType}:
     get:
       tags:
         - General Metadata Policies
@@ -2353,7 +2353,7 @@ paths:
           type: string
         in: path
         required: true
-  /subordinates/metadata-policies:
+  /api/v1/admin/subordinates/metadata-policies:
     get:
       tags:
         - General Metadata Policies
@@ -2391,7 +2391,7 @@ paths:
       operationId: updateGeneralMetadataPolicies
       summary: Update the complete general metadata policies structure.
       description: Use with care!
-  /subordinates/{subordinateID}:
+  /api/v1/admin/subordinates/{subordinateID}:
     get:
       tags:
         - Subordinates
@@ -2427,7 +2427,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/status:
+  /api/v1/admin/subordinates/{subordinateID}/status:
     put:
       tags:
         - Subordinates
@@ -2454,7 +2454,7 @@ paths:
       summary: Change subordinate status
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
-  /subordinates/{subordinateID}/history:
+  /api/v1/admin/subordinates/{subordinateID}/history:
     get:
       tags:
         - Subordinates
@@ -2490,7 +2490,7 @@ paths:
       summary: Get subordinate event history
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
-  /subordinates/{subordinateID}/jwks:
+  /api/v1/admin/subordinates/{subordinateID}/jwks:
     get:
       tags:
         - Subordinate Keys
@@ -2554,7 +2554,7 @@ paths:
       summary: Add a jwk to the subordinate's jwks
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
-  /subordinates/constraints:
+  /api/v1/admin/subordinates/constraints:
     get:
       tags:
         - General Constraints
@@ -2592,7 +2592,7 @@ paths:
       operationId: updateGeneralConstraints
       summary: Update the complete general constraints structure.
       description: Use with care!
-  /subordinates/{subordinateID}/constraints:
+  /api/v1/admin/subordinates/{subordinateID}/constraints:
     get:
       tags:
         - Subordinate Constraints
@@ -2664,7 +2664,7 @@ paths:
       summary: Deletes all subordinate-specific constraints.
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
-  /subordinates/constraints/max-path-length:
+  /api/v1/admin/subordinates/constraints/max-path-length:
     get:
       tags:
         - General Constraints
@@ -2713,7 +2713,7 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: deleteGeneralMaxPathLength
       summary: Delete general max_path_length constraint
-  /subordinates/constraints/naming-constraints:
+  /api/v1/admin/subordinates/constraints/naming-constraints:
     get:
       tags:
         - General Constraints
@@ -2760,7 +2760,7 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: deleteGeneralNamingConstraints
       summary: Delete general naming_constraints
-  /subordinates/constraints/allowed-entity-types:
+  /api/v1/admin/subordinates/constraints/allowed-entity-types:
     get:
       tags:
         - General Constraints
@@ -2819,7 +2819,7 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: addGeneralAllowedEntityType
       summary: Add general allowed entity type
-  /subordinates/constraints/allowed-entity-types/{entityType}:
+  /api/v1/admin/subordinates/constraints/allowed-entity-types/{entityType}:
     delete:
       tags:
         - General Constraints
@@ -2845,7 +2845,7 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: deleteGeneralAllowedEntityType
       summary: Delete general allowed entity type
-  /subordinates/{subordinateID}/constraints/max-path-length:
+  /api/v1/admin/subordinates/{subordinateID}/constraints/max-path-length:
     get:
       tags:
         - Subordinate Constraints
@@ -2907,7 +2907,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/constraints/naming-constraints:
+  /api/v1/admin/subordinates/{subordinateID}/constraints/naming-constraints:
     get:
       tags:
         - Subordinate Constraints
@@ -2967,7 +2967,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/constraints/allowed-entity-types:
+  /api/v1/admin/subordinates/{subordinateID}/constraints/allowed-entity-types:
     get:
       tags:
         - Subordinate Constraints
@@ -3041,7 +3041,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/constraints/allowed-entity-types/{entityType}:
+  /api/v1/admin/subordinates/{subordinateID}/constraints/allowed-entity-types/{entityType}:
     delete:
       tags:
         - Subordinate Constraints
@@ -3075,8 +3075,8 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: deleteSubordinateAllowedEntityType
       summary: Delete subordinate allowed entity type
-  /subordinates/metadata-policies-crit: { }
-  /subordinates/{subordinateID}/metadata/{entityType}/{claim}:
+  /api/v1/admin/subordinates/metadata-policies-crit: { }
+  /api/v1/admin/subordinates/{subordinateID}/metadata/{entityType}/{claim}:
     get:
       tags:
         - Subordinate Metadata
@@ -3137,7 +3137,7 @@ paths:
       - $ref: '#/components/parameters/SubordinateIDParam'
       - $ref: '#/components/parameters/EntityTypeParam'
       - $ref: '#/components/parameters/ClaimParam'
-  /subordinates/{subordinateID}/metadata/{entityType}:
+  /api/v1/admin/subordinates/{subordinateID}/metadata/{entityType}:
     get:
       tags:
         - Subordinate Metadata
@@ -3219,7 +3219,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
       - $ref: '#/components/parameters/EntityTypeParam'
-  /subordinates/{subordinateID}/metadata:
+  /api/v1/admin/subordinates/{subordinateID}/metadata:
     get:
       tags:
         - Subordinate Metadata
@@ -3264,7 +3264,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}/{operator}:
+  /api/v1/admin/subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}/{operator}:
     get:
       tags:
         - Subordinate Metadata Policies
@@ -3326,7 +3326,7 @@ paths:
       - $ref: '#/components/parameters/EntityTypeParam'
       - $ref: '#/components/parameters/ClaimParam'
       - $ref: '#/components/parameters/OperatorParam'
-  /subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}:
+  /api/v1/admin/subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}:
     get:
       tags:
         - Subordinate Metadata Policies
@@ -3422,7 +3422,7 @@ paths:
           type: string
         in: path
         required: true
-  /subordinates/{subordinateID}/metadata-policies/{entityType}:
+  /api/v1/admin/subordinates/{subordinateID}/metadata-policies/{entityType}:
     get:
       tags:
         - Subordinate Metadata Policies
@@ -3496,7 +3496,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
       - $ref: '#/components/parameters/EntityTypeParam'
-  /subordinates/{subordinateID}/metadata-policies:
+  /api/v1/admin/subordinates/{subordinateID}/metadata-policies:
     get:
       tags:
         - Subordinate Metadata Policies
@@ -3570,7 +3570,7 @@ paths:
           $ref: '#/components/schemas/InternalID'
         in: path
         required: true
-  /subordinates/{subordinateID}/jwks/{kid}:
+  /api/v1/admin/subordinates/{subordinateID}/jwks/{kid}:
     delete:
       tags:
         - Subordinate Keys
@@ -3599,7 +3599,7 @@ paths:
       operationId: deleteSubordinateJWK
       summary: Deletes a JWK from the subordinate's jwks
   # Removed subordinate crit endpoints; crit is part of additional-claims rows
-  /subordinates/metadata-policy-crit:
+  /api/v1/admin/subordinates/metadata-policy-crit:
     summary: Path used to manage the list of critical metadata policy operators.
     description: >-
       The REST endpoint/path used to list and create zero or more critical metadata policy operator
@@ -3662,7 +3662,7 @@ paths:
       operationId: createCriticalMetadataPolicyOperator
       summary: Create a critical metadata policy operator
       description: Creates a new critical metadata policy operator entry.
-  /subordinates/metadata-policy-crit/{operator}:
+  /api/v1/admin/subordinates/metadata-policy-crit/{operator}:
     summary: Path used to manage a single critical metadata policy operator.
     description: Manage a single critical metadata policy operator entry.
     delete:
