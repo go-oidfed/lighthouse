@@ -167,3 +167,45 @@ func (D *DBPublicKeyStorage) Get(kid string) (*public.PublicKeyEntry, error) {
 	}
 	return &row, nil
 }
+
+// NewDBPublicKeyStorageFromStorage creates a new DBPublicKeyStorage
+// and populates it from the passed PublicKeyStorage implementation.
+func NewDBPublicKeyStorageFromStorage(
+	db *gorm.DB, typeID string,
+	src public.PublicKeyStorage,
+) (
+	*DBPublicKeyStorage, error,
+) {
+	storage := NewDBPublicKeyStorage(db, typeID)
+	if err := storage.Load(); err != nil {
+		return nil, err
+	}
+
+	// Load source if necessary
+	if err := src.Load(); err != nil {
+		return nil, err
+	}
+	list, err := src.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range list {
+		if e.KID == "" && e.Key.Key != nil {
+			var kid string
+			_ = e.Key.Get("kid", &kid)
+			e.KID = kid
+		}
+		if e.KID == "" || e.Key.Key == nil {
+			continue
+		}
+		if k, cerr := e.Key.Clone(); cerr == nil {
+			e.Key.Key = k
+		} else {
+			continue
+		}
+		if err = storage.Add(e); err != nil {
+			return nil, err
+		}
+	}
+	return storage, nil
+}

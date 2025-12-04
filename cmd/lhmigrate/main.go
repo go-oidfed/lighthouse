@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
+	"github.com/go-oidfed/lighthouse/storage"
 )
 
 func usage() {
@@ -29,15 +30,18 @@ func publicCmd(args []string) int {
 	fs := flag.NewFlagSet("public", flag.ExitOnError)
 	var (
 		src    = fs.String("src", "", "Path to legacy public key storage directory")
-		dst    = fs.String("dst", "", "Destination directory for filesystem public key storage")
+		dst    = fs.String("dst", "", "Destination for migrated public key storage (dir for fs, or DB file for sqlite)")
 		typeID = fs.String(
 			"type", "federation", "Key type identifier (e.g., "+
 				"'federation')",
 		)
-		v = fs.Bool("v", false, "Verbose logging")
+		destDB  = fs.String("dest-db", "", "Destination database type: sqlite|mysql|postgres (optional; defaults to filesystem if empty)")
+		destDSN = fs.String("dest-dsn", "", "Destination DSN for mysql/postgres (ignored for sqlite)")
+		dbDebug = fs.Bool("db-debug", false, "Enable GORM debug logging for DB migration")
+		v       = fs.Bool("v", false, "Verbose logging")
 	)
 	fs.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys public -src <legacy_dir> -dst <dest_dir> -type <typeID>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys public -src <legacy_dir> -dst <dest> -type <typeID> [--dest-db=<sqlite|mysql|postgres>] [--dest-dsn=<dsn>] [--db-debug]\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -77,10 +81,37 @@ func publicCmd(args []string) int {
 		return 1
 	}
 
-	// Create destination filesystem storage and populate from legacy
-	if _, err := public.NewFilesystemPublicKeyStorageFromStorage(*dst, *typeID, legacy); err != nil {
-		log.WithError(err).Error("public key migration failed")
-		return 1
+	// Destination selection: filesystem (default) or DB
+	if strings.TrimSpace(*destDB) == "" {
+		// Filesystem destination
+		if _, err := public.NewFilesystemPublicKeyStorageFromStorage(*dst, *typeID, legacy); err != nil {
+			log.WithError(err).Error("public key migration failed")
+			return 1
+		}
+	} else {
+		// Database destination
+		var driver storage.DriverType
+		switch strings.ToLower(strings.TrimSpace(*destDB)) {
+		case string(storage.DriverSQLite):
+			driver = storage.DriverSQLite
+		case string(storage.DriverMySQL):
+			driver = storage.DriverMySQL
+		case string(storage.DriverPostgres):
+			driver = storage.DriverPostgres
+		default:
+			_, _ = fmt.Fprintf(os.Stderr, "invalid --dest-db: %s\n", *destDB)
+			return 2
+		}
+		cfg := storage.Config{Driver: driver, DSN: *destDSN, DataDir: *dst, Debug: *dbDebug}
+		db, err := storage.Connect(cfg)
+		if err != nil {
+			log.WithError(err).Error("failed to connect to destination database")
+			return 1
+		}
+		if _, err = storage.NewDBPublicKeyStorageFromStorage(db, *typeID, legacy); err != nil {
+			log.WithError(err).Error("public key migration to DB failed")
+			return 1
+		}
 	}
 	log.Info("public key migration completed")
 	return 0
@@ -217,7 +248,7 @@ func kmsCmd(args []string) int {
 func keysCmd(args []string) int {
 	if len(args) < 1 {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history)\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
+		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
 		return 2
 	}
 	sub := args[0]
@@ -228,7 +259,7 @@ func keysCmd(args []string) int {
 		return kmsCmd(args[1:])
 	case "-h", "--help", "help":
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history)\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
+		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
 		return 0
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "unknown keys subcommand: %s\n", sub)

@@ -61,24 +61,70 @@ Use `-type` to choose the key group. For federation signing keys, `-type federat
 
 ### Public key migration
 
+Migrate legacy JWKS and rotation history to either filesystem storage (default) or the database-backed public key storage.
+
+Filesystem destination (default):
+
 ```bash
 ./lhmigrate keys public -src <legacy_dir> -dst <dest_dir> -type <typeID>
+```
+
+Database destination:
+
+```bash
+# SQLite
+./lhmigrate keys public -src <legacy_dir> -dst </path/to/sqlite_dir_or_db> -type <typeID> --dest-db sqlite
+
+# MySQL
+./lhmigrate keys public -src <legacy_dir> -dst <ignored> -type <typeID> \
+  --dest-db mysql --dest-dsn 'user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True'
+
+# PostgreSQL
+./lhmigrate keys public -src <legacy_dir> -dst <ignored> -type <typeID> \
+  --dest-db postgres --dest-dsn 'host=localhost user=gorm password=gorm dbname=gorm port=9920'
 ```
 
 Flags:
 
 - `-src`: Path to legacy public key storage directory (required)
-- `-dst`: Destination directory for the new filesystem public key storage (default: same as `-src`)
+- `-dst`: Destination for filesystem store, or SQLite file/dir (default: same as `-src`)
 - `-type`: Key type identifier (default: `federation`)
-- `-v`: Verbose logging
+- `--dest-db`: Destination database type (`sqlite|mysql|postgres`). If omitted, filesystem destination is used.
+- `--dest-dsn`: DSN for MySQL/Postgres. Ignored for SQLite.
+- `--db-debug`: Enable GORM debug logging.
+- `-v`: Verbose CLI logging
 
-Example:
+Examples:
 
 ```bash
+# Filesystem migration
 ./lhmigrate keys public \
   -src /var/lib/lighthouse/legacy-keys \
   -dst /var/lib/lighthouse/keys \
   -type federation
+
+# SQLite DB migration (uses /var/lib/lighthouse/lighthouse.db if -dst is a directory)
+./lhmigrate keys public \
+  -src /var/lib/lighthouse/legacy-keys \
+  -dst /var/lib/lighthouse \
+  -type federation \
+  --dest-db sqlite
+
+# MySQL DB migration
+./lhmigrate keys public \
+  -src /var/lib/lighthouse/legacy-keys \
+  -dst ignored \
+  -type federation \
+  --dest-db mysql \
+  --dest-dsn 'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&parseTime=True'
+
+# PostgreSQL DB migration
+./lhmigrate keys public \
+  -src /var/lib/lighthouse/legacy-keys \
+  -dst ignored \
+  -type federation \
+  --dest-db postgres \
+  --dest-dsn 'host=localhost user=lh password=secret dbname=lighthouse port=9920'
 ```
 
 ### KMS (private key) migration
