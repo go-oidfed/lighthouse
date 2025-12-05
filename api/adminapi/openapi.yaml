@@ -4046,12 +4046,7 @@ components:
         - PS512
       type: string
       example: ES512
-    RevokeKey:
-      type: object
-      properties:
-        reason:
-          description: The reason for revoking the key.
-          type: string
+    
     KMSInfo:
       description: Information about the active KMS and current signing algorithm.
       type: object
@@ -4064,14 +4059,7 @@ components:
           $ref: '#/components/schemas/SignatureAlgorithm'
         rotation:
           $ref: '#/components/schemas/KMSRotationOptions'
-    UpdateKMSAlg:
-      description: Update the active signing algorithm.
-      type: object
-      required:
-        - algorithm
-      properties:
-        algorithm:
-          $ref: '#/components/schemas/SignatureAlgorithm'
+    
     KMSRotationOptions:
       description: Rotation options for the KMS-managed keys.
       type: object
@@ -4089,15 +4077,7 @@ components:
           format: int64
           description: Overlap window where old and new keys are both valid, in seconds.
           example: 604800
-    JwksResponse:
-      required:
-        - jwks
-      type: object
-      properties:
-        jwks:
-          type: array
-          items:
-            $ref: '#/components/schemas/ManagedJWK'
+    
     Jwk:
       required:
         - kid
@@ -4201,13 +4181,7 @@ components:
               description: The time when the key expires and will not be valid anymore.
               type: integer
               example: '1756536110'
-    HistoricalJWK:
-      description: A previously active key that has been revoked.
-      type: object
-      allOf:
-        - type: object
-        - $ref: '#/components/schemas/ManagedJWK'
-        - $ref: '#/components/schemas/Revoked'
+    
     Revoked:
       title: Root Type for Revoked
       description: JSON object that contains the properties of the revocation
@@ -4227,26 +4201,7 @@ components:
       example:
         revoked_at: 123972495172
         reason: compromised
-    CreateKey:
-      title: Root Type for CreateKey
-      description: Request payload to create a new signing key.
-      required: [ ]
-      type: object
-      properties:
-        kms:
-          description: The Key Management System to use. The KMS needs to be supported and configured.
-          type: string
-        alg:
-          $ref: '#/components/schemas/SignatureAlgorithm'
-          description: The signing algorithm for which a key should be created
-        kms_key_ref:
-          description: >-
-            A reference to the key in the Key Management System. Might not be supported by every
-            KMS.
-          type: string
-      example:
-        kms: filesystem
-        alg: ES512
+    
     EntityTypedMetadata:
       description: Metadata for one Entity Type
       type: object
@@ -4579,9 +4534,7 @@ components:
           max_path_length: 2
         additional_claims:
           custom_claim: custom_value
-    CriticalClaim:
-      description: A critical claim that must be understood and processed.
-      type: string
+    
     SubordinateStatus:
       description: New status to set for a subordinate.
       required:
@@ -4928,20 +4881,7 @@ components:
         additional_claims:
           $ref: '#/components/schemas/AdditionalClaims'
           description: Additional custom claims to include for this subject's trust mark.
-    PatchTrustMarkSubject:
-      description: Partial fields to update on a TrustMarkSubject.
-      type: object
-      properties:
-        entity_id:
-          $ref: '#/components/schemas/EntityID'
-          description: The Entity ID (identifier) of the subject.
-        status:
-          type: string
-          description: Current status of the subject.
-          example: active
-        additional_claims:
-          $ref: '#/components/schemas/AdditionalClaims'
-          description: Additional custom claims to include for this subject's trust mark.
+    
     TrustMarkSubjectStatus:
       description: New status to set for a TrustMarkSubject.
       type: object
