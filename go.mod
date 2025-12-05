@@ -12,7 +12,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/zachmann/go-utils v0.0.0-20251110102534-86c6793a17ed
 	gopkg.in/yaml.v3 v3.0.1
