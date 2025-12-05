@@ -15,6 +15,282 @@ externalDocs:
   description: OpenID Federation 1.0 specification
   url: https://openid.net/specs/openid-federation-1_0.html
 paths:
+  /api/v1/admin/entity-configuration/jwks:
+    get:
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnyValue'
+              example:
+                keys:
+                  - kty: EC
+                    crv: P-256
+                    kid: '12345'
+                    x: o-7zraXK...
+                    y: Xr_wCzJ1...
+                    alg: ES256
+          description: Successful response returning JWKS as published in the entity configuration.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getPublishedJWKS
+      summary: Get published JWKS
+  /api/v1/admin/entity-configuration/keys:
+    get:
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublicKeyEntry'
+          description: Successful response returning the list of API-managed public keys.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: listPublicKeys
+      summary: List API-managed public keys
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddPublicKeyEntry'
+        required: true
+      tags:
+        - Keys
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeyEntry'
+          description: Successfully added the public key.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: addPublicKey
+      summary: Add a new public key
+    
+  /api/v1/admin/entity-configuration/keys/{kid}:
+    parameters:
+      - name: kid
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags:
+        - Keys
+      parameters:
+        - name: revoke
+          in: query
+          description: If true, marks the key as revoked instead of hard delete.
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: reason
+          in: query
+          description: Optional reason when revoking the key.
+          required: false
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Successfully removed the public key.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: deletePublicKey
+      summary: Remove a public key
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePublicKeyMetadata'
+        required: true
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeyEntry'
+          description: Successfully updated the key metadata.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updatePublicKeyMetadata
+      summary: Update public key metadata
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RotatePublicKeyRequest'
+        required: true
+      tags:
+        - Keys
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeyEntry'
+          description: Successfully rotated the public key, marking previous as expired.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: rotatePublicKey
+      summary: Rotate a public key
+  /api/v1/admin/kms:
+    get:
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KMSInfo'
+          description: Returns information about the active KMS and signing algorithm.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getKMSInfo
+      summary: Get KMS information
+      description: Returns which KMS is active and which signing algorithm is configured.
+  /api/v1/admin/kms/alg:
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignatureAlgorithm'
+        required: true
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KMSInfo'
+          description: Successfully updated signing algorithm.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateKMSAlg
+      summary: Update KMS signing algorithm
+      description: Change the active signing algorithm.
+  /api/v1/admin/kms/rotation:
+    get:
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KMSRotationOptions'
+          description: Returns rotation options and whether rotation is enabled.
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: getKMSRotationOptions
+      summary: Get KMS rotation options
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KMSRotationOptions'
+        required: true
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KMSRotationOptions'
+          description: Successfully updated rotation options.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateKMSRotationOptions
+      summary: Update KMS rotation options
+    patch:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KMSRotationOptions'
+        required: true
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KMSRotationOptions'
+          description: Successfully patched rotation options.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: patchKMSRotationOptions
+      summary: Patch KMS rotation options
+  /api/v1/admin/kms/rotate:
+    post:
+      tags:
+        - Keys
+      parameters:
+        - name: revoke
+          in: query
+          description: If true, mark the old key as revoked instead of just expiring it.
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: reason
+          in: query
+          description: Optional reason when revoking the old key.
+          required: false
+          schema:
+            type: string
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeyEntry'
+          description: Successfully rotated signing key. Returns the new public key entry.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: triggerKMSRotation
+      summary: Trigger KMS key rotation
   /api/v1/admin/subordinates:
     get:
       tags:
@@ -95,7 +371,7 @@ paths:
                         contacts:
                           - support@example.org
                     jwks:
-                      jwks:
+                      keys:
                         - kty: EC
                           crv: P-256
                           kid: '12345'
@@ -533,90 +809,7 @@ paths:
       description: Deletes an existing `AuthorityHint`.
     parameters:
       - $ref: '#/components/parameters/AuthorityHintIDParam'
-  /api/v1/admin/entity-configuration/keys:
-    summary: Path used to manage keys
-    get:
-      summary: Get public signing keys
-      tags:
-        - Keys
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JwksResponse'
-          description: Successful response returning the public signing keys.
-        '500':
-          $ref: '#/components/responses/ServerError'
-      operationId: getKeys
-    post:
-      summary: Create a new key
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateKey'
-        required: false
-      tags:
-        - Keys
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ManagedJWK'
-          description: Key created successfully.
-        '400':
-          $ref: '#/components/responses/BadRequestError'
-        '404':
-          $ref: '#/components/responses/NotFoundError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-      operationId: createKey
-  /api/v1/admin/entity-configuration/keys/{kid}:
-    post:
-      tags:
-        - Keys
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ManagedJWK'
-          description: Successfully rotated key.
-        '404':
-          $ref: '#/components/responses/NotFoundError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-      operationId: rotateKey
-      summary: Rotate Key
-      description: The key identified by kid should be rotated, i.e. it is revoked and a new key is created.
-    delete:
-      tags:
-        - Keys
-      parameters:
-        - name: reason
-          description: The reason why this key must be revoked.
-          schema:
-            type: string
-          in: query
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HistoricalJWK'
-          description: Successfully revoked key.
-        '204':
-          description: Successfully revoked key.
-        '400':
-          $ref: '#/components/responses/BadRequestError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-      operationId: revokeKey
-      summary: Revoke a key
-    parameters:
-      - $ref: '#/components/parameters/KidParam'
+
   /api/v1/admin/entity-configuration/metadata/{entityType}/{claim}:
     get:
       tags:
@@ -3683,6 +3876,102 @@ paths:
         required: true
 components:
   schemas:
+    PublicKeyEntry:
+      description: A public key entry managed by the API.
+      type: object
+      required:
+        - kid
+        - key
+      properties:
+        kid:
+          type: string
+          description: Key ID
+        key:
+          $ref: '#/components/schemas/Jwk'
+        iat:
+          type: number
+          format: date-time
+          nullable: true
+          description: Time at which this key was issued.
+          example: '1756449710'
+        nbf:
+          type: number
+          format: date-time
+          nullable: true
+          description: Time from which the key is valid.
+          example: '1756449710'
+        exp:
+          type: number
+          format: date-time
+          nullable: true
+          description: Expiry time of the key.
+          example: '1756536110'
+        revoked_at:
+          type: number
+          format: date-time
+          nullable: true
+          description: Revocation time if revoked.
+          example: '1756536110'
+        reason:
+          type: string
+          description: Optional reason for revocation.
+    AddPublicKeyEntry:
+      description: Request to add a new public key.
+      type: object
+      required:
+        - key
+      properties:
+        key:
+          $ref: '#/components/schemas/Jwk'
+        iat:
+          type: number
+          format: date-time
+          nullable: true
+          description: Time at which this key was issued.
+          example: '1756449710'
+        nbf:
+          type: number
+          format: date-time
+          nullable: true
+          example: '1756449710'
+        exp:
+          type: number
+          format: date-time
+          nullable: true
+          example: '1756536110'
+    # DeletePublicKeyRequest removed; route uses path and query parameters instead of a request body.
+    UpdatePublicKeyMetadata:
+      description: Editable metadata fields for a public key.
+      type: object
+      properties:
+        nbf:
+          type: number
+          format: date-time
+          nullable: true
+          example: '1756449710'
+        exp:
+          type: number
+          format: date-time
+          nullable: true
+          example: '1756536110'
+    RotatePublicKeyRequest:
+      description: Request body for rotating a public key.
+      type: object
+      required:
+        - key
+      properties:
+        key:
+          $ref: '#/components/schemas/Jwk'
+        nbf:
+          type: string
+          format: date-time
+          nullable: true
+          example: '1756449710'
+        exp:
+          type: string
+          format: date-time
+          nullable: true
+          example: '1756536110'
     AnyValue:
       description: Any JSON value. This intentionally permits any type.
       type: object
@@ -3763,6 +4052,43 @@ components:
         reason:
           description: The reason for revoking the key.
           type: string
+    KMSInfo:
+      description: Information about the active KMS and current signing algorithm.
+      type: object
+      properties:
+        kms:
+          type: string
+          description: Identifier or type of the active KMS.
+          example: filesystem
+        algorithm:
+          $ref: '#/components/schemas/SignatureAlgorithm'
+        rotation:
+          $ref: '#/components/schemas/KMSRotationOptions'
+    UpdateKMSAlg:
+      description: Update the active signing algorithm.
+      type: object
+      required:
+        - algorithm
+      properties:
+        algorithm:
+          $ref: '#/components/schemas/SignatureAlgorithm'
+    KMSRotationOptions:
+      description: Rotation options for the KMS-managed keys.
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether automatic rotation is enabled.
+        interval:
+          type: integer
+          format: int64
+          description: Rotation interval in seconds.
+          example: 2592000
+        overlap:
+          type: integer
+          format: int64
+          description: Overlap window where old and new keys are both valid, in seconds.
+          example: 604800
     JwksResponse:
       required:
         - jwks
