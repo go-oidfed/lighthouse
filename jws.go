@@ -3,21 +3,17 @@ package lighthouse
 import (
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
-	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
+	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 type SigningConf struct {
-	KMS               string                 `yaml:"kms"`
-	PKBackend         string                 `yaml:"pk_backend"`
-	Alg               string                 `yaml:"alg"`
-	Algorithm         jwa.SignatureAlgorithm `yaml:"-"`
-	RSAKeyLen         int                    `yaml:"rsa_key_len"`
-	KeyRotation       kms.KeyRotationConfig  `yaml:"key_rotation"`
-	AutoGenerateKeys  bool                   `yaml:"auto_generate_keys"`
+	KMS               string `yaml:"kms"`
+	PKBackend         string `yaml:"pk_backend"`
+	AutoGenerateKeys  bool   `yaml:"auto_generate_keys"`
 	FileSystemBackend struct {
 		KeyFile string `yaml:"key_file"`
 		KeyDir  string `yaml:"key_dir"`
@@ -64,8 +60,6 @@ const (
 	PKBackendDatabase   = "db"
 )
 
-// TODO KMS to use config from DB
-
 func initKey(c SigningConf, storages model.Backends) (
 	keyManagement adminapi.KeyManagement,
 	err error,
@@ -94,20 +88,35 @@ func initKey(c SigningConf, storages model.Backends) (
 	if err = keyManagement.APIManagedPKs.Load(); err != nil {
 		return
 	}
+	alg, e := storage.GetSigningAlg(storages.KV)
+	if e != nil {
+		err = e
+		return
+	}
+	rsaKeyLen, e := storage.GetRSAKeyLen(storages.KV)
+	if e != nil {
+		err = e
+		return
+	}
+	rotationConf, e := storage.GetKeyRotation(storages.KV)
+	if e != nil {
+		err = e
+		return
+	}
 	switch c.KMS {
 	case KMSFilesystem:
 		if c.FileSystemBackend.KeyFile != "" {
 			keyManagement.BasicKeys = &kms.SingleSigningKeyFile{
-				Alg:  c.Algorithm,
+				Alg:  alg,
 				Path: c.FileSystemBackend.KeyFile,
 			}
 		} else {
 			keyManagement.Keys = kms.NewSingleAlgFilesystemKMS(
-				c.Algorithm, kms.FilesystemKMSConfig{
+				alg, kms.FilesystemKMSConfig{
 					KMSConfig: kms.KMSConfig{
 						GenerateKeys: c.AutoGenerateKeys,
-						RSAKeyLen:    c.RSAKeyLen,
-						KeyRotation:  c.KeyRotation,
+						RSAKeyLen:    rsaKeyLen,
+						KeyRotation:  rotationConf,
 					},
 					Dir:    c.FileSystemBackend.KeyDir,
 					TypeID: "federation",
@@ -116,11 +125,11 @@ func initKey(c SigningConf, storages model.Backends) (
 		}
 	case KMSPKCS11:
 		keyManagement.Keys = kms.NewSingleAlgPKCS11KMS(
-			c.Algorithm, kms.PKCS11KMSConfig{
+			alg, kms.PKCS11KMSConfig{
 				KMSConfig: kms.KMSConfig{
 					GenerateKeys: c.AutoGenerateKeys,
-					RSAKeyLen:    c.RSAKeyLen,
-					KeyRotation:  c.KeyRotation,
+					RSAKeyLen:    rsaKeyLen,
+					KeyRotation:  rotationConf,
 				},
 				TypeID:      "federation",
 				ModulePath:  c.PKCS11Backend.ModulePath,
@@ -141,7 +150,7 @@ func initKey(c SigningConf, storages model.Backends) (
 	if err = errors.Wrap(keyManagement.BasicKeys.Load(), "could not load kms"); err != nil {
 		return
 	}
-	if keyManagement.Keys != nil && c.KeyRotation.Enabled {
+	if keyManagement.Keys != nil && rotationConf.Enabled {
 		err = errors.Wrap(keyManagement.Keys.StartAutomaticRotation(), "could not start automatic key rotation")
 		return
 	}

@@ -36,7 +36,7 @@ func (s *KeyValueStorage) Get(scope, key string) (datatypes.JSON, error) {
 		).
 		Row()
 	if err := row.Scan(&raw); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

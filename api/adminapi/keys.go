@@ -275,6 +275,9 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 
 	r.Put(
 		"/kms/alg", func(c *fiber.Ctx) error {
+			if keyManagement.Keys == nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing signing alg dynamically"))
+			}
 			var alg string
 			if err := c.BodyParser(&alg); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -297,6 +300,12 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
+			if err = keyManagement.Keys.ChangeAlgs([]jwa.SignatureAlgorithm{jwaAlg}); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if err = keyManagement.Keys.ChangeDefaultAlgorithm(jwaAlg); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
 
 			return c.JSON(
 				kmsInfo{
@@ -312,6 +321,9 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 
 	r.Put(
 		"/kms/rsa-key-len", func(c *fiber.Ctx) error {
+			if keyManagement.Keys == nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing RSA key length dynamically"))
+			}
 			var rsaKeyLen int
 			if err := c.BodyParser(&rsaKeyLen); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -325,6 +337,9 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			}
 			alg, err := storage.GetSigningAlg(kvStorage)
 			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if err = keyManagement.Keys.ChangeRSAKeyLength(rsaKeyLen); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
 

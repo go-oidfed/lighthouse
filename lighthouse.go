@@ -131,7 +131,11 @@ func NewLightHouse(
 		},
 	)
 
-	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, []jwa.SignatureAlgorithm{signingConf.Algorithm})
+	alg, err := storage.GetSigningAlg(storages.KV)
+	if err != nil {
+		return nil, err
+	}
+	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, []jwa.SignatureAlgorithm{alg})
 	if tps := serverConf.TrustedProxies; len(tps) > 0 {
 		FiberServerConfig.TrustedProxies = serverConf.TrustedProxies
 		FiberServerConfig.EnableTrustedProxyCheck = true

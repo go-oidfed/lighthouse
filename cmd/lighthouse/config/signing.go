@@ -1,14 +1,14 @@
 package config
 
 import (
-	"time"
-
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
 	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse"
+	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 type legacySigningConf struct {
@@ -26,26 +26,122 @@ type legacySigningConf struct {
 	AutoGenerateKeys bool `yaml:"auto_generate_keys"`
 }
 
-type SigningConf lighthouse.SigningConf
+type SigningConf struct {
+	lighthouse.SigningConf `yaml:",inline"`
+	Alg                    string                 `yaml:"alg"`
+	AlgOverwrite           bool                   `yaml:"alg#overwrite"`
+	Algorithm              jwa.SignatureAlgorithm `yaml:"-"`
+	RSAKeyLen              int                    `yaml:"rsa_key_len"`
+	RSAKeyLenOverwrite     bool                   `yaml:"rsa_key_len#overwrite"`
+	KeyRotation            struct {
+		kms.KeyRotationConfig `yaml:",inline"`
+		EnabledOverwrite      bool `yaml:"enabled#overwrite"`
+		IntervalOverwrite     bool `yaml:"interval#overwrite"`
+		OverlapOverwrite      bool `yaml:"overlap#overwrite"`
+	} `yaml:"key_rotation"`
+	KeyRotationOverwrite bool `yaml:"key_rotation#overwrite"`
+}
+
+func (c SigningConf) OverwriteDBValues(kvStore model.KeyValueStore) error {
+	if c.Alg != "" {
+		if c.AlgOverwrite {
+			if err := errors.Wrap(
+				storage.SetSigningAlg(kvStore, c.Algorithm), "failed to overwrite db signing alg",
+			); err != nil {
+				return err
+			}
+		} else {
+			// Initialize only if unset in DB using raw GetAs
+			var algStr string
+			found, err := kvStore.GetAs(model.KeyValueScopeSigning, model.KeyValueKeyAlg, &algStr)
+			if err != nil {
+				return err
+			}
+			if !found {
+				if err = storage.SetSigningAlg(kvStore, c.Algorithm); err != nil {
+					return errors.Wrap(err, "failed to initialize db signing alg")
+				}
+			}
+		}
+	}
+	if c.RSAKeyLen != 0 {
+		if c.RSAKeyLenOverwrite {
+			if err := errors.Wrap(
+				storage.SetRSAKeyLen(kvStore, c.RSAKeyLen), "failed to overwrite db rsa key len",
+			); err != nil {
+				return err
+			}
+		} else {
+			// Initialize only if unset in DB using raw GetAs
+			var rsaLen int
+			found, err := kvStore.GetAs(model.KeyValueScopeSigning, model.KeyValueKeyRSAKeyLen, &rsaLen)
+			if err != nil {
+				return err
+			}
+			if !found {
+				if err = storage.SetRSAKeyLen(kvStore, c.RSAKeyLen); err != nil {
+					return errors.Wrap(err, "failed to initialize db rsa key len")
+				}
+			}
+		}
+	}
+	if err := c.overwriteDBRotation(kvStore); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c SigningConf) overwriteDBRotation(kvStore model.KeyValueStore) error {
+	if !c.KeyRotationOverwrite && !c.KeyRotation.EnabledOverwrite && !c.KeyRotation.IntervalOverwrite && !c.KeyRotation.OverlapOverwrite {
+		var existing kms.KeyRotationConfig
+		found, err := kvStore.GetAs(model.KeyValueScopeSigning, model.KeyValueKeyKeyRotation, &existing)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return errors.Wrap(
+				storage.SetKeyRotation(kvStore, c.KeyRotation.KeyRotationConfig), "failed to initialize db key rotation",
+			)
+		}
+		return nil
+	}
+	overwriteData := c.KeyRotation.KeyRotationConfig
+	if !c.KeyRotationOverwrite {
+		// Only do a partial overwrite
+		var err error
+		overwriteData, err = storage.GetKeyRotation(kvStore)
+		if err != nil {
+			return err
+		}
+		if c.KeyRotation.EnabledOverwrite {
+			overwriteData.Enabled = c.KeyRotation.Enabled
+		}
+		if c.KeyRotation.IntervalOverwrite {
+			overwriteData.Interval = c.KeyRotation.Interval
+		}
+		if c.KeyRotation.OverlapOverwrite {
+			overwriteData.Overlap = c.KeyRotation.Overlap
+		}
+	}
+	return errors.Wrap(storage.SetKeyRotation(kvStore, overwriteData), "failed to overwrite db key rotation")
+}
 
 var defaultSigningConf = SigningConf{
-	KMS:       lighthouse.KMSFilesystem,
-	PKBackend: lighthouse.PKBackendDatabase,
-	Alg:       "ES512",
-	RSAKeyLen: 2048,
-	KeyRotation: kms.KeyRotationConfig{
-		Enabled:  false,
-		Interval: duration.DurationOption(time.Second * 600000), // a little bit under a week
-		Overlap:  duration.DurationOption(time.Hour),
+	SigningConf: lighthouse.SigningConf{
+		KMS:              lighthouse.KMSFilesystem,
+		PKBackend:        lighthouse.PKBackendDatabase,
+		AutoGenerateKeys: true,
 	},
-	AutoGenerateKeys: true,
+	// The default values for alg, rsa_key_len and key_rotation are set in the db helper
 }
 
 func (c *SigningConf) validate() error {
 	var ok bool
-	c.Algorithm, ok = jwa.LookupSignatureAlgorithm(c.Alg)
-	if !ok {
-		return errors.New("error in signing conf: unknown algorithm " + c.Alg)
+	if c.Alg != "" {
+		c.Algorithm, ok = jwa.LookupSignatureAlgorithm(c.Alg)
+		if !ok {
+			return errors.New("error in signing conf: unknown algorithm " + c.Alg)
+		}
 	}
 	switch c.KMS {
 	case lighthouse.KMSFilesystem:

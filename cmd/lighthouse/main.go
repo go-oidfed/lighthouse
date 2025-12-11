@@ -63,6 +63,9 @@ func main() {
 	signingConf.KeyRotation.EntityConfigurationLifetimeFunc = func() (time.Duration, error) {
 		return storage.GetEntityConfigurationLifetime(backs.KV)
 	}
+	if err = signingConf.OverwriteDBValues(backs.KV); err != nil {
+		log.Fatal(err)
+	}
 
 	// for _, tmc := range c.Federation.TrustMarks {
 	// 	if err = tmc.Verify(
@@ -76,7 +79,7 @@ func main() {
 	lh, err := lighthouse.NewLightHouse(
 		config.Get().Server,
 		c.Federation.EntityID,
-		lighthouse.SigningConf(signingConf),
+		signingConf.SigningConf,
 		lighthouse.SubordinateStatementsConfig{
 			MetadataPolicies:             nil,
 			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
