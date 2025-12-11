@@ -9,11 +9,15 @@ const (
 	KeyValueScopeGlobal               = ""
 	KeyValueScopeEntityConfiguration  = "entity_configuration"
 	KeyValueScopeSubordinateStatement = "subordinate_statement"
+	KeyValueScopeSigning              = "signing"
 
 	KeyValueKeyLifetime       = "lifetime"
 	KeyValueKeyMetadataPolicy = "metadata_policy"
 	KeyValueKeyMetadata       = "metadata"
 	KeyValueKeyCriticalClaims = "crit"
+	KeyValueKeyAlg            = "alg"
+	KeyValueKeyRSAKeyLen      = "rsa_key_len"
+	KeyValueKeyKeyRotation    = "key_rotation"
 )
 
 // KeyValue stores arbitrary key-value data.

@@ -27,7 +27,10 @@ type Options struct {
 }
 
 // Register mounts all admin API routes under the provided group.
-func Register(r fiber.Router, serverURL string, storages model.Backends, fedEntity oidfed.FederationEntity, opts *Options) error {
+func Register(
+	r fiber.Router, serverURL string, storages model.Backends, fedEntity oidfed.FederationEntity,
+	keyManagement KeyManagement, opts *Options,
+) error {
 	// If an admin port is provided in options, adapt the serverURL to include/override the port
 	if opts != nil && opts.Port > 0 {
 		serverURL = adaptServerURLPort(serverURL, opts.Port)
@@ -90,7 +93,7 @@ func Register(r fiber.Router, serverURL string, storages model.Backends, fedEnti
 	// Authority Hints
 	registerAuthorityHints(r, storages.AuthorityHints)
 	// Keys
-	registerKeys(r)
+	registerKeys(r, keyManagement, storages.KV)
 	// Entity Configuration Trust Marks
 	registerEntityTrustMarks(r)
 	// Entity Configuration Metadata and Policies

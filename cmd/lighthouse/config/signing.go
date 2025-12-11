@@ -7,6 +7,8 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
 	"github.com/zachmann/go-utils/duration"
+
+	"github.com/go-oidfed/lighthouse"
 )
 
 type legacySigningConf struct {
@@ -24,63 +26,11 @@ type legacySigningConf struct {
 	AutoGenerateKeys bool `yaml:"auto_generate_keys"`
 }
 
-type SigningConf struct {
-	KMS               string                 `yaml:"kms"`
-	PKBackend         string                 `yaml:"pk_backend"`
-	Alg               string                 `yaml:"alg"`
-	Algorithm         jwa.SignatureAlgorithm `yaml:"-"`
-	RSAKeyLen         int                    `yaml:"rsa_key_len"`
-	KeyRotation       kms.KeyRotationConfig  `yaml:"key_rotation"`
-	AutoGenerateKeys  bool                   `yaml:"auto_generate_keys"`
-	FileSystemBackend struct {
-		KeyFile string `yaml:"key_file"`
-		KeyDir  string `yaml:"key_dir"`
-	} `yaml:"filesystem"`
-	PKCS11Backend struct {
-
-		// ModulePath is the path to the PKCS#11 module (crypto11.Config.Path)
-		ModulePath string `yaml:"module_path"`
-		// TokenLabel selects the token by label (crypto11.Config.TokenLabel)
-		TokenLabel string `yaml:"token_label"`
-		// TokenSerial selects the token by serial (crypto11.Config.TokenSerial)
-		TokenSerial string `yaml:"token_serial"`
-		// SlotNumber selects the token by slot number (crypto11.Config.SlotNumber)
-		SlotNumber *int `yaml:"token_slot"`
-		// Pin is the user PIN for the token (crypto11.Config.Pin)
-		Pin string `yaml:"pin"`
-
-		// Maximum number of concurrent sessions to open. If zero, DefaultMaxSessions is used.
-		// Otherwise, the value specified must be at least 2.
-		MaxSessions int `yaml:"max_sessions"`
-
-		// User type identifies the user type logging in. If zero, DefaultUserType is used.
-		UserType int `yaml:"user_type"`
-
-		// LoginNotSupported should be set to true for tokens that do not support logging in.
-		LoginNotSupported bool `yaml:"no_login"`
-
-		// Optional prefix for object labels inside HSM
-		LabelPrefix string `yaml:"label_prefix"`
-
-		// ExtraLabels are HSM object labels to load into this KMS even if
-		// they are not present yet in the PublicKeyStorage.
-		ExtraLabels []string `yaml:"load_labels"`
-	} `yaml:"pkcs11"`
-}
-
-const (
-	KMSFilesystem = "filesystem"
-	KMSPKCS11     = "pkcs11"
-)
-
-const (
-	PKBackendFilesystem = "filesystem"
-	PKBackendDatabase   = "db"
-)
+type SigningConf lighthouse.SigningConf
 
 var defaultSigningConf = SigningConf{
-	KMS:       KMSFilesystem,
-	PKBackend: PKBackendDatabase,
+	KMS:       lighthouse.KMSFilesystem,
+	PKBackend: lighthouse.PKBackendDatabase,
 	Alg:       "ES512",
 	RSAKeyLen: 2048,
 	KeyRotation: kms.KeyRotationConfig{
@@ -98,14 +48,14 @@ func (c *SigningConf) validate() error {
 		return errors.New("error in signing conf: unknown algorithm " + c.Alg)
 	}
 	switch c.KMS {
-	case KMSFilesystem:
+	case lighthouse.KMSFilesystem:
 		if c.FileSystemBackend.KeyDir == "" && c.FileSystemBackend.KeyFile == "" {
 			return errors.New("error in signing conf: filesystem.key_dir or filesystem.key_file must be specified")
 		}
 		if c.FileSystemBackend.KeyFile != "" {
 			c.KeyRotation.Enabled = false
 		}
-	case KMSPKCS11:
+	case lighthouse.KMSPKCS11:
 		if c.PKCS11Backend.ModulePath == "" {
 			return errors.New("error in signing conf: pkcs11.module_path must be specified")
 		}
@@ -118,7 +68,7 @@ func (c *SigningConf) validate() error {
 	default:
 		return errors.Errorf("error in signing conf: unknown KMS %s", c.KMS)
 	}
-	if c.PKBackend == PKBackendFilesystem && c.FileSystemBackend.KeyDir == "" {
+	if c.PKBackend == lighthouse.PKBackendFilesystem && c.FileSystemBackend.KeyDir == "" {
 		return errors.New("error in signing conf: filesystem.key_dir must be specified")
 	}
 	return nil

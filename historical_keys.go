@@ -10,9 +10,7 @@ import (
 )
 
 // AddHistoricalKeysEndpoint adds the federation historical keys endpoint
-func (fed *LightHouse) AddHistoricalKeysEndpoint(
-	endpoint EndpointConf, historyFnc func() (jwx.JWKS, error),
-) {
+func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) {
 	fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
@@ -20,11 +18,27 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(
 	signer := fed.GeneralJWTSigner.Typed(oidfedconst.JWTTypeJWKS)
 	fed.server.Get(
 		endpoint.Path, func(ctx *fiber.Ctx) error {
-			keys, err := historyFnc()
+			kmsHistory, err := fed.keyManagement.KMSManagedPKs.GetHistorical()
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 			}
+			apiHistory, err := fed.keyManagement.APIManagedPKs.GetHistorical()
+			if err != nil {
+				ctx.Status(fiber.StatusInternalServerError)
+				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			allEntries := append(kmsHistory, apiHistory...)
+			keys := jwx.NewJWKS()
+			for _, k := range allEntries {
+				kk, err := k.JWK()
+				if err != nil {
+					ctx.Status(fiber.StatusInternalServerError)
+					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+				}
+				_ = keys.AddKey(kk)
+			}
+
 			jwt, err := signer.JWT(
 				map[string]any{
 					"iss":  fed.FederationEntity.EntityID(),

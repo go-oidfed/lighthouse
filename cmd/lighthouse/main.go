@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
-	"github.com/go-oidfed/lib/jwx"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 
@@ -65,10 +64,6 @@ func main() {
 		return storage.GetEntityConfigurationLifetime(backs.KV)
 	}
 
-	if err = initKey(signingConf, backs.PKStorages); err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Loaded signing key")
 	// for _, tmc := range c.Federation.TrustMarks {
 	// 	if err = tmc.Verify(
 	// 		c.Federation.EntityID, c.Endpoints.TrustMarkEndpoint.ValidateURL(c.Federation.EntityID),
@@ -81,7 +76,7 @@ func main() {
 	lh, err := lighthouse.NewLightHouse(
 		config.Get().Server,
 		c.Federation.EntityID,
-		versatileSigner(), c.Signing.Algorithm,
+		lighthouse.SigningConf(signingConf),
 		lighthouse.SubordinateStatementsConfig{
 			MetadataPolicies:             nil,
 			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
@@ -170,28 +165,7 @@ func main() {
 		lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks)
 	}
 	if endpoint := c.Endpoints.HistoricalKeysEndpoint; endpoint.IsSet() {
-		lh.AddHistoricalKeysEndpoint(
-			endpoint, func() (jwx.JWKS, error) {
-				kmsHistory, err := kmsManagedPKs.GetHistorical()
-				if err != nil {
-					return jwx.JWKS{}, err
-				}
-				apiHistory, err := apiManagedPKs.GetHistorical()
-				if err != nil {
-					return jwx.JWKS{}, err
-				}
-				allEntries := append(kmsHistory, apiHistory...)
-				set := jwx.NewJWKS()
-				for _, k := range allEntries {
-					kk, err := k.JWK()
-					if err != nil {
-						return jwx.JWKS{}, err
-					}
-					_ = set.AddKey(kk)
-				}
-				return set, nil
-			},
-		)
+		lh.AddHistoricalKeysEndpoint(endpoint)
 	}
 	if endpoint := c.Endpoints.EnrollmentEndpoint; endpoint.IsSet() {
 		var checker lighthouse.EntityChecker

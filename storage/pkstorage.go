@@ -7,8 +7,6 @@ import (
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
-
-	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // DBPublicKeyStorage implements public.PublicKeyStorage backed by the database.
@@ -32,6 +30,9 @@ func (D *DBPublicKeyStorage) Load() error { return D.db.AutoMigrate(&public.Publ
 // GetAll returns all keys, including revoked and expired ones.
 func (D *DBPublicKeyStorage) GetAll() (out public.PublicKeyEntryList, err error) {
 	err = errors.WithStack(D.db.Find(&out).Error)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = nil
+	}
 	return
 }
 
@@ -42,6 +43,9 @@ func (D *DBPublicKeyStorage) GetRevoked() (out public.PublicKeyEntryList, err er
 			"revoked_at IS NOT NULL AND revoked_at <= CURRENT_TIMESTAMP",
 		).Find(&out).Error,
 	)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = nil
+	}
 	return
 }
 
@@ -52,6 +56,9 @@ func (D *DBPublicKeyStorage) GetExpired() (out public.PublicKeyEntryList, err er
 			"expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP",
 		).Find(&out).Error,
 	)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = nil
+	}
 	return
 }
 
@@ -62,6 +69,9 @@ func (D *DBPublicKeyStorage) GetHistorical() (out public.PublicKeyEntryList, err
 			"(expires_at IS NOT NULL AND expires_at <= CURRENT_TIMESTAMP) OR (revoked_at IS NOT NULL AND revoked_at <= CURRENT_TIMESTAMP)",
 		).Find(&out).Error,
 	)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = nil
+	}
 	return
 }
 
@@ -72,6 +82,9 @@ func (D *DBPublicKeyStorage) GetActive() (out public.PublicKeyEntryList, err err
 			"(revoked_at IS NULL OR revoked_at > CURRENT_TIMESTAMP) AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) AND (not_before IS NULL OR not_before <= CURRENT_TIMESTAMP)",
 		).Find(&out).Error,
 	)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = nil
+	}
 	return
 }
 
@@ -82,6 +95,9 @@ func (D *DBPublicKeyStorage) GetValid() (out public.PublicKeyEntryList, err erro
 			"(revoked_at IS NULL OR revoked_at > CURRENT_TIMESTAMP) AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)",
 		).Find(&out).Error,
 	)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = nil
+	}
 	return
 }
 
@@ -126,7 +142,7 @@ func (D *DBPublicKeyStorage) Update(kid string, data public.UpdateablePublicKeyM
 	var row public.PublicKeyEntry
 	if err := D.db.Where("kid = ?", kid).First(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return model.NotFoundError("public key not found")
+			return public.NotFoundError{KID: kid}
 		}
 		return errors.WithStack(err)
 	}
@@ -145,7 +161,7 @@ func (D *DBPublicKeyStorage) Revoke(kid, reason string) error {
 	if res := D.db.Where("kid = ?", kid).First(&row); res.Error != nil {
 		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
 			res.Error = nil
-			return model.NotFoundError("public key not found")
+			return public.NotFoundError{KID: kid}
 		}
 		return errors.WithStack(res.Error)
 	}

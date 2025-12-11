@@ -12,6 +12,7 @@ import (
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
@@ -63,6 +64,7 @@ type LightHouse struct {
 	adminAPIServer *fiber.App
 	serverConf     ServerConf
 	fedMetadata    oidfed.FederationEntityMetadata
+	keyManagement  adminapi.KeyManagement
 	LogoBanner     bool
 	VersionBanner  bool
 }
@@ -93,7 +95,7 @@ var FiberServerConfig = fiber.Config{
 func NewLightHouse(
 	serverConf ServerConf,
 	entityID string,
-	signer jwx.VersatileSigner, signingAlg jwa.SignatureAlgorithm,
+	signingConf SigningConf,
 	stmtConfig SubordinateStatementsConfig,
 	storages model.Backends,
 	admin AdminAPIOptions,
@@ -101,7 +103,35 @@ func NewLightHouse(
 	*LightHouse,
 	error,
 ) {
-	generalSigner := jwx.NewGeneralJWTSigner(signer, []jwa.SignatureAlgorithm{signingAlg})
+
+	keyManagement, err := initKey(signingConf, storages)
+	if err != nil {
+		return nil, err
+	}
+	versatileSigner := kms.KMSToVersatileSignerWithJWKSFunc(
+		keyManagement.BasicKeys, func() (jwx.JWKS, error) {
+			kmsHistory, err := keyManagement.KMSManagedPKs.GetValid()
+			if err != nil {
+				return jwx.JWKS{}, err
+			}
+			apiHistory, err := keyManagement.APIManagedPKs.GetValid()
+			if err != nil {
+				return jwx.JWKS{}, err
+			}
+			allEntries := append(kmsHistory, apiHistory...)
+			set := jwx.NewJWKS()
+			for _, k := range allEntries {
+				kk, err := k.JWK()
+				if err != nil {
+					return jwx.JWKS{}, err
+				}
+				_ = set.AddKey(kk)
+			}
+			return set, nil
+		},
+	)
+
+	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, []jwa.SignatureAlgorithm{signingConf.Algorithm})
 	if tps := serverConf.TrustedProxies; len(tps) > 0 {
 		FiberServerConfig.TrustedProxies = serverConf.TrustedProxies
 		FiberServerConfig.EnableTrustedProxyCheck = true
@@ -120,6 +150,7 @@ func NewLightHouse(
 		serverConf:                  serverConf,
 		LogoBanner:                  true,
 		VersionBanner:               true,
+		keyManagement:               keyManagement,
 	}
 
 	entity.FederationEntity = &oidfed.DynamicFederationEntity{
@@ -240,9 +271,11 @@ func NewLightHouse(
 			// Mount on main server
 			entity.adminAPIServer = server
 		}
-		if err := adminapi.Register(
+		if err = adminapi.Register(
 			entity.adminAPIServer.Group("/api/v1/admin"), entityID, storages,
-			entity.FederationEntity, &adminapi.Options{
+			entity.FederationEntity,
+			keyManagement,
+			&adminapi.Options{
 				UsersEnabled: admin.UsersEnabled,
 				Port:         admin.Port,
 			},

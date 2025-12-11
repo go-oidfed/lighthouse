@@ -118,7 +118,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdatePublicKeyMetadata'
+              type: object
+              properties:
+                exp:
+                  type: number
+                  format: date-time
+                  nullable: true
+                  example: '1756536110'
         required: true
       tags:
         - Keys
@@ -201,6 +207,31 @@ paths:
       operationId: updateKMSAlg
       summary: Update KMS signing algorithm
       description: Change the active signing algorithm.
+  /api/v1/admin/kms/rsa-key-len:
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: integer
+              description: RSA key length in bits.
+        required: true
+      tags:
+        - Keys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KMSInfo'
+          description: Successfully updated signing algorithm.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateKMSRSAKeyLen
+      summary: Update KMS RSA Key Length
+      description: Change the key length of newly generated RSA keys.
   /api/v1/admin/kms/rotation:
     get:
       tags:
@@ -279,12 +310,8 @@ paths:
           schema:
             type: string
       responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PublicKeyEntry'
-          description: Successfully rotated signing key. Returns the new public key entry.
+        '202':
+          description: Successfully rotated signing key.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '500':
@@ -3962,16 +3989,26 @@ components:
       properties:
         key:
           $ref: '#/components/schemas/Jwk'
+        iat:
+          type: number
+          format: date-time
+          nullable: true
+          example: '1756449710'
         nbf:
-          type: string
+          type: number
           format: date-time
           nullable: true
           example: '1756449710'
         exp:
-          type: string
+          type: number
           format: date-time
           nullable: true
           example: '1756536110'
+        old_key_exp:
+          type: number
+          format: date-time
+          nullable: true
+          example: '1756450010'
     AnyValue:
       description: Any JSON value. This intentionally permits any type.
       type: object
@@ -4057,6 +4094,10 @@ components:
           example: filesystem
         algorithm:
           $ref: '#/components/schemas/SignatureAlgorithm'
+        rsa_key_len:
+          type: integer
+          description: Length of RSA keys in bits.
+          example: 2048
         rotation:
           $ref: '#/components/schemas/KMSRotationOptions'
     
