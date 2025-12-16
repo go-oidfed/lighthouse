@@ -12,6 +12,7 @@ import (
 // registerTrustMarkTypes wires handlers using a TrustMarkTypesStore abstraction.
 func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	g := r.Group("/trust-marks/types")
+	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
@@ -23,7 +24,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	g.Post(
+	withCacheWipe.Post(
 		"/", func(c *fiber.Ctx) error {
 			var req model.AddTrustMarkType
 			if err := c.BodyParser(&req); err != nil {
@@ -54,7 +55,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	g.Put(
+	withCacheWipe.Put(
 		"/:trustMarkTypeID", func(c *fiber.Ctx) error {
 			var req model.AddTrustMarkType
 			if err := c.BodyParser(&req); err != nil {
@@ -83,7 +84,9 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 					if errors.As(err, &nf) {
 						// If no current owner and request provides data to create a new one, create/link now.
 						if req.TrustMarkOwner.OwnerID == nil {
-							if _, err := store.CreateOwner(c.Params("trustMarkTypeID"), *req.TrustMarkOwner); err != nil {
+							if _, err := store.CreateOwner(
+								c.Params("trustMarkTypeID"), *req.TrustMarkOwner,
+							); err != nil {
 								return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 							}
 						} else {
@@ -110,7 +113,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	g.Delete(
+	withCacheWipe.Delete(
 		"/:trustMarkTypeID", func(c *fiber.Ctx) error {
 			if err := store.Delete(c.Params("trustMarkTypeID")); err != nil {
 				var notFoundError model.NotFoundError
@@ -138,7 +141,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	r.Put(
+	withCacheWipe.Put(
 		"/trust-marks/types/:trustMarkTypeID/issuers", func(c *fiber.Ctx) error {
 			var req []model.AddTrustMarkIssuer
 			if err := c.BodyParser(&req); err != nil {
@@ -156,7 +159,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	r.Post(
+	withCacheWipe.Post(
 		"/trust-marks/types/:trustMarkTypeID/issuers",
 		func(c *fiber.Ctx) error {
 			var issuer model.AddTrustMarkIssuer
@@ -175,7 +178,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	r.Delete(
+	withCacheWipe.Delete(
 		"/trust-marks/types/:trustMarkTypeID/issuers/:issuerID",
 		func(c *fiber.Ctx) error {
 			// Accept issuer identifier as numeric ID or issuer string
@@ -190,7 +193,9 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 			// If not numeric, resolve via types storage helper by adding issuer relation then deleting
 			if issuerID == 0 {
 				// Attempt resolution via SetIssuers with a single issuer string to find ID through storage
-				_, err := store.AddIssuer(c.Params("trustMarkTypeID"), model.AddTrustMarkIssuer{Issuer: c.Params("issuerID")})
+				_, err := store.AddIssuer(
+					c.Params("trustMarkTypeID"), model.AddTrustMarkIssuer{Issuer: c.Params("issuerID")},
+				)
 				if err != nil {
 					var nf model.NotFoundError
 					if errors.As(err, &nf) {
@@ -240,7 +245,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	r.Put(
+	withCacheWipe.Put(
 		"/trust-marks/types/:trustMarkTypeID/owner", func(c *fiber.Ctx) error {
 			var req model.AddTrustMarkOwner
 			if err := c.BodyParser(&req); err != nil {
@@ -265,7 +270,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	r.Post(
+	withCacheWipe.Post(
 		"/trust-marks/types/:trustMarkTypeID/owner",
 		func(c *fiber.Ctx) error {
 			var req model.AddTrustMarkOwner
@@ -291,7 +296,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
-	r.Delete(
+	withCacheWipe.Delete(
 		"/trust-marks/types/:trustMarkTypeID/owner",
 		func(c *fiber.Ctx) error {
 			if err := store.DeleteOwner(c.Params("trustMarkTypeID")); err != nil {

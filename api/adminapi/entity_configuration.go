@@ -17,6 +17,7 @@ func registerEntityConfiguration(
 	fedEntity oidfed.FederationEntity,
 ) {
 	g := r.Group("/entity-configuration")
+	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
 			payload, err := fedEntity.EntityConfigurationPayload()
@@ -37,7 +38,7 @@ func registerEntityConfiguration(
 			return c.JSON(values)
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/additional-claims", func(c *fiber.Ctx) error {
 			var req []smodel.AddAdditionalClaim
 			if err := c.BodyParser(&req); err != nil {
@@ -53,7 +54,7 @@ func registerEntityConfiguration(
 			return c.JSON(updated)
 		},
 	)
-	g.Post(
+	withCacheWipe.Post(
 		"/additional-claims", func(c *fiber.Ctx) error {
 			var req smodel.AddAdditionalClaim
 			if err := c.BodyParser(&req); err != nil {
@@ -84,7 +85,7 @@ func registerEntityConfiguration(
 			return c.JSON(row)
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error {
 			id := c.Params("additionalClaimsID")
 			var req smodel.AddAdditionalClaim
@@ -106,8 +107,9 @@ func registerEntityConfiguration(
 			return c.JSON(updated)
 		},
 	)
-	g.Delete(
-		"/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error {
+	withCacheWipe.Delete(
+		"/additional-claims/:additionalClaimsID",
+		func(c *fiber.Ctx) error {
 			idStr := c.Params("additionalClaimsID")
 			id, err := strconv.ParseUint(idStr, 10, 64)
 			if err != nil {
@@ -120,7 +122,6 @@ func registerEntityConfiguration(
 		},
 	)
 
-	// Metadata
 	g.Get(
 		"/lifetime", func(c *fiber.Ctx) error {
 			var seconds int
@@ -134,7 +135,7 @@ func registerEntityConfiguration(
 			return c.JSON(seconds)
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/lifetime", func(c *fiber.Ctx) error {
 			// Expect body to be a JSON integer
 			if len(c.Body()) == 0 {
@@ -173,7 +174,7 @@ func registerEntityConfiguration(
 			return c.JSON(meta)
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/metadata", func(c *fiber.Ctx) error {
 			var meta oidfed.Metadata
 			if err := c.BodyParser(&meta); err != nil {
@@ -210,7 +211,7 @@ func registerEntityConfiguration(
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("metadata not found"))
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/metadata/:entityType/:claim", func(c *fiber.Ctx) error {
 			entityType := c.Params("entityType")
 			claim := c.Params("claim")
@@ -240,7 +241,7 @@ func registerEntityConfiguration(
 			return c.Send(c.Body())
 		},
 	)
-	g.Delete(
+	withCacheWipe.Delete(
 		"/metadata/:entityType/:claim", func(c *fiber.Ctx) error {
 			entityType := c.Params("entityType")
 			claim := c.Params("claim")
@@ -289,7 +290,7 @@ func registerEntityConfiguration(
 			return c.JSON(claims)
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/metadata/:entityType", func(c *fiber.Ctx) error {
 			entityType := c.Params("entityType")
 			var body map[string]json.RawMessage
@@ -315,7 +316,7 @@ func registerEntityConfiguration(
 			return c.JSON(body)
 		},
 	)
-	g.Post(
+	withCacheWipe.Post(
 		"/metadata/:entityType", func(c *fiber.Ctx) error {
 			entityType := c.Params("entityType")
 			var body map[string]json.RawMessage
@@ -346,7 +347,7 @@ func registerEntityConfiguration(
 			return c.JSON(body)
 		},
 	)
-	g.Delete(
+	withCacheWipe.Delete(
 		"/metadata/:entityType", func(c *fiber.Ctx) error {
 			entityType := c.Params("entityType")
 			var meta map[string]map[string]json.RawMessage

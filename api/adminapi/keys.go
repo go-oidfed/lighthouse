@@ -72,6 +72,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 
 	// Public keys collection
 	g := r.Group("/entity-configuration/keys")
+	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 
 	apiManagedPKs := keyManagement.APIManagedPKs
 
@@ -87,7 +88,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 	)
 
 	// POST: add a new public key
-	g.Post(
+	withCacheWipe.Post(
 		"/", func(c *fiber.Ctx) error {
 			var req public.PublicKeyEntry
 			if err := c.BodyParser(&req); err != nil {
@@ -124,7 +125,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 	type updateReq struct {
 		Exp *unixtime.Unixtime `json:"exp"`
 	}
-	g.Put(
+	withCacheWipe.Put(
 		"/:kid", func(c *fiber.Ctx) error {
 			kid := c.Params("kid")
 			// Use API-managed storage
@@ -168,7 +169,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 		Exp       *unixtime.Unixtime `json:"exp"`
 		OldKeyExp *unixtime.Unixtime `json:"old_key_exp"`
 	}
-	g.Post(
+	withCacheWipe.Post(
 		"/:kid", func(c *fiber.Ctx) error {
 			oldKid := c.Params("kid")
 			// Use API-managed storage
@@ -233,7 +234,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 	)
 
 	// DELETE kid: remove or revoke
-	g.Delete(
+	withCacheWipe.Delete(
 		"/:kid", func(c *fiber.Ctx) error {
 			kid := c.Params("kid")
 			revoke := c.QueryBool("revoke", false)
@@ -259,7 +260,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 		},
 	)
 
-	r.Put(
+	withCacheWipe.Put(
 		"/kms/alg", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing signing alg dynamically"))
@@ -310,7 +311,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 		},
 	)
 
-	r.Put(
+	withCacheWipe.Put(
 		"/kms/rsa-key-len", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing RSA key length dynamically"))
@@ -346,7 +347,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			return c.JSON(rot)
 		},
 	)
-	r.Put(
+	withCacheWipe.Put(
 		"/kms/rotation", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
@@ -364,7 +365,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			return c.JSON(cfg)
 		},
 	)
-	r.Patch(
+	withCacheWipe.Patch(
 		"/kms/rotation", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
@@ -399,7 +400,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 	)
 
 	// Trigger KMS rotation (placeholder)
-	r.Post(
+	withCacheWipe.Post(
 		"/kms/rotate", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))

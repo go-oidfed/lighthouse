@@ -12,6 +12,7 @@ import (
 // registerAuthorityHints wires handlers using an AuthorityHintsStore abstraction.
 func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 	g := r.Group("/entity-configuration/authority-hints")
+	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
@@ -23,7 +24,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 		},
 	)
 
-	g.Post(
+	withCacheWipe.Post(
 		"/", func(c *fiber.Ctx) error {
 			var req model.AddAuthorityHint
 			if err := c.BodyParser(&req); err != nil {
@@ -54,7 +55,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 		},
 	)
 
-	g.Put(
+	withCacheWipe.Put(
 		"/:authorityHintID", func(c *fiber.Ctx) error {
 			var req model.AddAuthorityHint
 			if err := c.BodyParser(&req); err != nil {
@@ -79,7 +80,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 		},
 	)
 
-	g.Delete(
+	withCacheWipe.Delete(
 		"/:authorityHintID", func(c *fiber.Ctx) error {
 			if err := store.Delete(c.Params("authorityHintID")); err != nil {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("authority hint not found"))

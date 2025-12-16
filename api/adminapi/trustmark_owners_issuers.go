@@ -13,6 +13,7 @@ import (
 // Owners: list and manage global owners and link to types
 func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, types model.TrustMarkTypesStore) {
 	g := r.Group("/trust-marks/owners")
+	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
 			list, err := owners.List()
@@ -75,7 +76,7 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 			return c.JSON(item)
 		},
 	)
-	g.Delete(
+	withCacheWipe.Delete(
 		"/:ownerID", func(c *fiber.Ctx) error {
 			if err := owners.Delete(c.Params("ownerID")); err != nil {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("owner not found"))
@@ -103,7 +104,7 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 			return c.JSON(typesOut)
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/:ownerID/types", func(c *fiber.Ctx) error {
 			// Accept list of type identifiers (numeric IDs or trust_mark_type strings)
 			var typeIdents []string
@@ -126,7 +127,7 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 			return c.JSON(typesOut)
 		},
 	)
-	g.Post(
+	withCacheWipe.Post(
 		"/:ownerID/types/:typeID", func(c *fiber.Ctx) error {
 			// Resolve type identifier from path
 			t, err := types.Get(c.Params("typeID"))
@@ -149,7 +150,7 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 			return c.Status(fiber.StatusCreated).JSON(typesOut)
 		},
 	)
-	g.Delete(
+	withCacheWipe.Delete(
 		"/:ownerID/types/:typeID", func(c *fiber.Ctx) error {
 			t, err := types.Get(c.Params("typeID"))
 			if err != nil {
@@ -167,6 +168,7 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 // Issuers: list and manage global issuers and link to types
 func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStore, types model.TrustMarkTypesStore) {
 	g := r.Group("/trust-marks/issuers")
+	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
 			list, err := issuers.List()
@@ -234,7 +236,7 @@ func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStor
 			return c.JSON(item)
 		},
 	)
-	g.Delete(
+	withCacheWipe.Delete(
 		"/:issuerID", func(c *fiber.Ctx) error {
 			if err := issuers.Delete(c.Params("issuerID")); err != nil {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("issuer not found"))
@@ -262,7 +264,7 @@ func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStor
 			return c.JSON(typesOut)
 		},
 	)
-	g.Put(
+	withCacheWipe.Put(
 		"/:issuerID/types", func(c *fiber.Ctx) error {
 			var typeIdents []string
 			if err := c.BodyParser(&typeIdents); err != nil {
@@ -284,7 +286,7 @@ func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStor
 			return c.JSON(typesOut)
 		},
 	)
-	g.Post(
+	withCacheWipe.Post(
 		"/:issuerID/types/:typeID", func(c *fiber.Ctx) error {
 			t, err := types.Get(c.Params("typeID"))
 			if err != nil {
@@ -306,7 +308,7 @@ func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStor
 			return c.Status(fiber.StatusCreated).JSON(typesOut)
 		},
 	)
-	g.Delete(
+	withCacheWipe.Delete(
 		"/:issuerID/types/:typeID", func(c *fiber.Ctx) error {
 			t, err := types.Get(c.Params("typeID"))
 			if err != nil {

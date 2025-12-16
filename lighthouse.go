@@ -24,13 +24,14 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
+	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/internal/version"
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-const entityConfigurationCachePeriod = 5 * time.Second
+const MaximumEntityConfigurationCachePeriod = 8 * time.Hour
 
 // EndpointConf is a type for configuring an endpoint with an internal and external path
 type EndpointConf struct {
@@ -232,9 +233,8 @@ func NewLightHouse(
 
 	server.Get(
 		"/.well-known/openid-federation", func(ctx *fiber.Ctx) error {
-			cacheKey := cache.Key(cache.KeyEntityConfiguration, entityID)
 			var cached []byte
-			set, err := cache.Get(cacheKey, &cached)
+			set, err := cache.Get(internal.CacheKeyEntityConfiguration, &cached)
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
@@ -243,13 +243,17 @@ func NewLightHouse(
 				ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 				return ctx.Send(cached)
 			}
-			jwt, err := entity.EntityConfigurationJWT()
+			ec, err := entity.EntityConfigurationPayload()
 			if err != nil {
 				return ctx.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			err = cache.Set(cacheKey, jwt, entityConfigurationCachePeriod)
+			jwt, err := entity.SignEntityStatement(*ec)
+			err = cache.Set(
+				internal.CacheKeyEntityConfiguration, jwt,
+				min(MaximumEntityConfigurationCachePeriod, time.Until(ec.ExpiresAt.Time.Add(-1*time.Minute))),
+			)
 			if err != nil {
-				log.Println(err.Error())
+				log.WithError(err).Error("failed to cache entity configuration")
 			}
 			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 			return ctx.Send(jwt)
