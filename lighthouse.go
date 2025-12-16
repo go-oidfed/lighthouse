@@ -21,7 +21,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	"github.com/lestrrat-go/jwx/v3/jwa"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
@@ -131,11 +130,7 @@ func NewLightHouse(
 		},
 	)
 
-	alg, err := storage.GetSigningAlg(storages.KV)
-	if err != nil {
-		return nil, err
-	}
-	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, []jwa.SignatureAlgorithm{alg})
+	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, keyManagement.BasicKeys.GetAlgs())
 	if tps := serverConf.TrustedProxies; len(tps) > 0 {
 		FiberServerConfig.TrustedProxies = serverConf.TrustedProxies
 		FiberServerConfig.EnableTrustedProxyCheck = true

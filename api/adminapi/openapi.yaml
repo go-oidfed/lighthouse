@@ -4087,13 +4087,24 @@ components:
     KMSInfo:
       description: Information about the active KMS and current signing algorithm.
       type: object
+      required:
+        - kms
+        - alg
+        - rsa_key_len
       properties:
         kms:
           type: string
           description: Identifier or type of the active KMS.
           example: filesystem
-        algorithm:
+        alg:
           $ref: '#/components/schemas/SignatureAlgorithm'
+        pending_alg:
+          $ref: '#/components/schemas/SignatureAlgorithm'
+        alg_change_at:
+          type: number
+          format: date-time
+          nullable: true
+          example: '1756450010'
         rsa_key_len:
           type: integer
           description: Length of RSA keys in bits.

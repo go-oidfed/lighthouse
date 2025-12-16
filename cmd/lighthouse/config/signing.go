@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
+	"github.com/go-oidfed/lib/unixtime"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
 	"github.com/zachmann/go-utils/duration"
@@ -43,22 +44,34 @@ type SigningConf struct {
 }
 
 func (c SigningConf) OverwriteDBValues(kvStore model.KeyValueStore) error {
+	now := unixtime.Now()
 	if c.Alg != "" {
 		if c.AlgOverwrite {
 			if err := errors.Wrap(
-				storage.SetSigningAlg(kvStore, c.Algorithm), "failed to overwrite db signing alg",
+				storage.SetSigningAlg(
+					kvStore, storage.SigningAlgWithNbf{
+						SigningAlg: c.Alg,
+						Nbf:        &now,
+					},
+				),
+				"failed to overwrite db signing alg",
 			); err != nil {
 				return err
 			}
 		} else {
 			// Initialize only if unset in DB using raw GetAs
-			var algStr string
-			found, err := kvStore.GetAs(model.KeyValueScopeSigning, model.KeyValueKeyAlg, &algStr)
+			var algs []storage.SigningAlgWithNbf
+			found, err := kvStore.GetAs(model.KeyValueScopeSigning, model.KeyValueKeyAlg, &algs)
 			if err != nil {
 				return err
 			}
 			if !found {
-				if err = storage.SetSigningAlg(kvStore, c.Algorithm); err != nil {
+				if err = storage.SetSigningAlg(
+					kvStore, storage.SigningAlgWithNbf{
+						SigningAlg: c.Alg,
+						Nbf:        &now,
+					},
+				); err != nil {
 					return errors.Wrap(err, "failed to initialize db signing alg")
 				}
 			}
@@ -100,7 +113,8 @@ func (c SigningConf) overwriteDBRotation(kvStore model.KeyValueStore) error {
 		}
 		if !found {
 			return errors.Wrap(
-				storage.SetKeyRotation(kvStore, c.KeyRotation.KeyRotationConfig), "failed to initialize db key rotation",
+				storage.SetKeyRotation(kvStore, c.KeyRotation.KeyRotationConfig),
+				"failed to initialize db key rotation",
 			)
 		}
 		return nil

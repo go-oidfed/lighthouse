@@ -19,6 +19,7 @@ type SigningConf struct {
 		KeyDir  string `yaml:"key_dir"`
 	} `yaml:"filesystem"`
 	PKCS11Backend struct {
+		StorageDir string `yaml:"storage_dir"`
 
 		// ModulePath is the path to the PKCS#11 module (crypto11.Config.Path)
 		ModulePath string `yaml:"module_path"`
@@ -132,6 +133,7 @@ func initKey(c SigningConf, storages model.Backends) (
 					KeyRotation:  rotationConf,
 				},
 				TypeID:      "federation",
+				StorageDir:  c.PKCS11Backend.StorageDir,
 				ModulePath:  c.PKCS11Backend.ModulePath,
 				TokenLabel:  c.PKCS11Backend.TokenLabel,
 				TokenSerial: c.PKCS11Backend.TokenSerial,

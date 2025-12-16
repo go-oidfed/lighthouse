@@ -28,10 +28,12 @@ type KeyManagement struct {
 }
 
 type kmsInfo struct {
-	KMS       string                `json:"kms"`
-	Alg       string                `json:"alg"`
-	RSAKeyLen int                   `json:"rsa_key_len"`
-	Rotation  kms.KeyRotationConfig `json:"rotation"`
+	KMS         string                `json:"kms"`
+	Alg         string                `json:"alg"`
+	PendingAlg  string                `json:"pending_alg,omitempty"`
+	AlgChangeAt *unixtime.Unixtime    `json:"alg_change_at,omitempty"`
+	RSAKeyLen   int                   `json:"rsa_key_len"`
+	Rotation    kms.KeyRotationConfig `json:"rotation"`
 }
 
 func addKeysToSet(set jwx.JWKS, keys public.PublicKeyEntryList) error {
@@ -249,27 +251,11 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 	// KMS info
 	r.Get(
 		"/kms", func(c *fiber.Ctx) error {
-			alg, err := storage.GetSigningAlg(kvStorage)
+			info, err := getKMSInfo(keyManagement, kvStorage)
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			rotation, err := storage.GetKeyRotation(kvStorage)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			rsaKeyLen, err := storage.GetRSAKeyLen(kvStorage)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-
-			return c.JSON(
-				kmsInfo{
-					KMS:       keyManagement.KMS,
-					Alg:       alg.String(),
-					RSAKeyLen: rsaKeyLen,
-					Rotation:  rotation,
-				},
-			)
+			return c.JSON(info)
 		},
 	)
 
@@ -289,33 +275,38 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			if !slices.Contains(jwx.SupportedAlgsStrings(), alg) {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("unsupported algorithm"))
 			}
-			if err := storage.SetSigningAlg(kvStorage, jwaAlg); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			rotation, err := storage.GetKeyRotation(kvStorage)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			rsaKeyLen, err := storage.GetRSAKeyLen(kvStorage)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if err = keyManagement.Keys.ChangeAlgs([]jwa.SignatureAlgorithm{jwaAlg}); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if err = keyManagement.Keys.ChangeDefaultAlgorithm(jwaAlg); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
 
-			return c.JSON(
-				kmsInfo{
-					KMS:       keyManagement.KMS,
-					Alg:       alg,
-					RSAKeyLen: rsaKeyLen,
-					Rotation:  rotation,
+			ecLifetime, err := storage.GetEntityConfigurationLifetime(kvStorage)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			rot, err := storage.GetKeyRotation(kvStorage)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			switchTime := unixtime.Unixtime{Time: time.Now().Add(ecLifetime).Add(10 * time.Second)}
+			if err = keyManagement.Keys.ChangeAlgsAt(
+				[]jwa.SignatureAlgorithm{jwaAlg}, switchTime, rot.Overlap.Duration(),
+			); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if err = keyManagement.Keys.ChangeDefaultAlgorithmAt(jwaAlg, switchTime); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if err = storage.SetSigningAlg(
+				kvStorage, storage.SigningAlgWithNbf{
+					SigningAlg: alg,
+					Nbf:        &switchTime,
 				},
-			)
+			); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			info, err := getKMSInfo(keyManagement, kvStorage)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
 
+			return c.JSON(info)
 		},
 	)
 
@@ -331,27 +322,14 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			if err := storage.SetRSAKeyLen(kvStorage, rsaKeyLen); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			rotation, err := storage.GetKeyRotation(kvStorage)
+			if err := keyManagement.Keys.ChangeRSAKeyLength(rsaKeyLen); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			info, err := getKMSInfo(keyManagement, kvStorage)
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			alg, err := storage.GetSigningAlg(kvStorage)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if err = keyManagement.Keys.ChangeRSAKeyLength(rsaKeyLen); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-
-			return c.JSON(
-				kmsInfo{
-					KMS:       keyManagement.KMS,
-					Alg:       alg.String(),
-					RSAKeyLen: rsaKeyLen,
-					Rotation:  rotation,
-				},
-			)
-
+			return c.JSON(info)
 		},
 	)
 
@@ -435,4 +413,34 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			return c.SendStatus(fiber.StatusAccepted)
 		},
 	)
+}
+
+func getKMSInfo(keyManagement KeyManagement, kvStorage smodel.KeyValueStore) (*kmsInfo, error) {
+	alg := keyManagement.BasicKeys.GetDefaultAlg()
+	rotation, err := storage.GetKeyRotation(kvStorage)
+	if err != nil {
+		return nil, err
+	}
+	rsaKeyLen, err := storage.GetRSAKeyLen(kvStorage)
+	if err != nil {
+		return nil, err
+	}
+	var pendingAlg string
+	var pendingEffective *unixtime.Unixtime
+	if keyManagement.Keys != nil {
+		_, pending := keyManagement.Keys.GetPendingChanges()
+		if pending != nil {
+			pendingAlg = pending.Alg.String()
+			pendingEffective = &pending.EffectiveAt
+		}
+	}
+
+	return &kmsInfo{
+		KMS:         keyManagement.KMS,
+		Alg:         alg.String(),
+		PendingAlg:  pendingAlg,
+		AlgChangeAt: pendingEffective,
+		RSAKeyLen:   rsaKeyLen,
+		Rotation:    rotation,
+	}, nil
 }

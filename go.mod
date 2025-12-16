@@ -6,7 +6,7 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.8.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.9.1-0.20251211144358-5ed4565f5aa5
+	github.com/go-oidfed/lib v0.9.1-0.20251216134331-269207ab9790
 	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/lestrrat-go/jwx/v3 v3.0.12
 	github.com/pkg/errors v0.9.1
@@ -14,7 +14,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.10.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	github.com/zachmann/go-utils v0.0.0-20251209145914-281844f501d3
+	github.com/zachmann/go-utils v0.0.0-20251216142941-208653c379f5
 	golang.org/x/crypto v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/datatypes v1.2.7

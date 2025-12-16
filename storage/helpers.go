@@ -1,13 +1,17 @@
 package storage
 
 import (
+	"cmp"
 	"encoding/json"
+	"slices"
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
+	"github.com/go-oidfed/lib/unixtime"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -88,35 +92,86 @@ func GetEntityConfigurationAdditionalClaims(store model.AdditionalClaimsStore) (
 	return extra, crits, nil
 }
 
+var DefaultSigningAlg = jwa.ES512()
+
 // GetSigningAlg returns the signing algorithm
 func GetSigningAlg(kvStorage model.KeyValueStore) (jwa.SignatureAlgorithm, error) {
 	if kvStorage == nil {
 		return jwa.ES512(), nil
 	}
-	var alg string
+	var algs []SigningAlgWithNbf
 	found, err := kvStorage.GetAs(
 		model.KeyValueScopeSigning,
-		model.KeyValueKeyAlg, &alg,
+		model.KeyValueKeyAlg, &algs,
 	)
 	if err != nil {
 		return jwa.SignatureAlgorithm{}, err
 	}
 	if !found {
-		return jwa.ES512(), nil
+		return DefaultSigningAlg, nil
 	}
+	slices.SortFunc(
+		algs, func(a, b SigningAlgWithNbf) int {
+			if a.Nbf == nil && b.Nbf != nil {
+				return -1
+			}
+			if b.Nbf == nil && a.Nbf != nil {
+				return 1
+			}
+			if a.Nbf == nil && b.Nbf == nil {
+				return 0
+			}
+			return cmp.Compare(a.Nbf.UnixNano(), b.Nbf.UnixNano())
+		},
+	)
+	currentIndex := -1
+	now := time.Now()
+	for i, a := range algs {
+		if a.Nbf != nil && a.Nbf.Before(now) {
+			currentIndex = i
+			break
+		}
+	}
+	if currentIndex == -1 {
+		if algs[0].Nbf == nil {
+			currentIndex = 0
+		} else {
+			// Only future algs stored, returning default
+			return DefaultSigningAlg, nil
+		}
+	}
+	alg := algs[currentIndex].SigningAlg
 	a, ok := jwa.LookupSignatureAlgorithm(alg)
 	if !ok {
 		return a, errors.Errorf("invalid signing algorithm: %s", alg)
 	}
+	if err = kvStorage.SetAny(
+		model.KeyValueScopeSigning,
+		model.KeyValueKeyAlg, algs[currentIndex:],
+	); err != nil {
+		log.WithError(err).Error("failed to remove expired signing algorithms")
+	}
 	return a, nil
 }
 
+// SigningAlgWithNbf is a signing algorithm with a not-before time used for
+// database storage
+type SigningAlgWithNbf struct {
+	SigningAlg string
+	Nbf        *unixtime.Unixtime
+}
+
 // SetSigningAlg sets the signing algorithm
-func SetSigningAlg(kvStorage model.KeyValueStore, alg jwa.SignatureAlgorithm) error {
+func SetSigningAlg(kvStorage model.KeyValueStore, alg SigningAlgWithNbf) error {
 	if kvStorage == nil {
 		return errors.New("key value store is not set")
 	}
-	return kvStorage.SetAny(model.KeyValueScopeSigning, model.KeyValueKeyAlg, alg.String())
+	var stored []SigningAlgWithNbf
+	_, err := kvStorage.GetAs(model.KeyValueScopeSigning, model.KeyValueKeyAlg, &stored)
+	if err != nil {
+		return err
+	}
+	return kvStorage.SetAny(model.KeyValueScopeSigning, model.KeyValueKeyAlg, append(stored, alg))
 }
 
 // GetRSAKeyLen returns the RSA key length
