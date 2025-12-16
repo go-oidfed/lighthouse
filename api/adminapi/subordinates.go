@@ -17,14 +17,38 @@ func registerSubordinates(r fiber.Router) {
 	g.Get("/:subordinateID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
 	withCacheWipe.Put("/:subordinateID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
 	g.Get(
-		"/:subordinateID/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) },
+		"/:subordinateID/additional-claims/:additionalClaimsID",
+		func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) },
 	)
 	withCacheWipe.Put(
-		"/:subordinateID/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) },
+		"/:subordinateID/additional-claims/:additionalClaimsID",
+		func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) },
 	)
 	withCacheWipe.Delete(
 		"/:subordinateID/additional-claims/:additionalClaimsID",
 		func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) },
+	)
+}
+
+// General metadata policies (no subordinateID)
+func registerGeneralMetadataPolicies(r fiber.Router) {
+	g := r.Group("/subordinates/metadata-policies")
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	g.Get("/", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Put("/", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	g.Get("/:entityType", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Put("/:entityType", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Post("/:entityType", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Delete("/:entityType", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+	g.Get("/:entityType/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Put("/:entityType/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Post("/:entityType/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Delete("/:entityType/:claim", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+	g.Get("/:entityType/:claim/:operator", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Put("/:entityType/:claim/:operator", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Post("/:entityType/:claim/:operator", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+	withCacheWipe.Delete(
+		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) },
 	)
 }
 
