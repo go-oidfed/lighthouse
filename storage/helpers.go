@@ -129,6 +129,8 @@ func GetSigningAlg(kvStorage model.KeyValueStore) (jwa.SignatureAlgorithm, error
 	for i, a := range algs {
 		if a.Nbf != nil && a.Nbf.Before(now) {
 			currentIndex = i
+		}
+		if currentIndex != -1 && a.Nbf != nil && a.Nbf.After(now) {
 			break
 		}
 	}
