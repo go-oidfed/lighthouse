@@ -128,17 +128,15 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 		},
 	)
 	withCacheWipe.Post(
-		"/:ownerID/types/:typeID", func(c *fiber.Ctx) error {
-			// Resolve type identifier from path
-			t, err := types.Get(c.Params("typeID"))
-			if err != nil {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
+		"/:ownerID/types", func(c *fiber.Ctx) error {
+			var ident uint
+			if err := c.BodyParser(&ident); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-			ids, err := owners.AddType(c.Params("ownerID"), t.ID)
+			ids, err := owners.AddType(c.Params("ownerID"), ident)
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			// Return full objects
 			typesOut := make([]model.TrustMarkType, 0, len(ids))
 			for _, id := range ids {
 				item, err := types.Get(strconv.FormatUint(uint64(id), 10))
@@ -287,16 +285,15 @@ func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStor
 		},
 	)
 	withCacheWipe.Post(
-		"/:issuerID/types/:typeID", func(c *fiber.Ctx) error {
-			t, err := types.Get(c.Params("typeID"))
-			if err != nil {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
+		"/:issuerID/types", func(c *fiber.Ctx) error {
+			var ident uint
+			if err := c.BodyParser(&ident); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-			ids, err := issuers.AddType(c.Params("issuerID"), t.ID)
+			ids, err := issuers.AddType(c.Params("issuerID"), ident)
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			// Return full objects
 			typesOut := make([]model.TrustMarkType, 0, len(ids))
 			for _, id := range ids {
 				item, err := types.Get(strconv.FormatUint(uint64(id), 10))

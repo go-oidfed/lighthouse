@@ -361,7 +361,7 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateI
 		IssuedAt:           unixtime.Unixtime{Time: now},
 		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime)},
 		SourceEndpoint:     fed.fedMetadata.FederationFetchEndpoint,
-		JWKS:               subordinate.JWKS.JWKS(),
+		JWKS:               subordinate.JWKS.Keys,
 		Metadata:           subordinate.Metadata,
 		MetadataPolicy:     fed.MetadataPolicies,
 		Constraints:        fed.Constraints,

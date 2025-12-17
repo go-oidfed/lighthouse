@@ -127,8 +127,8 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	// Issuers
-	r.Get(
-		"/trust-marks/types/:trustMarkTypeID/issuers", func(c *fiber.Ctx) error {
+	g.Get(
+		"/:trustMarkTypeID/issuers", func(c *fiber.Ctx) error {
 			issuers, err := store.ListIssuers(c.Params("trustMarkTypeID"))
 			if err != nil {
 				var notFoundError model.NotFoundError
@@ -142,7 +142,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	withCacheWipe.Put(
-		"/trust-marks/types/:trustMarkTypeID/issuers", func(c *fiber.Ctx) error {
+		"/:trustMarkTypeID/issuers", func(c *fiber.Ctx) error {
 			var req []model.AddTrustMarkIssuer
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -160,10 +160,10 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	withCacheWipe.Post(
-		"/trust-marks/types/:trustMarkTypeID/issuers",
+		"/:trustMarkTypeID/issuers",
 		func(c *fiber.Ctx) error {
 			var issuer model.AddTrustMarkIssuer
-			if err := c.BodyParser(&issuer); err != nil || issuer.Issuer == "" {
+			if err := c.BodyParser(&issuer); err != nil || (issuer.Issuer == "" && issuer.IssuerID == nil) {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			issuers, err := store.AddIssuer(c.Params("trustMarkTypeID"), issuer)
@@ -179,7 +179,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	withCacheWipe.Delete(
-		"/trust-marks/types/:trustMarkTypeID/issuers/:issuerID",
+		"/:trustMarkTypeID/issuers/:issuerID",
 		func(c *fiber.Ctx) error {
 			// Accept issuer identifier as numeric ID or issuer string
 			var issuerID uint
@@ -231,8 +231,8 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	// Owner
-	r.Get(
-		"/trust-marks/types/:trustMarkTypeID/owner", func(c *fiber.Ctx) error {
+	g.Get(
+		"/:trustMarkTypeID/owner", func(c *fiber.Ctx) error {
 			owner, err := store.GetOwner(c.Params("trustMarkTypeID"))
 			if err != nil {
 				var notFoundError model.NotFoundError
@@ -246,13 +246,13 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	withCacheWipe.Put(
-		"/trust-marks/types/:trustMarkTypeID/owner", func(c *fiber.Ctx) error {
+		"/:trustMarkTypeID/owner", func(c *fiber.Ctx) error {
 			var req model.AddTrustMarkOwner
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-			if req.EntityID == "" {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
+			if req.EntityID == "" && req.OwnerID == nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id or owner_id is required"))
 			}
 			owner, err := store.UpdateOwner(c.Params("trustMarkTypeID"), req)
 			if err != nil {
@@ -271,7 +271,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	withCacheWipe.Post(
-		"/trust-marks/types/:trustMarkTypeID/owner",
+		"/:trustMarkTypeID/owner",
 		func(c *fiber.Ctx) error {
 			var req model.AddTrustMarkOwner
 			if err := c.BodyParser(&req); err != nil {
@@ -297,7 +297,7 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 	)
 
 	withCacheWipe.Delete(
-		"/trust-marks/types/:trustMarkTypeID/owner",
+		"/:trustMarkTypeID/owner",
 		func(c *fiber.Ctx) error {
 			if err := store.DeleteOwner(c.Params("trustMarkTypeID")); err != nil {
 				var notFoundError model.NotFoundError

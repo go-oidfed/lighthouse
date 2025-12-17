@@ -22,7 +22,6 @@ type Storage struct {
 var models = []any{
 	&model.SubordinateInfo{},
 	&model.SubordinateEvent{},
-	&model.Key{},
 	&model.JWKS{},
 	&model.KeyValue{},
 	&model.PolicyOperator{},
@@ -485,7 +484,7 @@ func (s *TrustMarkTypesStorage) OwnersByType() (oidfed.TrustMarkOwners, error) {
 	out := make(oidfed.TrustMarkOwners, len(types))
 	for _, t := range types {
 		var owner model.TrustMarkOwner
-		if err := s.db.First(&owner, *t.OwnerID).Error; err != nil {
+		if err := s.db.Preload("JWKS").First(&owner, *t.OwnerID).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				// Skip missing owner rows gracefully
 				continue
@@ -494,7 +493,7 @@ func (s *TrustMarkTypesStorage) OwnersByType() (oidfed.TrustMarkOwners, error) {
 		}
 		out[t.TrustMarkType] = oidfed.TrustMarkOwnerSpec{
 			ID:   owner.EntityID,
-			JWKS: owner.JWKS.JWKS(),
+			JWKS: owner.JWKS.Keys,
 		}
 	}
 	return out, nil
@@ -752,7 +751,7 @@ type TrustMarkOwnersStorage struct {
 
 func (s *TrustMarkOwnersStorage) List() ([]model.TrustMarkOwner, error) {
 	var items []model.TrustMarkOwner
-	if err := s.db.Find(&items).Error; err != nil {
+	if err := s.db.Preload("JWKS").Find(&items).Error; err != nil {
 		return nil, errors.Wrap(err, "trust_mark_owners: list failed")
 	}
 	return items, nil
@@ -775,11 +774,11 @@ func (s *TrustMarkOwnersStorage) Create(req model.AddTrustMarkOwner) (*model.Tru
 func (s *TrustMarkOwnersStorage) findByIdent(ident string) (*model.TrustMarkOwner, error) {
 	var item model.TrustMarkOwner
 	if id, err := strconv.ParseUint(ident, 10, 64); err == nil {
-		if tx := s.db.First(&item, uint(id)); tx.Error == nil {
+		if tx := s.db.Preload("JWKS").First(&item, uint(id)); tx.Error == nil {
 			return &item, nil
 		}
 	}
-	if err := s.db.Where("entity_id = ?", ident).First(&item).Error; err != nil {
+	if err := s.db.Preload("JWKS").Where("entity_id = ?", ident).First(&item).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, model.NotFoundError("trust mark owner not found")
 		}

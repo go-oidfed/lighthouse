@@ -2312,7 +2312,7 @@ paths:
                 value:
                   entity_id: https://owner.example.org
                   jwks:
-                    jwks:
+                    keys:
                       - kty: EC
                         crv: P-256
                         kid: 'owner-12345'
@@ -4361,7 +4361,7 @@ components:
         - jwks
       type: object
       properties:
-        jwks:
+        keys:
           type: array
           items:
             $ref: '#/components/schemas/Jwk'
@@ -4565,7 +4565,7 @@ components:
         registered_entity_types:
           - openid_provider
         jwks:
-          jwks:
+          keys:
             - kty: EC
               crv: P-256
               kid: 'sub-12345'
@@ -4649,7 +4649,7 @@ components:
       example:
         entity_id: https://owner.example.org
         jwks:
-          jwks:
+          keys:
             - kty: EC
               crv: P-256
               kid: 'owner-12345'
@@ -4682,7 +4682,7 @@ components:
           example:
             entity_id: https://owner.example.org
             jwks:
-              jwks:
+              keys:
                 - kty: EC
                   crv: P-256
                   kid: 'owner-12345'
@@ -4705,7 +4705,7 @@ components:
       example:
         entity_id: https://owner.example.org
         jwks:
-          jwks:
+          keys:
             - kty: EC
               crv: P-256
               kid: 'owner-12345'

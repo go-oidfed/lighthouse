@@ -17,7 +17,7 @@ type TrustMarkType struct {
 	TrustMarkType string            `gorm:"uniqueIndex" json:"trust_mark_type"`
 	OwnerID       *uint             `json:"owner_id,omitempty"`
 	Owner         *TrustMarkOwner   `json:"owner,omitempty"`
-	Description   string            `gorm:"type:text" json:"description"`
+	Description   string            `gorm:"type:text" json:"description,omitempty"`
 	Issuers       []TrustMarkIssuer `gorm:"many2many:trust_mark_type_issuers" json:"issuers,omitempty"`
 }
 
@@ -29,9 +29,9 @@ type TrustMarkOwner struct {
 	UpdatedAt   int            `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 	EntityID    string         `gorm:"uniqueIndex" json:"entity_id"`
-	JWKSID      uint           `json:"jwks_id"`
+	JWKSID      uint           `json:"-"`
 	JWKS        JWKS           `json:"jwks"`
-	Description string         `gorm:"type:text" json:"description"`
+	Description string         `gorm:"type:text" json:"description,omitempty"`
 }
 
 // AddTrustMarkOwner is the request payload to create/update a TrustMarkOwner
@@ -145,7 +145,7 @@ type TrustMarkIssuer struct {
 	UpdatedAt   int             `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt  `gorm:"index" json:"-"`
 	Issuer      string          `gorm:"uniqueIndex" json:"issuer"`
-	Description string          `gorm:"type:text" json:"description"`
+	Description string          `gorm:"type:text" json:"description,omitempty"`
 	Types       []TrustMarkType `gorm:"many2many:trust_mark_type_issuers" json:"types,omitempty"`
 }
 
