@@ -10,14 +10,15 @@ import (
 
 // TrustMarkType represents a trust mark type in the database
 type TrustMarkType struct {
-	ID            uint            `gorm:"primarykey" json:"id"`
-	CreatedAt     int             `json:"created_at"`
-	UpdatedAt     int             `json:"updated_at"`
-	DeletedAt     gorm.DeletedAt  `gorm:"index" json:"-"`
-	TrustMarkType string          `gorm:"uniqueIndex" json:"trust_mark_type"`
-	OwnerID       *uint           `json:"owner_id,omitempty"`
-	Owner         *TrustMarkOwner `json:"owner,omitempty"`
-	Description   string          `gorm:"type:text" json:"description"`
+	ID            uint              `gorm:"primarykey" json:"id"`
+	CreatedAt     int               `json:"created_at"`
+	UpdatedAt     int               `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt    `gorm:"index" json:"-"`
+	TrustMarkType string            `gorm:"uniqueIndex" json:"trust_mark_type"`
+	OwnerID       *uint             `json:"owner_id,omitempty"`
+	Owner         *TrustMarkOwner   `json:"owner,omitempty"`
+	Description   string            `gorm:"type:text" json:"description"`
+	Issuers       []TrustMarkIssuer `gorm:"many2many:trust_mark_type_issuers" json:"issuers,omitempty"`
 }
 
 // TrustMarkOwner represents the owner of a trust mark type.
@@ -31,18 +32,6 @@ type TrustMarkOwner struct {
 	JWKSID      uint           `json:"jwks_id"`
 	JWKS        JWKS           `json:"jwks"`
 	Description string         `gorm:"type:text" json:"description"`
-}
-
-// TrustMarkTypeIssuer represents an authorized issuer for a trust mark type.
-type TrustMarkTypeIssuer struct {
-	ID              uint            `gorm:"primarykey" json:"id"`
-	CreatedAt       int             `json:"created_at"`
-	UpdatedAt       int             `json:"updated_at"`
-	DeletedAt       gorm.DeletedAt  `gorm:"index" json:"-"`
-	TrustMarkTypeID uint            `gorm:"index:,unique,composite:tmtype_issuer" json:"trust_mark_type_id"`
-	TrustMarkType   TrustMarkType   `json:"trust_mark_type"`
-	IssuerID        uint            `gorm:"index:,unique,composite:tmtype_issuer" json:"issuer_id"`
-	Issuer          TrustMarkIssuer `json:"issuer"`
 }
 
 // AddTrustMarkOwner is the request payload to create/update a TrustMarkOwner
@@ -151,12 +140,13 @@ func (a *AddTrustMarkIssuer) UnmarshalJSON(data []byte) error {
 
 // TrustMarkIssuer represents the issuer object returned by the API
 type TrustMarkIssuer struct {
-	ID          uint           `gorm:"primarykey" json:"id"`
-	CreatedAt   int            `json:"created_at"`
-	UpdatedAt   int            `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-	Issuer      string         `gorm:"uniqueIndex" json:"issuer"`
-	Description string         `gorm:"type:text" json:"description"`
+	ID          uint            `gorm:"primarykey" json:"id"`
+	CreatedAt   int             `json:"created_at"`
+	UpdatedAt   int             `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt  `gorm:"index" json:"-"`
+	Issuer      string          `gorm:"uniqueIndex" json:"issuer"`
+	Description string          `gorm:"type:text" json:"description"`
+	Types       []TrustMarkType `gorm:"many2many:trust_mark_type_issuers" json:"types,omitempty"`
 }
 
 // TrustMarkOwnersStore manages global owners and their relations to types.

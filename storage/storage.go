@@ -30,7 +30,6 @@ var models = []any{
 	&model.TrustMarkType{},
 	&model.TrustMarkOwner{},
 	&model.TrustMarkIssuer{},
-	&model.TrustMarkTypeIssuer{},
 	&model.TrustMarkSpec{},
 	&model.TrustMarkSubject{},
 	&model.PublishedTrustMark{},
@@ -465,10 +464,6 @@ func (s *TrustMarkTypesStorage) Delete(ident string) error {
 	if err != nil {
 		return err
 	}
-	// Cascade delete issuers then owner reference (owner itself is not deleted automatically)
-	if err = s.db.Where("trust_mark_type_id = ?", item.ID).Delete(&model.TrustMarkTypeIssuer{}).Error; err != nil {
-		return errors.Wrap(err, "trust_mark_types: delete issuers failed")
-	}
 	// Null owner
 	item.OwnerID = nil
 	item.Owner = nil
@@ -507,16 +502,15 @@ func (s *TrustMarkTypesStorage) OwnersByType() (oidfed.TrustMarkOwners, error) {
 
 // IssuersByType returns a map of trust_mark_type -> []issuer (entity IDs) for all types.
 func (s *TrustMarkTypesStorage) IssuersByType() (oidfed.AllowedTrustMarkIssuers, error) {
-	// Load all type-issuer relations with preloads
-	var rels []model.TrustMarkTypeIssuer
-	if err := s.db.Preload("TrustMarkType").Preload("Issuer").Find(&rels).Error; err != nil {
+	var types []model.TrustMarkType
+	if err := s.db.Preload("Issuers").Find(&types).Error; err != nil {
 		return nil, errors.Wrap(err, "trust_mark_types: list issuers by type failed")
 	}
 	out := make(oidfed.AllowedTrustMarkIssuers)
-	for _, r := range rels {
-		typ := r.TrustMarkType.TrustMarkType
-		iss := r.Issuer.Issuer
-		out[typ] = append(out[typ], iss)
+	for _, t := range types {
+		for _, iss := range t.Issuers {
+			out[t.TrustMarkType] = append(out[t.TrustMarkType], iss.Issuer)
+		}
 	}
 	return out, nil
 }
@@ -527,19 +521,11 @@ func (s *TrustMarkTypesStorage) ListIssuers(ident string) ([]model.TrustMarkIssu
 	if err != nil {
 		return nil, err
 	}
-	var rows []model.TrustMarkTypeIssuer
-	if err = s.db.Preload("Issuer").Where("trust_mark_type_id = ?", item.ID).Find(&rows).Error; err != nil {
+	var typ model.TrustMarkType
+	if err = s.db.Preload("Issuers").First(&typ, item.ID).Error; err != nil {
 		return nil, errors.Wrap(err, "trust_mark_types: list issuers failed")
 	}
-	out := make([]model.TrustMarkIssuer, len(rows))
-	for i, r := range rows {
-		out[i] = model.TrustMarkIssuer{
-			ID:          r.Issuer.ID,
-			Issuer:      r.Issuer.Issuer,
-			Description: r.Issuer.Description,
-		}
-	}
-	return out, nil
+	return typ.Issuers, nil
 }
 
 func (s *TrustMarkTypesStorage) SetIssuers(ident string, in []model.AddTrustMarkIssuer) (
@@ -549,27 +535,22 @@ func (s *TrustMarkTypesStorage) SetIssuers(ident string, in []model.AddTrustMark
 	if err != nil {
 		return nil, err
 	}
-	// Replace all issuers
-	if err = s.db.Where("trust_mark_type_id = ?", item.ID).Delete(&model.TrustMarkTypeIssuer{}).Error; err != nil {
-		return nil, errors.Wrap(err, "trust_mark_types: clear issuers failed")
-	}
-	// Insert new
+	// Resolve all issuers
+	issuers := make([]model.TrustMarkIssuer, 0, len(in))
 	for _, iss := range in {
 		issuerID, err := s.resolveIssuerID(iss)
 		if err != nil {
 			return nil, err
 		}
-		rec := &model.TrustMarkTypeIssuer{
-			TrustMarkTypeID: item.ID,
-			IssuerID:        issuerID,
+		var issuer model.TrustMarkIssuer
+		if err = s.db.First(&issuer, issuerID).Error; err != nil {
+			return nil, errors.Wrap(err, "trust_mark_types: resolve issuer row failed")
 		}
-		if err = s.db.Create(rec).Error; err != nil {
-			if isUniqueConstraintError(err) {
-				// ignore duplicates within provided list
-				continue
-			}
-			return nil, errors.Wrap(err, "trust_mark_types: set issuers failed")
-		}
+		issuers = append(issuers, issuer)
+	}
+	// Replace association
+	if err = s.db.Model(&model.TrustMarkType{ID: item.ID}).Association("Issuers").Replace(issuers); err != nil {
+		return nil, errors.Wrap(err, "trust_mark_types: set issuers failed")
 	}
 	return s.ListIssuers(ident)
 }
@@ -585,15 +566,11 @@ func (s *TrustMarkTypesStorage) AddIssuer(ident string, issuer model.AddTrustMar
 	if err != nil {
 		return nil, err
 	}
-	rec := &model.TrustMarkTypeIssuer{
-		TrustMarkTypeID: item.ID,
-		IssuerID:        issuerID,
+	var issuerRow model.TrustMarkIssuer
+	if err = s.db.First(&issuerRow, issuerID).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_types: resolve issuer row failed")
 	}
-	if err = s.db.Create(rec).Error; err != nil {
-		if isUniqueConstraintError(err) {
-			// no-op, already exists
-			return s.ListIssuers(ident)
-		}
+	if err = s.db.Model(&model.TrustMarkType{ID: item.ID}).Association("Issuers").Append(&issuerRow); err != nil {
 		return nil, errors.Wrap(err, "trust_mark_types: add issuer failed")
 	}
 	return s.ListIssuers(ident)
@@ -604,11 +581,13 @@ func (s *TrustMarkTypesStorage) DeleteIssuerByID(ident string, issuerID uint) ([
 	if err != nil {
 		return nil, err
 	}
-	if err = s.db.Where("trust_mark_type_id = ? AND issuer_id = ?", item.ID, issuerID).
-		Delete(&model.TrustMarkTypeIssuer{}).Error; err != nil {
+	var issuerRow model.TrustMarkIssuer
+	if err = s.db.First(&issuerRow, issuerID).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_types: resolve issuer row failed")
+	}
+	if err = s.db.Model(&model.TrustMarkType{ID: item.ID}).Association("Issuers").Delete(&issuerRow); err != nil {
 		return nil, errors.Wrap(err, "trust_mark_types: delete issuer failed")
 	}
-	// Return updated list
 	return s.ListIssuers(ident)
 }
 
@@ -995,11 +974,13 @@ func (s *TrustMarkIssuersStorage) Types(ident string) ([]uint, error) {
 	if err != nil {
 		return nil, err
 	}
-	var ids []uint
-	if err = s.db.Model(&model.TrustMarkTypeIssuer{}).
-		Where("issuer_id = ?", item.ID).
-		Pluck("trust_mark_type_id", &ids).Error; err != nil {
+	var issuer model.TrustMarkIssuer
+	if err = s.db.Preload("Types").First(&issuer, item.ID).Error; err != nil {
 		return nil, errors.Wrap(err, "trust_mark_issuers: list types failed")
+	}
+	ids := make([]uint, len(issuer.Types))
+	for i, t := range issuer.Types {
+		ids[i] = t.ID
 	}
 	return ids, nil
 }
@@ -1009,9 +990,7 @@ func (s *TrustMarkIssuersStorage) SetTypes(ident string, typeIdents []string) ([
 	if err != nil {
 		return nil, err
 	}
-	if err = s.db.Where("issuer_id = ?", item.ID).Delete(&model.TrustMarkTypeIssuer{}).Error; err != nil {
-		return nil, errors.Wrap(err, "trust_mark_issuers: clear types failed")
-	}
+	types := make([]model.TrustMarkType, 0, len(typeIdents))
 	for _, ident := range typeIdents {
 		var t model.TrustMarkType
 		if id, er := strconv.ParseUint(ident, 10, 64); er == nil {
@@ -1023,16 +1002,10 @@ func (s *TrustMarkIssuersStorage) SetTypes(ident string, typeIdents []string) ([
 				return nil, errors.Wrap(err, "trust_mark_issuers: resolve type ident failed")
 			}
 		}
-		rel := &model.TrustMarkTypeIssuer{
-			TrustMarkTypeID: t.ID,
-			IssuerID:        item.ID,
-		}
-		if err = s.db.Create(rel).Error; err != nil {
-			if isUniqueConstraintError(err) {
-				continue
-			}
-			return nil, errors.Wrap(err, "trust_mark_issuers: set type failed")
-		}
+		types = append(types, t)
+	}
+	if err = s.db.Model(&model.TrustMarkIssuer{ID: item.ID}).Association("Types").Replace(types); err != nil {
+		return nil, errors.Wrap(err, "trust_mark_issuers: set type failed")
 	}
 	return s.Types(ident)
 }
@@ -1042,14 +1015,11 @@ func (s *TrustMarkIssuersStorage) AddType(ident string, typeID uint) ([]uint, er
 	if err != nil {
 		return nil, err
 	}
-	rel := &model.TrustMarkTypeIssuer{
-		TrustMarkTypeID: typeID,
-		IssuerID:        item.ID,
+	var t model.TrustMarkType
+	if err = s.db.First(&t, typeID).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_issuers: resolve type id failed")
 	}
-	if err = s.db.Create(rel).Error; err != nil {
-		if isUniqueConstraintError(err) {
-			return s.Types(ident)
-		}
+	if err = s.db.Model(&model.TrustMarkIssuer{ID: item.ID}).Association("Types").Append(&t); err != nil {
 		return nil, errors.Wrap(err, "trust_mark_issuers: add type failed")
 	}
 	return s.Types(ident)
@@ -1060,8 +1030,11 @@ func (s *TrustMarkIssuersStorage) DeleteType(ident string, typeID uint) ([]uint,
 	if err != nil {
 		return nil, err
 	}
-	if err = s.db.Where("issuer_id = ? AND trust_mark_type_id = ?", item.ID, typeID).
-		Delete(&model.TrustMarkTypeIssuer{}).Error; err != nil {
+	var t model.TrustMarkType
+	if err = s.db.First(&t, typeID).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_issuers: resolve type id failed")
+	}
+	if err = s.db.Model(&model.TrustMarkIssuer{ID: item.ID}).Association("Types").Delete(&t); err != nil {
 		return nil, errors.Wrap(err, "trust_mark_issuers: delete type failed")
 	}
 	return s.Types(ident)
