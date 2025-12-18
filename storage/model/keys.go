@@ -26,12 +26,11 @@ func (j JWKS) MarshalJSON() ([]byte, error) {
 	if j.Keys.Set == nil {
 		return []byte("null"), nil
 	}
-	// TODO use clone when it is fixed upstream
-	// k, err := j.Keys.Clone()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	k := j.Keys.Set
+	k, err := j.Keys.Clone()
+	if err != nil {
+		return nil, err
+	}
+	// k := j.Keys.Set
 	_ = k.Set("id", j.ID)
 	return json.Marshal(k)
 }

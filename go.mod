@@ -8,7 +8,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-oidfed/lib v0.9.1-0.20251216134331-269207ab9790
 	github.com/gofiber/fiber/v2 v2.52.10
-	github.com/lestrrat-go/jwx/v3 v3.0.12
+	github.com/lestrrat-go/jwx/v3 v3.0.13-0.20251217233401-cf05bd2a99d5
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/sirupsen/logrus v1.9.3
