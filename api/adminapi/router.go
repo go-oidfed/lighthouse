@@ -97,8 +97,8 @@ func Register(
 	// Entity Configuration Trust Marks
 	registerEntityTrustMarks(r)
 	// Subordinates
+	registerGeneralMetadataPolicies(r, storages.KV)
 	registerSubordinates(r)
-	registerGeneralMetadataPolicies(r)
 	registerGeneralSubordinateLifetime(r)
 	// Subordinate metadata, policies, constraints, keys
 	registerSubordinateMetadata(r)

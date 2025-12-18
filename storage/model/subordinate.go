@@ -28,7 +28,7 @@ type SubordinateInfo struct {
 	EntityID           string                          `gorm:"uniqueIndex" json:"entity_id"`
 	Description        string                          `gorm:"type:text" json:"description"`
 	EntityTypes        EntityTypes                     `gorm:"many2many:subordinate_entity_types" json:"entity_types"`
-	JWKSID             uint                            `json:"jwks_id"`
+	JWKSID             uint                            `json:"-"`
 	JWKS               JWKS                            `json:"jwks"`
 	Metadata           *oidfed.Metadata                `gorm:"serializer:json" json:"metadata,omitempty"`
 	MetadataPolicy     *oidfed.MetadataPolicies        `gorm:"serializer:json" json:"metadata_policies,omitempty"`
@@ -43,11 +43,11 @@ func (SubordinateInfo) TableName() string { return "subordinates" }
 
 // PolicyOperator represents a policy operator in the database.
 type PolicyOperator struct {
-	ID             uint           `gorm:"primarykey" json:"id"`
-	CreatedAt      int            `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt      int            `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
-	PolicyOperator string         `json:"policy_operator"`
+	ID             uint                      `gorm:"primarykey" json:"id"`
+	CreatedAt      int                       `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt      int                       `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt      gorm.DeletedAt            `gorm:"index" json:"-"`
+	PolicyOperator oidfed.PolicyOperatorName `json:"policy_operator"`
 }
 
 // PolicyOperators is a collection of PolicyOperator objects.
@@ -61,7 +61,7 @@ func NewPolicyOperators(operators []oidfed.PolicyOperatorName) PolicyOperators {
 	policyOperators := make(PolicyOperators, len(operators))
 	for i, t := range operators {
 		policyOperators[i] = PolicyOperator{
-			PolicyOperator: string(t),
+			PolicyOperator: t,
 		}
 	}
 	return policyOperators
@@ -74,7 +74,7 @@ func NewPolicyOperatorsFromStrings(operators []string) PolicyOperators {
 	policyOperators := make(PolicyOperators, len(operators))
 	for i, t := range operators {
 		policyOperators[i] = PolicyOperator{
-			PolicyOperator: t,
+			PolicyOperator: oidfed.PolicyOperatorName(t),
 		}
 	}
 	return policyOperators
@@ -85,7 +85,7 @@ func NewPolicyOperatorsFromStrings(operators []string) PolicyOperators {
 func (et PolicyOperators) ToStrings() []string {
 	result := make([]string, len(et))
 	for i, t := range et {
-		result[i] = t.PolicyOperator
+		result[i] = string(t.PolicyOperator)
 	}
 	return result
 }
@@ -95,7 +95,7 @@ func (et PolicyOperators) ToStrings() []string {
 func (et PolicyOperators) ToPolicyOperatorNames() []oidfed.PolicyOperatorName {
 	result := make([]oidfed.PolicyOperatorName, len(et))
 	for i, t := range et {
-		result[i] = oidfed.PolicyOperatorName(t.PolicyOperator)
+		result[i] = t.PolicyOperator
 	}
 	return result
 }

@@ -67,12 +67,12 @@ type LightHouse struct {
 	keyManagement  adminapi.KeyManagement
 	LogoBanner     bool
 	VersionBanner  bool
+	storages       model.Backends
 }
 
 // SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
 // SubordinateStatements issued by this LightHouse
 type SubordinateStatementsConfig struct {
-	MetadataPolicies             *oidfed.MetadataPolicies
 	SubordinateStatementLifetime time.Duration
 	Constraints                  *oidfed.ConstraintSpecification
 	CriticalExtensions           []string
@@ -151,6 +151,7 @@ func NewLightHouse(
 		LogoBanner:                  true,
 		VersionBanner:               true,
 		keyManagement:               keyManagement,
+		storages:                    storages,
 	}
 
 	entity.FederationEntity = &oidfed.DynamicFederationEntity{
@@ -356,17 +357,17 @@ func (fed LightHouse) Start() {
 func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateInfo) oidfed.EntityStatementPayload {
 	now := time.Now()
 	return oidfed.EntityStatementPayload{
-		Issuer:             fed.FederationEntity.EntityID(),
-		Subject:            subordinate.EntityID,
-		IssuedAt:           unixtime.Unixtime{Time: now},
-		ExpiresAt:          unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime)},
-		SourceEndpoint:     fed.fedMetadata.FederationFetchEndpoint,
-		JWKS:               subordinate.JWKS.Keys,
-		Metadata:           subordinate.Metadata,
-		MetadataPolicy:     fed.MetadataPolicies,
-		Constraints:        fed.Constraints,
-		CriticalExtensions: fed.CriticalExtensions,
-		MetadataPolicyCrit: fed.MetadataPolicyCrit,
+		Issuer:         fed.FederationEntity.EntityID(),
+		Subject:        subordinate.EntityID,
+		IssuedAt:       unixtime.Unixtime{Time: now},
+		ExpiresAt:      unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime)},
+		SourceEndpoint: fed.fedMetadata.FederationFetchEndpoint,
+		JWKS:           subordinate.JWKS.Keys,
+		Metadata:       subordinate.Metadata,
+		MetadataPolicy: subordinate.MetadataPolicy,
+		Constraints:    subordinate.Constraints,
+		// CriticalExtensions: subordinate.Crit, //TODO
+		MetadataPolicyCrit: subordinate.MetadataPolicyCrit.ToPolicyOperatorNames(),
 		Extra:              utils.MergeMaps(true, fed.SubordinateStatementsConfig.Extra, map[string]any{}),
 	}
 }

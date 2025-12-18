@@ -81,7 +81,6 @@ func main() {
 		c.Federation.EntityID,
 		signingConf.SigningConf,
 		lighthouse.SubordinateStatementsConfig{
-			MetadataPolicies:             nil,
 			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
 			// TODO read all of this from config or a storage backend
 		},
@@ -98,7 +97,6 @@ func main() {
 	lh.LogoBanner = c.Logging.Banner.Logo
 	lh.VersionBanner = c.Logging.Banner.Version
 
-	lh.MetadataPolicies = c.Federation.MetadataPolicy
 	lh.Constraints = c.Federation.Constraints
 	lh.CriticalExtensions = c.Federation.CriticalExtensions
 	lh.MetadataPolicyCrit = c.Federation.MetadataPolicyCrit

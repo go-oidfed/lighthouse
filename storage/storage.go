@@ -166,6 +166,17 @@ func (s *SubordinateStorage) Subordinate(entityID string) (*model.SubordinateInf
 		}
 		return nil, fmt.Errorf("failed to find entity: %w", result.Error)
 	}
+	if dbInfo.MetadataPolicy == nil {
+		kvStorage := KeyValueStorage{db: s.db}
+		if _, err := kvStorage.GetAs(
+			model.KeyValueScopeSubordinateStatement,
+			model.KeyValueKeyMetadataPolicy, &dbInfo.MetadataPolicy,
+		); err != nil {
+			return nil, errors.Wrap(
+				err, "failed to get general metadata policy",
+			)
+		}
+	}
 
 	return &dbInfo, nil
 }
