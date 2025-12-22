@@ -9,16 +9,174 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-func registerSubordinates(r fiber.Router) {
+var DefaultSubordinateStatus = model.StatusActive
+
+func registerSubordinates(r fiber.Router, subordinates model.SubordinateStorageBackend) {
 	g := r.Group("/subordinates")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
-	g.Get("/", func(c *fiber.Ctx) error { return c.JSON([]fiber.Map{}) })
-	g.Post("/", func(c *fiber.Ctx) error { return c.Status(fiber.StatusCreated).JSON(fiber.Map{}) })
-	g.Get("/:subordinateID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Put("/:subordinateID", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Delete("/:subordinateID", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+	// List subordinates, optional filters via query: entity_type, status
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			type request struct {
+				Status     *model.Status `query:"-"`
+				EntityType []string      `query:"entity_type"`
+			}
+			var req request
+			var infos []model.BasicSubordinateInfo
+			var err error
+
+			if err = c.QueryParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+			}
+
+			s := c.Query("status")
+			if s != "" {
+				st, err := model.ParseStatus(s)
+				if err != nil {
+					return c.Status(fiber.StatusBadRequest).JSON(
+						oidfed.ErrorInvalidRequest(
+							fmt.Sprintf(
+								"invalid status: %s", err.Error(),
+							),
+						),
+					)
+				}
+				req.Status = &st
+			}
+
+			if req.EntityType != nil {
+				if req.Status != nil {
+					infos, err = subordinates.GetByStatusAndAnyEntityType(*req.Status, req.EntityType)
+				} else {
+					// Only entity_type in query
+					infos, err = subordinates.GetByAnyEntityType(req.EntityType)
+				}
+			} else if req.Status != nil {
+				// Only status in query
+				infos, err = subordinates.GetByStatus(*req.Status)
+			} else {
+				infos, err = subordinates.GetAll()
+			}
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(infos)
+		},
+	)
+
+	// Create subordinate
+	g.Post(
+		"/", func(c *fiber.Ctx) error {
+			var req model.ExtendedSubordinateInfo
+			req.Status = DefaultSubordinateStatus
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if req.EntityID == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("missing entity_id"))
+			}
+			if err := subordinates.Add(req); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			stored, err := subordinates.Get(req.EntityID)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.Status(fiber.StatusCreated).JSON(stored)
+		},
+	)
+
+	// Get subordinate details
+	g.Get(
+		"/:subordinateID", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			fmt.Printf("INFO: %+v\n", info) //TODO remove
+			return c.JSON(*info)
+		},
+	)
+
+	// Update subordinate details (replace basic fields)
+	withCacheWipe.Put(
+		"/:subordinateID", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			existing, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if existing == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			var body struct {
+				Description *string  `json:"description"`
+				EntityTypes []string `json:"entity_types"`
+			}
+			if err = c.BodyParser(&body); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if body.Description != nil {
+				existing.Description = *body.Description
+			}
+			if body.EntityTypes != nil {
+				subordinateEntityTypes := make([]model.SubordinateEntityType, len(body.EntityTypes))
+				for i, et := range body.EntityTypes {
+					subordinateEntityTypes[i] = model.SubordinateEntityType{EntityType: et}
+				}
+				existing.SubordinateEntityTypes = subordinateEntityTypes
+			}
+			if err = subordinates.Update(existing.EntityID, *existing); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(existing)
+		},
+	)
+
+	// Delete subordinate
+	withCacheWipe.Delete(
+		"/:subordinateID", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			if err := subordinates.DeleteByDBID(id); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Update subordinate status
+	withCacheWipe.Put(
+		"/:subordinateID/status", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			var status model.Status
+			if err := c.BodyParser(&status); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if err := subordinates.UpdateStatusByDBID(id, status); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			return c.JSON(info)
+		},
+	)
 	g.Get("/:subordinateID/statement", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"statement": fiber.Map{}}) })
-	g.Get("/:subordinateID/history", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"events": []fiber.Map{}}) })
+	g.Get(
+		"/:subordinateID/history", func(c *fiber.Ctx) error {
+			// Placeholder: hook into events model.SubordinateEvent when available
+			return c.JSON(fiber.Map{"events": []fiber.Map{}})
+		},
+	)
 
 	// Subordinate additional claims
 	g.Get("/:subordinateID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })

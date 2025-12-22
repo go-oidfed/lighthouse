@@ -22,7 +22,7 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
 			}
-			info, err := store.Subordinate(sub)
+			info, err := store.Get(sub)
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))

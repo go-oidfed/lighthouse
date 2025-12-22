@@ -32,7 +32,7 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
 			}
-			storedInfo, err := store.Subordinate(req.Subject)
+			storedInfo, err := store.Get(req.Subject)
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
@@ -65,13 +65,20 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 			if len(req.EntityTypes) == 0 {
 				req.EntityTypes = entityConfig.Metadata.GuessEntityTypes()
 			}
-			info := model.SubordinateInfo{
-				JWKS:        model.NewJWKS(entityConfig.JWKS),
-				EntityID:    entityConfig.Subject,
-				EntityTypes: model.NewEntityTypes(req.EntityTypes),
-				Status:      model.StatusPending,
+
+			subEntityTypes := make([]model.SubordinateEntityType, len(req.EntityTypes))
+			for i, t := range req.EntityTypes {
+				subEntityTypes[i] = model.SubordinateEntityType{EntityType: t}
 			}
-			if err = store.Write(
+			info := model.ExtendedSubordinateInfo{
+				JWKS: model.NewJWKS(entityConfig.JWKS),
+				BasicSubordinateInfo: model.BasicSubordinateInfo{
+					EntityID:               entityConfig.Subject,
+					SubordinateEntityTypes: subEntityTypes,
+					Status:                 model.StatusPending,
+				},
+			}
+			if err = store.Update(
 				entityConfig.Subject, info,
 			); err != nil {
 				ctx.Status(fiber.StatusInternalServerError)

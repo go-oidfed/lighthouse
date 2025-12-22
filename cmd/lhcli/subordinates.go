@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/pkg/errors"
@@ -122,14 +121,18 @@ func addSubordinate(cmd *cobra.Command, args []string) error {
 	if len(entityTypes) == 0 {
 		entityTypes = entityConfig.Metadata.GuessEntityTypes()
 	}
-	info := model.SubordinateInfo{
-		JWKS:        model.NewJWKS(entityConfig.JWKS),
-		EntityID:    entityConfig.Subject,
-		EntityTypes: model.NewEntityTypes(entityTypes),
+	subEntityTypes := make([]model.SubordinateEntityType, len(entityTypes))
+	for i, t := range entityTypes {
+		subEntityTypes[i] = model.SubordinateEntityType{EntityType: t}
 	}
-	if err := subordinateStorage.Write(
-		entityConfig.Subject, info,
-	); err != nil {
+	info := model.ExtendedSubordinateInfo{
+		JWKS: model.NewJWKS(entityConfig.JWKS),
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID:               entityConfig.Subject,
+			SubordinateEntityTypes: subEntityTypes,
+		},
+	}
+	if err := subordinateStorage.Add(info); err != nil {
 		return errors.Wrap(err, "failed to add subordinate to storage")
 	}
 	fmt.Println("subordinate added successfully")
@@ -163,7 +166,7 @@ func blockSubordinate(cmd *cobra.Command, args []string) error {
 
 	entityID := args[0]
 
-	if err := subordinateStorage.Block(entityID); err != nil {
+	if err := subordinateStorage.UpdateStatus(entityID, model.StatusBlocked); err != nil {
 		return errors.Wrap(err, "failed to block subordinate in storage")
 	}
 	fmt.Println("subordinate blocked successfully")
@@ -178,49 +181,46 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "failed to load subordinates from storage")
 	}
 
-	pendingQ := subordinateStorage.Pending()
-	var pendingIDs []string
-	var pendingInfos []model.SubordinateInfo
-	var err error
-	if onlyIDs {
-		pendingIDs, err = pendingQ.EntityIDs()
-	} else {
-		pendingInfos, err = pendingQ.Subordinates()
-	}
+	pending, err := subordinateStorage.GetByStatus(model.StatusPending)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get pending subordinates")
 	}
-	if len(pendingIDs) == 0 && len(pendingInfos) == 0 {
+	if len(pending) == 0 {
 		fmt.Println("No pending requests")
 		return nil
 	}
 	if printFlag {
-		str := strings.Join(pendingIDs, "\n")
-		if !onlyIDs {
-			for _, info := range pendingInfos {
-				s, err := stringSubordinateInfo(info)
+		var str string
+		for _, info := range pending {
+			printStr := info.EntityID
+			if !onlyIDs {
+				extended, err := subordinateStorage.Get(info.EntityID)
 				if err != nil {
 					return err
 				}
-				str += fmt.Sprintf("%s\n", s)
+				printStr, err = stringSubordinateInfo(*extended)
+				if err != nil {
+					return err
+				}
 			}
+			str += fmt.Sprintf("%s\n", printStr)
 		}
 		fmt.Printf("The following entities have pending requests:\n%s\n\n", str)
 		return nil
 	}
-	if onlyIDs {
-		for _, entityID := range pendingIDs {
-			if err = promptInSubordinateRequest(entityID, entityID); err != nil {
-				return err
-			}
-		}
-	} else {
-		for _, infos := range pendingInfos {
-			str, err := stringSubordinateInfo(infos)
+
+	for _, info := range pending {
+		printStr := info.EntityID
+		if !onlyIDs {
+			extended, err := subordinateStorage.Get(info.EntityID)
 			if err != nil {
 				return err
 			}
-			if err = promptInSubordinateRequest(infos.EntityID, str); err != nil {
+			printStr, err = stringSubordinateInfo(*extended)
+			if err != nil {
+				return err
+			}
+			if err = promptInSubordinateRequest(info.EntityID, printStr); err != nil {
 				return err
 			}
 		}
@@ -231,12 +231,12 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 func promptInSubordinateRequest(entityID, str string) error {
 	approved := promptApproval("Do you approve entity '%s'", str)
 	if approved {
-		return subordinateStorage.Approve(entityID)
+		return subordinateStorage.UpdateStatus(entityID, model.StatusActive)
 	}
-	return subordinateStorage.Block(entityID)
+	return subordinateStorage.UpdateStatus(entityID, model.StatusBlocked)
 }
 
-func stringSubordinateInfo(info model.SubordinateInfo) (string, error) {
+func stringSubordinateInfo(info model.ExtendedSubordinateInfo) (string, error) {
 	data, err := json.Marshal(info)
 	if err != nil {
 		return "", err

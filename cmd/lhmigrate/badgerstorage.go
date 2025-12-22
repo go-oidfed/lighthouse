@@ -220,7 +220,7 @@ func (store *TrustMarkedEntitiesBadgerStorage) TrustMarkedStatus(trustMarkType, 
 	k := store.key(trustMarkType, entityID)
 	found, err := store.store.Read(k, &status)
 	if !found {
-		return StatusInactive, nil
+		return model.StatusInactive, nil
 	}
 	if err != nil {
 		found, e := store.store.Read(k, &id)
@@ -254,7 +254,7 @@ func (*TrustMarkedEntitiesBadgerStorage) key(trustMarkType, entityID string) str
 	return fmt.Sprintf("%s|%s", trustMarkType, entityID)
 }
 
-// Load implements the SubordinateStorageBackend interface
+// Load implements the LegacySubordinateStorageBackend interface
 func (store *TrustMarkedEntitiesBadgerStorage) Load() error {
 	return store.store.Load()
 }

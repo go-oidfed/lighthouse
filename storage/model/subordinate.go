@@ -1,43 +1,53 @@
 package model
 
 import (
+	"encoding/json"
+
 	oidfed "github.com/go-oidfed/lib"
 	"gorm.io/gorm"
 )
 
-// Status is a type for holding a status for something that is stored in the
-// database; this type describes the status or state of the entity,
-// e.g. "blocked" or "active"
-type Status int
-
-// Constants for Status
-const (
-	StatusActive Status = iota
-	StatusBlocked
-	StatusPending
-	StatusInactive
-)
-
-// SubordinateInfo holds information about a subordinate for storage
+// ExtendedSubordinateInfo holds information about a subordinate for storage
 // Table name is set to `subordinates` to replace legacy `subordinate_infos`.
-type SubordinateInfo struct {
-	ID                 uint                            `gorm:"primarykey" json:"id"`
-	CreatedAt          int                             `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt          int                             `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt          gorm.DeletedAt                  `gorm:"index" json:"-"`
-	EntityID           string                          `gorm:"uniqueIndex" json:"entity_id"`
-	Description        string                          `gorm:"type:text" json:"description"`
-	EntityTypes        EntityTypes                     `gorm:"many2many:subordinate_entity_types" json:"entity_types"`
-	JWKSID             uint                            `json:"-"`
-	JWKS               JWKS                            `json:"jwks"`
-	Metadata           *oidfed.Metadata                `gorm:"serializer:json" json:"metadata,omitempty"`
-	MetadataPolicy     *oidfed.MetadataPolicies        `gorm:"serializer:json" json:"metadata_policies,omitempty"`
-	Constraints        *oidfed.ConstraintSpecification `gorm:"serializer:json" json:"constraints,omitempty"`
-	MetadataPolicyCrit PolicyOperators                 `gorm:"many2many:subordinates_policy_operators" json:"metadata_policy_crit,omitempty"`
-	Status             Status                          `gorm:"index" json:"status"`
+type ExtendedSubordinateInfo struct {
+	BasicSubordinateInfo
+	JWKSID                      uint                            `json:"-"`
+	JWKS                        JWKS                            `json:"jwks"`
+	Metadata                    *oidfed.Metadata                `gorm:"serializer:json" json:"metadata,omitempty"`
+	MetadataPolicy              *oidfed.MetadataPolicies        `gorm:"serializer:json" json:"metadata_policy,omitempty"`
+	Constraints                 *oidfed.ConstraintSpecification `gorm:"serializer:json" json:"constraints,omitempty"`
+	MetadataPolicyCrit          PolicyOperators                 `gorm:"many2many:subordinates_policy_operators" json:"metadata_policy_crit,omitempty"`
+	SubordinateAdditionalClaims []SubordinateAdditionalClaim    `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"subordinate_additional_claims,omitempty"`
 }
 
-func (SubordinateInfo) TableName() string { return "subordinates" }
+type BasicSubordinateInfo struct {
+	ID                     uint                    `gorm:"primarykey" json:"id"`
+	CreatedAt              int                     `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt              int                     `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt              gorm.DeletedAt          `gorm:"index" json:"-"`
+	EntityID               string                  `gorm:"uniqueIndex" json:"entity_id"`
+	Description            string                  `gorm:"type:text" json:"description,omitempty"`
+	SubordinateEntityTypes []SubordinateEntityType `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"-"`
+	Status                 Status                  `gorm:"index" json:"status"`
+}
+
+func (ExtendedSubordinateInfo) TableName() string { return "subordinates" }
+
+// MarshalJSON customizes ExtendedSubordinateInfo JSON to expose entity types as []string
+func (et SubordinateEntityType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(et.EntityType)
+}
+
+// UnmarshalJSON accepts entity_types as []string and populates join rows
+func (s *SubordinateEntityType) UnmarshalJSON(b []byte) error {
+	return json.Unmarshal(b, &s.EntityType)
+}
+
+// SubordinateEntityType is a join row mapping subordinates to entity type strings.
+type SubordinateEntityType struct {
+	SubordinateID uint   `gorm:"index;uniqueIndex:uidx_sub_ent" json:"-"`
+	EntityType    string `gorm:"size:255;uniqueIndex:uidx_sub_ent" json:"entity_type"`
+}
 
 // Removed CritExtensions and subordinate_crit_extensions per db-fixes.
 

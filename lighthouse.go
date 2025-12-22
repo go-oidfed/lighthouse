@@ -353,8 +353,8 @@ func (fed LightHouse) Start() {
 	log.WithError(fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key)).Fatal()
 }
 
-// CreateSubordinateStatement returns an oidfed.EntityStatementPayload for the passed storage.SubordinateInfo
-func (fed LightHouse) CreateSubordinateStatement(subordinate *model.SubordinateInfo) oidfed.EntityStatementPayload {
+// CreateSubordinateStatement returns an oidfed.EntityStatementPayload for the passed storage.ExtendedSubordinateInfo
+func (fed LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSubordinateInfo) oidfed.EntityStatementPayload {
 	now := time.Now()
 	return oidfed.EntityStatementPayload{
 		Issuer:         fed.FederationEntity.EntityID(),
