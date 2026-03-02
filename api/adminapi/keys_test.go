@@ -411,3 +411,74 @@ func TestDeletePublicKey(t *testing.T) {
 		t.Error("Expected key to be deleted, but it still exists in the database")
 	}
 }
+
+func TestUpdatePublicKeyExp(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-update-keys-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+	}
+	if err := km.APIManagedPKs.Load(); err != nil {
+		t.Fatalf("Failed to create public key table: %v", err)
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// INJECT DATA: Put a key in the DB so we have something to update
+	body := `{
+		"key": {
+			"kty": "RSA",
+			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+			"e": "AQAB",
+			"kid": "my-update-test-key"
+		}
+	}`
+	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+	setupReq.Header.Set("Content-Type", "application/json")
+	app.Test(setupReq, -1)
+
+	// 2. ACT	
+	updateBody := `{"exp": 2000000000}`
+	updateReq := httptest.NewRequest("PUT", "/entity-configuration/keys/my-update-test-key", strings.NewReader(updateBody))
+	updateReq.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(updateReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. ASSERT
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	// TODO Task E: Fetch the key from the database using km.APIManagedPKs.Get("my-update-test-key")
+	updatedKey, err := km.APIManagedPKs.Get("my-update-test-key")
+	if err != nil {
+		t.Fatalf("Error fetching key from database: %v", err)
+	}
+	if updatedKey == nil {
+		t.Fatal("Expected to find key in database, got nil")
+	}
+	// TODO Task F: Assert that `updatedKey.ExpiresAt` is not nil
+	if updatedKey.ExpiresAt == nil {
+		t.Error("Expected ExpiresAt to be set, but it was nil")
+	}
+	// TODO Task G: Assert that `updatedKey.ExpiresAt.Time.Unix()` equals 2000000000
+	if updatedKey.ExpiresAt.Time.Unix() != 2000000000 {
+		t.Errorf("Expected ExpiresAt to be 2000000000, got %d", updatedKey.ExpiresAt.Time.Unix())
+	}
+}
