@@ -589,3 +589,81 @@ func TestRotatePublicKey(t *testing.T) {
 		t.Fatal("Expected to find new key in database, got nil")
 	}
 }
+
+
+func TestGetEntityConfigurationJWKS(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-jwks-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+		// CRITICAL: We must initialize KMSManagedPKs too, otherwise the endpoint panics!
+		KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"), 
+	}
+	_ = km.APIManagedPKs.Load()
+	_ = km.KMSManagedPKs.Load()
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// INJECT DATA: Add one key to the API managed storage
+	body := `{
+		"kid": "my-jwks-key", 
+		"key": {
+			"kty": "RSA",
+			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+			"e": "AQAB",
+			"kid": "my-jwks-key"
+		}
+	}`
+	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+	setupReq.Header.Set("Content-Type", "application/json")
+	app.Test(setupReq, -1)
+
+	// 2. ACT
+	// TODO Task A: Create a GET request to "/entity-configuration/jwks"
+	getReq := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
+	// TODO Task B: Execute the request using app.Test
+	resp, err := app.Test(getReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	
+
+	// 3. ASSERT
+	// TODO Task C: Assert resp.StatusCode is exactly 200
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected status 200, got %d. Response body: %s", resp.StatusCode, string(respBody))
+	}
+
+	// TODO Task D: Read the body and parse it. A JWKS is a JSON object with a "keys" array.	
+	var jwks struct {
+		Keys []map[string]any `json:"keys"`
+	}
+	if err := json.Unmarshal(respBody, &jwks); err != nil {
+		t.Fatalf("Failed to parse JWKS JSON: %v", err)
+	}
+
+	// We injected 1 key, so the "keys" array should have a length of 1
+	if len(jwks.Keys) != 1 {
+		t.Errorf("Expected 1 key in JWKS, got %d", len(jwks.Keys))
+	} else if jwks.Keys[0]["kid"] != "my-jwks-key" {
+		t.Errorf("Expected kid 'my-jwks-key', got '%v'", jwks.Keys[0]["kid"])
+	}
+}
