@@ -123,7 +123,7 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 		func(tx *gorm.DB) error {
 			var dbInfo model.ExtendedSubordinateInfo
 			result := tx.Where("entity_id = ?", entityID).First(&dbInfo)
-			if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				return result.Error
 			}
 			info.ID = dbInfo.ID

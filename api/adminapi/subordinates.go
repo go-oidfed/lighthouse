@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -495,7 +496,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error {
 			et := c.Params("entityType")
 			claim := c.Params("claim")
-			op := c.Params("operator")
+			op := oidfed.PolicyOperatorName(c.Params("operator"))
 			var mp oidfed.MetadataPolicies
 			found, err := storagesKV.GetAs(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &mp,
@@ -510,7 +511,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 			if entry == nil {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("metadata policy not found"))
 			}
-			val, ok := entry[oidfed.PolicyOperatorName(op)]
+			val, ok := entry[op]
 			if !ok {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("operator not found"))
 			}
@@ -522,7 +523,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error {
 			et := c.Params("entityType")
 			claim := c.Params("claim")
-			op := c.Params("operator")
+			op := oidfed.PolicyOperatorName(c.Params("operator"))
 			var val any
 			if err := c.BodyParser(&val); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -537,10 +538,10 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 			if entry == nil {
 				entry = oidfed.MetadataPolicyEntry{}
 				created = 1
-			} else if _, ok := entry[oidfed.PolicyOperatorName(op)]; !ok {
+			} else if _, ok := entry[op]; !ok {
 				created = 1
 			}
-			entry[oidfed.PolicyOperatorName(op)] = val
+			entry[op] = val
 			setEntry(&mp, et, claim, entry)
 			if err := storagesKV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, mp,
@@ -559,7 +560,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error {
 			et := c.Params("entityType")
 			claim := c.Params("claim")
-			op := c.Params("operator")
+			op := oidfed.PolicyOperatorName(c.Params("operator"))
 			var val any
 			if err := c.BodyParser(&val); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -574,10 +575,10 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 			if entry == nil {
 				entry = oidfed.MetadataPolicyEntry{}
 				created = 1
-			} else if _, ok := entry[oidfed.PolicyOperatorName(op)]; !ok {
+			} else if _, ok := entry[op]; !ok {
 				created = 1
 			}
-			entry[oidfed.PolicyOperatorName(op)] = val
+			entry[op] = val
 			setEntry(&mp, et, claim, entry)
 			if err := storagesKV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, mp,
@@ -596,13 +597,13 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error {
 			et := c.Params("entityType")
 			claim := c.Params("claim")
-			op := c.Params("operator")
+			op := oidfed.PolicyOperatorName(c.Params("operator"))
 			var mp map[string]map[string]map[string]any
 			_, _ = storagesKV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &mp)
 			if mp != nil {
 				if m := mp[et]; m != nil {
 					if ops := m[claim]; ops != nil {
-						delete(ops, op)
+						delete(ops, string(op))
 						if len(ops) == 0 {
 							delete(m, claim)
 						}
@@ -634,27 +635,583 @@ func registerSubordinateMetadata(r fiber.Router) {
 	withCacheWipe.Delete("/:entityType/:claim", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
 }
 
-func registerSubordinateMetadataPolicies(r fiber.Router) {
+func registerSubordinateMetadataPolicies(
+	r fiber.Router, subordinates model.SubordinateStorageBackend, kv model.KeyValueStore,
+) {
 	g := r.Group("/subordinates/:subordinateID/metadata-policies")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
-	g.Get("/", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Put("/", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Post("/", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Delete("/", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
-	g.Get("/:entityType", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Put("/:entityType", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Post("/:entityType", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Delete("/:entityType", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
-	g.Get("/:entityType/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Put("/:entityType/:claim", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Delete("/:entityType/:claim", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+
+	// Helpers shared with general metadata policies.
+	getPolicy := func(mp *oidfed.MetadataPolicies, et string) oidfed.MetadataPolicy {
+		switch et {
+		case "openid_provider":
+			return mp.OpenIDProvider
+		case "openid_relying_party":
+			return mp.RelyingParty
+		case "oauth_authorization_server":
+			return mp.OAuthAuthorizationServer
+		case "oauth_client":
+			return mp.OAuthClient
+		case "oauth_resource":
+			return mp.OAuthProtectedResource
+		case "federation_entity":
+			return mp.FederationEntity
+		default:
+			if mp.Extra != nil {
+				return mp.Extra[et]
+			}
+		}
+		return nil
+	}
+	setPolicy := func(mp *oidfed.MetadataPolicies, et string, policy oidfed.MetadataPolicy) {
+		switch et {
+		case "openid_provider":
+			mp.OpenIDProvider = policy
+		case "openid_relying_party":
+			mp.RelyingParty = policy
+		case "oauth_authorization_server":
+			mp.OAuthAuthorizationServer = policy
+		case "oauth_client":
+			mp.OAuthClient = policy
+		case "oauth_resource":
+			mp.OAuthProtectedResource = policy
+		case "federation_entity":
+			mp.FederationEntity = policy
+		default:
+			if mp.Extra == nil {
+				mp.Extra = map[string]oidfed.MetadataPolicy{}
+			}
+			mp.Extra[et] = policy
+		}
+	}
+	setEntry := func(mp *oidfed.MetadataPolicies, et, claim string, entry oidfed.MetadataPolicyEntry) {
+		policy := getPolicy(mp, et)
+		if policy == nil {
+			policy = oidfed.MetadataPolicy{}
+		}
+		policy[claim] = entry
+		setPolicy(mp, et, policy)
+	}
+
+	getGeneral := func() (*oidfed.MetadataPolicies, bool, error) {
+		var mp oidfed.MetadataPolicies
+		found, err := kv.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &mp)
+		if err != nil {
+			return nil, false, err
+		}
+		if !found {
+			return nil, false, nil
+		}
+		return &mp, true, nil
+	}
+
+	getSub := func(dbID string) (*model.ExtendedSubordinateInfo, error) {
+		info, err := subordinates.GetByDBID(dbID)
+		if err != nil {
+			return nil, err
+		}
+		if info == nil {
+			return nil, model.NotFoundError("subordinate not found")
+		}
+		return info, nil
+	}
+
+	writeNotFound := func(c *fiber.Ctx, msg string) error {
+		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(msg))
+	}
+	writeServerError := func(c *fiber.Ctx, err error) error {
+		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+	}
+	writeBadBody := func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+	}
+
+	// GET full subordinate-specific policies
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			return c.JSON(info.MetadataPolicy)
+		},
+	)
+
+	// PUT replace full subordinate-specific policies
+	withCacheWipe.Put(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body oidfed.MetadataPolicies
+			if err := c.BodyParser(&body); err != nil {
+				return writeBadBody(c)
+			}
+			info.MetadataPolicy = &body
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(body)
+		},
+	)
+
+	// POST copy general metadata policies to subordinate
+	withCacheWipe.Post(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			general, found, err := getGeneral()
+			if err != nil {
+				return writeServerError(c, err)
+			}
+			if !found || general == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			} else {
+				copied := *general
+				info.MetadataPolicy = &copied
+			}
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.Status(fiber.StatusCreated).JSON(info.MetadataPolicy)
+		},
+	)
+
+	// DELETE subordinate-specific policies
+	withCacheWipe.Delete(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			info.MetadataPolicy = nil
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Entity type handlers
+	g.Get(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			policy := getPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			return c.JSON(policy)
+		},
+	)
+	withCacheWipe.Put(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body oidfed.MetadataPolicy
+			if err := c.BodyParser(&body); err != nil {
+				return writeBadBody(c)
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			setPolicy(info.MetadataPolicy, et, body)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(body)
+		},
+	)
+	withCacheWipe.Post(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body oidfed.MetadataPolicy
+			if err := c.BodyParser(&body); err != nil {
+				return writeBadBody(c)
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			existing := getPolicy(info.MetadataPolicy, et)
+			if existing == nil {
+				existing = oidfed.MetadataPolicy{}
+			}
+			for claim, ops := range body {
+				existing[claim] = ops
+			}
+			setPolicy(info.MetadataPolicy, et, existing)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(existing)
+		},
+	)
+	withCacheWipe.Delete(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			if info.MetadataPolicy != nil {
+				if et == "openid_provider" {
+					info.MetadataPolicy.OpenIDProvider = nil
+				} else if et == "openid_relying_party" {
+					info.MetadataPolicy.RelyingParty = nil
+				} else if et == "oauth_authorization_server" {
+					info.MetadataPolicy.OAuthAuthorizationServer = nil
+				} else if et == "oauth_client" {
+					info.MetadataPolicy.OAuthClient = nil
+				} else if et == "oauth_resource" {
+					info.MetadataPolicy.OAuthProtectedResource = nil
+				} else if et == "federation_entity" {
+					info.MetadataPolicy.FederationEntity = nil
+				} else if info.MetadataPolicy.Extra != nil {
+					delete(info.MetadataPolicy.Extra, et)
+				}
+			}
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Claim handlers
+	g.Get(
+		"/:entityType/:claim", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			policy := getPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			ops := policy[claim]
+			if ops == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			return c.JSON(ops)
+		},
+	)
+	withCacheWipe.Put(
+		"/:entityType/:claim", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body oidfed.MetadataPolicyEntry
+			if err := c.BodyParser(&body); err != nil {
+				return writeBadBody(c)
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			setEntry(info.MetadataPolicy, et, claim, body)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(body)
+		},
+	)
+	withCacheWipe.Post(
+		"/:entityType/:claim", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body oidfed.MetadataPolicyEntry
+			if err := c.BodyParser(&body); err != nil {
+				return writeBadBody(c)
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			policy := getPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				policy = oidfed.MetadataPolicy{}
+			}
+			existing := policy[claim]
+			if existing == nil {
+				existing = oidfed.MetadataPolicyEntry{}
+			}
+			for op, v := range body {
+				existing[op] = v
+			}
+			policy[claim] = existing
+			setPolicy(info.MetadataPolicy, et, policy)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(existing)
+		},
+	)
+	withCacheWipe.Delete(
+		"/:entityType/:claim", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			if info.MetadataPolicy != nil {
+				policy := getPolicy(info.MetadataPolicy, et)
+				if policy == nil {
+					return writeNotFound(c, "metadata policy not found")
+				}
+				if _, ok := policy[claim]; !ok {
+					return writeNotFound(c, "metadata policy not found")
+				}
+				delete(policy, claim)
+				setPolicy(info.MetadataPolicy, et, policy)
+			}
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Operator handlers
+	g.Get(
+		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			op := oidfed.PolicyOperatorName(c.Params("operator"))
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			policy := getPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			entry := policy[claim]
+			if entry == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			v, ok := entry[op]
+			if !ok {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			return c.JSON(v)
+		},
+	)
+	withCacheWipe.Put(
+		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			op := oidfed.PolicyOperatorName(c.Params("operator"))
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body any
+			if err := json.Unmarshal(c.Body(), &body); err != nil {
+				return writeBadBody(c)
+			}
+
+			created := false
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			policy := getPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				policy = oidfed.MetadataPolicy{}
+				created = true
+			}
+			entry := policy[claim]
+			if entry == nil {
+				entry = oidfed.MetadataPolicyEntry{}
+				created = true
+			}
+			if _, ok := entry[op]; !ok {
+				created = true
+			}
+			entry[op] = body
+			policy[claim] = entry
+			setPolicy(info.MetadataPolicy, et, policy)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			if created {
+				return c.Status(fiber.StatusCreated).JSON(body)
+			}
+			return c.JSON(body)
+		},
+	)
+	withCacheWipe.Delete(
+		"/:entityType/:claim/:operator", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			op := oidfed.PolicyOperatorName(c.Params("operator"))
+			info, err := getSub(id)
+			if err != nil {
+				var notFoundError model.NotFoundError
+				if errors.As(err, &notFoundError) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if info.MetadataPolicy == nil {
+				return writeNotFound(c, "metadata policy not found")
+			}
+			if info.MetadataPolicy != nil {
+				policy := getPolicy(info.MetadataPolicy, et)
+				if policy != nil {
+					entry := policy[claim]
+					if entry != nil {
+						if _, ok := entry[op]; !ok {
+							return writeNotFound(c, "metadata policy not found")
+						}
+						delete(entry, op)
+						policy[claim] = entry
+						if len(entry) == 0 {
+							delete(policy, claim)
+						}
+						setPolicy(info.MetadataPolicy, et, policy)
+					}
+				}
+			}
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
 }
 
 func registerSubordinateConstraints(
-	r fiber.Router, subordinates model.SubordinateStorageBackend,
+	r fiber.Router, subordinates model.SubordinateStorageBackend, kv model.KeyValueStore,
 ) {
 	g := r.Group("/subordinates/:subordinateID/constraints")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+
+	// Helper to get general constraints from KV store
+	getGeneralConstraints := func() (*oidfed.ConstraintSpecification, bool, error) {
+		var cs oidfed.ConstraintSpecification
+		found, err := kv.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &cs)
+		if err != nil {
+			return nil, false, err
+		}
+		if !found {
+			return nil, false, nil
+		}
+		return &cs, true, nil
+	}
+
 	// Subordinate-specific constraints (stored per subordinate row)
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
@@ -696,10 +1253,33 @@ func registerSubordinateConstraints(
 			return c.JSON(body)
 		},
 	)
+	// POST /: Copy general constraints to this subordinate
 	withCacheWipe.Post(
 		"/", func(c *fiber.Ctx) error {
-			//TODO
-			return nil
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			general, found, err := getGeneralConstraints()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found || general == nil {
+				// No general constraints set, copy empty
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			} else {
+				// Deep copy general constraints
+				copied := *general
+				info.Constraints = &copied
+			}
+			if err = subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.Status(fiber.StatusCreated).JSON(info.Constraints)
 		},
 	)
 	withCacheWipe.Delete(
@@ -717,6 +1297,239 @@ func registerSubordinateConstraints(
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Max path length
+	g.Get(
+		"/max-path-length", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if info.Constraints == nil || info.Constraints.MaxPathLength == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("max_path_length not set"))
+			}
+			return c.JSON(*info.Constraints.MaxPathLength)
+		},
+	)
+	withCacheWipe.Put(
+		"/max-path-length", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if len(c.Body()) == 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
+			}
+			var mpl int
+			if err := json.Unmarshal(c.Body(), &mpl); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if mpl < 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("max_path_length must be >= 0"))
+			}
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			info.Constraints.MaxPathLength = &mpl
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(mpl)
+		},
+	)
+	withCacheWipe.Delete(
+		"/max-path-length", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if info.Constraints != nil {
+				info.Constraints.MaxPathLength = nil
+				if err := subordinates.Update(info.EntityID, *info); err != nil {
+					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+				}
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Naming constraints
+	g.Get(
+		"/naming-constraints", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if info.Constraints == nil || info.Constraints.NamingConstraints == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("naming_constraints not set"))
+			}
+			return c.JSON(info.Constraints.NamingConstraints)
+		},
+	)
+	withCacheWipe.Put(
+		"/naming-constraints", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			var body oidfed.NamingConstraints
+			if err := c.BodyParser(&body); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			info.Constraints.NamingConstraints = &body
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(body)
+		},
+	)
+	withCacheWipe.Delete(
+		"/naming-constraints", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if info.Constraints != nil {
+				info.Constraints.NamingConstraints = nil
+				if err := subordinates.Update(info.EntityID, *info); err != nil {
+					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+				}
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Allowed entity types
+	g.Get(
+		"/allowed-entity-types", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if info.Constraints == nil || info.Constraints.AllowedEntityTypes == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("allowed_entity_types not set"))
+			}
+			return c.JSON(info.Constraints.AllowedEntityTypes)
+		},
+	)
+	withCacheWipe.Put(
+		"/allowed-entity-types", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			var body []string
+			if err := c.BodyParser(&body); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			info.Constraints.AllowedEntityTypes = body
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(info.Constraints.AllowedEntityTypes)
+		},
+	)
+	withCacheWipe.Post(
+		"/allowed-entity-types", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if len(c.Body()) == 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
+			}
+			entityType := string(c.Body())
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			// Check if already exists
+			for _, t := range info.Constraints.AllowedEntityTypes {
+				if t == entityType {
+					return c.Status(fiber.StatusCreated).JSON(info.Constraints.AllowedEntityTypes)
+				}
+			}
+			info.Constraints.AllowedEntityTypes = append(info.Constraints.AllowedEntityTypes, entityType)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.Status(fiber.StatusCreated).JSON(info.Constraints.AllowedEntityTypes)
+		},
+	)
+	withCacheWipe.Delete(
+		"/allowed-entity-types/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			entityType := c.Params("entityType")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if info.Constraints == nil {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			updated := make([]string, 0, len(info.Constraints.AllowedEntityTypes))
+			removed := false
+			for _, t := range info.Constraints.AllowedEntityTypes {
+				if t == entityType {
+					removed = true
+					continue
+				}
+				updated = append(updated, t)
+			}
+			if !removed {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			info.Constraints.AllowedEntityTypes = updated
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(info.Constraints.AllowedEntityTypes)
 		},
 	)
 }
