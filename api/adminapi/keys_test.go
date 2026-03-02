@@ -527,7 +527,12 @@ func TestRotatePublicKey(t *testing.T) {
 			"kid": "my-old-key"
 		}
 	}`
-	app.Test(httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(oldKeyBody)), -1)
+	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(oldKeyBody))
+	setupReq.Header.Set("Content-Type", "application/json")
+	app.Test(setupReq, -1)
+	if k, _ := km.APIManagedPKs.Get("my-old-key"); k == nil {
+		t.Fatal("Setup failed: old key was not inserted into database")
+	}
 
 	// 2. ACT
 	// We are going to POST the new key to the old key's URL to trigger the rotation
