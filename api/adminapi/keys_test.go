@@ -39,6 +39,19 @@ func (m *mockFullKMS) ChangeKeyRotationConfig(cfg kms.KeyRotationConfig) error {
     return nil // Pretend the KMS successfully updated its schedule
 }
 
+func (m *mockFullKMS) ChangeRSAKeyLength(length int) error {
+	return nil // Pretend the KMS successfully updated the key length
+}
+
+func (m *mockFullKMS) RotateAllKeys(revoke bool, reason string) error {
+	return nil // Pretend the KMS successfully rotated all keys
+}
+
+func (m *mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
+	// Return nil, nil to indicate the mock has no pending updates
+	return nil, nil
+}
+
 // --- TESTS ---
 
 func TestGetKMSInfo(t *testing.T) {
@@ -733,5 +746,95 @@ func TestPatchKMSRotation(t *testing.T) {
 	// TODO Task F: Assert that savedConfig.Enabled is now true
 	if !savedConfig.Enabled {
 		t.Errorf("Expected savedConfig.Enabled to be true, got false")
+	}
+}
+
+
+func TestPutKMSRSAKeyLen(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-rsa-len-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		KMS:  "mock-kms",
+		BasicKeys: &mockBasicKMS{},
+		Keys: &mockFullKMS{},
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// 2. ACT
+	// We send just the integer 4096 in the JSON body
+	req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`4096`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. ASSERT
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Errorf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(body))
+	}
+
+	// Verify in DB
+	savedLen, err := storage.GetRSAKeyLen(store.KeyValue())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if savedLen != 4096 {
+		t.Errorf("Expected RSA key length 4096, got %d", savedLen)
+	}
+}
+
+func TestPostKMSRotateAll(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-rotate-all-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		KMS:  "mock-kms",
+		Keys: &mockFullKMS{},
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// 2. ACT
+	req := httptest.NewRequest("POST", "/kms/rotate", nil)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. ASSERT
+	// This endpoint returns 202 Accepted, not 200 OK!
+	if resp.StatusCode != fiber.StatusAccepted { 
+		body, _ := io.ReadAll(resp.Body)
+		t.Errorf("Expected status 202, got %d. Body: %s", resp.StatusCode, string(body))
 	}
 }
