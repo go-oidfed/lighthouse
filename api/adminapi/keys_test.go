@@ -241,11 +241,14 @@ func TestPostPublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// 3. ASSERT
 	
 	if resp.StatusCode != 201 {
-		respBody, _ := io.ReadAll(resp.Body)
 		t.Errorf("Expected status 201, got %d. Response body: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -314,7 +317,10 @@ func TestGetPublicKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// 3. ASSERT
 	// TODO Task C: Check that resp.StatusCode is exactly 200
@@ -390,8 +396,10 @@ func TestDeletePublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	respBody, _ := io.ReadAll(resp.Body)
-	
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// 3. ASSERT
 	// TODO Task C: Check that resp.StatusCode is exactly 204 (fiber.StatusNoContent)
@@ -480,5 +488,99 @@ func TestUpdatePublicKeyExp(t *testing.T) {
 	// TODO Task G: Assert that `updatedKey.ExpiresAt.Time.Unix()` equals 2000000000
 	if updatedKey.ExpiresAt.Time.Unix() != 2000000000 {
 		t.Errorf("Expected ExpiresAt to be 2000000000, got %d", updatedKey.ExpiresAt.Time.Unix())
+	}
+}
+
+
+func TestRotatePublicKey(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-rotate-keys-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+	}
+	if err := km.APIManagedPKs.Load(); err != nil {
+		t.Fatalf("Failed to create public key table: %v", err)
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// INJECT OLD DATA: This is the key we want to rotate out
+	oldKeyBody := `{
+		"key": {
+			"kty": "RSA",
+			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+			"e": "AQAB",
+			"kid": "my-old-key"
+		}
+	}`
+	app.Test(httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(oldKeyBody)), -1)
+
+	// 2. ACT
+	// We are going to POST the new key to the old key's URL to trigger the rotation
+	newKeyBody := `{
+		"key": {
+			"kty": "RSA",
+			"n": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+			"e": "AQAB",
+			"kid": "my-new-key"
+		}
+	}`
+	
+	// TODO Task A: Create a POST request to "/entity-configuration/keys/my-old-key"
+	rotateReq := httptest.NewRequest("POST", "/entity-configuration/keys/my-old-key", strings.NewReader(newKeyBody))
+	// TODO Task B: Use `strings.NewReader(newKeyBody)` as the body, and set Content-Type to "application/json"
+	rotateReq.Header.Set("Content-Type", "application/json")
+	// TODO Task C: Execute it using app.Test
+	resp, err := app.Test(rotateReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. ASSERT
+	// TODO Task D: Assert resp.StatusCode is exactly 201 (Created)
+	// Don't forget to use `io.ReadAll(resp.Body)` so you can print the error if it fails!
+	if resp.StatusCode != 201 {
+		t.Errorf("Expected status 201, got %d. Response body: %s", resp.StatusCode, string(body))
+	}
+	
+	// TODO Task E: Fetch the OLD key from the DB (km.APIManagedPKs.Get("my-old-key"))
+	oldKey, err := km.APIManagedPKs.Get("my-old-key")
+	if err != nil {
+		t.Fatalf("Failed to fetch old key from database: %v", err)
+	}
+	if oldKey == nil {
+		t.Fatal("Expected to find old key in database, got nil")
+	}
+	// TODO Task F: Assert that `oldKey.ExpiresAt` is NOT nil (because the rotation should have scheduled it to expire)
+	if oldKey.ExpiresAt == nil {
+		t.Error("Expected ExpiresAt to be set on old key, but it was nil")
+	}
+	
+	// TODO Task G: Fetch the NEW key from the DB (km.APIManagedPKs.Get("my-new-key"))
+	newKey, err := km.APIManagedPKs.Get("my-new-key")
+	if err != nil {
+		t.Fatalf("Failed to fetch new key from database: %v", err)
+	}
+	// TODO Task H: Assert that `newKey` is NOT nil (it successfully saved the new key)
+	if newKey == nil {
+		t.Fatal("Expected to find new key in database, got nil")
 	}
 }
