@@ -134,7 +134,18 @@ func createResolveResponse(
 		},
 	}
 	if leaf.TrustMarks != nil {
-		res.ResolveResponsePayload.TrustMarks = leaf.TrustMarks.VerifiedFederation(&ta.EntityStatementPayload)
+		verifiedTrustMarks := leaf.TrustMarks.VerifiedFederation(&ta.EntityStatementPayload)
+		res.ResolveResponsePayload.TrustMarks = verifiedTrustMarks
+		for i := range verifiedTrustMarks {
+			mark, err := verifiedTrustMarks[i].TrustMark()
+			if err != nil {
+				ctx.Status(fiber.StatusInternalServerError)
+				return nil, ctx.JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if mark.ExpiresAt != nil && mark.ExpiresAt.Before(res.ExpiresAt.Time) {
+				res.ExpiresAt = *mark.ExpiresAt
+			}
+		}
 	}
 	return res, nil
 }
