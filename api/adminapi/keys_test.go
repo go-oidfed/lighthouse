@@ -336,3 +336,78 @@ func TestGetPublicKeys(t *testing.T) {
 	}
 	
 }
+
+
+func TestDeletePublicKey(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-delete-keys-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+	}
+	if err := km.APIManagedPKs.Load(); err != nil {
+		t.Fatalf("Failed to create public key table: %v", err)
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// INJECT DATA: Put a key in the DB so we have something to delete
+	body := `{
+		"key": {
+			"kty": "RSA",
+			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+			"e": "AQAB",
+			"kid": "my-delete-test-key"
+		}
+	}`
+	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+	setupReq.Header.Set("Content-Type", "application/json")
+	app.Test(setupReq, -1)
+
+	// Quick sanity check to ensure the key actually got saved before we delete it!
+	if key, _ := km.APIManagedPKs.Get("my-delete-test-key"); key == nil {
+		t.Fatal("Setup failed: key was not inserted into database")
+	}
+
+	// 2. ACT
+	// TODO Task A: Create a DELETE request to "/entity-configuration/keys/my-delete-test-key"
+	deleteReq := httptest.NewRequest("DELETE", "/entity-configuration/keys/my-delete-test-key", nil)
+	// TODO Task B: Execute the request using app.Test
+	resp, err := app.Test(deleteReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	
+
+	// 3. ASSERT
+	// TODO Task C: Check that resp.StatusCode is exactly 204 (fiber.StatusNoContent)
+	if resp.StatusCode != 204 {
+		t.Errorf("Expected status 204, got %d. Response body: %s", resp.StatusCode, string(respBody))
+	}
+	
+	// TODO Task D: Let's check the database to ensure it's GONE!
+	// Use km.APIManagedPKs.Get("my-delete-test-key") again.
+	// If the key IS NOT nil, then it didn't delete properly!
+	// if deletedKey != nil { t.Error(...) }
+	deletedKey, err := km.APIManagedPKs.Get("my-delete-test-key")
+	if err != nil {
+		t.Fatalf("Error fetching key from database: %v", err)
+	}
+	if deletedKey != nil {
+		t.Error("Expected key to be deleted, but it still exists in the database")
+	}
+}
