@@ -102,7 +102,7 @@ func Register(
 	registerGeneralSubordinateLifetime(r)
 	registerSubordinates(r, storages.Subordinates)
 	// Subordinate metadata, policies, constraints, keys
-	registerSubordinateMetadata(r)
+	registerSubordinateMetadata(r, storages.Subordinates)
 	registerSubordinateMetadataPolicies(r, storages.Subordinates, storages.KV)
 	registerSubordinateConstraints(r, storages.Subordinates, storages.KV)
 	registerSubordinateKeys(r)
