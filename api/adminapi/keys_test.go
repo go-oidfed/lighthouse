@@ -1,6 +1,7 @@
 package adminapi
 
 import (
+	"encoding/json"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -261,4 +262,77 @@ func TestPostPublicKey(t *testing.T) {
 	if savedKey.KID != "my-test-key-1" {
 		t.Errorf("Expected KID 'my-test-key-1', got '%s'", savedKey.KID)
 	}
+}
+
+
+func TestGetPublicKeys(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-get-keys-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+	}
+	if err := km.APIManagedPKs.Load(); err != nil {
+		t.Fatalf("Failed to create public key table: %v", err)
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// INJECT DATA: Let's use our previous test's logic to put a key in the DB directly
+	body := `{
+		"kid": "my-get-test-key", 
+		"key": {
+			"kty": "RSA",
+			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+			"e": "AQAB",
+			"kid": "my-get-test-key"
+		}
+	}`
+	// We use the app.Test to POST the data first (we know this works because of our last test!)
+	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+	setupReq.Header.Set("Content-Type", "application/json")
+	app.Test(setupReq, -1) 
+
+	// 2. ACT
+	// TODO Task A: Create a GET request to "/entity-configuration/keys/" (notice the trailing slash!)
+	getReq := httptest.NewRequest("GET", "/entity-configuration/keys/", nil)
+	// TODO Task B: Execute the request using app.Test
+	resp, err := app.Test(getReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+
+	// 3. ASSERT
+	// TODO Task C: Check that resp.StatusCode is exactly 200
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected status 200, got %d. Response body: %s", resp.StatusCode, string(respBody))
+	}
+	
+	// Task D: Let's read the JSON response and see if our key is in it!	
+	// The API returns a list of keys, so we parse it into a slice of maps
+	var returnedKeys []map[string]any
+	if err := json.Unmarshal(respBody, &returnedKeys); err != nil {
+		t.Fatalf("Failed to parse JSON response: %v", err)
+	}
+
+	if len(returnedKeys) != 1 {
+		t.Errorf("Expected 1 key in the response, but got %d", len(returnedKeys))
+	} else if returnedKeys[0]["kid"] != "my-get-test-key" {
+		t.Errorf("Expected kid 'my-get-test-key', got '%v'", returnedKeys[0]["kid"])
+	}
+	
 }
