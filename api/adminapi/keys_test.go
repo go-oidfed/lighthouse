@@ -2,13 +2,17 @@ package adminapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
+	"github.com/go-oidfed/lib/unixtime"
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v3/jwa"
@@ -16,11 +20,8 @@ import (
 
 // --- MOCKS ---
 
-// mockBasicKMS pretends to be a KMS system.
-// We only implement the method we need: GetDefaultAlg.
+// mockBasicKMS implements kms.BasicKeyManagementSystem with a fixed ES256 default algorithm.
 type mockBasicKMS struct {
-	// We embed the interface to satisfy the compiler if there are other methods we don't implement yet.
-	// NOTE: If the test panics, it means we need to implement more methods.
 	kms.BasicKeyManagementSystem
 }
 
@@ -28,870 +29,1080 @@ func (m *mockBasicKMS) GetDefaultAlg() jwa.SignatureAlgorithm {
 	return jwa.ES256()
 }
 
-// mockFullKMS embeds the full KeyManagementSystem interface.
-// We use this when we need to test methods like ChangeKeyRotationConfig.
+// mockFullKMS implements kms.KeyManagementSystem for testing endpoints that require
+// the full KMS interface (rotation, algorithm changes, etc.).
 type mockFullKMS struct {
-    kms.KeyManagementSystem // This lets us satisfy the interface without implementing every single method
+	kms.KeyManagementSystem
 }
 
-// Mock the specific method we are testing
-func (m *mockFullKMS) ChangeKeyRotationConfig(cfg kms.KeyRotationConfig) error {
-    return nil // Pretend the KMS successfully updated its schedule
+func (m *mockFullKMS) ChangeKeyRotationConfig(cfg kms.KeyRotationConfig) error { return nil }
+func (m *mockFullKMS) ChangeRSAKeyLength(length int) error                     { return nil }
+func (m *mockFullKMS) RotateAllKeys(revoke bool, reason string) error          { return nil }
+func (m *mockFullKMS) ChangeAlgsAt(algs []jwa.SignatureAlgorithm, effectiveAt unixtime.Unixtime, overlap time.Duration) error {
+	return nil
 }
-
-func (m *mockFullKMS) ChangeRSAKeyLength(length int) error {
-	return nil // Pretend the KMS successfully updated the key length
+func (m *mockFullKMS) ChangeDefaultAlgorithmAt(alg jwa.SignatureAlgorithm, effectiveAt unixtime.Unixtime) error {
+	return nil
 }
-
-func (m *mockFullKMS) RotateAllKeys(revoke bool, reason string) error {
-	return nil // Pretend the KMS successfully rotated all keys
-}
-
 func (m *mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
-	// Return nil, nil to indicate the mock has no pending updates
 	return nil, nil
 }
 
-// --- TESTS ---
+// --- TEST HELPERS ---
 
-func TestGetKMSInfo(t *testing.T) {
-	// 1. ARRANGE: Setup the world
-	// ---------------------------
+// testRSAKeyN is a valid RSA modulus reused across all key tests to avoid duplication.
+const testRSAKeyN = "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw"
 
-	// A. Create a temporary database
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-kms-*")
+// newTestStorage creates a temporary SQLite database for testing.
+// The temporary directory is cleaned up automatically when the test finishes.
+func newTestStorage(t *testing.T) *storage.Storage {
+	t.Helper()
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir) // Clean up when done
-
-	// B. Connect to the DB (using SQLite)
-	config := storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
-	}
-	store, err := storage.NewStorage(config)
-	if err != nil {
-		t.Fatalf("Failed to create storage: %v", err)
-	}
-
-	// C. Setup the KeyManagement struct with our Mock
-	km := KeyManagement{
-		KMS:       "mock-kms",
-		BasicKeys: &mockBasicKMS{},
-		// We leave 'Keys', 'APIManagedPKs', etc. nil because GET /kms doesn't use them (hopefully)
-	}
-
-	// D. Setup Fiber App and Register Routes
-	app := fiber.New()
-	// We pass the KeyValueStorage from our real DB
-	registerKeys(app, km, store.KeyValue())
-
-	// 2. ACT: Perform the request
-	// ---------------------------
-	req := httptest.NewRequest("GET", "/kms", nil)
-	resp, err := app.Test(req, -1) // -1 means no timeout
-	if err != nil {
-		t.Fatalf("Request failed: %v", err)
-	}
-
-	// 3. ASSERT: Verify the result
-	// ----------------------------
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
-
-	// Optional: You could read the body here and verify "alg" is "ES256"
-}
-
-// ... (keep your existing TestGetKMSInfo function) ...
-
-func TestPutKMSAlg_NotSupported(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-kms-alg-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	config := storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
-	}
-	store, err := storage.NewStorage(config)
-	if err != nil {
-		t.Fatalf("Failed to create storage: %v", err)
-	}
-
-	km := KeyManagement{
-		KMS:       "mock-kms",
-		BasicKeys: &mockBasicKMS{},
-		Keys:      nil, // Explicitly nil to trigger the error
-	}
-
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
-
-	// 2. ACT
-	req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`"ES512"`))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
-	if err != nil {
-		t.Fatalf("Request failed: %v", err)
-	}
-
-	// 3. ASSERT
-	if resp.StatusCode != 400 {
-		t.Errorf("Expected status 400, got %d", resp.StatusCode)
-	}
-}
-
-
-func TestUpdateKMSRotation(t *testing.T) {
-    // 1. ARRANGE
-    tempDir, err := os.MkdirTemp("", "lighthouse-test-rotation-*")
-    if err != nil {
-        t.Fatal(err)
-    }
-    defer os.RemoveAll(tempDir)
-
-    store, err := storage.NewStorage(storage.Config{
-        Driver:  storage.DriverSQLite,
-        DataDir: tempDir,
-    })
-    if err != nil {
-        t.Fatalf("Failed to create storage: %v", err)
-    }
-
-    // Use our new "Full" mock here
-    km := KeyManagement{
-        KMS:  "mock-kms",
-        Keys: &mockFullKMS{}, 
-    }
-
-    app := fiber.New()
-    registerKeys(app, km, store.KeyValue())
-
-    // 2. ACT
-    // We send a JSON body to update the rotation settings
-    // JSON: enabled=true, interval=3600s (1 hour), overlap=600s (10 mins)
-    body := `{"enabled": true, "interval": 3600, "overlap": 600}`
-    req := httptest.NewRequest("PUT", "/kms/rotation", strings.NewReader(body))
-    req.Header.Set("Content-Type", "application/json")
-
-    resp, err := app.Test(req, -1)
-    if err != nil {
-        t.Fatalf("Request failed: %v", err)
-    }
-
-    // 3. ASSERT (HTTP Layer)
-    if resp.StatusCode != 200 {
-        t.Errorf("Expected status 200, got %d", resp.StatusCode)
-    }
-
-    // 4. ASSERT (Database Layer)
-    // We verify that the data actually persisted to the storage
-    savedConfig, err := storage.GetKeyRotation(store.KeyValue())
-    if err != nil {
-        t.Fatalf("Failed to get rotation config from storage: %v", err)
-    }
-
-    if savedConfig.Enabled != true {
-        t.Errorf("Expected enabled true, got %v", savedConfig.Enabled)
-    }
-    // Note: interval is stored as time.Duration (nanoseconds) usually, 
-    // so 3600 seconds = 3600 * 1,000,000,000
-    if savedConfig.Interval.Duration().Seconds() != 3600 {
-        t.Errorf("Expected interval 3600s, got %f", savedConfig.Interval.Duration().Seconds())
-    }
-	if savedConfig.Overlap.Duration().Seconds() != 600 {
-		t.Errorf("Expected overlap 600s, got %f", savedConfig.Overlap.Duration().Seconds())
-	}
-}
-
-func TestPostPublicKey(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-post-keys-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
+	t.Cleanup(func() { os.RemoveAll(tempDir) })
 
 	store, err := storage.NewStorage(storage.Config{
 		Driver:  storage.DriverSQLite,
 		DataDir: tempDir,
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to create storage: %v", err)
 	}
+	return store
+}
 
-	// Set up APIManagedPKs using the real database!
+// newTestKeyBody returns a JSON body for adding a public key with the given kid.
+func newTestKeyBody(kid string) string {
+	return fmt.Sprintf(`{
+		"key": {
+			"kty": "RSA",
+			"n": "%s",
+			"e": "AQAB",
+			"kid": "%s"
+		}
+	}`, testRSAKeyN, kid)
+}
+
+// setupPublicKeyApp creates a Fiber app configured with API-managed key storage.
+// Returns the app and the KeyManagement struct for DB assertions.
+func setupPublicKeyApp(t *testing.T) (*fiber.App, KeyManagement, *storage.Storage) {
+	t.Helper()
+	store := newTestStorage(t)
 	km := KeyManagement{
 		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
 	}
-
 	if err := km.APIManagedPKs.Load(); err != nil {
 		t.Fatalf("Failed to create public key table: %v", err)
 	}
-
 	app := fiber.New()
 	registerKeys(app, km, store.KeyValue())
+	return app, km, store
+}
 
-	// 2. ACT
-	// We send a JSON body containing a standard RSA Public Key in JWK format
-	body := `{
-		"key": {
-			"kty": "RSA",
-			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-			"e": "AQAB",
-			"kid": "my-test-key-1"
-		}
-	}`
+// injectTestKey adds a public key via the API and asserts success.
+func injectTestKey(t *testing.T, app *fiber.App, kid string) {
+	t.Helper()
+	body := newTestKeyBody(kid)
 	req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-
 	resp, err := app.Test(req, -1)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to inject test key %q: %v", kid, err)
 	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 3. ASSERT
-	
 	if resp.StatusCode != 201 {
-		t.Errorf("Expected status 201, got %d. Response body: %s", resp.StatusCode, string(respBody))
-	}
-
-	// Using the storage method `Get`, we ask the database for "my-test-key-1"
-	savedKey, err := km.APIManagedPKs.Get("my-test-key-1")
-	if err != nil {
-		t.Fatalf("Failed to fetch key from database: %v", err)
-	}
-	
-	if savedKey == nil {
-		t.Fatal("Expected to find saved key in database, got nil")
-	}
-	
-	if savedKey.KID != "my-test-key-1" {
-		t.Errorf("Expected KID 'my-test-key-1', got '%s'", savedKey.KID)
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Inject key %q: expected 201, got %d: %s", kid, resp.StatusCode, string(b))
 	}
 }
 
-
-func TestGetPublicKeys(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-get-keys-*")
+// doRequest is a tiny helper to execute an HTTP request against a Fiber app and
+// return the response plus the fully-read body.
+func doRequest(t *testing.T, app *fiber.App, req *http.Request) (*http.Response, []byte) {
+	t.Helper()
+	resp, err := app.Test(req, -1)
 	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	km := KeyManagement{
-		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
-	}
-	if err := km.APIManagedPKs.Load(); err != nil {
-		t.Fatalf("Failed to create public key table: %v", err)
-	}
-
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
-
-	// INJECT DATA: Let's use our previous test's logic to put a key in the DB directly
-	body := `{
-		"kid": "my-get-test-key", 
-		"key": {
-			"kty": "RSA",
-			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-			"e": "AQAB",
-			"kid": "my-get-test-key"
-		}
-	}`
-	// We use the app.Test to POST the data first (we know this works because of our last test!)
-	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
-	setupReq.Header.Set("Content-Type", "application/json")
-	app.Test(setupReq, -1) 
-
-	// 2. ACT
-	// TODO Task A: Create a GET request to "/entity-configuration/keys/" (notice the trailing slash!)
-	getReq := httptest.NewRequest("GET", "/entity-configuration/keys/", nil)
-	// TODO Task B: Execute the request using app.Test
-	resp, err := app.Test(getReq, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 3. ASSERT
-	// TODO Task C: Check that resp.StatusCode is exactly 200
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected status 200, got %d. Response body: %s", resp.StatusCode, string(respBody))
-	}
-	
-	// Task D: Let's read the JSON response and see if our key is in it!	
-	// The API returns a list of keys, so we parse it into a slice of maps
-	var returnedKeys []map[string]any
-	if err := json.Unmarshal(respBody, &returnedKeys); err != nil {
-		t.Fatalf("Failed to parse JSON response: %v", err)
-	}
-
-	if len(returnedKeys) != 1 {
-		t.Errorf("Expected 1 key in the response, but got %d", len(returnedKeys))
-	} else if returnedKeys[0]["kid"] != "my-get-test-key" {
-		t.Errorf("Expected kid 'my-get-test-key', got '%v'", returnedKeys[0]["kid"])
-	}
-	
-}
-
-
-func TestDeletePublicKey(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-delete-keys-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	km := KeyManagement{
-		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
-	}
-	if err := km.APIManagedPKs.Load(); err != nil {
-		t.Fatalf("Failed to create public key table: %v", err)
-	}
-
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
-
-	// INJECT DATA: Put a key in the DB so we have something to delete
-	body := `{
-		"key": {
-			"kty": "RSA",
-			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-			"e": "AQAB",
-			"kid": "my-delete-test-key"
-		}
-	}`
-	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
-	setupReq.Header.Set("Content-Type", "application/json")
-	app.Test(setupReq, -1)
-
-	// Quick sanity check to ensure the key actually got saved before we delete it!
-	if key, _ := km.APIManagedPKs.Get("my-delete-test-key"); key == nil {
-		t.Fatal("Setup failed: key was not inserted into database")
-	}
-
-	// 2. ACT
-	// TODO Task A: Create a DELETE request to "/entity-configuration/keys/my-delete-test-key"
-	deleteReq := httptest.NewRequest("DELETE", "/entity-configuration/keys/my-delete-test-key", nil)
-	// TODO Task B: Execute the request using app.Test
-	resp, err := app.Test(deleteReq, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 3. ASSERT
-	// TODO Task C: Check that resp.StatusCode is exactly 204 (fiber.StatusNoContent)
-	if resp.StatusCode != 204 {
-		t.Errorf("Expected status 204, got %d. Response body: %s", resp.StatusCode, string(respBody))
-	}
-	
-	// TODO Task D: Let's check the database to ensure it's GONE!
-	// Use km.APIManagedPKs.Get("my-delete-test-key") again.
-	// If the key IS NOT nil, then it didn't delete properly!
-	// if deletedKey != nil { t.Error(...) }
-	deletedKey, err := km.APIManagedPKs.Get("my-delete-test-key")
-	if err != nil {
-		t.Fatalf("Error fetching key from database: %v", err)
-	}
-	if deletedKey != nil {
-		t.Error("Expected key to be deleted, but it still exists in the database")
-	}
-}
-
-func TestUpdatePublicKeyExp(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-update-keys-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	km := KeyManagement{
-		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
-	}
-	if err := km.APIManagedPKs.Load(); err != nil {
-		t.Fatalf("Failed to create public key table: %v", err)
-	}
-
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
-
-	// INJECT DATA: Put a key in the DB so we have something to update
-	body := `{
-		"key": {
-			"kty": "RSA",
-			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-			"e": "AQAB",
-			"kid": "my-update-test-key"
-		}
-	}`
-	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
-	setupReq.Header.Set("Content-Type", "application/json")
-	app.Test(setupReq, -1)
-
-	// 2. ACT	
-	updateBody := `{"exp": 2000000000}`
-	updateReq := httptest.NewRequest("PUT", "/entity-configuration/keys/my-update-test-key", strings.NewReader(updateBody))
-	updateReq.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(updateReq, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 3. ASSERT
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
-
-	// TODO Task E: Fetch the key from the database using km.APIManagedPKs.Get("my-update-test-key")
-	updatedKey, err := km.APIManagedPKs.Get("my-update-test-key")
-	if err != nil {
-		t.Fatalf("Error fetching key from database: %v", err)
-	}
-	if updatedKey == nil {
-		t.Fatal("Expected to find key in database, got nil")
-	}
-	// TODO Task F: Assert that `updatedKey.ExpiresAt` is not nil
-	if updatedKey.ExpiresAt == nil {
-		t.Error("Expected ExpiresAt to be set, but it was nil")
-	}
-	// TODO Task G: Assert that `updatedKey.ExpiresAt.Time.Unix()` equals 2000000000
-	if updatedKey.ExpiresAt.Time.Unix() != 2000000000 {
-		t.Errorf("Expected ExpiresAt to be 2000000000, got %d", updatedKey.ExpiresAt.Time.Unix())
-	}
-}
-
-
-func TestRotatePublicKey(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-rotate-keys-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	km := KeyManagement{
-		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
-	}
-	if err := km.APIManagedPKs.Load(); err != nil {
-		t.Fatalf("Failed to create public key table: %v", err)
-	}
-
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
-
-	// INJECT OLD DATA: This is the key we want to rotate out
-	oldKeyBody := `{
-		"key": {
-			"kty": "RSA",
-			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-			"e": "AQAB",
-			"kid": "my-old-key"
-		}
-	}`
-	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(oldKeyBody))
-	setupReq.Header.Set("Content-Type", "application/json")
-	app.Test(setupReq, -1)
-	if k, _ := km.APIManagedPKs.Get("my-old-key"); k == nil {
-		t.Fatal("Setup failed: old key was not inserted into database")
-	}
-
-	// 2. ACT
-	// We are going to POST the new key to the old key's URL to trigger the rotation
-	newKeyBody := `{
-		"key": {
-			"kty": "RSA",
-			"n": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-			"e": "AQAB",
-			"kid": "my-new-key"
-		}
-	}`
-	
-	// TODO Task A: Create a POST request to "/entity-configuration/keys/my-old-key"
-	rotateReq := httptest.NewRequest("POST", "/entity-configuration/keys/my-old-key", strings.NewReader(newKeyBody))
-	// TODO Task B: Use `strings.NewReader(newKeyBody)` as the body, and set Content-Type to "application/json"
-	rotateReq.Header.Set("Content-Type", "application/json")
-	// TODO Task C: Execute it using app.Test
-	resp, err := app.Test(rotateReq, -1)
-	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Request %s %s failed: %v", req.Method, req.URL.Path, err)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to read response body: %v", err)
 	}
+	return resp, body
+}
 
-	// 3. ASSERT
-	// TODO Task D: Assert resp.StatusCode is exactly 201 (Created)
-	// Don't forget to use `io.ReadAll(resp.Body)` so you can print the error if it fails!
-	if resp.StatusCode != 201 {
-		t.Errorf("Expected status 201, got %d. Response body: %s", resp.StatusCode, string(body))
-	}
-	
-	// TODO Task E: Fetch the OLD key from the DB (km.APIManagedPKs.Get("my-old-key"))
-	oldKey, err := km.APIManagedPKs.Get("my-old-key")
-	if err != nil {
-		t.Fatalf("Failed to fetch old key from database: %v", err)
-	}
-	if oldKey == nil {
-		t.Fatal("Expected to find old key in database, got nil")
-	}
-	// TODO Task F: Assert that `oldKey.ExpiresAt` is NOT nil (because the rotation should have scheduled it to expire)
-	if oldKey.ExpiresAt == nil {
-		t.Error("Expected ExpiresAt to be set on old key, but it was nil")
-	}
-	
-	// TODO Task G: Fetch the NEW key from the DB (km.APIManagedPKs.Get("my-new-key"))
-	newKey, err := km.APIManagedPKs.Get("my-new-key")
-	if err != nil {
-		t.Fatalf("Failed to fetch new key from database: %v", err)
-	}
-	// TODO Task H: Assert that `newKey` is NOT nil (it successfully saved the new key)
-	if newKey == nil {
-		t.Fatal("Expected to find new key in database, got nil")
+// --- PUBLIC KEY MANAGEMENT TESTS ---
+
+func TestPostPublicKey(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, km, _ := setupPublicKeyApp(t)
+
+		body := newTestKeyBody("my-test-key-1")
+		req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 201 {
+			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Verify the response body contains the key
+		var created map[string]any
+		if err := json.Unmarshal(respBody, &created); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if created["kid"] != "my-test-key-1" {
+			t.Errorf("Response kid: expected 'my-test-key-1', got %q", created["kid"])
+		}
+
+		// Verify it persisted to the database
+		savedKey, err := km.APIManagedPKs.Get("my-test-key-1")
+		if err != nil {
+			t.Fatalf("Failed to fetch key from database: %v", err)
+		}
+		if savedKey == nil {
+			t.Fatal("Expected to find saved key in database, got nil")
+		}
+		if savedKey.KID != "my-test-key-1" {
+			t.Errorf("Expected KID 'my-test-key-1', got %q", savedKey.KID)
+		}
+	})
+
+	t.Run("MissingKey", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+
+		// Send a body with no key field
+		req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("KidMismatch", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+
+		// The top-level "kid" doesn't match the key's embedded "kid"
+		body := fmt.Sprintf(`{
+			"kid": "wrong-kid",
+			"key": {
+				"kty": "RSA",
+				"n": "%s",
+				"e": "AQAB",
+				"kid": "actual-kid"
+			}
+		}`, testRSAKeyN)
+		req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+
+		req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(`not valid json`))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+}
+
+func TestGetPublicKeys(t *testing.T) {
+	t.Run("ReturnsInjectedKeys", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "key-1")
+		injectTestKey(t, app, "key-2")
+
+		req := httptest.NewRequest("GET", "/entity-configuration/keys/", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		var keys []map[string]any
+		if err := json.Unmarshal(respBody, &keys); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+
+		if len(keys) != 2 {
+			t.Errorf("Expected 2 keys, got %d", len(keys))
+		}
+	})
+
+	t.Run("EmptyWhenNoKeys", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+
+		req := httptest.NewRequest("GET", "/entity-configuration/keys/", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		var keys []map[string]any
+		if err := json.Unmarshal(respBody, &keys); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if len(keys) != 0 {
+			t.Errorf("Expected 0 keys, got %d", len(keys))
+		}
+	})
+}
+
+func TestDeletePublicKey(t *testing.T) {
+	t.Run("HardDelete", func(t *testing.T) {
+		app, km, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "key-to-delete")
+
+		// Sanity check key exists
+		if k, _ := km.APIManagedPKs.Get("key-to-delete"); k == nil {
+			t.Fatal("Setup failed: key was not inserted")
+		}
+
+		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/key-to-delete", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 204 {
+			t.Errorf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Verify key is gone from database
+		deletedKey, err := km.APIManagedPKs.Get("key-to-delete")
+		if err != nil {
+			t.Fatalf("Error fetching key from database: %v", err)
+		}
+		if deletedKey != nil {
+			t.Error("Expected key to be deleted, but it still exists")
+		}
+	})
+
+	t.Run("RevokeInsteadOfDelete", func(t *testing.T) {
+		app, km, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "key-to-revoke")
+
+		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/key-to-revoke?revoke=true&reason=compromised", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 204 {
+			t.Errorf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Key should still exist but be revoked
+		revokedKey, err := km.APIManagedPKs.Get("key-to-revoke")
+		if err != nil {
+			t.Fatalf("Error fetching key from database: %v", err)
+		}
+		if revokedKey == nil {
+			t.Fatal("Revoked key should still exist in database")
+		}
+		if revokedKey.RevokedAt == nil {
+			t.Error("Expected RevokedAt to be set on revoked key")
+		}
+	})
+
+	t.Run("NonExistentKey", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+
+		// Deleting a non-existent key should still return 204 (idempotent)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/does-not-exist", nil)
+		resp, _ := doRequest(t, app, req)
+
+		if resp.StatusCode != 204 {
+			t.Errorf("Expected status 204 for idempotent delete, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestUpdatePublicKeyExp(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, km, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "key-to-update")
+
+		body := `{"exp": 2000000000}`
+		req := httptest.NewRequest("PUT", "/entity-configuration/keys/key-to-update", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Verify response body
+		var updated map[string]any
+		if err := json.Unmarshal(respBody, &updated); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if updated["kid"] != "key-to-update" {
+			t.Errorf("Response kid mismatch: got %q", updated["kid"])
+		}
+
+		// Verify in database
+		updatedKey, err := km.APIManagedPKs.Get("key-to-update")
+		if err != nil {
+			t.Fatalf("Error fetching key: %v", err)
+		}
+		if updatedKey == nil {
+			t.Fatal("Expected to find key in database, got nil")
+		}
+		if updatedKey.ExpiresAt == nil {
+			t.Fatal("Expected ExpiresAt to be set, but it was nil")
+		}
+		if updatedKey.ExpiresAt.Time.Unix() != 2000000000 {
+			t.Errorf("Expected ExpiresAt 2000000000, got %d", updatedKey.ExpiresAt.Time.Unix())
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+
+		body := `{"exp": 2000000000}`
+		req := httptest.NewRequest("PUT", "/entity-configuration/keys/nonexistent-key", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 404 {
+			t.Errorf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "key-bad-update")
+
+		req := httptest.NewRequest("PUT", "/entity-configuration/keys/key-bad-update", strings.NewReader(`not json`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+}
+
+func TestRotatePublicKey(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, km, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "old-key")
+
+		newKeyBody := fmt.Sprintf(`{
+			"key": {
+				"kty": "RSA",
+				"n": "%s",
+				"e": "AQAB",
+				"kid": "new-key"
+			}
+		}`, testRSAKeyN)
+
+		req := httptest.NewRequest("POST", "/entity-configuration/keys/old-key", strings.NewReader(newKeyBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 201 {
+			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Verify the response body contains the new key
+		var created map[string]any
+		if err := json.Unmarshal(respBody, &created); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if created["kid"] != "new-key" {
+			t.Errorf("Response kid: expected 'new-key', got %q", created["kid"])
+		}
+
+		// Old key should now have an expiration
+		oldKey, err := km.APIManagedPKs.Get("old-key")
+		if err != nil {
+			t.Fatalf("Failed to fetch old key: %v", err)
+		}
+		if oldKey == nil {
+			t.Fatal("Old key should still exist after rotation")
+		}
+		if oldKey.ExpiresAt == nil {
+			t.Error("Old key should have ExpiresAt set after rotation")
+		}
+
+		// New key should exist
+		newKey, err := km.APIManagedPKs.Get("new-key")
+		if err != nil {
+			t.Fatalf("Failed to fetch new key: %v", err)
+		}
+		if newKey == nil {
+			t.Fatal("New key should exist after rotation")
+		}
+	})
+
+	t.Run("OldKeyNotFound", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+
+		newKeyBody := newTestKeyBody("new-key")
+		req := httptest.NewRequest("POST", "/entity-configuration/keys/nonexistent-old-key", strings.NewReader(newKeyBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 404 {
+			t.Errorf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("MissingKey", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "existing-key")
+
+		req := httptest.NewRequest("POST", "/entity-configuration/keys/existing-key", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, _, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "existing-key-2")
+
+		req := httptest.NewRequest("POST", "/entity-configuration/keys/existing-key-2", strings.NewReader(`not json`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("WithCustomOldKeyExp", func(t *testing.T) {
+		app, km, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "rotate-custom-old")
+
+		newKeyBody := fmt.Sprintf(`{
+			"key": {
+				"kty": "RSA",
+				"n": "%s",
+				"e": "AQAB",
+				"kid": "rotate-custom-new"
+			},
+			"old_key_exp": 1900000000
+		}`, testRSAKeyN)
+
+		req := httptest.NewRequest("POST", "/entity-configuration/keys/rotate-custom-old", strings.NewReader(newKeyBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 201 {
+			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Verify old key has the custom expiration
+		oldKey, err := km.APIManagedPKs.Get("rotate-custom-old")
+		if err != nil {
+			t.Fatalf("Failed to fetch old key: %v", err)
+		}
+		if oldKey == nil || oldKey.ExpiresAt == nil {
+			t.Fatal("Old key should have ExpiresAt set")
+		}
+		if oldKey.ExpiresAt.Time.Unix() != 1900000000 {
+			t.Errorf("Old key ExpiresAt: expected 1900000000, got %d", oldKey.ExpiresAt.Time.Unix())
+		}
+	})
+}
+
+// --- JWKS TESTS ---
+
+func TestGetEntityConfigurationJWKS(t *testing.T) {
+	t.Run("ReturnsValidKeys", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+			KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"),
+		}
+		_ = km.APIManagedPKs.Load()
+		_ = km.KMSManagedPKs.Load()
+
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		injectTestKey(t, app, "jwks-key-1")
+
+		req := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		var jwks struct {
+			Keys []map[string]any `json:"keys"`
+		}
+		if err := json.Unmarshal(respBody, &jwks); err != nil {
+			t.Fatalf("Failed to parse JWKS: %v", err)
+		}
+		if len(jwks.Keys) != 1 {
+			t.Errorf("Expected 1 key in JWKS, got %d", len(jwks.Keys))
+		} else if jwks.Keys[0]["kid"] != "jwks-key-1" {
+			t.Errorf("Expected kid 'jwks-key-1', got %q", jwks.Keys[0]["kid"])
+		}
+	})
+
+	t.Run("EmptyWhenNoKeys", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+			KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"),
+		}
+		_ = km.APIManagedPKs.Load()
+		_ = km.KMSManagedPKs.Load()
+
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		var jwks struct {
+			Keys []map[string]any `json:"keys"`
+		}
+		if err := json.Unmarshal(respBody, &jwks); err != nil {
+			t.Fatalf("Failed to parse JWKS: %v", err)
+		}
+		if len(jwks.Keys) != 0 {
+			t.Errorf("Expected 0 keys in JWKS, got %d", len(jwks.Keys))
+		}
+	})
+
+	t.Run("ExcludesExpiredKeys", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+			KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"),
+		}
+		_ = km.APIManagedPKs.Load()
+		_ = km.KMSManagedPKs.Load()
+
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		// Inject a key, then expire it
+		injectTestKey(t, app, "expired-key")
+
+		expBody := `{"exp": 1000000000}`
+		expReq := httptest.NewRequest("PUT", "/entity-configuration/keys/expired-key", strings.NewReader(expBody))
+		expReq.Header.Set("Content-Type", "application/json")
+		doRequest(t, app, expReq)
+
+		// JWKS should not include the expired key
+		req := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var jwks struct {
+			Keys []map[string]any `json:"keys"`
+		}
+		if err := json.Unmarshal(respBody, &jwks); err != nil {
+			t.Fatalf("Failed to parse JWKS: %v", err)
+		}
+		if len(jwks.Keys) != 0 {
+			t.Errorf("Expected 0 keys in JWKS (expired should be excluded), got %d", len(jwks.Keys))
+		}
+	})
+}
+
+// --- KMS MANAGEMENT TESTS ---
+
+func TestGetKMSInfo(t *testing.T) {
+	t.Run("ReturnsKMSDetails", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("GET", "/kms", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Verify the response body structure and values
+		var info map[string]any
+		if err := json.Unmarshal(respBody, &info); err != nil {
+			t.Fatalf("Failed to parse KMS info: %v", err)
+		}
+		if info["kms"] != "mock-kms" {
+			t.Errorf("Expected kms 'mock-kms', got %q", info["kms"])
+		}
+		if info["alg"] != "ES256" {
+			t.Errorf("Expected alg 'ES256', got %q", info["alg"])
+		}
+		// Default RSA key length should be 2048
+		if rsaLen, ok := info["rsa_key_len"].(float64); !ok || int(rsaLen) != 2048 {
+			t.Errorf("Expected rsa_key_len 2048, got %v", info["rsa_key_len"])
+		}
+	})
+
+	t.Run("IncludesPendingAlg", func(t *testing.T) {
+		store := newTestStorage(t)
+		// Use a custom mock that reports a pending change
+		pendingMock := &mockFullKMSWithPending{}
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      pendingMock,
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("GET", "/kms", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var info map[string]any
+		if err := json.Unmarshal(respBody, &info); err != nil {
+			t.Fatalf("Failed to parse KMS info: %v", err)
+		}
+		if info["pending_alg"] != "ES384" {
+			t.Errorf("Expected pending_alg 'ES384', got %v", info["pending_alg"])
+		}
+		if info["alg_change_at"] == nil {
+			t.Error("Expected alg_change_at to be set")
+		}
+	})
+}
+
+// mockFullKMSWithPending returns pending changes for testing the KMS info response.
+type mockFullKMSWithPending struct {
+	mockFullKMS
+}
+
+func (m *mockFullKMSWithPending) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
+	return nil, &kms.PendingDefaultChange{
+		Alg:         jwa.ES384(),
+		EffectiveAt: unixtime.Unixtime{Time: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
 	}
 }
 
-
-func TestGetEntityConfigurationJWKS(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-jwks-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	km := KeyManagement{
-		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
-		// CRITICAL: We must initialize KMSManagedPKs too, otherwise the endpoint panics!
-		KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"), 
-	}
-	_ = km.APIManagedPKs.Load()
-	_ = km.KMSManagedPKs.Load()
-
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
-
-	// INJECT DATA: Add one key to the API managed storage
-	body := `{
-		"kid": "my-jwks-key", 
-		"key": {
-			"kty": "RSA",
-			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
-			"e": "AQAB",
-			"kid": "my-jwks-key"
+func TestPutKMSAlg(t *testing.T) {
+	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      nil,
 		}
-	}`
-	setupReq := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
-	setupReq.Header.Set("Content-Type", "application/json")
-	app.Test(setupReq, -1)
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
 
-	// 2. ACT
-	// TODO Task A: Create a GET request to "/entity-configuration/jwks"
-	getReq := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
-	// TODO Task B: Execute the request using app.Test
-	resp, err := app.Test(getReq, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	
+		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`"ES512"`))
+		req.Header.Set("Content-Type", "application/json")
 
-	// 3. ASSERT
-	// TODO Task C: Assert resp.StatusCode is exactly 200
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected status 200, got %d. Response body: %s", resp.StatusCode, string(respBody))
-	}
+		resp, respBody := doRequest(t, app, req)
 
-	// TODO Task D: Read the body and parse it. A JWKS is a JSON object with a "keys" array.	
-	var jwks struct {
-		Keys []map[string]any `json:"keys"`
-	}
-	if err := json.Unmarshal(respBody, &jwks); err != nil {
-		t.Fatalf("Failed to parse JWKS JSON: %v", err)
-	}
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
 
-	// We injected 1 key, so the "keys" array should have a length of 1
-	if len(jwks.Keys) != 1 {
-		t.Errorf("Expected 1 key in JWKS, got %d", len(jwks.Keys))
-	} else if jwks.Keys[0]["kid"] != "my-jwks-key" {
-		t.Errorf("Expected kid 'my-jwks-key', got '%v'", jwks.Keys[0]["kid"])
-	}
+	t.Run("InvalidAlgorithm", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`"INVALID-ALG"`))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`not json`))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`"ES512"`))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		// Verify the response is valid KMS info
+		var info map[string]any
+		if err := json.Unmarshal(respBody, &info); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if info["kms"] != "mock-kms" {
+			t.Errorf("Expected kms 'mock-kms', got %v", info["kms"])
+		}
+	})
+}
+
+func TestPutKMSRSAKeyLen(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`4096`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		savedLen, err := storage.GetRSAKeyLen(store.KeyValue())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if savedLen != 4096 {
+			t.Errorf("Expected RSA key length 4096, got %d", savedLen)
+		}
+	})
+
+	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      nil,
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`4096`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:       "mock-kms",
+			BasicKeys: &mockBasicKMS{},
+			Keys:      &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`"not a number"`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+}
+
+// --- KMS ROTATION TESTS ---
+
+func TestGetKMSRotation(t *testing.T) {
+	t.Run("ReturnsConfig", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		initialConfig := kms.KeyRotationConfig{Enabled: true}
+		_ = storage.SetKeyRotation(store.KeyValue(), initialConfig)
+
+		req := httptest.NewRequest("GET", "/kms/rotation", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		var config map[string]any
+		if err := json.Unmarshal(respBody, &config); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+		if config["enabled"] != true {
+			t.Errorf("Expected enabled true, got %v", config["enabled"])
+		}
+	})
+
+	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: nil,
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("GET", "/kms/rotation", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+}
+
+func TestPutKMSRotation(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		body := `{"enabled": true, "interval": 3600, "overlap": 600}`
+		req := httptest.NewRequest("PUT", "/kms/rotation", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		savedConfig, err := storage.GetKeyRotation(store.KeyValue())
+		if err != nil {
+			t.Fatalf("Failed to get rotation config: %v", err)
+		}
+		if !savedConfig.Enabled {
+			t.Error("Expected enabled true, got false")
+		}
+		if savedConfig.Interval.Duration().Seconds() != 3600 {
+			t.Errorf("Expected interval 3600s, got %f", savedConfig.Interval.Duration().Seconds())
+		}
+		if savedConfig.Overlap.Duration().Seconds() != 600 {
+			t.Errorf("Expected overlap 600s, got %f", savedConfig.Overlap.Duration().Seconds())
+		}
+	})
+
+	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: nil,
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		body := `{"enabled": true}`
+		req := httptest.NewRequest("PUT", "/kms/rotation", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
+
+		req := httptest.NewRequest("PUT", "/kms/rotation", strings.NewReader(`not json`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
 }
 
 func TestPatchKMSRotation(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-patch-rotation-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
+	t.Run("PartialUpdate", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
 
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
+		// Set initial config
+		_ = storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: false})
+
+		// PATCH only the 'enabled' field
+		req := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(`{"enabled": true}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+
+		savedConfig, err := storage.GetKeyRotation(store.KeyValue())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !savedConfig.Enabled {
+			t.Error("Expected enabled to be true after PATCH")
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	km := KeyManagement{
-		KMS:  "mock-kms",
-		Keys: &mockFullKMS{}, 
-	}
+	t.Run("PatchInterval", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
 
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
+		_ = storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: true})
 
-	// SETUP: Let's set an initial rotation config in the database
-	// We will set Enabled = false, Interval = 3600
-	initialConfig := kms.KeyRotationConfig{
-		Enabled:  false,
-		// Note: interval is usually stored as time.Duration under the hood
-	}
-	_ = storage.SetKeyRotation(store.KeyValue(), initialConfig)
+		// PATCH only the interval
+		req := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(`{"interval": 7200}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
 
-	// 2. ACT
-	// We want to PATCH it to set "enabled" to true, but we WON'T send "interval"
-	patchBody := `{"enabled": true}`
-	
-	// TODO Task A: Create a PATCH request to "/kms/rotation" using the patchBody
-	patchReq := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(patchBody))
-	// TODO Task B: Set the "Content-Type" header to "application/json"
-	patchReq.Header.Set("Content-Type", "application/json")
-	// TODO Task C: Execute the request using app.Test
-	resp, err := app.Test(patchReq, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
 
-	// 3. ASSERT
-	// TODO Task D: Assert resp.StatusCode is exactly 200
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected status 200, got %d. Response body: %s", resp.StatusCode, string(respBody))
-	}
-
-	// TODO Task E: Fetch the config from the database to ensure it updated
-	savedConfig, err := storage.GetKeyRotation(store.KeyValue())
-	if err != nil {
-		t.Fatal(err)
-	}
-	
-	// TODO Task F: Assert that savedConfig.Enabled is now true
-	if !savedConfig.Enabled {
-		t.Errorf("Expected savedConfig.Enabled to be true, got false")
-	}
-}
-
-
-func TestPutKMSRSAKeyLen(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-rsa-len-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
+		savedConfig, err := storage.GetKeyRotation(store.KeyValue())
+		if err != nil {
+			t.Fatal(err)
+		}
+		// enabled should still be true (we didn't patch it)
+		if !savedConfig.Enabled {
+			t.Error("Expected enabled to remain true")
+		}
+		if savedConfig.Interval.Duration().Seconds() != 7200 {
+			t.Errorf("Expected interval 7200s, got %f", savedConfig.Interval.Duration().Seconds())
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	km := KeyManagement{
-		KMS:  "mock-kms",
-		BasicKeys: &mockBasicKMS{},
-		Keys: &mockFullKMS{},
-	}
+	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: nil,
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
 
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
+		req := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(`{"enabled": true}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
 
-	// 2. ACT
-	// We send just the integer 4096 in the JSON body
-	req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`4096`))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 3. ASSERT
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		t.Errorf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(body))
-	}
-
-	// Verify in DB
-	savedLen, err := storage.GetRSAKeyLen(store.KeyValue())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if savedLen != 4096 {
-		t.Errorf("Expected RSA key length 4096, got %d", savedLen)
-	}
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+	})
 }
 
 func TestPostKMSRotateAll(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-rotate-all-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
+	t.Run("Success", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: &mockFullKMS{},
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
 
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
+		req := httptest.NewRequest("POST", "/kms/rotate", nil)
+		resp, respBody := doRequest(t, app, req)
+
+		if resp.StatusCode != fiber.StatusAccepted {
+			t.Errorf("Expected status 202, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	km := KeyManagement{
-		KMS:  "mock-kms",
-		Keys: &mockFullKMS{},
-	}
+	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+		store := newTestStorage(t)
+		km := KeyManagement{
+			KMS:  "mock-kms",
+			Keys: nil,
+		}
+		app := fiber.New()
+		registerKeys(app, km, store.KeyValue())
 
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
+		req := httptest.NewRequest("POST", "/kms/rotate", nil)
+		resp, respBody := doRequest(t, app, req)
 
-	// 2. ACT
-	req := httptest.NewRequest("POST", "/kms/rotate", nil)
-	resp, err := app.Test(req, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 3. ASSERT
-	// This endpoint returns 202 Accepted, not 200 OK!
-	if resp.StatusCode != fiber.StatusAccepted { 
-		body, _ := io.ReadAll(resp.Body)
-		t.Errorf("Expected status 202, got %d. Body: %s", resp.StatusCode, string(body))
-	}
-}
-
-
-func TestGetKMSRotation(t *testing.T) {
-	// 1. ARRANGE
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-get-rotation-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
+		if resp.StatusCode != 400 {
+			t.Errorf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	km := KeyManagement{
-		KMS:  "mock-kms",
-		Keys: &mockFullKMS{},
-	}
-
-	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
-
-	// SETUP: Put a specific configuration in the database
-	initialConfig := kms.KeyRotationConfig{
-		Enabled: true,
-	}
-	_ = storage.SetKeyRotation(store.KeyValue(), initialConfig)
-
-	// 2. ACT
-	req := httptest.NewRequest("GET", "/kms/rotation", nil)
-	resp, err := app.Test(req, -1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 3. ASSERT
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(body))
-	}
-
-	body, _ := io.ReadAll(resp.Body)
-	
-	// We check if the JSON response contains our 'true' value for enabled
-	var responseConfig map[string]interface{}
-	if err := json.Unmarshal(body, &responseConfig); err != nil {
-		t.Fatalf("Failed to parse JSON response: %v", err)
-	}
-
-	if responseConfig["enabled"] != true {
-		t.Errorf("Expected enabled to be true, got %v", responseConfig["enabled"])
-	}
 }
