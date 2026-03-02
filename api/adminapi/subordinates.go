@@ -1,6 +1,7 @@
 package adminapi
 
 import (
+	"encoding/json"
 	"fmt"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -275,12 +276,6 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 			return c.JSON(mp)
 		},
 	)
-	g.Get(
-		"/ping", func(c *fiber.Ctx) error {
-			fmt.Println("PING")
-			return c.SendString("ok")
-		},
-	) // TODO remove
 	// PUT full policy
 	withCacheWipe.Put(
 		"/", func(c *fiber.Ctx) error {
@@ -332,7 +327,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			setPolicy(&mp, et, body)
-			if err := storagesKV.SetAny(
+			if err = storagesKV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, mp,
 			); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -361,7 +356,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, storagesKV model.KeyValueSt
 				existing[claim] = ops
 			}
 			setPolicy(&mp, et, existing)
-			if err := storagesKV.SetAny(
+			if err = storagesKV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, mp,
 			); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -655,42 +650,327 @@ func registerSubordinateMetadataPolicies(r fiber.Router) {
 	withCacheWipe.Delete("/:entityType/:claim", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
 }
 
-func registerSubordinateConstraints(r fiber.Router) {
-	withCacheWipe := r.Use(subordinateStatementsCacheInvalidationMiddleware)
-	// General constraints
-	r.Get("/subordinates/constraints", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Put("/subordinates/constraints", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-
-	r.Get("/subordinates/:subordinateID/constraints", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
+func registerSubordinateConstraints(
+	r fiber.Router, subordinates model.SubordinateStorageBackend,
+) {
+	g := r.Group("/subordinates/:subordinateID/constraints")
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	// Subordinate-specific constraints (stored per subordinate row)
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			if info.Constraints == nil {
+				return c.JSON(oidfed.ConstraintSpecification{})
+			}
+			return c.JSON(info.Constraints)
+		},
+	)
 	withCacheWipe.Put(
-		"/subordinates/:subordinateID/constraints", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) },
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			var body oidfed.ConstraintSpecification
+			if err := c.BodyParser(&body); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if body.MaxPathLength != nil && *body.MaxPathLength < 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("max_path_length must be >= 0"))
+			}
+			info.Constraints = &body
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(body)
+		},
 	)
 	withCacheWipe.Post(
-		"/subordinates/:subordinateID/constraints",
-		func(c *fiber.Ctx) error { return c.Status(fiber.StatusCreated).JSON(fiber.Map{}) },
+		"/", func(c *fiber.Ctx) error {
+			//TODO
+			return nil
+		},
 	)
 	withCacheWipe.Delete(
-		"/subordinates/:subordinateID/constraints",
-		func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) },
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+			info.Constraints = nil
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+}
+
+func registerGeneralConstraints(
+	r fiber.Router, kv model.KeyValueStore,
+) {
+	g := r.Group("/subordinates/constraints")
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+
+	getGeneral := func() (*oidfed.ConstraintSpecification, bool, error) {
+		var cs oidfed.ConstraintSpecification
+		found, err := kv.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &cs)
+		if err != nil {
+			return nil, false, err
+		}
+		if !found {
+			return nil, false, nil
+		}
+		return &cs, true, nil
+	}
+	setGeneral := func(cs *oidfed.ConstraintSpecification) error {
+		if cs == nil {
+			return kv.Delete(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints)
+		}
+		return kv.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, *cs)
+	}
+
+	// General constraints
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			cs, found, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("constraints not set"))
+			}
+			return c.JSON(cs)
+		},
+	)
+	withCacheWipe.Put(
+		"/", func(c *fiber.Ctx) error {
+			var body oidfed.ConstraintSpecification
+			if err := c.BodyParser(&body); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if body.MaxPathLength != nil && *body.MaxPathLength < 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("max_path_length must be >= 0"))
+			}
+			if err := setGeneral(&body); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(body)
+		},
 	)
 
 	// Allowed entity types
-	r.Get("/subordinates/constraints/allowed-entity-types", func(c *fiber.Ctx) error { return c.JSON([]string{}) })
+	g.Get(
+		"/allowed-entity-types", func(c *fiber.Ctx) error {
+			cs, found, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("allowed_entity_types not set"))
+			}
+			if cs.AllowedEntityTypes == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("allowed_entity_types not set"))
+			}
+			return c.JSON(cs.AllowedEntityTypes)
+		},
+	)
 	withCacheWipe.Put(
-		"/subordinates/constraints/allowed-entity-types", func(c *fiber.Ctx) error { return c.JSON([]string{}) },
+		"/allowed-entity-types", func(c *fiber.Ctx) error {
+			var body []string
+			if err := c.BodyParser(&body); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			cs, _, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if cs == nil {
+				cs = &oidfed.ConstraintSpecification{}
+			}
+			cs.AllowedEntityTypes = body
+			if err := setGeneral(cs); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(cs.AllowedEntityTypes)
+		},
 	)
 	withCacheWipe.Post(
-		"/subordinates/constraints/allowed-entity-types",
-		func(c *fiber.Ctx) error { return c.Status(fiber.StatusCreated).JSON([]string{}) },
+		"/allowed-entity-types", func(c *fiber.Ctx) error {
+			if len(c.Body()) == 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
+			}
+			entityType := string(c.Body())
+			cs, _, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if cs == nil {
+				cs = &oidfed.ConstraintSpecification{}
+			}
+			for _, t := range cs.AllowedEntityTypes {
+				if t == entityType {
+					return c.Status(fiber.StatusCreated).JSON(cs.AllowedEntityTypes)
+				}
+			}
+			cs.AllowedEntityTypes = append(cs.AllowedEntityTypes, entityType)
+			if err := setGeneral(cs); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.Status(fiber.StatusCreated).JSON(cs.AllowedEntityTypes)
+		},
 	)
 	withCacheWipe.Delete(
-		"/subordinates/constraints/allowed-entity-types/:entityType",
-		func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) },
+		"/allowed-entity-types/:entityType", func(c *fiber.Ctx) error {
+			entityType := c.Params("entityType")
+			cs, found, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			updated := make([]string, 0, len(cs.AllowedEntityTypes))
+			removed := false
+			for _, t := range cs.AllowedEntityTypes {
+				if t == entityType {
+					removed = true
+					continue
+				}
+				updated = append(updated, t)
+			}
+			if !removed {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			cs.AllowedEntityTypes = updated
+			if err := setGeneral(cs); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(cs.AllowedEntityTypes)
+		},
 	)
 
 	// Max path length
-	r.Get("/subordinates/constraints/max-path-length", func(c *fiber.Ctx) error { return c.JSON(nil) })
-	withCacheWipe.Put("/subordinates/constraints/max-path-length", func(c *fiber.Ctx) error { return c.JSON(0) })
+	g.Get(
+		"/max-path-length", func(c *fiber.Ctx) error {
+			cs, found, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found || cs.MaxPathLength == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("max_path_length not set"))
+			}
+			return c.JSON(*cs.MaxPathLength)
+		},
+	)
+	withCacheWipe.Put(
+		"/max-path-length", func(c *fiber.Ctx) error {
+			if len(c.Body()) == 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
+			}
+			var mpl int
+			if err := json.Unmarshal(c.Body(), &mpl); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if mpl < 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("max_path_length must be >= 0"))
+			}
+			cs, _, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if cs == nil {
+				cs = &oidfed.ConstraintSpecification{}
+			}
+			cs.MaxPathLength = &mpl
+			if err := setGeneral(cs); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(mpl)
+		},
+	)
+	withCacheWipe.Delete(
+		"/max-path-length", func(c *fiber.Ctx) error {
+			cs, found, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			cs.MaxPathLength = nil
+			if err := setGeneral(cs); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
+	// Naming constraints
+	g.Get(
+		"/naming-constraints", func(c *fiber.Ctx) error {
+			cs, found, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found || cs.NamingConstraints == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("naming_constraints not set"))
+			}
+			return c.JSON(cs.NamingConstraints)
+		},
+	)
+	withCacheWipe.Put(
+		"/naming-constraints", func(c *fiber.Ctx) error {
+			var body oidfed.NamingConstraints
+			if err := c.BodyParser(&body); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			cs, _, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if cs == nil {
+				cs = &oidfed.ConstraintSpecification{}
+			}
+			cs.NamingConstraints = &body
+			if err := setGeneral(cs); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(body)
+		},
+	)
+	withCacheWipe.Delete(
+		"/naming-constraints", func(c *fiber.Ctx) error {
+			cs, found, err := getGeneral()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			cs.NamingConstraints = nil
+			if err := setGeneral(cs); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+
 }
 
 func registerSubordinateKeys(r fiber.Router) {

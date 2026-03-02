@@ -2785,6 +2785,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Constraints'
           description: Successful response
+        '404':
+          $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getGeneralConstraints
@@ -2894,8 +2896,9 @@ paths:
             application/json:
               schema:
                 type: integer
-                nullable: true
           description: Successful response returning max_path_length.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getGeneralMaxPathLength
@@ -2944,6 +2947,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/NamingConstraints'
           description: Successful response returning naming_constraints.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getGeneralNamingConstraints
@@ -2991,6 +2996,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/AllowedEntityTypes'
           description: Successful response returning allowed entity types.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getGeneralAllowedEntityTypes
@@ -5243,22 +5250,22 @@ tags:
     description: Manage Trust Marks published in the entity configuration.
   - name: Entity Configuration Metadata
     description: Manage metadata claims published in the entity configuration.
-  - name: General Metadata Policies
-    description: Manage general metadata policies applied to entities.
-  - name: General Constraints
-    description: Manage general constraints applied to subordinate entities.
   - name: Subordinates
     description: Manage subordinate entities.
   - name: Subordinate Keys
     description: Manage keys associated with subordinate entities.
   - name: Subordinate Metadata
     description: Manage metadata claims for subordinate entities.
+  - name: General Metadata Policies
+    description: Manage general metadata policies applied to entities.
   - name: Subordinate Metadata Policies
     description: Manage metadata policies for subordinate entities.
-  - name: Subordinate Constraints
-    description: Manage constraints specific to subordinate entities.
   - name: Subordinate Critical Metadata Policies
     description: Manage subordinate critical metadata policy operators.
+  - name: General Constraints
+    description: Manage general constraints applied to subordinate entities.
+  - name: Subordinate Constraints
+    description: Manage constraints specific to subordinate entities.
   - name: Federation Trust Marks
     description: Manage trust marks in the federation.
   - name: Trust Mark Issuance

@@ -14,6 +14,7 @@ const (
 	KeyValueKeyLifetime       = "lifetime"
 	KeyValueKeyMetadataPolicy = "metadata_policy"
 	KeyValueKeyMetadata       = "metadata"
+	KeyValueKeyConstraints    = "constraints"
 	KeyValueKeyCriticalClaims = "crit"
 	KeyValueKeyAlg            = "alg"
 	KeyValueKeyRSAKeyLen      = "rsa_key_len"
