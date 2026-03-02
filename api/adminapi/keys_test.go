@@ -838,3 +838,60 @@ func TestPostKMSRotateAll(t *testing.T) {
 		t.Errorf("Expected status 202, got %d. Body: %s", resp.StatusCode, string(body))
 	}
 }
+
+
+func TestGetKMSRotation(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-get-rotation-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		KMS:  "mock-kms",
+		Keys: &mockFullKMS{},
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// SETUP: Put a specific configuration in the database
+	initialConfig := kms.KeyRotationConfig{
+		Enabled: true,
+	}
+	_ = storage.SetKeyRotation(store.KeyValue(), initialConfig)
+
+	// 2. ACT
+	req := httptest.NewRequest("GET", "/kms/rotation", nil)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. ASSERT
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(body))
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	
+	// We check if the JSON response contains our 'true' value for enabled
+	var responseConfig map[string]interface{}
+	if err := json.Unmarshal(body, &responseConfig); err != nil {
+		t.Fatalf("Failed to parse JSON response: %v", err)
+	}
+
+	if responseConfig["enabled"] != true {
+		t.Errorf("Expected enabled to be true, got %v", responseConfig["enabled"])
+	}
+}
