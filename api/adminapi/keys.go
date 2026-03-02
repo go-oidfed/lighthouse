@@ -250,6 +250,9 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 	)
 
 	// KMS info
+	// KMS routes are mounted directly on r (not on the /entity-configuration/keys group)
+	// because they live under /kms/* per the OpenAPI spec.
+	kmsWithCacheWipe := r.Use(entityConfigurationCacheInvalidationMiddleware)
 	r.Get(
 		"/kms", func(c *fiber.Ctx) error {
 			info, err := getKMSInfo(keyManagement, kvStorage)
@@ -260,7 +263,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 		},
 	)
 
-	withCacheWipe.Put(
+	kmsWithCacheWipe.Put(
 		"/kms/alg", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing signing alg dynamically"))
@@ -311,7 +314,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 		},
 	)
 
-	withCacheWipe.Put(
+	kmsWithCacheWipe.Put(
 		"/kms/rsa-key-len", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing RSA key length dynamically"))
@@ -347,7 +350,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			return c.JSON(rot)
 		},
 	)
-	withCacheWipe.Put(
+	kmsWithCacheWipe.Put(
 		"/kms/rotation", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
@@ -365,7 +368,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			return c.JSON(cfg)
 		},
 	)
-	withCacheWipe.Patch(
+	kmsWithCacheWipe.Patch(
 		"/kms/rotation", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
@@ -399,8 +402,8 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 		},
 	)
 
-	// Trigger KMS rotation (placeholder)
-	withCacheWipe.Post(
+	// Trigger KMS rotation
+	kmsWithCacheWipe.Post(
 		"/kms/rotate", func(c *fiber.Ctx) error {
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
