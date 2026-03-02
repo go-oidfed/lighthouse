@@ -667,3 +667,71 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 		t.Errorf("Expected kid 'my-jwks-key', got '%v'", jwks.Keys[0]["kid"])
 	}
 }
+
+func TestPatchKMSRotation(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-patch-rotation-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	km := KeyManagement{
+		KMS:  "mock-kms",
+		Keys: &mockFullKMS{}, 
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// SETUP: Let's set an initial rotation config in the database
+	// We will set Enabled = false, Interval = 3600
+	initialConfig := kms.KeyRotationConfig{
+		Enabled:  false,
+		// Note: interval is usually stored as time.Duration under the hood
+	}
+	_ = storage.SetKeyRotation(store.KeyValue(), initialConfig)
+
+	// 2. ACT
+	// We want to PATCH it to set "enabled" to true, but we WON'T send "interval"
+	patchBody := `{"enabled": true}`
+	
+	// TODO Task A: Create a PATCH request to "/kms/rotation" using the patchBody
+	patchReq := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(patchBody))
+	// TODO Task B: Set the "Content-Type" header to "application/json"
+	patchReq.Header.Set("Content-Type", "application/json")
+	// TODO Task C: Execute the request using app.Test
+	resp, err := app.Test(patchReq, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. ASSERT
+	// TODO Task D: Assert resp.StatusCode is exactly 200
+	if resp.StatusCode != 200 {
+		t.Errorf("Expected status 200, got %d. Response body: %s", resp.StatusCode, string(respBody))
+	}
+
+	// TODO Task E: Fetch the config from the database to ensure it updated
+	savedConfig, err := storage.GetKeyRotation(store.KeyValue())
+	if err != nil {
+		t.Fatal(err)
+	}
+	
+	// TODO Task F: Assert that savedConfig.Enabled is now true
+	if !savedConfig.Enabled {
+		t.Errorf("Expected savedConfig.Enabled to be true, got false")
+	}
+}
