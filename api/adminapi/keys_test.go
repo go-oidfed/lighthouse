@@ -66,12 +66,18 @@ func newTestStorage(t *testing.T) *storage.Storage {
 		DataDir: tempDir,
 	})
 	if err != nil {
-		os.RemoveAll(tempDir)
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			t.Fatalf("Failed to create storage: %v (also failed to remove temp dir %q: %v)", err, tempDir, removeErr)
+		}
 		t.Fatalf("Failed to create storage: %v", err)
 	}
 	// TODO: Storage doesn't expose a Close() method; ideally the DB connection
 	// should be closed before removing the temp dir to avoid file locks on Windows.
-	t.Cleanup(func() { os.RemoveAll(tempDir) })
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("Failed to remove temp dir %q: %v", tempDir, err)
+		}
+	})
 	return store
 }
 
@@ -364,8 +370,8 @@ func TestUpdatePublicKeyExp(t *testing.T) {
 		if updatedKey.ExpiresAt == nil {
 			t.Fatal("Expected ExpiresAt to be set, but it was nil")
 		}
-		if updatedKey.ExpiresAt.Time.Unix() != 2000000000 {
-			t.Errorf("Expected ExpiresAt 2000000000, got %d", updatedKey.ExpiresAt.Time.Unix())
+		if updatedKey.ExpiresAt.Unix() != 2000000000 {
+			t.Errorf("Expected ExpiresAt 2000000000, got %d", updatedKey.ExpiresAt.Unix())
 		}
 	})
 
@@ -518,8 +524,8 @@ func TestRotatePublicKey(t *testing.T) {
 		if oldKey == nil || oldKey.ExpiresAt == nil {
 			t.Fatal("Old key should have ExpiresAt set")
 		}
-		if oldKey.ExpiresAt.Time.Unix() != 1900000000 {
-			t.Errorf("Old key ExpiresAt: expected 1900000000, got %d", oldKey.ExpiresAt.Time.Unix())
+		if oldKey.ExpiresAt.Unix() != 1900000000 {
+			t.Errorf("Old key ExpiresAt: expected 1900000000, got %d", oldKey.ExpiresAt.Unix())
 		}
 	})
 }
