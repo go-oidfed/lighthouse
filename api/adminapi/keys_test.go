@@ -1,6 +1,7 @@
 package adminapi
 
 import (
+	"io"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -191,5 +192,73 @@ func TestUpdateKMSRotation(t *testing.T) {
     }
 	if savedConfig.Overlap.Duration().Seconds() != 600 {
 		t.Errorf("Expected overlap 600s, got %f", savedConfig.Overlap.Duration().Seconds())
+	}
+}
+
+func TestPostPublicKey(t *testing.T) {
+	// 1. ARRANGE
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-post-keys-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	store, err := storage.NewStorage(storage.Config{
+		Driver:  storage.DriverSQLite,
+		DataDir: tempDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up APIManagedPKs using the real database!
+	km := KeyManagement{
+		APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
+	}
+
+	if err := km.APIManagedPKs.Load(); err != nil {
+		t.Fatalf("Failed to create public key table: %v", err)
+	}
+
+	app := fiber.New()
+	registerKeys(app, km, store.KeyValue())
+
+	// 2. ACT
+	// We send a JSON body containing a standard RSA Public Key in JWK format
+	body := `{
+		"key": {
+			"kty": "RSA",
+			"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+			"e": "AQAB",
+			"kid": "my-test-key-1"
+		}
+	}`
+	req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. ASSERT
+	
+	if resp.StatusCode != 201 {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Errorf("Expected status 201, got %d. Response body: %s", resp.StatusCode, string(respBody))
+	}
+
+	// Using the storage method `Get`, we ask the database for "my-test-key-1"
+	savedKey, err := km.APIManagedPKs.Get("my-test-key-1")
+	if err != nil {
+		t.Fatalf("Failed to fetch key from database: %v", err)
+	}
+	
+	if savedKey == nil {
+		t.Fatal("Expected to find saved key in database, got nil")
+	}
+	
+	if savedKey.KID != "my-test-key-1" {
+		t.Errorf("Expected KID 'my-test-key-1', got '%s'", savedKey.KID)
 	}
 }
