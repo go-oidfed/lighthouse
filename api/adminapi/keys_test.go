@@ -35,13 +35,13 @@ type mockFullKMS struct {
 	kms.KeyManagementSystem
 }
 
-func (m *mockFullKMS) ChangeKeyRotationConfig(cfg kms.KeyRotationConfig) error { return nil }
-func (m *mockFullKMS) ChangeRSAKeyLength(length int) error                     { return nil }
-func (m *mockFullKMS) RotateAllKeys(revoke bool, reason string) error          { return nil }
-func (m *mockFullKMS) ChangeAlgsAt(algs []jwa.SignatureAlgorithm, effectiveAt unixtime.Unixtime, overlap time.Duration) error {
+func (m *mockFullKMS) ChangeKeyRotationConfig(_ kms.KeyRotationConfig) error { return nil }
+func (m *mockFullKMS) ChangeRSAKeyLength(_ int) error                        { return nil }
+func (m *mockFullKMS) RotateAllKeys(_ bool, _ string) error                  { return nil }
+func (m *mockFullKMS) ChangeAlgsAt(_ []jwa.SignatureAlgorithm, _ unixtime.Unixtime, _ time.Duration) error {
 	return nil
 }
-func (m *mockFullKMS) ChangeDefaultAlgorithmAt(alg jwa.SignatureAlgorithm, effectiveAt unixtime.Unixtime) error {
+func (m *mockFullKMS) ChangeDefaultAlgorithmAt(_ jwa.SignatureAlgorithm, _ unixtime.Unixtime) error {
 	return nil
 }
 func (m *mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
