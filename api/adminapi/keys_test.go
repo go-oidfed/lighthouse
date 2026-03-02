@@ -61,15 +61,17 @@ func newTestStorage(t *testing.T) *storage.Storage {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(tempDir) })
-
 	store, err := storage.NewStorage(storage.Config{
 		Driver:  storage.DriverSQLite,
 		DataDir: tempDir,
 	})
 	if err != nil {
+		os.RemoveAll(tempDir)
 		t.Fatalf("Failed to create storage: %v", err)
 	}
+	// TODO: Storage doesn't expose a Close() method; ideally the DB connection
+	// should be closed before removing the temp dir to avoid file locks on Windows.
+	t.Cleanup(func() { os.RemoveAll(tempDir) })
 	return store
 }
 
@@ -531,8 +533,12 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
 			KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"),
 		}
-		_ = km.APIManagedPKs.Load()
-		_ = km.KMSManagedPKs.Load()
+		if err := km.APIManagedPKs.Load(); err != nil {
+			t.Fatalf("Failed to load API-managed PKs: %v", err)
+		}
+		if err := km.KMSManagedPKs.Load(); err != nil {
+			t.Fatalf("Failed to load KMS-managed PKs: %v", err)
+		}
 
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
@@ -565,8 +571,12 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
 			KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"),
 		}
-		_ = km.APIManagedPKs.Load()
-		_ = km.KMSManagedPKs.Load()
+		if err := km.APIManagedPKs.Load(); err != nil {
+			t.Fatalf("Failed to load API-managed PKs: %v", err)
+		}
+		if err := km.KMSManagedPKs.Load(); err != nil {
+			t.Fatalf("Failed to load KMS-managed PKs: %v", err)
+		}
 
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
@@ -595,8 +605,12 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
 			KMSManagedPKs: store.DBPublicKeyStorage("kms-managed"),
 		}
-		_ = km.APIManagedPKs.Load()
-		_ = km.KMSManagedPKs.Load()
+		if err := km.APIManagedPKs.Load(); err != nil {
+			t.Fatalf("Failed to load API-managed PKs: %v", err)
+		}
+		if err := km.KMSManagedPKs.Load(); err != nil {
+			t.Fatalf("Failed to load KMS-managed PKs: %v", err)
+		}
 
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
@@ -880,7 +894,9 @@ func TestGetKMSRotation(t *testing.T) {
 		registerKeys(app, km, store.KeyValue())
 
 		initialConfig := kms.KeyRotationConfig{Enabled: true}
-		_ = storage.SetKeyRotation(store.KeyValue(), initialConfig)
+		if err := storage.SetKeyRotation(store.KeyValue(), initialConfig); err != nil {
+			t.Fatalf("Failed to set initial rotation config: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/kms/rotation", nil)
 		resp, respBody := doRequest(t, app, req)
@@ -999,7 +1015,9 @@ func TestPatchKMSRotation(t *testing.T) {
 		registerKeys(app, km, store.KeyValue())
 
 		// Set initial config
-		_ = storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: false})
+		if err := storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: false}); err != nil {
+			t.Fatalf("Failed to set initial rotation config: %v", err)
+		}
 
 		// PATCH only the 'enabled' field
 		req := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(`{"enabled": true}`))
@@ -1028,7 +1046,9 @@ func TestPatchKMSRotation(t *testing.T) {
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
 
-		_ = storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: true})
+		if err := storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: true}); err != nil {
+			t.Fatalf("Failed to set initial rotation config: %v", err)
+		}
 
 		// PATCH only the interval
 		req := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(`{"interval": 7200}`))
