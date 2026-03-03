@@ -4536,6 +4536,15 @@ components:
         entity_id:
           $ref: '#/components/schemas/EntityID'
           description: The Entity ID (identifier) of the subordinate.
+        status:
+          description: Initial status of the subordinate. Defaults to "active" if not provided.
+          type: string
+          enum:
+            - active
+            - blocked
+            - pending
+            - inactive
+          default: active
         description:
           type: string
           description: Optional human-readable description for this Subordinate.
@@ -4549,6 +4558,7 @@ components:
           description: Optional JWKS for the subordinate.
       example:
         entity_id: https://subordinate.example.com
+        status: active
         description: My subordinate entity
         registered_entity_types:
           - openid_provider

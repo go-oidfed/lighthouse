@@ -91,6 +91,9 @@ func handleCreateSubordinate(subordinates model.SubordinateStorageBackend) fiber
 		if req.EntityID == "" {
 			return writeBadRequest(c, "missing entity_id")
 		}
+		if !req.Status.Valid() {
+			return writeBadRequest(c, "invalid status")
+		}
 		if err := subordinates.Add(req); err != nil {
 			return writeServerError(c, err)
 		}
