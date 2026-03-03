@@ -70,7 +70,7 @@ func (s *SubordinateStorage) Get(entityID string) (*model.ExtendedSubordinateInf
 	var dbInfo model.ExtendedSubordinateInfo
 	result := s.db.Where(
 		"entity_id = ?", entityID,
-	).Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").First(&dbInfo)
+	).Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").First(&dbInfo)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -95,7 +95,7 @@ func (s *SubordinateStorage) Get(entityID string) (*model.ExtendedSubordinateInf
 // GetByDBID retrieves a subordinate by DB primary key
 func (s *SubordinateStorage) GetByDBID(id string) (*model.ExtendedSubordinateInfo, error) {
 	var dbInfo model.ExtendedSubordinateInfo
-	result := s.db.Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").First(&dbInfo, id)
+	result := s.db.Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").First(&dbInfo, id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -144,6 +144,45 @@ func (s *SubordinateStorage) UpdateStatusByDBID(id string, status model.Status) 
 			return tx.Save(&info).Error
 		},
 	)
+}
+
+// UpdateJWKSByDBID updates the JWKS for a subordinate by DB primary key.
+// If the subordinate has no JWKS yet, one is created and linked.
+// Returns the updated JWKS with correct ID.
+func (s *SubordinateStorage) UpdateJWKSByDBID(id string, jwks model.JWKS) (*model.JWKS, error) {
+	var resultJWKS *model.JWKS
+	err := s.db.Transaction(
+		func(tx *gorm.DB) error {
+			var info model.ExtendedSubordinateInfo
+			if err := tx.Preload("JWKS").First(&info, id).Error; err != nil {
+				return errors.Wrap(err, "failed to find subordinate by id")
+			}
+
+			if info.JWKSID == 0 {
+				// No JWKS exists yet, create a new one
+				if err := tx.Create(&jwks).Error; err != nil {
+					return errors.Wrap(err, "failed to create JWKS")
+				}
+				info.JWKSID = jwks.ID
+				info.JWKS = jwks
+				if err := tx.Save(&info).Error; err != nil {
+					return errors.Wrap(err, "failed to link JWKS to subordinate")
+				}
+			} else {
+				// JWKS exists, update its keys
+				info.JWKS.Keys = jwks.Keys
+				if err := tx.Save(&info.JWKS).Error; err != nil {
+					return errors.Wrap(err, "failed to update JWKS")
+				}
+			}
+			resultJWKS = &info.JWKS
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return resultJWKS, nil
 }
 
 // GetAll returns all subordinates

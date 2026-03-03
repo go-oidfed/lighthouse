@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	oidfed "github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/jwx"
 	"github.com/gofiber/fiber/v2"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -677,231 +679,249 @@ func registerSubordinateMetadata(r fiber.Router, subordinates model.SubordinateS
 	}
 
 	// GET full subordinate-specific metadata
-	g.Get("/", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		if info.Metadata == nil {
-			return writeNotFound(c, "metadata not found")
-		}
-		return c.JSON(info.Metadata)
-	})
+			if info.Metadata == nil {
+				return writeNotFound(c, "metadata not found")
+			}
+			return c.JSON(info.Metadata)
+		},
+	)
 
 	// PUT replace full subordinate-specific metadata
-	withCacheWipe.Put("/", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	withCacheWipe.Put(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		var body oidfed.Metadata
-		if err := c.BodyParser(&body); err != nil {
-			return writeBadBody(c)
-		}
-		info.Metadata = &body
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		return c.JSON(body)
-	})
+			var body oidfed.Metadata
+			if err := c.BodyParser(&body); err != nil {
+				return writeBadBody(c)
+			}
+			info.Metadata = &body
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(body)
+		},
+	)
 
 	// Entity type
-	g.Get("/:entityType", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		et := c.Params("entityType")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	g.Get(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		m := getEntityMetadata(info.Metadata, et)
-		if m == nil {
-			return writeNotFound(c, "metadata not found")
-		}
-		return c.JSON(m)
-	})
-	withCacheWipe.Put("/:entityType", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		et := c.Params("entityType")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+			m := getEntityMetadata(info.Metadata, et)
+			if m == nil {
+				return writeNotFound(c, "metadata not found")
 			}
-			return writeServerError(c, err)
-		}
-		var body map[string]any
-		if err := json.Unmarshal(c.Body(), &body); err != nil {
-			return writeBadBody(c)
-		}
-		if info.Metadata == nil {
-			info.Metadata = &oidfed.Metadata{}
-		}
-		setEntityMetadata(info.Metadata, et, body)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		return c.JSON(body)
-	})
-	withCacheWipe.Post("/:entityType", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		et := c.Params("entityType")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+			return c.JSON(m)
+		},
+	)
+	withCacheWipe.Put(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		var body map[string]any
-		if err := json.Unmarshal(c.Body(), &body); err != nil {
-			return writeBadBody(c)
-		}
-		if info.Metadata == nil {
-			info.Metadata = &oidfed.Metadata{}
-		}
-		existing := getEntityMetadata(info.Metadata, et)
-		if existing == nil {
-			existing = map[string]any{}
-		}
-		for k, v := range body {
-			existing[k] = v
-		}
-		setEntityMetadata(info.Metadata, et, existing)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		return c.JSON(existing)
-	})
-	withCacheWipe.Delete("/:entityType", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		et := c.Params("entityType")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+			var body map[string]any
+			if err := json.Unmarshal(c.Body(), &body); err != nil {
+				return writeBadBody(c)
 			}
-			return writeServerError(c, err)
-		}
-		if getEntityMetadata(info.Metadata, et) == nil {
-			return writeNotFound(c, "metadata not found")
-		}
-		if info.Metadata == nil {
-			info.Metadata = &oidfed.Metadata{}
-		}
-		deleteEntityMetadata(info.Metadata, et)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		return c.SendStatus(fiber.StatusNoContent)
-	})
+			if info.Metadata == nil {
+				info.Metadata = &oidfed.Metadata{}
+			}
+			setEntityMetadata(info.Metadata, et, body)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(body)
+		},
+	)
+	withCacheWipe.Post(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body map[string]any
+			if err := json.Unmarshal(c.Body(), &body); err != nil {
+				return writeBadBody(c)
+			}
+			if info.Metadata == nil {
+				info.Metadata = &oidfed.Metadata{}
+			}
+			existing := getEntityMetadata(info.Metadata, et)
+			if existing == nil {
+				existing = map[string]any{}
+			}
+			for k, v := range body {
+				existing[k] = v
+			}
+			setEntityMetadata(info.Metadata, et, existing)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(existing)
+		},
+	)
+	withCacheWipe.Delete(
+		"/:entityType", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			if getEntityMetadata(info.Metadata, et) == nil {
+				return writeNotFound(c, "metadata not found")
+			}
+			if info.Metadata == nil {
+				info.Metadata = &oidfed.Metadata{}
+			}
+			deleteEntityMetadata(info.Metadata, et)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
 
 	// Claim
-	g.Get("/:entityType/:claim", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		et := c.Params("entityType")
-		claim := c.Params("claim")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	g.Get(
+		"/:entityType/:claim", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		m := getEntityMetadata(info.Metadata, et)
-		if m == nil {
-			return writeNotFound(c, "metadata not found")
-		}
-		v, ok := m[claim]
-		if !ok {
-			return writeNotFound(c, "metadata not found")
-		}
-		return c.JSON(v)
-	})
-	withCacheWipe.Put("/:entityType/:claim", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		et := c.Params("entityType")
-		claim := c.Params("claim")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+			m := getEntityMetadata(info.Metadata, et)
+			if m == nil {
+				return writeNotFound(c, "metadata not found")
 			}
-			return writeServerError(c, err)
-		}
-		var body any
-		if err := json.Unmarshal(c.Body(), &body); err != nil {
-			return writeBadBody(c)
-		}
-		created := false
-		if info.Metadata == nil {
-			info.Metadata = &oidfed.Metadata{}
-		}
-		m := getEntityMetadata(info.Metadata, et)
-		if m == nil {
-			m = map[string]any{}
-			created = true
-		}
-		if _, ok := m[claim]; !ok {
-			created = true
-		}
-		m[claim] = body
-		setEntityMetadata(info.Metadata, et, m)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		if created {
-			return c.Status(fiber.StatusCreated).JSON(body)
-		}
-		return c.JSON(body)
-	})
-	withCacheWipe.Delete("/:entityType/:claim", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		et := c.Params("entityType")
-		claim := c.Params("claim")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+			v, ok := m[claim]
+			if !ok {
+				return writeNotFound(c, "metadata not found")
 			}
-			return writeServerError(c, err)
-		}
-		m := getEntityMetadata(info.Metadata, et)
-		if m == nil {
-			return writeNotFound(c, "metadata not found")
-		}
-		if _, ok := m[claim]; !ok {
-			return writeNotFound(c, "metadata not found")
-		}
-		delete(m, claim)
-		if info.Metadata == nil {
-			info.Metadata = &oidfed.Metadata{}
-		}
-		setEntityMetadata(info.Metadata, et, m)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		return c.SendStatus(fiber.StatusNoContent)
-	})
+			return c.JSON(v)
+		},
+	)
+	withCacheWipe.Put(
+		"/:entityType/:claim", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			var body any
+			if err := json.Unmarshal(c.Body(), &body); err != nil {
+				return writeBadBody(c)
+			}
+			created := false
+			if info.Metadata == nil {
+				info.Metadata = &oidfed.Metadata{}
+			}
+			m := getEntityMetadata(info.Metadata, et)
+			if m == nil {
+				m = map[string]any{}
+				created = true
+			}
+			if _, ok := m[claim]; !ok {
+				created = true
+			}
+			m[claim] = body
+			setEntityMetadata(info.Metadata, et, m)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			if created {
+				return c.Status(fiber.StatusCreated).JSON(body)
+			}
+			return c.JSON(body)
+		},
+	)
+	withCacheWipe.Delete(
+		"/:entityType/:claim", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			et := c.Params("entityType")
+			claim := c.Params("claim")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
+			}
+			m := getEntityMetadata(info.Metadata, et)
+			if m == nil {
+				return writeNotFound(c, "metadata not found")
+			}
+			if _, ok := m[claim]; !ok {
+				return writeNotFound(c, "metadata not found")
+			}
+			delete(m, claim)
+			if info.Metadata == nil {
+				info.Metadata = &oidfed.Metadata{}
+			}
+			setEntityMetadata(info.Metadata, et, m)
+			if err := subordinates.Update(info.EntityID, *info); err != nil {
+				return writeServerError(c, err)
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
 }
 
 func registerSubordinateMetadataPolicies(
@@ -2055,15 +2075,149 @@ func registerGeneralConstraints(
 
 }
 
-func registerSubordinateKeys(r fiber.Router) {
+func registerSubordinateKeys(r fiber.Router, subordinates model.SubordinateStorageBackend) {
 	g := r.Group("/subordinates/:subordinateID/jwks")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
-	g.Get("/", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"jwks": []fiber.Map{}}) })
-	withCacheWipe.Put("/", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"jwks": []fiber.Map{}}) })
-	withCacheWipe.Post(
-		"/", func(c *fiber.Ctx) error { return c.Status(fiber.StatusCreated).JSON(fiber.Map{"jwks": []fiber.Map{}}) },
-	)
-	withCacheWipe.Delete("/:kid", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+
+	getSub := func(dbID string) (*model.ExtendedSubordinateInfo, error) {
+		info, err := subordinates.GetByDBID(dbID)
+		if err != nil {
+			return nil, err
+		}
+		if info == nil {
+			return nil, model.NotFoundError("subordinate not found")
+		}
+		return info, nil
+	}
+	writeNotFound := func(c *fiber.Ctx, msg string) error {
+		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(msg))
+	}
+	writeServerError := func(c *fiber.Ctx, err error) error {
+		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+	}
+	writeBadBody := func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+	}
+
+	// GET subordinate JWKS
+	g.Get("/", func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
+		info, err := getSub(id)
+		if err != nil {
+			var nf model.NotFoundError
+			if errors.As(err, &nf) {
+				return writeNotFound(c, err.Error())
+			}
+			return writeServerError(c, err)
+		}
+		// Return empty JWKS if none exists
+		if info.JWKS.Keys.Set == nil {
+			return c.JSON(fiber.Map{"keys": []any{}})
+		}
+		return c.JSON(info.JWKS)
+	})
+
+	// PUT replace subordinate JWKS
+	withCacheWipe.Put("/", func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
+		// Verify subordinate exists
+		if _, err := getSub(id); err != nil {
+			var nf model.NotFoundError
+			if errors.As(err, &nf) {
+				return writeNotFound(c, err.Error())
+			}
+			return writeServerError(c, err)
+		}
+		var body model.JWKS
+		if err := c.BodyParser(&body); err != nil {
+			return writeBadBody(c)
+		}
+		updatedJWKS, err := subordinates.UpdateJWKSByDBID(id, body)
+		if err != nil {
+			return writeServerError(c, err)
+		}
+		return c.JSON(updatedJWKS)
+	})
+
+	// POST add JWK to subordinate JWKS
+	withCacheWipe.Post("/", func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
+		info, err := getSub(id)
+		if err != nil {
+			var nf model.NotFoundError
+			if errors.As(err, &nf) {
+				return writeNotFound(c, err.Error())
+			}
+			return writeServerError(c, err)
+		}
+		// Parse single JWK from body
+		var jwkMap map[string]any
+		if err := json.Unmarshal(c.Body(), &jwkMap); err != nil {
+			return writeBadBody(c)
+		}
+		// Convert to jwk.Key
+		keyData, err := json.Marshal(jwkMap)
+		if err != nil {
+			return writeBadBody(c)
+		}
+		key, err := jwk.ParseKey(keyData)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid JWK: " + err.Error()))
+		}
+		// Initialize JWKS if nil
+		if info.JWKS.Keys.Set == nil {
+			info.JWKS.Keys = jwx.NewJWKS()
+		}
+		// Add key to set
+		if err := info.JWKS.Keys.AddKey(key); err != nil {
+			return writeServerError(c, err)
+		}
+		// Use UpdateJWKSByDBID to properly persist and get correct ID
+		updatedJWKS, err := subordinates.UpdateJWKSByDBID(id, info.JWKS)
+		if err != nil {
+			return writeServerError(c, err)
+		}
+		return c.Status(fiber.StatusCreated).JSON(updatedJWKS)
+	})
+
+	// DELETE remove JWK by kid from subordinate JWKS
+	withCacheWipe.Delete("/:kid", func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
+		kid := c.Params("kid")
+		info, err := getSub(id)
+		if err != nil {
+			var nf model.NotFoundError
+			if errors.As(err, &nf) {
+				return writeNotFound(c, err.Error())
+			}
+			return writeServerError(c, err)
+		}
+		if info.JWKS.Keys.Set == nil {
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+		// Find and remove the key with matching kid
+		found := false
+		for i := 0; i < info.JWKS.Keys.Len(); i++ {
+			key, ok := info.JWKS.Keys.Key(i)
+			if !ok {
+				continue
+			}
+			keyID, _ := key.KeyID()
+			if keyID == kid {
+				_ = info.JWKS.Keys.RemoveKey(key)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+		// Persist the updated JWKS
+		if _, err = subordinates.UpdateJWKSByDBID(id, info.JWKS); err != nil {
+			return writeServerError(c, err)
+		}
+		return c.SendStatus(fiber.StatusNoContent)
+	})
 }
 
 // Subordinate crit is managed via the additional-claims endpoints; no separate crit endpoints

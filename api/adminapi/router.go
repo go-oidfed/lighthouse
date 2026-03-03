@@ -105,7 +105,7 @@ func Register(
 	registerSubordinateMetadata(r, storages.Subordinates)
 	registerSubordinateMetadataPolicies(r, storages.Subordinates, storages.KV)
 	registerSubordinateConstraints(r, storages.Subordinates, storages.KV)
-	registerSubordinateKeys(r)
+	registerSubordinateKeys(r, storages.Subordinates)
 	registerSubordinateMetadataPolicyCrit(r)
 	// Trust Mark Types and Issuance
 	registerTrustMarkTypes(r, storages.TrustMarkTypes)

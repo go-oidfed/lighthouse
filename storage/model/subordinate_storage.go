@@ -31,6 +31,7 @@ type SubordinateStorageBackend interface {
 	DeleteByDBID(id string) error
 	UpdateStatus(entityID string, status Status) error
 	UpdateStatusByDBID(id string, status Status) error
+	UpdateJWKSByDBID(id string, jwks JWKS) (*JWKS, error)
 	Get(entityID string) (*ExtendedSubordinateInfo, error)
 	GetByDBID(id string) (*ExtendedSubordinateInfo, error)
 	GetAll() ([]BasicSubordinateInfo, error)
