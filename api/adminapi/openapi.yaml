@@ -2632,6 +2632,30 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: getSubordinateDetails
       summary: Get subordinate details
+    put:
+      tags:
+        - Subordinates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubordinate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateDetails'
+          description: Successfully updated subordinate details.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: updateSubordinateDetails
+      summary: Update subordinate details
     delete:
       tags:
         - Subordinates
@@ -4498,18 +4522,13 @@ components:
           type: array
           items:
             type: string
-          example:
-            - openid_provider
-            - openid_relying_party
       example:
-        id: id
         entity_id: https://subordinate.example.com
-        status: active
         registered_entity_types:
           - openid_provider
           - openid_relying_party
     AddSubordinate:
-      description: Data to add/register a subordinate entity.
+      description: Data to create a new subordinate entity.
       required:
         - entity_id
       type: object
@@ -4517,6 +4536,9 @@ components:
         entity_id:
           $ref: '#/components/schemas/EntityID'
           description: The Entity ID (identifier) of the subordinate.
+        description:
+          type: string
+          description: Optional human-readable description for this Subordinate.
         registered_entity_types:
           description: Entity types the subordinate is registered for.
           type: array
@@ -4524,9 +4546,26 @@ components:
             type: string
         jwks:
           $ref: '#/components/schemas/Jwks'
-          description: The subordinate's JWKS.
+          description: Optional JWKS for the subordinate.
       example:
         entity_id: https://subordinate.example.com
+        description: My subordinate entity
+        registered_entity_types:
+          - openid_provider
+    UpdateSubordinate:
+      description: Data to update a subordinate entity.
+      type: object
+      properties:
+        description:
+          type: string
+          description: Optional human-readable description for this Subordinate.
+        registered_entity_types:
+          description: Entity types the subordinate is registered for.
+          type: array
+          items:
+            type: string
+      example:
+        description: Updated description
         registered_entity_types:
           - openid_provider
           - openid_relying_party
@@ -4554,13 +4593,16 @@ components:
           type: array
           items:
             type: string
+        description:
+          description: Optional human-readable description of the subordinate.
+          type: string
         jwks:
           $ref: '#/components/schemas/Jwks'
           description: The subordinate's JWKS.
         metadata:
           $ref: '#/components/schemas/Metadata'
           description: Subordinate-specific metadata.
-        metadata_policies:
+        metadata_policy:
           $ref: '#/components/schemas/MetadataPolicy'
           description: Subordinate-specific metadata policies.
         constraints:

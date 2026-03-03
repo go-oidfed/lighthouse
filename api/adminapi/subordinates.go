@@ -120,8 +120,8 @@ func registerSubordinates(r fiber.Router, subordinates model.SubordinateStorageB
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
 			}
 			var body struct {
-				Description *string  `json:"description"`
-				EntityTypes []string `json:"entity_types"`
+				Description           *string  `json:"description"`
+				RegisteredEntityTypes []string `json:"registered_entity_types"`
 			}
 			if err = c.BodyParser(&body); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -129,9 +129,9 @@ func registerSubordinates(r fiber.Router, subordinates model.SubordinateStorageB
 			if body.Description != nil {
 				existing.Description = *body.Description
 			}
-			if body.EntityTypes != nil {
-				subordinateEntityTypes := make([]model.SubordinateEntityType, len(body.EntityTypes))
-				for i, et := range body.EntityTypes {
+			if body.RegisteredEntityTypes != nil {
+				subordinateEntityTypes := make([]model.SubordinateEntityType, len(body.RegisteredEntityTypes))
+				for i, et := range body.RegisteredEntityTypes {
 					subordinateEntityTypes[i] = model.SubordinateEntityType{EntityType: et}
 				}
 				existing.SubordinateEntityTypes = subordinateEntityTypes

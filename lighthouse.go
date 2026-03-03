@@ -361,19 +361,31 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSubo
 		log.WithError(err).Warn("failed to get subordinate statement lifetime, using default")
 		lifetime = storage.DefaultSubordinateStatementLifetime
 	}
+
+	// Build extra claims and critical extensions from subordinate additional claims
+	// (includes fallback from general claims applied in storage layer)
+	extra := make(map[string]any)
+	var criticalExtensions []string
+	for _, claim := range subordinate.SubordinateAdditionalClaims {
+		extra[claim.Claim] = claim.Value
+		if claim.Crit {
+			criticalExtensions = append(criticalExtensions, claim.Claim)
+		}
+	}
+
 	return oidfed.EntityStatementPayload{
-		Issuer:         fed.FederationEntity.EntityID(),
-		Subject:        subordinate.EntityID,
-		IssuedAt:       unixtime.Unixtime{Time: now},
-		ExpiresAt:      unixtime.Unixtime{Time: now.Add(lifetime)},
-		SourceEndpoint: fed.fedMetadata.FederationFetchEndpoint,
-		JWKS:           subordinate.JWKS.Keys,
-		Metadata:       subordinate.Metadata,
-		MetadataPolicy: subordinate.MetadataPolicy,
-		Constraints:    subordinate.Constraints,
-		// CriticalExtensions: subordinate.Crit, //TODO
+		Issuer:             fed.FederationEntity.EntityID(),
+		Subject:            subordinate.EntityID,
+		IssuedAt:           unixtime.Unixtime{Time: now},
+		ExpiresAt:          unixtime.Unixtime{Time: now.Add(lifetime)},
+		SourceEndpoint:     fed.fedMetadata.FederationFetchEndpoint,
+		JWKS:               subordinate.JWKS.Keys,
+		Metadata:           subordinate.Metadata,
+		MetadataPolicy:     subordinate.MetadataPolicy,
+		Constraints:        subordinate.Constraints,
+		CriticalExtensions: criticalExtensions,
 		MetadataPolicyCrit: subordinate.MetadataPolicyCrit.ToPolicyOperatorNames(),
-		Extra:              utils.MergeMaps(true, fed.SubordinateStatementsConfig.Extra, map[string]any{}),
+		Extra:              extra,
 	}
 }
 

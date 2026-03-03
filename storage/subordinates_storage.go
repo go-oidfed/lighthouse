@@ -70,51 +70,83 @@ func (s *SubordinateStorage) Get(entityID string) (*model.ExtendedSubordinateInf
 	var dbInfo model.ExtendedSubordinateInfo
 	result := s.db.Where(
 		"entity_id = ?", entityID,
-	).Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").First(&dbInfo)
+	).Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").Preload("MetadataPolicyCrit").First(&dbInfo)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to find entity: %w", result.Error)
 	}
-	if dbInfo.MetadataPolicy == nil {
-		kvStorage := KeyValueStorage{db: s.db}
-		if _, err := kvStorage.GetAs(
-			model.KeyValueScopeSubordinateStatement,
-			model.KeyValueKeyMetadataPolicy, &dbInfo.MetadataPolicy,
-		); err != nil {
-			return nil, errors.Wrap(
-				err, "failed to get general metadata policy",
-			)
-		}
+	if err := s.applyGeneralFallbacks(&dbInfo); err != nil {
+		return nil, err
 	}
-
 	return &dbInfo, nil
 }
 
 // GetByDBID retrieves a subordinate by DB primary key
 func (s *SubordinateStorage) GetByDBID(id string) (*model.ExtendedSubordinateInfo, error) {
 	var dbInfo model.ExtendedSubordinateInfo
-	result := s.db.Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").First(&dbInfo, id)
+	result := s.db.Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").Preload("MetadataPolicyCrit").First(&dbInfo, id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to find entity: %w", result.Error)
 	}
-	if dbInfo.MetadataPolicy == nil {
-		kvStorage := KeyValueStorage{db: s.db}
+	if err := s.applyGeneralFallbacks(&dbInfo); err != nil {
+		return nil, err
+	}
+	return &dbInfo, nil
+}
+
+// applyGeneralFallbacks fills in subordinate fields with general defaults from KV store
+// when the subordinate-specific values are not set.
+func (s *SubordinateStorage) applyGeneralFallbacks(info *model.ExtendedSubordinateInfo) error {
+	kvStorage := KeyValueStorage{db: s.db}
+
+	// Fallback for MetadataPolicy
+	if info.MetadataPolicy == nil {
 		if _, err := kvStorage.GetAs(
 			model.KeyValueScopeSubordinateStatement,
-			model.KeyValueKeyMetadataPolicy, &dbInfo.MetadataPolicy,
+			model.KeyValueKeyMetadataPolicy, &info.MetadataPolicy,
 		); err != nil {
-			return nil, errors.Wrap(
-				err, "failed to get general metadata policy",
-			)
+			return errors.Wrap(err, "failed to get general metadata policy")
 		}
 	}
 
-	return &dbInfo, nil
+	// Fallback for Metadata
+	if info.Metadata == nil {
+		if _, err := kvStorage.GetAs(
+			model.KeyValueScopeSubordinateStatement,
+			model.KeyValueKeyMetadata, &info.Metadata,
+		); err != nil {
+			return errors.Wrap(err, "failed to get general metadata")
+		}
+	}
+
+	// Fallback for Constraints
+	if info.Constraints == nil {
+		if _, err := kvStorage.GetAs(
+			model.KeyValueScopeSubordinateStatement,
+			model.KeyValueKeyConstraints, &info.Constraints,
+		); err != nil {
+			return errors.Wrap(err, "failed to get general constraints")
+		}
+	}
+
+	// Fallback for AdditionalClaims
+	if len(info.SubordinateAdditionalClaims) == 0 {
+		var generalClaims []model.SubordinateAdditionalClaim
+		if _, err := kvStorage.GetAs(
+			model.KeyValueScopeSubordinateStatement,
+			model.KeyValueKeyAdditionalClaims, &generalClaims,
+		); err != nil {
+			return errors.Wrap(err, "failed to get general additional claims")
+		}
+		info.SubordinateAdditionalClaims = generalClaims
+	}
+
+	return nil
 }
 
 // Update updates the subordinate info by entityID

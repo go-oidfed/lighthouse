@@ -17,7 +17,7 @@ type ExtendedSubordinateInfo struct {
 	MetadataPolicy              *oidfed.MetadataPolicies        `gorm:"serializer:json" json:"metadata_policy,omitempty"`
 	Constraints                 *oidfed.ConstraintSpecification `gorm:"serializer:json" json:"constraints,omitempty"`
 	MetadataPolicyCrit          PolicyOperators                 `gorm:"many2many:subordinates_policy_operators" json:"metadata_policy_crit,omitempty"`
-	SubordinateAdditionalClaims []SubordinateAdditionalClaim    `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"subordinate_additional_claims,omitempty"`
+	SubordinateAdditionalClaims []SubordinateAdditionalClaim    `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"additional_claims,omitempty"`
 }
 
 type BasicSubordinateInfo struct {
@@ -27,7 +27,7 @@ type BasicSubordinateInfo struct {
 	DeletedAt              gorm.DeletedAt          `gorm:"index" json:"-"`
 	EntityID               string                  `gorm:"uniqueIndex" json:"entity_id"`
 	Description            string                  `gorm:"type:text" json:"description,omitempty"`
-	SubordinateEntityTypes []SubordinateEntityType `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"-"`
+	SubordinateEntityTypes []SubordinateEntityType `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"registered_entity_types,omitempty"`
 	Status                 Status                  `gorm:"index" json:"status"`
 }
 
