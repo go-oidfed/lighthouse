@@ -36,6 +36,16 @@ func writeConflict(c *fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(msg))
 }
 
+// handleTxError handles errors from transactional operations.
+// It maps NotFoundError to 404 responses and other errors to 500 responses.
+func handleTxError(c *fiber.Ctx, err error) error {
+	var nf model.NotFoundError
+	if errors.As(err, &nf) {
+		return writeNotFound(c, err.Error())
+	}
+	return writeServerError(c, err)
+}
+
 // Subordinate lookup helpers
 
 // getSubordinateByDBID retrieves a subordinate by database ID, returning an error if not found.

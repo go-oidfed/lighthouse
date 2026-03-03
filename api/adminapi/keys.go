@@ -48,7 +48,7 @@ func addKeysToSet(set jwx.JWKS, keys public.PublicKeyEntryList) error {
 }
 
 // registerKeys wires routes for managing public keys and KMS-related endpoints.
-func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.KeyValueStore) {
+func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.KeyValueStore, storages smodel.Backends) {
 	// Published JWKS (as seen in entity configuration)
 	r.Get(
 		"/entity-configuration/jwks", func(c *fiber.Ctx) error {
@@ -161,7 +161,7 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 		},
 	)
 
-	// POST kid: rotate a public key
+	// POST kid: rotate a public key (transactional - updates old key expiration and adds new key atomically)
 	type rotateReq struct {
 		Key       public.JWKKey      `json:"key"`
 		Iat       *unixtime.Unixtime `json:"iat"`
@@ -172,7 +172,6 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 	withCacheWipe.Post(
 		"/:kid", func(c *fiber.Ctx) error {
 			oldKid := c.Params("kid")
-			// Use API-managed storage
 			var req rotateReq
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -198,20 +197,22 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			if oldKeyExpiration == nil {
 				oldKeyExpiration = &unixtime.Unixtime{Time: req.Nbf.Add(rotationConf.Overlap.Duration())}
 			}
-			err = apiManagedPKs.Update(
-				oldKid, public.UpdateablePublicKeyMetadata{
+
+			// Wrap key rotation in a transaction to ensure atomicity
+			var created *public.PublicKeyEntry
+			err = storages.InTransaction(func(tx *smodel.Backends) error {
+				// Get API-managed public key storage within transaction
+				txPKStorage := tx.PKStorages("api-managed")
+
+				// Update old key expiration
+				if err := txPKStorage.Update(oldKid, public.UpdateablePublicKeyMetadata{
 					ExpiresAt: oldKeyExpiration,
-				},
-			)
-			if err != nil {
-				var nf public.NotFoundError
-				if errors.As(err, &nf) {
-					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(nf.Error()))
+				}); err != nil {
+					return err
 				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if err = apiManagedPKs.Add(
-				public.PublicKeyEntry{
+
+				// Add new key
+				if err := txPKStorage.Add(public.PublicKeyEntry{
 					KID:       kid,
 					Key:       req.Key,
 					IssuedAt:  req.Iat,
@@ -219,14 +220,21 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 					UpdateablePublicKeyMetadata: public.UpdateablePublicKeyMetadata{
 						ExpiresAt: req.Exp,
 					},
-				},
-			); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
+				}); err != nil {
+					return err
+				}
 
-			// Fetch the created entry to return it
-			created, err := apiManagedPKs.Get(kid)
+				// Fetch the created entry within transaction
+				var err error
+				created, err = txPKStorage.Get(kid)
+				return err
+			})
+
 			if err != nil {
+				var nf public.NotFoundError
+				if errors.As(err, &nf) {
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(nf.Error()))
+				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			return c.Status(fiber.StatusCreated).JSON(created)

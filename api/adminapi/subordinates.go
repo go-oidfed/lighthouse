@@ -26,52 +26,50 @@ var DefaultSubordinateStatus = model.StatusActive
 // RegisterSubordinateHandlers registers all subordinate-related handlers on the given router.
 // This includes basic CRUD, metadata, metadata policies, constraints, keys, additional claims,
 // statement preview, and lifetime configuration endpoints.
+//
+// All write operations are wrapped in database transactions to ensure atomicity of
+// data changes and event recording.
 func RegisterSubordinateHandlers(
 	r fiber.Router,
-	subordinates model.SubordinateStorageBackend,
-	events model.SubordinateEventStore,
-	kv model.KeyValueStore,
+	storages model.Backends,
 	fedEntity oidfed.FederationEntity,
 ) {
-	// Create event recorder for tracking subordinate events
-	recorder := newEventRecorder(events)
-
 	// Register general endpoints first (routes without :subordinateID in the path)
 	// These must be registered before subordinate-specific routes to avoid conflicts
 
 	// General metadata policies: /subordinates/metadata-policies/*
-	registerGeneralMetadataPolicies(r, kv)
+	registerGeneralMetadataPolicies(r, storages.KV)
 
 	// General metadata policy crit: /subordinates/metadata-policy-crit/*
-	registerSubordinateMetadataPolicyCrit(r, kv)
+	registerSubordinateMetadataPolicyCrit(r, storages.KV)
 
 	// General constraints: /subordinates/constraints/*
-	registerGeneralConstraints(r, kv)
+	registerGeneralConstraints(r, storages.KV)
 
 	// General additional claims: /subordinates/additional-claims/*
-	registerGeneralAdditionalClaims(r, kv)
+	registerGeneralAdditionalClaims(r, storages.KV)
 
 	// General lifetime: /subordinates/lifetime
-	registerGeneralSubordinateLifetime(r, kv)
+	registerGeneralSubordinateLifetime(r, storages.KV)
 
 	// Base CRUD operations: /subordinates, /subordinates/:subordinateID, etc.
-	registerSubordinatesBase(r, subordinates, events, recorder)
+	registerSubordinatesBase(r, storages)
 
 	// Statement preview: /subordinates/:subordinateID/statement
-	registerSubordinateStatement(r, subordinates, kv, fedEntity)
+	registerSubordinateStatement(r, storages.Subordinates, storages.KV, fedEntity)
 
 	// Subordinate-specific metadata: /subordinates/:subordinateID/metadata/*
-	registerSubordinateMetadata(r, subordinates, recorder)
+	registerSubordinateMetadata(r, storages)
 
 	// Subordinate-specific metadata policies: /subordinates/:subordinateID/metadata-policies/*
-	registerSubordinateMetadataPolicies(r, subordinates, kv, recorder)
+	registerSubordinateMetadataPolicies(r, storages)
 
 	// Subordinate-specific constraints: /subordinates/:subordinateID/constraints/*
-	registerSubordinateConstraints(r, subordinates, kv, recorder)
+	registerSubordinateConstraints(r, storages)
 
 	// Subordinate-specific JWKS: /subordinates/:subordinateID/jwks/*
-	registerSubordinateKeys(r, subordinates, recorder)
+	registerSubordinateKeys(r, storages)
 
 	// Subordinate-specific additional claims: /subordinates/:subordinateID/additional-claims/*
-	registerSubordinateAdditionalClaims(r, subordinates, recorder)
+	registerSubordinateAdditionalClaims(r, storages)
 }

@@ -333,43 +333,42 @@ func handleDeleteGeneralMetadataPolicyOperator(kv model.KeyValueStore) fiber.Han
 }
 
 // registerSubordinateMetadataPolicies registers subordinate-specific metadata policy endpoints.
+// All write operations are wrapped in transactions for atomicity.
 func registerSubordinateMetadataPolicies(
 	r fiber.Router,
-	subordinates model.SubordinateStorageBackend,
-	kv model.KeyValueStore,
-	recorder *eventRecorder,
+	storages model.Backends,
 ) {
 	g := r.Group("/subordinates/:subordinateID/metadata-policies")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
 
 	// GET / - Get full subordinate-specific policies
-	g.Get("/", handleGetSubordinateMetadataPolicies(subordinates))
+	g.Get("/", handleGetSubordinateMetadataPolicies(storages.Subordinates))
 
-	// PUT / - Replace full subordinate-specific policies
-	withCacheWipe.Put("/", handlePutSubordinateMetadataPolicies(subordinates, recorder))
+	// PUT / - Replace full subordinate-specific policies (transactional)
+	withCacheWipe.Put("/", handlePutSubordinateMetadataPolicies(storages))
 
-	// POST / - Copy general metadata policies to subordinate
-	withCacheWipe.Post("/", handlePostSubordinateMetadataPolicies(subordinates, kv, recorder))
+	// POST / - Copy general metadata policies to subordinate (transactional)
+	withCacheWipe.Post("/", handlePostSubordinateMetadataPolicies(storages))
 
-	// DELETE / - Delete subordinate-specific policies
-	withCacheWipe.Delete("/", handleDeleteSubordinateMetadataPolicies(subordinates, recorder))
+	// DELETE / - Delete subordinate-specific policies (transactional)
+	withCacheWipe.Delete("/", handleDeleteSubordinateMetadataPolicies(storages))
 
 	// Entity type endpoints
-	g.Get("/:entityType", handleGetSubordinateMetadataPoliciesEntityType(subordinates))
-	withCacheWipe.Put("/:entityType", handlePutSubordinateMetadataPoliciesEntityType(subordinates, recorder))
-	withCacheWipe.Post("/:entityType", handlePostSubordinateMetadataPoliciesEntityType(subordinates, recorder))
-	withCacheWipe.Delete("/:entityType", handleDeleteSubordinateMetadataPoliciesEntityType(subordinates, recorder))
+	g.Get("/:entityType", handleGetSubordinateMetadataPoliciesEntityType(storages.Subordinates))
+	withCacheWipe.Put("/:entityType", handlePutSubordinateMetadataPoliciesEntityType(storages))
+	withCacheWipe.Post("/:entityType", handlePostSubordinateMetadataPoliciesEntityType(storages))
+	withCacheWipe.Delete("/:entityType", handleDeleteSubordinateMetadataPoliciesEntityType(storages))
 
 	// Claim endpoints
-	g.Get("/:entityType/:claim", handleGetSubordinateMetadataPoliciesClaim(subordinates))
-	withCacheWipe.Put("/:entityType/:claim", handlePutSubordinateMetadataPoliciesClaim(subordinates, recorder))
-	withCacheWipe.Post("/:entityType/:claim", handlePostSubordinateMetadataPoliciesClaim(subordinates, recorder))
-	withCacheWipe.Delete("/:entityType/:claim", handleDeleteSubordinateMetadataPoliciesClaim(subordinates, recorder))
+	g.Get("/:entityType/:claim", handleGetSubordinateMetadataPoliciesClaim(storages.Subordinates))
+	withCacheWipe.Put("/:entityType/:claim", handlePutSubordinateMetadataPoliciesClaim(storages))
+	withCacheWipe.Post("/:entityType/:claim", handlePostSubordinateMetadataPoliciesClaim(storages))
+	withCacheWipe.Delete("/:entityType/:claim", handleDeleteSubordinateMetadataPoliciesClaim(storages))
 
 	// Operator endpoints
-	g.Get("/:entityType/:claim/:operator", handleGetSubordinateMetadataPoliciesOperator(subordinates))
-	withCacheWipe.Put("/:entityType/:claim/:operator", handlePutSubordinateMetadataPoliciesOperator(subordinates, recorder))
-	withCacheWipe.Delete("/:entityType/:claim/:operator", handleDeleteSubordinateMetadataPoliciesOperator(subordinates, recorder))
+	g.Get("/:entityType/:claim/:operator", handleGetSubordinateMetadataPoliciesOperator(storages.Subordinates))
+	withCacheWipe.Put("/:entityType/:claim/:operator", handlePutSubordinateMetadataPoliciesOperator(storages))
+	withCacheWipe.Delete("/:entityType/:claim/:operator", handleDeleteSubordinateMetadataPoliciesOperator(storages))
 }
 
 func handleGetSubordinateMetadataPolicies(subordinates model.SubordinateStorageBackend) fiber.Handler {
@@ -385,73 +384,95 @@ func handleGetSubordinateMetadataPolicies(subordinates model.SubordinateStorageB
 	}
 }
 
-func handlePutSubordinateMetadataPolicies(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handlePutSubordinateMetadataPolicies(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
-		}
+		id := c.Params("subordinateID")
 		var body oidfed.MetadataPolicies
 		if err := c.BodyParser(&body); err != nil {
 			return writeBadBody(c)
 		}
-		info.MetadataPolicy = &body
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			info.MetadataPolicy = &body
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated)
+		})
+		if err != nil {
+			return handleTxError(c, err)
 		}
-		recorder.Record(info.ID, model.EventTypePolicyUpdated)
 		return c.JSON(body)
 	}
 }
 
-func handlePostSubordinateMetadataPolicies(
-	subordinates model.SubordinateStorageBackend,
-	kv model.KeyValueStore,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handlePostSubordinateMetadataPolicies(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		info, err := handleSubordinateLookup(c, subordinates)
+		id := c.Params("subordinateID")
+		var result *oidfed.MetadataPolicies
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			general, found, err := loadGeneralMetadataPolicy(tx.KV)
+			if err != nil {
+				return err
+			}
+			if !found || general == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			} else {
+				copied := *general
+				info.MetadataPolicy = &copied
+			}
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			result = info.MetadataPolicy
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("copied from general"))
+		})
 		if err != nil {
-			return err
+			return handleTxError(c, err)
 		}
-		general, found, err := loadGeneralMetadataPolicy(kv)
-		if err != nil {
-			return writeServerError(c, err)
-		}
-		if !found || general == nil {
-			info.MetadataPolicy = &oidfed.MetadataPolicies{}
-		} else {
-			copied := *general
-			info.MetadataPolicy = &copied
-		}
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyUpdated, WithMessage("copied from general"))
-		return c.Status(fiber.StatusCreated).JSON(info.MetadataPolicy)
+		return c.Status(fiber.StatusCreated).JSON(result)
 	}
 }
 
-func handleDeleteSubordinateMetadataPolicies(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleDeleteSubordinateMetadataPolicies(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		info, err := handleSubordinateLookup(c, subordinates)
+		id := c.Params("subordinateID")
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				return model.NotFoundError("metadata policy not found")
+			}
+			info.MetadataPolicy = nil
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted)
+		})
 		if err != nil {
-			return err
+			return handleTxError(c, err)
 		}
-		if info.MetadataPolicy == nil {
-			return writeNotFound(c, "metadata policy not found")
-		}
-		info.MetadataPolicy = nil
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyDeleted)
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
@@ -474,83 +495,106 @@ func handleGetSubordinateMetadataPoliciesEntityType(subordinates model.Subordina
 	}
 }
 
-func handlePutSubordinateMetadataPoliciesEntityType(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handlePutSubordinateMetadataPoliciesEntityType(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
-		}
 		var body oidfed.MetadataPolicy
 		if err := c.BodyParser(&body); err != nil {
 			return writeBadBody(c)
 		}
-		if info.MetadataPolicy == nil {
-			info.MetadataPolicy = &oidfed.MetadataPolicies{}
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			setMetadataPolicy(info.MetadataPolicy, et, body)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et))
+		})
+		if err != nil {
+			return handleTxError(c, err)
 		}
-		setMetadataPolicy(info.MetadataPolicy, et, body)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et))
 		return c.JSON(body)
 	}
 }
 
-func handlePostSubordinateMetadataPoliciesEntityType(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handlePostSubordinateMetadataPoliciesEntityType(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
-		}
 		var body oidfed.MetadataPolicy
 		if err := c.BodyParser(&body); err != nil {
 			return writeBadBody(c)
 		}
-		if info.MetadataPolicy == nil {
-			info.MetadataPolicy = &oidfed.MetadataPolicies{}
+
+		var result oidfed.MetadataPolicy
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			existing := getMetadataPolicy(info.MetadataPolicy, et)
+			if existing == nil {
+				existing = oidfed.MetadataPolicy{}
+			}
+			for claim, ops := range body {
+				existing[claim] = ops
+			}
+			setMetadataPolicy(info.MetadataPolicy, et, existing)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			result = existing
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et))
+		})
+		if err != nil {
+			return handleTxError(c, err)
 		}
-		existing := getMetadataPolicy(info.MetadataPolicy, et)
-		if existing == nil {
-			existing = oidfed.MetadataPolicy{}
-		}
-		for claim, ops := range body {
-			existing[claim] = ops
-		}
-		setMetadataPolicy(info.MetadataPolicy, et, existing)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et))
-		return c.JSON(existing)
+		return c.JSON(result)
 	}
 }
 
-func handleDeleteSubordinateMetadataPoliciesEntityType(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleDeleteSubordinateMetadataPoliciesEntityType(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
-		info, err := handleSubordinateLookup(c, subordinates)
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				return model.NotFoundError("metadata policy not found")
+			}
+			deleteMetadataPolicy(info.MetadataPolicy, et)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage("entity type: "+et))
+		})
 		if err != nil {
-			return err
+			return handleTxError(c, err)
 		}
-		if info.MetadataPolicy == nil {
-			return writeNotFound(c, "metadata policy not found")
-		}
-		deleteMetadataPolicy(info.MetadataPolicy, et)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyDeleted, WithMessage("entity type: "+et))
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
@@ -578,99 +622,122 @@ func handleGetSubordinateMetadataPoliciesClaim(subordinates model.SubordinateSto
 	}
 }
 
-func handlePutSubordinateMetadataPoliciesClaim(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handlePutSubordinateMetadataPoliciesClaim(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		claim := c.Params("claim")
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
-		}
 		var body oidfed.MetadataPolicyEntry
 		if err := c.BodyParser(&body); err != nil {
 			return writeBadBody(c)
 		}
-		if info.MetadataPolicy == nil {
-			info.MetadataPolicy = &oidfed.MetadataPolicies{}
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			setMetadataPolicyEntry(info.MetadataPolicy, et, claim, body)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim))
+		})
+		if err != nil {
+			return handleTxError(c, err)
 		}
-		setMetadataPolicyEntry(info.MetadataPolicy, et, claim, body)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim))
 		return c.JSON(body)
 	}
 }
 
-func handlePostSubordinateMetadataPoliciesClaim(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handlePostSubordinateMetadataPoliciesClaim(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		claim := c.Params("claim")
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
-		}
 		var body oidfed.MetadataPolicyEntry
 		if err := c.BodyParser(&body); err != nil {
 			return writeBadBody(c)
 		}
-		if info.MetadataPolicy == nil {
-			info.MetadataPolicy = &oidfed.MetadataPolicies{}
+
+		var result oidfed.MetadataPolicyEntry
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			policy := getMetadataPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				policy = oidfed.MetadataPolicy{}
+			}
+			existing := policy[claim]
+			if existing == nil {
+				existing = oidfed.MetadataPolicyEntry{}
+			}
+			for op, v := range body {
+				existing[op] = v
+			}
+			policy[claim] = existing
+			setMetadataPolicy(info.MetadataPolicy, et, policy)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			result = existing
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim))
+		})
+		if err != nil {
+			return handleTxError(c, err)
 		}
-		policy := getMetadataPolicy(info.MetadataPolicy, et)
-		if policy == nil {
-			policy = oidfed.MetadataPolicy{}
-		}
-		existing := policy[claim]
-		if existing == nil {
-			existing = oidfed.MetadataPolicyEntry{}
-		}
-		for op, v := range body {
-			existing[op] = v
-		}
-		policy[claim] = existing
-		setMetadataPolicy(info.MetadataPolicy, et, policy)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim))
-		return c.JSON(existing)
+		return c.JSON(result)
 	}
 }
 
-func handleDeleteSubordinateMetadataPoliciesClaim(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleDeleteSubordinateMetadataPoliciesClaim(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		claim := c.Params("claim")
-		info, err := handleSubordinateLookup(c, subordinates)
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				return model.NotFoundError("metadata policy not found")
+			}
+			policy := getMetadataPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				return model.NotFoundError("metadata policy not found")
+			}
+			if _, ok := policy[claim]; !ok {
+				return model.NotFoundError("metadata policy not found")
+			}
+			delete(policy, claim)
+			setMetadataPolicy(info.MetadataPolicy, et, policy)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim))
+		})
 		if err != nil {
-			return err
+			return handleTxError(c, err)
 		}
-		if info.MetadataPolicy == nil {
-			return writeNotFound(c, "metadata policy not found")
-		}
-		policy := getMetadataPolicy(info.MetadataPolicy, et)
-		if policy == nil {
-			return writeNotFound(c, "metadata policy not found")
-		}
-		if _, ok := policy[claim]; !ok {
-			return writeNotFound(c, "metadata policy not found")
-		}
-		delete(policy, claim)
-		setMetadataPolicy(info.MetadataPolicy, et, policy)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim))
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
@@ -703,47 +770,54 @@ func handleGetSubordinateMetadataPoliciesOperator(subordinates model.Subordinate
 	}
 }
 
-func handlePutSubordinateMetadataPoliciesOperator(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handlePutSubordinateMetadataPoliciesOperator(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		claim := c.Params("claim")
 		op := oidfed.PolicyOperatorName(c.Params("operator"))
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
-		}
 		var body any
 		if err := json.Unmarshal(c.Body(), &body); err != nil {
 			return writeBadBody(c)
 		}
 
-		created := false
-		if info.MetadataPolicy == nil {
-			info.MetadataPolicy = &oidfed.MetadataPolicies{}
+		var created bool
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			created = false
+			if info.MetadataPolicy == nil {
+				info.MetadataPolicy = &oidfed.MetadataPolicies{}
+			}
+			policy := getMetadataPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				policy = oidfed.MetadataPolicy{}
+				created = true
+			}
+			entry := policy[claim]
+			if entry == nil {
+				entry = oidfed.MetadataPolicyEntry{}
+				created = true
+			}
+			if _, ok := entry[op]; !ok {
+				created = true
+			}
+			entry[op] = body
+			policy[claim] = entry
+			setMetadataPolicy(info.MetadataPolicy, et, policy)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim+"."+string(op)))
+		})
+		if err != nil {
+			return handleTxError(c, err)
 		}
-		policy := getMetadataPolicy(info.MetadataPolicy, et)
-		if policy == nil {
-			policy = oidfed.MetadataPolicy{}
-			created = true
-		}
-		entry := policy[claim]
-		if entry == nil {
-			entry = oidfed.MetadataPolicyEntry{}
-			created = true
-		}
-		if _, ok := entry[op]; !ok {
-			created = true
-		}
-		entry[op] = body
-		policy[claim] = entry
-		setMetadataPolicy(info.MetadataPolicy, et, policy)
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim+"."+string(op)))
 		if created {
 			return c.Status(fiber.StatusCreated).JSON(body)
 		}
@@ -751,40 +825,49 @@ func handlePutSubordinateMetadataPoliciesOperator(
 	}
 }
 
-func handleDeleteSubordinateMetadataPoliciesOperator(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleDeleteSubordinateMetadataPoliciesOperator(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		claim := c.Params("claim")
 		op := oidfed.PolicyOperatorName(c.Params("operator"))
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
-		}
-		if info.MetadataPolicy == nil {
-			return writeNotFound(c, "metadata policy not found")
-		}
-		policy := getMetadataPolicy(info.MetadataPolicy, et)
-		if policy != nil {
-			entry := policy[claim]
-			if entry != nil {
-				if _, ok := entry[op]; !ok {
-					return writeNotFound(c, "metadata policy not found")
-				}
-				delete(entry, op)
-				policy[claim] = entry
-				if len(entry) == 0 {
-					delete(policy, claim)
-				}
-				setMetadataPolicy(info.MetadataPolicy, et, policy)
+
+		err := storages.InTransaction(func(tx *model.Backends) error {
+			info, err := tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
 			}
+			if info == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			if info.MetadataPolicy == nil {
+				return model.NotFoundError("metadata policy not found")
+			}
+			policy := getMetadataPolicy(info.MetadataPolicy, et)
+			if policy == nil {
+				return model.NotFoundError("metadata policy not found")
+			}
+			entry := policy[claim]
+			if entry == nil {
+				return model.NotFoundError("metadata policy not found")
+			}
+			if _, ok := entry[op]; !ok {
+				return model.NotFoundError("metadata policy not found")
+			}
+			delete(entry, op)
+			policy[claim] = entry
+			if len(entry) == 0 {
+				delete(policy, claim)
+			}
+			setMetadataPolicy(info.MetadataPolicy, et, policy)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim+"."+string(op)))
+		})
+		if err != nil {
+			return handleTxError(c, err)
 		}
-		if err := subordinates.Update(info.EntityID, *info); err != nil {
-			return writeServerError(c, err)
-		}
-		recorder.Record(info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim+"."+string(op)))
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }

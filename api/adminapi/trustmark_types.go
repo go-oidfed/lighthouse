@@ -10,7 +10,9 @@ import (
 )
 
 // registerTrustMarkTypes wires handlers using a TrustMarkTypesStore abstraction.
-func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
+// The storages parameter provides transaction support for operations that span multiple stores.
+func registerTrustMarkTypes(r fiber.Router, storages model.Backends) {
+	store := storages.TrustMarkTypes
 	g := r.Group("/trust-marks/types")
 	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 
@@ -55,8 +57,10 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 		},
 	)
 
+	// PUT /:trustMarkTypeID - Update trust mark type with optional owner and issuers (transactional)
 	withCacheWipe.Put(
 		"/:trustMarkTypeID", func(c *fiber.Ctx) error {
+			trustMarkTypeID := c.Params("trustMarkTypeID")
 			var req model.AddTrustMarkType
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
@@ -64,50 +68,56 @@ func registerTrustMarkTypes(r fiber.Router, store model.TrustMarkTypesStore) {
 			if req.TrustMarkType == "" {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("trust_mark_type is required"))
 			}
-			item, err := store.Update(c.Params("trustMarkTypeID"), req)
+
+			// Wrap all operations in a transaction for atomicity
+			var item *model.TrustMarkType
+			err := storages.InTransaction(func(tx *model.Backends) error {
+				txStore := tx.TrustMarkTypes
+				var err error
+				item, err = txStore.Update(trustMarkTypeID, req)
+				if err != nil {
+					return err
+				}
+
+				// Optionally set or update owner
+				if req.TrustMarkOwner != nil {
+					if _, err := txStore.UpdateOwner(trustMarkTypeID, *req.TrustMarkOwner); err != nil {
+						var nf model.NotFoundError
+						if errors.As(err, &nf) {
+							// If no current owner and request provides data to create a new one, create/link now.
+							if req.TrustMarkOwner.OwnerID == nil {
+								if _, err := txStore.CreateOwner(trustMarkTypeID, *req.TrustMarkOwner); err != nil {
+									return err
+								}
+							} else {
+								// Referenced owner not found
+								return model.NotFoundError("trust mark owner not found")
+							}
+						} else {
+							return err
+						}
+					}
+				}
+
+				// Optionally replace issuers
+				if len(req.TrustMarkIssuers) > 0 {
+					if _, err := txStore.SetIssuers(trustMarkTypeID, req.TrustMarkIssuers); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+
 			if err != nil {
 				var notFoundError model.NotFoundError
 				if errors.As(err, &notFoundError) {
-					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
 				}
 				var alreadyExistsError model.AlreadyExistsError
 				if errors.As(err, &alreadyExistsError) {
 					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("trust mark type already exists"))
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-
-			// Optionally set or update owner
-			if req.TrustMarkOwner != nil {
-				if _, err := store.UpdateOwner(c.Params("trustMarkTypeID"), *req.TrustMarkOwner); err != nil {
-					var nf model.NotFoundError
-					if errors.As(err, &nf) {
-						// If no current owner and request provides data to create a new one, create/link now.
-						if req.TrustMarkOwner.OwnerID == nil {
-							if _, err := store.CreateOwner(
-								c.Params("trustMarkTypeID"), *req.TrustMarkOwner,
-							); err != nil {
-								return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-							}
-						} else {
-							// Referenced owner not found
-							return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark owner not found"))
-						}
-					} else {
-						return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-					}
-				}
-			}
-
-			// Optionally replace issuers
-			if len(req.TrustMarkIssuers) > 0 {
-				if _, err := store.SetIssuers(c.Params("trustMarkTypeID"), req.TrustMarkIssuers); err != nil {
-					var nf model.NotFoundError
-					if errors.As(err, &nf) {
-						return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
-					}
-					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-				}
 			}
 			return c.JSON(item)
 		},

@@ -135,19 +135,44 @@ func LoadStorageBackends(cfg Config) (model.Backends, error) {
 	if err != nil {
 		return model.Backends{}, err
 	}
-	return model.Backends{
-		Subordinates:      warehouse.SubordinateStorage(),
-		SubordinateEvents: warehouse.SubordinateEventsStorage(),
-		TrustMarks:        warehouse.TrustMarkedEntitiesStorage(),
-		AuthorityHints:    warehouse.AuthorityHintsStorage(),
-		TrustMarkTypes:    warehouse.TrustMarkTypesStorage(),
-		TrustMarkOwners:   warehouse.TrustMarkOwnersStorage(),
-		TrustMarkIssuers:  warehouse.TrustMarkIssuersStorage(),
-		AdditionalClaims:  warehouse.AdditionalClaimsStorage(),
-		KV:                warehouse.KeyValue(),
-		Users:             warehouse.UsersStorage(),
-		PKStorages: func(s string) public.PublicKeyStorage {
-			return NewDBPublicKeyStorage(warehouse.db, s)
+	return warehouse.Backends(), nil
+}
+
+// Backends returns all storage backends with transaction support.
+func (s *Storage) Backends() model.Backends {
+	return s.backendsWithDB(s.db, true)
+}
+
+// backendsWithDB creates Backends using the provided gorm.DB.
+// If withTransaction is true, the Transaction field is populated to enable
+// wrapping multiple operations in a single database transaction.
+func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool) model.Backends {
+	backends := model.Backends{
+		Subordinates:      &SubordinateStorage{db: db},
+		SubordinateEvents: NewSubordinateEventsStorage(db),
+		TrustMarks:        &TrustMarkedEntitiesStorage{db: db},
+		AuthorityHints:    &AuthorityHintsStorage{db: db},
+		TrustMarkTypes:    &TrustMarkTypesStorage{db: db},
+		TrustMarkOwners:   &TrustMarkOwnersStorage{db: db},
+		TrustMarkIssuers:  &TrustMarkIssuersStorage{db: db},
+		AdditionalClaims:  &AdditionalClaimsStorage{db: db},
+		KV:                &KeyValueStorage{db: db},
+		Users:             &UsersStorage{db: db, params: s.userParams},
+		PKStorages: func(typeID string) public.PublicKeyStorage {
+			return NewDBPublicKeyStorage(db, typeID)
 		},
-	}, nil
+	}
+
+	if withTransaction {
+		backends.Transaction = func(fn model.TransactionFunc) error {
+			return s.db.Transaction(func(tx *gorm.DB) error {
+				// Create backends that operate within the transaction
+				// withTransaction=false to prevent nested transactions
+				txBackends := s.backendsWithDB(tx, false)
+				return fn(&txBackends)
+			})
+		}
+	}
+
+	return backends
 }

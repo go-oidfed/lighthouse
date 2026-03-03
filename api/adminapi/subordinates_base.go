@@ -1,6 +1,7 @@
 package adminapi
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -13,33 +14,31 @@ import (
 // registerSubordinatesBase registers basic CRUD endpoints for subordinates.
 func registerSubordinatesBase(
 	r fiber.Router,
-	subordinates model.SubordinateStorageBackend,
-	events model.SubordinateEventStore,
-	recorder *eventRecorder,
+	storages model.Backends,
 ) {
 	g := r.Group("/subordinates")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
 
 	// GET / - List subordinates, optional filters via query: entity_type, status
-	g.Get("/", handleListSubordinates(subordinates))
+	g.Get("/", handleListSubordinates(storages.Subordinates))
 
-	// POST / - Create subordinate
-	g.Post("/", handleCreateSubordinate(subordinates, recorder))
+	// POST / - Create subordinate (transactional)
+	g.Post("/", handleCreateSubordinate(storages))
 
 	// GET /:subordinateID - Get subordinate details
-	g.Get("/:subordinateID", handleGetSubordinate(subordinates))
+	g.Get("/:subordinateID", handleGetSubordinate(storages.Subordinates))
 
-	// PUT /:subordinateID - Update subordinate details (replace basic fields)
-	withCacheWipe.Put("/:subordinateID", handleUpdateSubordinate(subordinates, recorder))
+	// PUT /:subordinateID - Update subordinate details (transactional)
+	withCacheWipe.Put("/:subordinateID", handleUpdateSubordinate(storages))
 
-	// DELETE /:subordinateID - Delete subordinate
-	withCacheWipe.Delete("/:subordinateID", handleDeleteSubordinate(subordinates, recorder))
+	// DELETE /:subordinateID - Delete subordinate (transactional)
+	withCacheWipe.Delete("/:subordinateID", handleDeleteSubordinate(storages))
 
-	// PUT /:subordinateID/status - Update subordinate status
-	withCacheWipe.Put("/:subordinateID/status", handleUpdateSubordinateStatus(subordinates, recorder))
+	// PUT /:subordinateID/status - Update subordinate status (transactional)
+	withCacheWipe.Put("/:subordinateID/status", handleUpdateSubordinateStatus(storages))
 
 	// GET /:subordinateID/history - Subordinate history
-	g.Get("/:subordinateID/history", handleSubordinateHistory(subordinates, events))
+	g.Get("/:subordinateID/history", handleSubordinateHistory(storages.Subordinates, storages.SubordinateEvents))
 }
 
 func handleListSubordinates(subordinates model.SubordinateStorageBackend) fiber.Handler {
@@ -87,10 +86,7 @@ func handleListSubordinates(subordinates model.SubordinateStorageBackend) fiber.
 	}
 }
 
-func handleCreateSubordinate(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleCreateSubordinate(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var req model.ExtendedSubordinateInfo
 		req.Status = DefaultSubordinateStatus
@@ -107,20 +103,31 @@ func handleCreateSubordinate(
 		if req.Status == model.StatusActive && !jwksHasKeys(&req.JWKS) {
 			return writeBadRequest(c, "status cannot be active without keys")
 		}
-		if err := subordinates.Add(req); err != nil {
-			return writeServerError(c, err)
-		}
-		stored, err := subordinates.Get(req.EntityID)
+
+		var stored *model.ExtendedSubordinateInfo
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				if err := tx.Subordinates.Add(req); err != nil {
+					return err
+				}
+				var err error
+				stored, err = tx.Subordinates.Get(req.EntityID)
+				if err != nil {
+					return err
+				}
+				// Record creation event within transaction
+				return RecordEvent(
+					tx.SubordinateEvents,
+					stored.ID,
+					model.EventTypeCreated,
+					WithStatus(stored.Status),
+					WithMessage(fmt.Sprintf("subordinate created: %s", stored.EntityID)),
+				)
+			},
+		)
 		if err != nil {
 			return writeServerError(c, err)
 		}
-		// Record creation event
-		recorder.Record(
-			stored.ID,
-			model.EventTypeCreated,
-			WithStatus(stored.Status),
-			WithMessage(fmt.Sprintf("subordinate created: %s", stored.EntityID)),
-		)
 		return c.Status(fiber.StatusCreated).JSON(stored)
 	}
 }
@@ -139,88 +146,102 @@ func handleGetSubordinate(subordinates model.SubordinateStorageBackend) fiber.Ha
 	}
 }
 
-func handleUpdateSubordinate(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleUpdateSubordinate(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
-		existing, err := subordinates.GetByDBID(id)
-		if err != nil {
-			return writeServerError(c, err)
-		}
-		if existing == nil {
-			return writeNotFound(c, "subordinate not found")
-		}
 
 		var body struct {
 			Description           *string  `json:"description"`
 			RegisteredEntityTypes []string `json:"registered_entity_types"`
 		}
-		if err = c.BodyParser(&body); err != nil {
+		if err := c.BodyParser(&body); err != nil {
 			return writeBadBody(c)
 		}
-		if body.Description != nil {
-			existing.Description = *body.Description
-		}
-		if body.RegisteredEntityTypes != nil {
-			subordinateEntityTypes := make([]model.SubordinateEntityType, len(body.RegisteredEntityTypes))
-			for i, et := range body.RegisteredEntityTypes {
-				subordinateEntityTypes[i] = model.SubordinateEntityType{EntityType: et}
+
+		var result *model.ExtendedSubordinateInfo
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				existing, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if existing == nil {
+					return model.NotFoundError("subordinate not found")
+				}
+
+				if body.Description != nil {
+					existing.Description = *body.Description
+				}
+				if body.RegisteredEntityTypes != nil {
+					subordinateEntityTypes := make([]model.SubordinateEntityType, len(body.RegisteredEntityTypes))
+					for i, et := range body.RegisteredEntityTypes {
+						subordinateEntityTypes[i] = model.SubordinateEntityType{EntityType: et}
+					}
+					existing.SubordinateEntityTypes = subordinateEntityTypes
+				}
+				if err = tx.Subordinates.Update(existing.EntityID, *existing); err != nil {
+					return err
+				}
+				// Record update event within transaction
+				if err = RecordEvent(
+					tx.SubordinateEvents, existing.ID, model.EventTypeUpdated, WithStatus(existing.Status),
+				); err != nil {
+					return err
+				}
+				result = existing
+				return nil
+			},
+		)
+
+		if err != nil {
+			var nf model.NotFoundError
+			if errors.As(err, &nf) {
+				return writeNotFound(c, err.Error())
 			}
-			existing.SubordinateEntityTypes = subordinateEntityTypes
-		}
-		if err = subordinates.Update(existing.EntityID, *existing); err != nil {
 			return writeServerError(c, err)
 		}
-		// Record update event
-		recorder.Record(existing.ID, model.EventTypeUpdated, WithStatus(existing.Status))
-		return c.JSON(existing)
+		return c.JSON(result)
 	}
 }
 
-func handleDeleteSubordinate(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleDeleteSubordinate(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
-		// Get subordinate info before deletion to record event
-		existing, err := subordinates.GetByDBID(id)
+
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				// Get subordinate info before deletion
+				existing, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if existing == nil {
+					return model.NotFoundError("subordinate not found")
+				}
+
+				// Delete events first (within transaction, will rollback if subordinate delete fails)
+				if err := tx.SubordinateEvents.DeleteBySubordinateID(existing.ID); err != nil {
+					return err
+				}
+
+				return tx.Subordinates.DeleteByDBID(id)
+			},
+		)
+
 		if err != nil {
-			return writeServerError(c, err)
-		}
-		if existing == nil {
-			return writeNotFound(c, "subordinate not found")
-		}
-		subordinateID := existing.ID
-
-		// Delete events first (since they reference the subordinate)
-		recorder.DeleteForSubordinate(subordinateID)
-
-		if err := subordinates.DeleteByDBID(id); err != nil {
+			var nf model.NotFoundError
+			if errors.As(err, &nf) {
+				return writeNotFound(c, err.Error())
+			}
 			return writeServerError(c, err)
 		}
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
 
-func handleUpdateSubordinateStatus(
-	subordinates model.SubordinateStorageBackend,
-	recorder *eventRecorder,
-) fiber.Handler {
+func handleUpdateSubordinateStatus(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
-
-		// Get existing info to record old status
-		existing, err := subordinates.GetByDBID(id)
-		if err != nil {
-			return writeServerError(c, err)
-		}
-		if existing == nil {
-			return writeNotFound(c, "subordinate not found")
-		}
-		oldStatus := existing.Status
 
 		var status model.Status
 		if err := c.BodyParser(&status); err != nil {
@@ -229,32 +250,65 @@ func handleUpdateSubordinateStatus(
 		if !status.Valid() {
 			return writeBadRequest(c, "invalid status")
 		}
-		// Check if setting to active - need to verify subordinate has keys
-		if status == model.StatusActive {
-			if !subordinateHasKeys(existing) {
-				return writeBadRequest(c, "status cannot be active without keys")
-			}
-		}
-		if err := subordinates.UpdateStatusByDBID(id, status); err != nil {
-			return writeServerError(c, err)
-		}
 
-		info, err := subordinates.GetByDBID(id)
-		if err != nil {
-			return writeServerError(c, err)
-		}
-		if info == nil {
-			return writeNotFound(c, "subordinate not found")
-		}
+		var result *model.ExtendedSubordinateInfo
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				// Get existing info to record old status
+				existing, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if existing == nil {
+					return model.NotFoundError("subordinate not found")
+				}
+				oldStatus := existing.Status
 
-		// Record status update event
-		recorder.Record(
-			info.ID,
-			model.EventTypeStatusUpdated,
-			WithStatus(status),
-			WithMessage(fmt.Sprintf("status changed from %s to %s", oldStatus, status)),
+				// Check if setting to active - need to verify subordinate has keys
+				if status == model.StatusActive {
+					if !subordinateHasKeys(existing) {
+						return fmt.Errorf("status cannot be active without keys")
+					}
+				}
+				if err := tx.Subordinates.UpdateStatusByDBID(id, status); err != nil {
+					return err
+				}
+
+				info, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if info == nil {
+					return model.NotFoundError("subordinate not found")
+				}
+
+				// Record status update event within transaction
+				if err = RecordEvent(
+					tx.SubordinateEvents,
+					info.ID,
+					model.EventTypeStatusUpdated,
+					WithStatus(status),
+					WithMessage(fmt.Sprintf("status changed from %s to %s", oldStatus, status)),
+				); err != nil {
+					return err
+				}
+				result = info
+				return nil
+			},
 		)
-		return c.JSON(info)
+
+		if err != nil {
+			var nf model.NotFoundError
+			if errors.As(err, &nf) {
+				return writeNotFound(c, err.Error())
+			}
+			// Check for the "status cannot be active without keys" error
+			if err.Error() == "status cannot be active without keys" {
+				return writeBadRequest(c, err.Error())
+			}
+			return writeServerError(c, err)
+		}
+		return c.JSON(result)
 	}
 }
 
@@ -353,13 +407,15 @@ func handleSubordinateHistory(
 			limit = 100
 		}
 
-		return c.JSON(fiber.Map{
-			"events": eventsResp,
-			"pagination": fiber.Map{
-				"total":  total,
-				"limit":  limit,
-				"offset": opts.Offset,
+		return c.JSON(
+			fiber.Map{
+				"events": eventsResp,
+				"pagination": fiber.Map{
+					"total":  total,
+					"limit":  limit,
+					"offset": opts.Offset,
+				},
 			},
-		})
+		)
 	}
 }

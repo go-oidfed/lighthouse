@@ -92,14 +92,14 @@ func Register(
 	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV, fedEntity)
 	// Authority Hints
 	registerAuthorityHints(r, storages.AuthorityHints)
-	// Keys
-	registerKeys(r, keyManagement, storages.KV)
+	// Keys (with transaction support for key rotation)
+	registerKeys(r, keyManagement, storages.KV, storages)
 	// Entity Configuration Trust Marks
 	registerEntityTrustMarks(r)
-	// Subordinates - all handlers registered via single entry point
-	RegisterSubordinateHandlers(r, storages.Subordinates, storages.SubordinateEvents, storages.KV, fedEntity)
-	// Trust Mark Types and Issuance
-	registerTrustMarkTypes(r, storages.TrustMarkTypes)
+	// Subordinates - all handlers registered via single entry point (with transaction support)
+	RegisterSubordinateHandlers(r, storages, fedEntity)
+	// Trust Mark Types and Issuance (with transaction support)
+	registerTrustMarkTypes(r, storages)
 	// Global Owners and Issuers
 	registerTrustMarkOwners(r, storages.TrustMarkOwners, storages.TrustMarkTypes)
 	registerTrustMarkIssuers(r, storages.TrustMarkIssuers, storages.TrustMarkTypes)

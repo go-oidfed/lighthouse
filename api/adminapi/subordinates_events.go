@@ -3,20 +3,8 @@ package adminapi
 import (
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
-
-// eventRecorder provides helper methods for recording subordinate events.
-type eventRecorder struct {
-	store model.SubordinateEventStore
-}
-
-// newEventRecorder creates a new eventRecorder.
-func newEventRecorder(store model.SubordinateEventStore) *eventRecorder {
-	return &eventRecorder{store: store}
-}
 
 // EventOption is a functional option for configuring an event.
 type EventOption func(*model.SubordinateEvent)
@@ -43,11 +31,18 @@ func WithActor(actor string) EventOption {
 	}
 }
 
-// Record records a new event for a subordinate.
-// Event recording failures are logged but do not fail the operation.
-func (r *eventRecorder) Record(subordinateID uint, eventType string, opts ...EventOption) {
-	if r.store == nil {
-		return
+// RecordEvent records an event using the provided event store and returns any error.
+// This is designed for use within transactions where event recording failure
+// should cause the entire transaction to roll back.
+// Use the EventOption functions (WithStatus, WithMessage, WithActor) to configure the event.
+func RecordEvent(
+	store model.SubordinateEventStore,
+	subordinateID uint,
+	eventType string,
+	opts ...EventOption,
+) error {
+	if store == nil {
+		return nil
 	}
 
 	event := model.SubordinateEvent{
@@ -60,19 +55,5 @@ func (r *eventRecorder) Record(subordinateID uint, eventType string, opts ...Eve
 		opt(&event)
 	}
 
-	if err := r.store.Add(event); err != nil {
-		log.Errorf("failed to record subordinate event: %v", err)
-	}
-}
-
-// DeleteForSubordinate removes all events for a subordinate.
-// This is called when a subordinate is deleted.
-func (r *eventRecorder) DeleteForSubordinate(subordinateID uint) {
-	if r.store == nil {
-		return
-	}
-
-	if err := r.store.DeleteBySubordinateID(subordinateID); err != nil {
-		log.Errorf("failed to delete subordinate events: %v", err)
-	}
+	return store.Add(event)
 }
