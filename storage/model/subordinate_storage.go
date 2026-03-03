@@ -41,4 +41,12 @@ type SubordinateStorageBackend interface {
 	GetByStatusAndEntityTypes(status Status, entityTypes []string) ([]BasicSubordinateInfo, error)
 	GetByStatusAndAnyEntityType(status Status, entityTypes []string) ([]BasicSubordinateInfo, error)
 	Load() error
+
+	// Additional claims CRUD for a specific subordinate
+	ListAdditionalClaims(subordinateDBID string) ([]SubordinateAdditionalClaim, error)
+	SetAdditionalClaims(subordinateDBID string, claims []AddAdditionalClaim) ([]SubordinateAdditionalClaim, error)
+	CreateAdditionalClaim(subordinateDBID string, claim AddAdditionalClaim) (*SubordinateAdditionalClaim, error)
+	GetAdditionalClaim(subordinateDBID string, claimID string) (*SubordinateAdditionalClaim, error)
+	UpdateAdditionalClaim(subordinateDBID string, claimID string, claim AddAdditionalClaim) (*SubordinateAdditionalClaim, error)
+	DeleteAdditionalClaim(subordinateDBID string, claimID string) error
 }

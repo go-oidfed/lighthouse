@@ -97,15 +97,19 @@ func Register(
 	// Entity Configuration Trust Marks
 	registerEntityTrustMarks(r)
 	// Subordinates
+	// IMPORTANT: Register general routes (e.g., /subordinates/additional-claims) BEFORE
+	// parameterized routes (e.g., /subordinates/:subordinateID) to avoid route conflicts
 	registerGeneralMetadataPolicies(r, storages.KV)
 	registerGeneralConstraints(r, storages.KV)
 	registerGeneralSubordinateLifetime(r, storages.KV)
+	registerGeneralAdditionalClaims(r, storages.KV)
 	registerSubordinates(r, storages.Subordinates)
-	// Subordinate metadata, policies, constraints, keys
+	// Subordinate metadata, policies, constraints, keys, additional claims
 	registerSubordinateMetadata(r, storages.Subordinates)
 	registerSubordinateMetadataPolicies(r, storages.Subordinates, storages.KV)
 	registerSubordinateConstraints(r, storages.Subordinates, storages.KV)
 	registerSubordinateKeys(r, storages.Subordinates)
+	registerSubordinateAdditionalClaims(r, storages.Subordinates)
 	registerSubordinateMetadataPolicyCrit(r)
 	// Trust Mark Types and Issuance
 	registerTrustMarkTypes(r, storages.TrustMarkTypes)

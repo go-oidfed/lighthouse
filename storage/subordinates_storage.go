@@ -318,3 +318,207 @@ func (s *SubordinateStorage) fetchByIDsBasic(ids []uint) ([]model.BasicSubordina
 
 // Load is a no-op for GORM storage
 func (s *SubordinateStorage) Load() error { return nil }
+
+// ListAdditionalClaims returns all additional claims for a subordinate.
+func (s *SubordinateStorage) ListAdditionalClaims(subordinateDBID string) ([]model.SubordinateAdditionalClaim, error) {
+	subID, err := s.parseSubordinateID(subordinateDBID)
+	if err != nil {
+		return nil, err
+	}
+	var claims []model.SubordinateAdditionalClaim
+	if err := s.db.Where("subordinate_id = ?", subID).Find(&claims).Error; err != nil {
+		return nil, errors.Wrap(err, "failed to list additional claims")
+	}
+	return claims, nil
+}
+
+// SetAdditionalClaims replaces all additional claims for a subordinate.
+func (s *SubordinateStorage) SetAdditionalClaims(
+	subordinateDBID string, claims []model.AddAdditionalClaim,
+) ([]model.SubordinateAdditionalClaim, error) {
+	subID, err := s.parseSubordinateID(subordinateDBID)
+	if err != nil {
+		return nil, err
+	}
+	// Verify subordinate exists
+	if _, err := s.verifySubordinateExists(subID); err != nil {
+		return nil, err
+	}
+
+	var result []model.SubordinateAdditionalClaim
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		// Delete existing claims
+		if err := tx.Where("subordinate_id = ?", subID).Delete(&model.SubordinateAdditionalClaim{}).Error; err != nil {
+			return errors.Wrap(err, "failed to delete existing claims")
+		}
+		// Insert new claims
+		if len(claims) == 0 {
+			return nil
+		}
+		rows := make([]model.SubordinateAdditionalClaim, len(claims))
+		for i, c := range claims {
+			rows[i] = model.SubordinateAdditionalClaim{
+				SubordinateID: subID,
+				Claim:         c.Claim,
+				Value:         c.Value,
+				Crit:          c.Crit,
+			}
+		}
+		if err := tx.Create(&rows).Error; err != nil {
+			return errors.Wrap(err, "failed to insert claims")
+		}
+		result = rows
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// CreateAdditionalClaim creates a single additional claim for a subordinate.
+func (s *SubordinateStorage) CreateAdditionalClaim(
+	subordinateDBID string, claim model.AddAdditionalClaim,
+) (*model.SubordinateAdditionalClaim, error) {
+	subID, err := s.parseSubordinateID(subordinateDBID)
+	if err != nil {
+		return nil, err
+	}
+	// Verify subordinate exists
+	if _, err := s.verifySubordinateExists(subID); err != nil {
+		return nil, err
+	}
+
+	row := model.SubordinateAdditionalClaim{
+		SubordinateID: subID,
+		Claim:         claim.Claim,
+		Value:         claim.Value,
+		Crit:          claim.Crit,
+	}
+	if err := s.db.Create(&row).Error; err != nil {
+		if isUniqueConstraintErr(err) {
+			return nil, model.AlreadyExistsErrorFmt("claim %q already exists for this subordinate", claim.Claim)
+		}
+		return nil, errors.Wrap(err, "failed to create additional claim")
+	}
+	return &row, nil
+}
+
+// GetAdditionalClaim retrieves a single additional claim by ID for a subordinate.
+func (s *SubordinateStorage) GetAdditionalClaim(
+	subordinateDBID string, claimID string,
+) (*model.SubordinateAdditionalClaim, error) {
+	subID, err := s.parseSubordinateID(subordinateDBID)
+	if err != nil {
+		return nil, err
+	}
+	var row model.SubordinateAdditionalClaim
+	result := s.db.Where("subordinate_id = ? AND id = ?", subID, claimID).First(&row)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, model.NotFoundError("additional claim not found")
+		}
+		return nil, errors.Wrap(result.Error, "failed to get additional claim")
+	}
+	return &row, nil
+}
+
+// UpdateAdditionalClaim updates an existing additional claim for a subordinate.
+func (s *SubordinateStorage) UpdateAdditionalClaim(
+	subordinateDBID string, claimID string, claim model.AddAdditionalClaim,
+) (*model.SubordinateAdditionalClaim, error) {
+	subID, err := s.parseSubordinateID(subordinateDBID)
+	if err != nil {
+		return nil, err
+	}
+	var row model.SubordinateAdditionalClaim
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Where("subordinate_id = ? AND id = ?", subID, claimID).First(&row)
+		if result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				return model.NotFoundError("additional claim not found")
+			}
+			return errors.Wrap(result.Error, "failed to find additional claim")
+		}
+		// Check if claim name is changing and would conflict
+		if claim.Claim != "" && claim.Claim != row.Claim {
+			var existing model.SubordinateAdditionalClaim
+			if err := tx.Where("subordinate_id = ? AND claim = ? AND id != ?", subID, claim.Claim, row.ID).First(&existing).Error; err == nil {
+				return model.AlreadyExistsErrorFmt("claim %q already exists for this subordinate", claim.Claim)
+			}
+			row.Claim = claim.Claim
+		}
+		row.Value = claim.Value
+		row.Crit = claim.Crit
+		if err := tx.Save(&row).Error; err != nil {
+			return errors.Wrap(err, "failed to update additional claim")
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+// DeleteAdditionalClaim deletes an additional claim for a subordinate.
+func (s *SubordinateStorage) DeleteAdditionalClaim(subordinateDBID string, claimID string) error {
+	subID, err := s.parseSubordinateID(subordinateDBID)
+	if err != nil {
+		return err
+	}
+	result := s.db.Where("subordinate_id = ? AND id = ?", subID, claimID).Delete(&model.SubordinateAdditionalClaim{})
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "failed to delete additional claim")
+	}
+	if result.RowsAffected == 0 {
+		return model.NotFoundError("additional claim not found")
+	}
+	return nil
+}
+
+// parseSubordinateID parses the subordinate DB ID string to uint.
+func (s *SubordinateStorage) parseSubordinateID(subordinateDBID string) (uint, error) {
+	var subID uint
+	if _, err := fmt.Sscanf(subordinateDBID, "%d", &subID); err != nil {
+		return 0, model.NotFoundErrorFmt("invalid subordinate ID: %s", subordinateDBID)
+	}
+	return subID, nil
+}
+
+// verifySubordinateExists checks if a subordinate with the given ID exists.
+func (s *SubordinateStorage) verifySubordinateExists(subID uint) (*model.ExtendedSubordinateInfo, error) {
+	var info model.ExtendedSubordinateInfo
+	if err := s.db.First(&info, subID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.NotFoundError("subordinate not found")
+		}
+		return nil, errors.Wrap(err, "failed to verify subordinate exists")
+	}
+	return &info, nil
+}
+
+// isUniqueConstraintErr checks if an error is a unique constraint violation.
+func isUniqueConstraintErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Check for common unique constraint error patterns across databases
+	return contains(errStr, "UNIQUE constraint") || // SQLite
+		contains(errStr, "duplicate key") || // PostgreSQL
+		contains(errStr, "Duplicate entry") // MySQL
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

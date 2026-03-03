@@ -6,13 +6,14 @@ import (
 
 // SubordinateAdditionalClaim stores one additional claim for a subordinate.
 // value is stored as JSON; claim name is indexed; crit marks if claim is critical.
+// The composite unique index ensures each subordinate can have unique claim names.
 type SubordinateAdditionalClaim struct {
 	ID            uint           `gorm:"primarykey" json:"id"`
 	CreatedAt     int            `json:"created_at"`
 	UpdatedAt     int            `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
-	SubordinateID uint           `gorm:"index" json:"subordinate_id"`
-	Claim         string         `gorm:"uniqueIndex" json:"claim"`
+	SubordinateID uint           `gorm:"index;uniqueIndex:idx_subordinate_claim" json:"subordinate_id"`
+	Claim         string         `gorm:"uniqueIndex:idx_subordinate_claim" json:"claim"`
 	Value         any            `gorm:"serializer:json" json:"value"`
 	Crit          bool           `gorm:"index" json:"crit"`
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
@@ -183,21 +184,7 @@ func registerSubordinates(r fiber.Router, subordinates model.SubordinateStorageB
 		},
 	)
 
-	// Subordinate additional claims
-	g.Get("/:subordinateID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	withCacheWipe.Put("/:subordinateID/additional-claims", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) })
-	g.Get(
-		"/:subordinateID/additional-claims/:additionalClaimsID",
-		func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) },
-	)
-	withCacheWipe.Put(
-		"/:subordinateID/additional-claims/:additionalClaimsID",
-		func(c *fiber.Ctx) error { return c.JSON(fiber.Map{}) },
-	)
-	withCacheWipe.Delete(
-		"/:subordinateID/additional-claims/:additionalClaimsID",
-		func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) },
-	)
+	// Subordinate additional claims - handlers registered separately in registerSubordinateAdditionalClaims
 }
 
 // General metadata policies (no subordinateID)
@@ -2279,6 +2266,333 @@ func registerGeneralSubordinateLifetime(r fiber.Router, kv model.KeyValueStore) 
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			return c.JSON(seconds)
+		},
+	)
+}
+
+// registerSubordinateAdditionalClaims adds handlers for subordinate-specific additional claims.
+func registerSubordinateAdditionalClaims(r fiber.Router, subordinates model.SubordinateStorageBackend) {
+	g := r.Group("/subordinates/:subordinateID/additional-claims")
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+
+	// GET / - List all additional claims for a subordinate
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			claims, err := subordinates.ListAdditionalClaims(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(claims)
+		},
+	)
+
+	// PUT / - Replace all additional claims for a subordinate
+	withCacheWipe.Put(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			var req []model.AddAdditionalClaim
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			claims, err := subordinates.SetAdditionalClaims(id, req)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(claims)
+		},
+	)
+
+	// POST / - Create a single additional claim
+	withCacheWipe.Post(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			var req model.AddAdditionalClaim
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			claim, err := subordinates.CreateAdditionalClaim(id, req)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
+				}
+				var ae model.AlreadyExistsError
+				if errors.As(err, &ae) {
+					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.Status(fiber.StatusCreated).JSON(claim)
+		},
+	)
+
+	// GET /:additionalClaimsID - Get a single additional claim
+	g.Get(
+		"/:additionalClaimsID", func(c *fiber.Ctx) error {
+			subID := c.Params("subordinateID")
+			claimID := c.Params("additionalClaimsID")
+			claim, err := subordinates.GetAdditionalClaim(subID, claimID)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(claim)
+		},
+	)
+
+	// PUT /:additionalClaimsID - Update a single additional claim
+	withCacheWipe.Put(
+		"/:additionalClaimsID", func(c *fiber.Ctx) error {
+			subID := c.Params("subordinateID")
+			claimID := c.Params("additionalClaimsID")
+			var req model.AddAdditionalClaim
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			claim, err := subordinates.UpdateAdditionalClaim(subID, claimID, req)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
+				}
+				var ae model.AlreadyExistsError
+				if errors.As(err, &ae) {
+					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(claim)
+		},
+	)
+
+	// DELETE /:additionalClaimsID - Delete a single additional claim
+	withCacheWipe.Delete(
+		"/:additionalClaimsID", func(c *fiber.Ctx) error {
+			subID := c.Params("subordinateID")
+			claimID := c.Params("additionalClaimsID")
+			if err := subordinates.DeleteAdditionalClaim(subID, claimID); err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
+}
+
+// generalAdditionalClaim represents an additional claim stored in the KV store.
+type generalAdditionalClaim struct {
+	ID    int    `json:"id"`
+	Claim string `json:"claim"`
+	Value any    `json:"value"`
+	Crit  bool   `json:"crit"`
+}
+
+// registerGeneralAdditionalClaims adds handlers for general additional claims applied to all subordinates.
+func registerGeneralAdditionalClaims(r fiber.Router, kv model.KeyValueStore) {
+	g := r.Group("/subordinates/additional-claims")
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+
+	// Helper to load claims from KV
+	loadClaims := func() ([]generalAdditionalClaim, error) {
+		var claims []generalAdditionalClaim
+		found, err := kv.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, &claims)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return []generalAdditionalClaim{}, nil
+		}
+		return claims, nil
+	}
+
+	// Helper to save claims to KV
+	saveClaims := func(claims []generalAdditionalClaim) error {
+		return kv.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, claims)
+	}
+
+	// Helper to find next ID
+	nextID := func(claims []generalAdditionalClaim) int {
+		maxID := 0
+		for _, c := range claims {
+			if c.ID > maxID {
+				maxID = c.ID
+			}
+		}
+		return maxID + 1
+	}
+
+	// GET / - List all general additional claims
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			claims, err := loadClaims()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(claims)
+		},
+	)
+
+	// PUT / - Replace all general additional claims
+	withCacheWipe.Put(
+		"/", func(c *fiber.Ctx) error {
+			var req []model.AddAdditionalClaim
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			claims := make([]generalAdditionalClaim, len(req))
+			for i, r := range req {
+				claims[i] = generalAdditionalClaim{
+					ID:    i + 1,
+					Claim: r.Claim,
+					Value: r.Value,
+					Crit:  r.Crit,
+				}
+			}
+			if err := saveClaims(claims); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(claims)
+		},
+	)
+
+	// POST / - Add a single general additional claim
+	withCacheWipe.Post(
+		"/", func(c *fiber.Ctx) error {
+			var req model.AddAdditionalClaim
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			claims, err := loadClaims()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			// Check for duplicate claim name
+			for _, existing := range claims {
+				if existing.Claim == req.Claim {
+					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("claim already exists"))
+				}
+			}
+			newClaim := generalAdditionalClaim{
+				ID:    nextID(claims),
+				Claim: req.Claim,
+				Value: req.Value,
+				Crit:  req.Crit,
+			}
+			claims = append(claims, newClaim)
+			if err = saveClaims(claims); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.Status(fiber.StatusCreated).JSON(newClaim)
+		},
+	)
+
+	// GET /:additionalClaimsID - Get a single general additional claim
+	g.Get(
+		"/:additionalClaimsID", func(c *fiber.Ctx) error {
+			idStr := c.Params("additionalClaimsID")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid additionalClaimsID"))
+			}
+			claims, err := loadClaims()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			for _, claim := range claims {
+				if claim.ID == id {
+					return c.JSON(claim)
+				}
+			}
+			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("additional claim not found"))
+		},
+	)
+
+	// PUT /:additionalClaimsID - Update a single general additional claim
+	withCacheWipe.Put(
+		"/:additionalClaimsID", func(c *fiber.Ctx) error {
+			idStr := c.Params("additionalClaimsID")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid additionalClaimsID"))
+			}
+			var req model.AddAdditionalClaim
+			if err := c.BodyParser(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			claims, err := loadClaims()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			found := -1
+			for i, claim := range claims {
+				if claim.ID == id {
+					found = i
+					break
+				}
+			}
+			if found == -1 {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("additional claim not found"))
+			}
+			// Check for duplicate claim name (excluding current)
+			if req.Claim != "" && req.Claim != claims[found].Claim {
+				for i, existing := range claims {
+					if i != found && existing.Claim == req.Claim {
+						return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("claim already exists"))
+					}
+				}
+				claims[found].Claim = req.Claim
+			}
+			claims[found].Value = req.Value
+			claims[found].Crit = req.Crit
+			if err := saveClaims(claims); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(claims[found])
+		},
+	)
+
+	// DELETE /:additionalClaimsID - Delete a single general additional claim
+	withCacheWipe.Delete(
+		"/:additionalClaimsID", func(c *fiber.Ctx) error {
+			idStr := c.Params("additionalClaimsID")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid additionalClaimsID"))
+			}
+			claims, err := loadClaims()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			found := -1
+			for i, claim := range claims {
+				if claim.ID == id {
+					found = i
+					break
+				}
+			}
+			if found == -1 {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("additional claim not found"))
+			}
+			claims = append(claims[:found], claims[found+1:]...)
+			if err := saveClaims(claims); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.SendStatus(fiber.StatusNoContent)
 		},
 	)
 }
