@@ -12,7 +12,11 @@ import (
 )
 
 // registerSubordinateKeys registers JWKS endpoints for subordinates.
-func registerSubordinateKeys(r fiber.Router, subordinates model.SubordinateStorageBackend) {
+func registerSubordinateKeys(
+	r fiber.Router,
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) {
 	g := r.Group("/subordinates/:subordinateID/jwks")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
 
@@ -20,13 +24,13 @@ func registerSubordinateKeys(r fiber.Router, subordinates model.SubordinateStora
 	g.Get("/", handleGetSubordinateJWKS(subordinates))
 
 	// PUT / - Replace subordinate JWKS
-	withCacheWipe.Put("/", handlePutSubordinateJWKS(subordinates))
+	withCacheWipe.Put("/", handlePutSubordinateJWKS(subordinates, recorder))
 
 	// POST / - Add JWK to subordinate JWKS
-	withCacheWipe.Post("/", handlePostSubordinateJWK(subordinates))
+	withCacheWipe.Post("/", handlePostSubordinateJWK(subordinates, recorder))
 
 	// DELETE /:kid - Remove JWK by kid from subordinate JWKS
-	withCacheWipe.Delete("/:kid", handleDeleteSubordinateJWK(subordinates))
+	withCacheWipe.Delete("/:kid", handleDeleteSubordinateJWK(subordinates, recorder))
 }
 
 func handleGetSubordinateJWKS(subordinates model.SubordinateStorageBackend) fiber.Handler {
@@ -43,11 +47,15 @@ func handleGetSubordinateJWKS(subordinates model.SubordinateStorageBackend) fibe
 	}
 }
 
-func handlePutSubordinateJWKS(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePutSubordinateJWKS(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		// Verify subordinate exists
-		if _, err := handleSubordinateLookup(c, subordinates); err != nil {
+		info, err := handleSubordinateLookup(c, subordinates)
+		if err != nil {
 			return err
 		}
 		var body model.JWKS
@@ -58,11 +66,16 @@ func handlePutSubordinateJWKS(subordinates model.SubordinateStorageBackend) fibe
 		if err != nil {
 			return writeServerError(c, err)
 		}
+		// Record JWKS replaced event
+		recorder.Record(info.ID, model.EventTypeJWKSReplaced)
 		return c.JSON(updatedJWKS)
 	}
 }
 
-func handlePostSubordinateJWK(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePostSubordinateJWK(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		info, err := handleSubordinateLookup(c, subordinates)
@@ -96,11 +109,17 @@ func handlePostSubordinateJWK(subordinates model.SubordinateStorageBackend) fibe
 		if err != nil {
 			return writeServerError(c, err)
 		}
+		// Record JWK added event
+		kid, _ := key.KeyID()
+		recorder.Record(info.ID, model.EventTypeJWKAdded, WithMessage("key added: "+kid))
 		return c.Status(fiber.StatusCreated).JSON(updatedJWKS)
 	}
 }
 
-func handleDeleteSubordinateJWK(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handleDeleteSubordinateJWK(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		kid := c.Params("kid")
@@ -132,6 +151,8 @@ func handleDeleteSubordinateJWK(subordinates model.SubordinateStorageBackend) fi
 		if _, err = subordinates.UpdateJWKSByDBID(id, info.JWKS); err != nil {
 			return writeServerError(c, err)
 		}
+		// Record JWK removed event
+		recorder.Record(info.ID, model.EventTypeJWKRemoved, WithMessage("key removed: "+kid))
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }

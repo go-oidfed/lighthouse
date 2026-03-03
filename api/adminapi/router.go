@@ -97,7 +97,7 @@ func Register(
 	// Entity Configuration Trust Marks
 	registerEntityTrustMarks(r)
 	// Subordinates - all handlers registered via single entry point
-	RegisterSubordinateHandlers(r, storages.Subordinates, storages.KV, fedEntity)
+	RegisterSubordinateHandlers(r, storages.Subordinates, storages.SubordinateEvents, storages.KV, fedEntity)
 	// Trust Mark Types and Issuance
 	registerTrustMarkTypes(r, storages.TrustMarkTypes)
 	// Global Owners and Issuers

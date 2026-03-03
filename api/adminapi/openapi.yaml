@@ -2716,6 +2716,53 @@ paths:
     get:
       tags:
         - Subordinates
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of events to return (default 50, max 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Number of events to skip for pagination.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: type
+          in: query
+          description: Filter events by type.
+          schema:
+            type: string
+            enum:
+              - created
+              - deleted
+              - status_updated
+              - updated
+              - jwk_added
+              - jwk_removed
+              - jwks_replaced
+              - metadata_updated
+              - metadata_deleted
+              - policy_updated
+              - policy_deleted
+              - constraints_updated
+              - constraints_deleted
+              - claims_updated
+              - claim_deleted
+        - name: from
+          in: query
+          description: Filter events with timestamp >= this value (unix seconds).
+          schema:
+            type: integer
+        - name: to
+          in: query
+          description: Filter events with timestamp <= this value (unix seconds).
+          schema:
+            type: integer
       responses:
         '200':
           content:
@@ -2729,23 +2776,31 @@ paths:
                       - timestamp: 1724242320
                         type: created
                         status: active
-                        message: Subordinate registered
-                        actor: admin@example.org
+                        message: "subordinate created: https://rp.example.org"
+                        actor: null
                       - timestamp: 1725184800
                         type: jwk_added
-                        message: Added signing key
-                        actor: admin@example.org
+                        message: "key added: key-12345"
+                        actor: null
                       - timestamp: 1726392600
                         type: metadata_updated
-                        message: Updated OP metadata
-                        actor: admin@example.org
-          description: Successful response returning the subordinate's event history.
+                        message: "entity type: openid_relying_party"
+                        actor: null
+                    pagination:
+                      total: 25
+                      limit: 50
+                      offset: 0
+          description: Successful response returning the subordinate's event history with pagination.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getSubordinateHistory
       summary: Get subordinate event history
+      description: |
+        Retrieves the event history for a subordinate. Events are ordered by timestamp descending (newest first).
+        
+        Supports pagination via `limit` and `offset` parameters, and filtering by event type and timestamp range.
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
   /api/v1/admin/subordinates/{subordinateID}/jwks:
@@ -4676,13 +4731,18 @@ components:
           description: The status value to set.
           example: active
     SubordinateHistory:
-      description: History of events related to a subordinate.
+      description: History of events related to a subordinate with pagination information.
       type: object
+      required:
+        - events
+        - pagination
       properties:
         events:
           type: array
           items:
             $ref: '#/components/schemas/SubordinateEvent'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
     SubordinateEvent:
       description: A single event in subordinate history.
       type: object
@@ -4695,19 +4755,52 @@ components:
           description: Unix timestamp (seconds since epoch) when the event occurred.
         type:
           type: string
-          description: The type/category of the event (e.g., created, deleted, jwk_added).
+          description: The type/category of the event.
+          enum:
+            - created
+            - deleted
+            - status_updated
+            - updated
+            - jwk_added
+            - jwk_removed
+            - jwks_replaced
+            - metadata_updated
+            - metadata_deleted
+            - policy_updated
+            - policy_deleted
+            - constraints_updated
+            - constraints_deleted
+            - claims_updated
+            - claim_deleted
         status:
           type: string
           description: Subordinate status at the time of the event, if applicable.
           nullable: true
         message:
           type: string
-          description: Optional descriptive message.
+          description: Optional descriptive message providing context for the event.
           nullable: true
         actor:
           type: string
           description: Optional identifier for the actor performing the event.
           nullable: true
+    Pagination:
+      description: Pagination information for list responses.
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+      properties:
+        total:
+          type: integer
+          description: Total number of items matching the query.
+        limit:
+          type: integer
+          description: Maximum number of items returned per page.
+        offset:
+          type: integer
+          description: Number of items skipped.
     TrustMarkOwner:
       description: Owner of a trust mark type.
       required:

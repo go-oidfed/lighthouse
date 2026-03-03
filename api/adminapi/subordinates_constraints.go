@@ -11,7 +11,10 @@ import (
 
 // registerSubordinateConstraints registers subordinate-specific constraint endpoints.
 func registerSubordinateConstraints(
-	r fiber.Router, subordinates model.SubordinateStorageBackend, kv model.KeyValueStore,
+	r fiber.Router,
+	subordinates model.SubordinateStorageBackend,
+	kv model.KeyValueStore,
+	recorder *eventRecorder,
 ) {
 	g := r.Group("/subordinates/:subordinateID/constraints")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
@@ -20,29 +23,29 @@ func registerSubordinateConstraints(
 	g.Get("/", handleGetSubordinateConstraints(subordinates))
 
 	// PUT / - Replace subordinate constraints
-	withCacheWipe.Put("/", handlePutSubordinateConstraints(subordinates))
+	withCacheWipe.Put("/", handlePutSubordinateConstraints(subordinates, recorder))
 
 	// POST / - Copy general constraints to subordinate
-	withCacheWipe.Post("/", handlePostSubordinateConstraints(subordinates, kv))
+	withCacheWipe.Post("/", handlePostSubordinateConstraints(subordinates, kv, recorder))
 
 	// DELETE / - Delete subordinate constraints
-	withCacheWipe.Delete("/", handleDeleteSubordinateConstraints(subordinates))
+	withCacheWipe.Delete("/", handleDeleteSubordinateConstraints(subordinates, recorder))
 
 	// Max path length endpoints
 	g.Get("/max-path-length", handleGetSubordinateMaxPathLength(subordinates))
-	withCacheWipe.Put("/max-path-length", handlePutSubordinateMaxPathLength(subordinates))
-	withCacheWipe.Delete("/max-path-length", handleDeleteSubordinateMaxPathLength(subordinates))
+	withCacheWipe.Put("/max-path-length", handlePutSubordinateMaxPathLength(subordinates, recorder))
+	withCacheWipe.Delete("/max-path-length", handleDeleteSubordinateMaxPathLength(subordinates, recorder))
 
 	// Naming constraints endpoints
 	g.Get("/naming-constraints", handleGetSubordinateNamingConstraints(subordinates))
-	withCacheWipe.Put("/naming-constraints", handlePutSubordinateNamingConstraints(subordinates))
-	withCacheWipe.Delete("/naming-constraints", handleDeleteSubordinateNamingConstraints(subordinates))
+	withCacheWipe.Put("/naming-constraints", handlePutSubordinateNamingConstraints(subordinates, recorder))
+	withCacheWipe.Delete("/naming-constraints", handleDeleteSubordinateNamingConstraints(subordinates, recorder))
 
 	// Allowed entity types endpoints
 	g.Get("/allowed-entity-types", handleGetSubordinateAllowedEntityTypes(subordinates))
-	withCacheWipe.Put("/allowed-entity-types", handlePutSubordinateAllowedEntityTypes(subordinates))
-	withCacheWipe.Post("/allowed-entity-types", handlePostSubordinateAllowedEntityTypes(subordinates))
-	withCacheWipe.Delete("/allowed-entity-types/:entityType", handleDeleteSubordinateAllowedEntityType(subordinates))
+	withCacheWipe.Put("/allowed-entity-types", handlePutSubordinateAllowedEntityTypes(subordinates, recorder))
+	withCacheWipe.Post("/allowed-entity-types", handlePostSubordinateAllowedEntityTypes(subordinates, recorder))
+	withCacheWipe.Delete("/allowed-entity-types/:entityType", handleDeleteSubordinateAllowedEntityType(subordinates, recorder))
 }
 
 // Helper to get general constraints from KV store
@@ -71,7 +74,10 @@ func handleGetSubordinateConstraints(subordinates model.SubordinateStorageBacken
 	}
 }
 
-func handlePutSubordinateConstraints(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePutSubordinateConstraints(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -88,11 +94,16 @@ func handlePutSubordinateConstraints(subordinates model.SubordinateStorageBacken
 		if err := subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsUpdated)
 		return c.JSON(body)
 	}
 }
 
-func handlePostSubordinateConstraints(subordinates model.SubordinateStorageBackend, kv model.KeyValueStore) fiber.Handler {
+func handlePostSubordinateConstraints(
+	subordinates model.SubordinateStorageBackend,
+	kv model.KeyValueStore,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -111,11 +122,15 @@ func handlePostSubordinateConstraints(subordinates model.SubordinateStorageBacke
 		if err = subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsUpdated, WithMessage("copied from general"))
 		return c.Status(fiber.StatusCreated).JSON(info.Constraints)
 	}
 }
 
-func handleDeleteSubordinateConstraints(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handleDeleteSubordinateConstraints(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -125,6 +140,7 @@ func handleDeleteSubordinateConstraints(subordinates model.SubordinateStorageBac
 		if err := subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsDeleted)
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
@@ -142,7 +158,10 @@ func handleGetSubordinateMaxPathLength(subordinates model.SubordinateStorageBack
 	}
 }
 
-func handlePutSubordinateMaxPathLength(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePutSubordinateMaxPathLength(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -165,11 +184,15 @@ func handlePutSubordinateMaxPathLength(subordinates model.SubordinateStorageBack
 		if err := subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsUpdated, WithMessage("max_path_length"))
 		return c.JSON(mpl)
 	}
 }
 
-func handleDeleteSubordinateMaxPathLength(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handleDeleteSubordinateMaxPathLength(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -180,6 +203,7 @@ func handleDeleteSubordinateMaxPathLength(subordinates model.SubordinateStorageB
 			if err := subordinates.Update(info.EntityID, *info); err != nil {
 				return writeServerError(c, err)
 			}
+			recorder.Record(info.ID, model.EventTypeConstraintsDeleted, WithMessage("max_path_length"))
 		}
 		return c.SendStatus(fiber.StatusNoContent)
 	}
@@ -198,7 +222,10 @@ func handleGetSubordinateNamingConstraints(subordinates model.SubordinateStorage
 	}
 }
 
-func handlePutSubordinateNamingConstraints(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePutSubordinateNamingConstraints(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -215,11 +242,15 @@ func handlePutSubordinateNamingConstraints(subordinates model.SubordinateStorage
 		if err := subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsUpdated, WithMessage("naming_constraints"))
 		return c.JSON(body)
 	}
 }
 
-func handleDeleteSubordinateNamingConstraints(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handleDeleteSubordinateNamingConstraints(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -230,6 +261,7 @@ func handleDeleteSubordinateNamingConstraints(subordinates model.SubordinateStor
 			if err := subordinates.Update(info.EntityID, *info); err != nil {
 				return writeServerError(c, err)
 			}
+			recorder.Record(info.ID, model.EventTypeConstraintsDeleted, WithMessage("naming_constraints"))
 		}
 		return c.SendStatus(fiber.StatusNoContent)
 	}
@@ -248,7 +280,10 @@ func handleGetSubordinateAllowedEntityTypes(subordinates model.SubordinateStorag
 	}
 }
 
-func handlePutSubordinateAllowedEntityTypes(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePutSubordinateAllowedEntityTypes(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -265,11 +300,15 @@ func handlePutSubordinateAllowedEntityTypes(subordinates model.SubordinateStorag
 		if err := subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"))
 		return c.JSON(info.Constraints.AllowedEntityTypes)
 	}
 }
 
-func handlePostSubordinateAllowedEntityTypes(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePostSubordinateAllowedEntityTypes(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		info, err := handleSubordinateLookup(c, subordinates)
 		if err != nil {
@@ -292,11 +331,15 @@ func handlePostSubordinateAllowedEntityTypes(subordinates model.SubordinateStora
 		if err := subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"))
 		return c.Status(fiber.StatusCreated).JSON(info.Constraints.AllowedEntityTypes)
 	}
 }
 
-func handleDeleteSubordinateAllowedEntityType(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handleDeleteSubordinateAllowedEntityType(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		entityType := c.Params("entityType")
 		info, err := handleSubordinateLookup(c, subordinates)
@@ -322,6 +365,7 @@ func handleDeleteSubordinateAllowedEntityType(subordinates model.SubordinateStor
 		if err := subordinates.Update(info.EntityID, *info); err != nil {
 			return writeServerError(c, err)
 		}
+		recorder.Record(info.ID, model.EventTypeConstraintsDeleted, WithMessage("allowed_entity_types"))
 		return c.JSON(info.Constraints.AllowedEntityTypes)
 	}
 }

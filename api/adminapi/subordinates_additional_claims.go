@@ -11,7 +11,11 @@ import (
 )
 
 // registerSubordinateAdditionalClaims adds handlers for subordinate-specific additional claims.
-func registerSubordinateAdditionalClaims(r fiber.Router, subordinates model.SubordinateStorageBackend) {
+func registerSubordinateAdditionalClaims(
+	r fiber.Router,
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) {
 	g := r.Group("/subordinates/:subordinateID/additional-claims")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
 
@@ -19,19 +23,19 @@ func registerSubordinateAdditionalClaims(r fiber.Router, subordinates model.Subo
 	g.Get("/", handleListSubordinateAdditionalClaims(subordinates))
 
 	// PUT / - Replace all additional claims for a subordinate
-	withCacheWipe.Put("/", handlePutSubordinateAdditionalClaims(subordinates))
+	withCacheWipe.Put("/", handlePutSubordinateAdditionalClaims(subordinates, recorder))
 
 	// POST / - Create a single additional claim
-	withCacheWipe.Post("/", handlePostSubordinateAdditionalClaim(subordinates))
+	withCacheWipe.Post("/", handlePostSubordinateAdditionalClaim(subordinates, recorder))
 
 	// GET /:additionalClaimsID - Get a single additional claim
 	g.Get("/:additionalClaimsID", handleGetSubordinateAdditionalClaim(subordinates))
 
 	// PUT /:additionalClaimsID - Update a single additional claim
-	withCacheWipe.Put("/:additionalClaimsID", handleUpdateSubordinateAdditionalClaim(subordinates))
+	withCacheWipe.Put("/:additionalClaimsID", handleUpdateSubordinateAdditionalClaim(subordinates, recorder))
 
 	// DELETE /:additionalClaimsID - Delete a single additional claim
-	withCacheWipe.Delete("/:additionalClaimsID", handleDeleteSubordinateAdditionalClaim(subordinates))
+	withCacheWipe.Delete("/:additionalClaimsID", handleDeleteSubordinateAdditionalClaim(subordinates, recorder))
 }
 
 func handleListSubordinateAdditionalClaims(subordinates model.SubordinateStorageBackend) fiber.Handler {
@@ -49,7 +53,10 @@ func handleListSubordinateAdditionalClaims(subordinates model.SubordinateStorage
 	}
 }
 
-func handlePutSubordinateAdditionalClaims(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePutSubordinateAdditionalClaims(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		var req []model.AddAdditionalClaim
@@ -64,11 +71,19 @@ func handlePutSubordinateAdditionalClaims(subordinates model.SubordinateStorageB
 			}
 			return writeServerError(c, err)
 		}
+		// Get subordinate ID for event recording
+		info, _ := subordinates.GetByDBID(id)
+		if info != nil {
+			recorder.Record(info.ID, model.EventTypeClaimsUpdated)
+		}
 		return c.JSON(claims)
 	}
 }
 
-func handlePostSubordinateAdditionalClaim(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handlePostSubordinateAdditionalClaim(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		var req model.AddAdditionalClaim
@@ -86,6 +101,11 @@ func handlePostSubordinateAdditionalClaim(subordinates model.SubordinateStorageB
 				return writeConflict(c, err.Error())
 			}
 			return writeServerError(c, err)
+		}
+		// Get subordinate ID for event recording
+		info, _ := subordinates.GetByDBID(id)
+		if info != nil {
+			recorder.Record(info.ID, model.EventTypeClaimsUpdated, WithMessage("claim: "+req.Claim))
 		}
 		return c.Status(fiber.StatusCreated).JSON(claim)
 	}
@@ -107,7 +127,10 @@ func handleGetSubordinateAdditionalClaim(subordinates model.SubordinateStorageBa
 	}
 }
 
-func handleUpdateSubordinateAdditionalClaim(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handleUpdateSubordinateAdditionalClaim(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		subID := c.Params("subordinateID")
 		claimID := c.Params("additionalClaimsID")
@@ -127,20 +150,34 @@ func handleUpdateSubordinateAdditionalClaim(subordinates model.SubordinateStorag
 			}
 			return writeServerError(c, err)
 		}
+		// Get subordinate ID for event recording
+		info, _ := subordinates.GetByDBID(subID)
+		if info != nil {
+			recorder.Record(info.ID, model.EventTypeClaimsUpdated, WithMessage("claim: "+req.Claim))
+		}
 		return c.JSON(claim)
 	}
 }
 
-func handleDeleteSubordinateAdditionalClaim(subordinates model.SubordinateStorageBackend) fiber.Handler {
+func handleDeleteSubordinateAdditionalClaim(
+	subordinates model.SubordinateStorageBackend,
+	recorder *eventRecorder,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		subID := c.Params("subordinateID")
 		claimID := c.Params("additionalClaimsID")
+		// Get subordinate info for event recording before delete
+		info, _ := subordinates.GetByDBID(subID)
+
 		if err := subordinates.DeleteAdditionalClaim(subID, claimID); err != nil {
 			var nf model.NotFoundError
 			if errors.As(err, &nf) {
 				return writeNotFound(c, err.Error())
 			}
 			return writeServerError(c, err)
+		}
+		if info != nil {
+			recorder.Record(info.ID, model.EventTypeClaimDeleted, WithMessage("claim ID: "+claimID))
 		}
 		return c.SendStatus(fiber.StatusNoContent)
 	}

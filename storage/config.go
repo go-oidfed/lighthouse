@@ -136,15 +136,16 @@ func LoadStorageBackends(cfg Config) (model.Backends, error) {
 		return model.Backends{}, err
 	}
 	return model.Backends{
-		Subordinates:     warehouse.SubordinateStorage(),
-		TrustMarks:       warehouse.TrustMarkedEntitiesStorage(),
-		AuthorityHints:   warehouse.AuthorityHintsStorage(),
-		TrustMarkTypes:   warehouse.TrustMarkTypesStorage(),
-		TrustMarkOwners:  warehouse.TrustMarkOwnersStorage(),
-		TrustMarkIssuers: warehouse.TrustMarkIssuersStorage(),
-		AdditionalClaims: warehouse.AdditionalClaimsStorage(),
-		KV:               warehouse.KeyValue(),
-		Users:            warehouse.UsersStorage(),
+		Subordinates:      warehouse.SubordinateStorage(),
+		SubordinateEvents: warehouse.SubordinateEventsStorage(),
+		TrustMarks:        warehouse.TrustMarkedEntitiesStorage(),
+		AuthorityHints:    warehouse.AuthorityHintsStorage(),
+		TrustMarkTypes:    warehouse.TrustMarkTypesStorage(),
+		TrustMarkOwners:   warehouse.TrustMarkOwnersStorage(),
+		TrustMarkIssuers:  warehouse.TrustMarkIssuersStorage(),
+		AdditionalClaims:  warehouse.AdditionalClaimsStorage(),
+		KV:                warehouse.KeyValue(),
+		Users:             warehouse.UsersStorage(),
 		PKStorages: func(s string) public.PublicKeyStorage {
 			return NewDBPublicKeyStorage(warehouse.db, s)
 		},

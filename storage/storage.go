@@ -94,6 +94,11 @@ func (s *Storage) TrustMarkIssuersStorage() *TrustMarkIssuersStorage {
 	return &TrustMarkIssuersStorage{db: s.db}
 }
 
+// SubordinateEventsStorage returns a SubordinateEventsStorage
+func (s *Storage) SubordinateEventsStorage() *SubordinateEventsStorage {
+	return NewSubordinateEventsStorage(s.db)
+}
+
 // DBPublicKeyStorage returns a DBPublicKeyStorage
 func (s *Storage) DBPublicKeyStorage(typeID string) *DBPublicKeyStorage {
 	return NewDBPublicKeyStorage(s.db, typeID)

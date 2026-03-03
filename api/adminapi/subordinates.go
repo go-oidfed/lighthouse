@@ -29,9 +29,13 @@ var DefaultSubordinateStatus = model.StatusActive
 func RegisterSubordinateHandlers(
 	r fiber.Router,
 	subordinates model.SubordinateStorageBackend,
+	events model.SubordinateEventStore,
 	kv model.KeyValueStore,
 	fedEntity oidfed.FederationEntity,
 ) {
+	// Create event recorder for tracking subordinate events
+	recorder := newEventRecorder(events)
+
 	// Register general endpoints first (routes without :subordinateID in the path)
 	// These must be registered before subordinate-specific routes to avoid conflicts
 
@@ -51,23 +55,23 @@ func RegisterSubordinateHandlers(
 	registerGeneralSubordinateLifetime(r, kv)
 
 	// Base CRUD operations: /subordinates, /subordinates/:subordinateID, etc.
-	registerSubordinatesBase(r, subordinates)
+	registerSubordinatesBase(r, subordinates, events, recorder)
 
 	// Statement preview: /subordinates/:subordinateID/statement
 	registerSubordinateStatement(r, subordinates, kv, fedEntity)
 
 	// Subordinate-specific metadata: /subordinates/:subordinateID/metadata/*
-	registerSubordinateMetadata(r, subordinates)
+	registerSubordinateMetadata(r, subordinates, recorder)
 
 	// Subordinate-specific metadata policies: /subordinates/:subordinateID/metadata-policies/*
-	registerSubordinateMetadataPolicies(r, subordinates, kv)
+	registerSubordinateMetadataPolicies(r, subordinates, kv, recorder)
 
 	// Subordinate-specific constraints: /subordinates/:subordinateID/constraints/*
-	registerSubordinateConstraints(r, subordinates, kv)
+	registerSubordinateConstraints(r, subordinates, kv, recorder)
 
 	// Subordinate-specific JWKS: /subordinates/:subordinateID/jwks/*
-	registerSubordinateKeys(r, subordinates)
+	registerSubordinateKeys(r, subordinates, recorder)
 
 	// Subordinate-specific additional claims: /subordinates/:subordinateID/additional-claims/*
-	registerSubordinateAdditionalClaims(r, subordinates)
+	registerSubordinateAdditionalClaims(r, subordinates, recorder)
 }
