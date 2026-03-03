@@ -193,3 +193,19 @@ func deleteEntityMetadata(md *oidfed.Metadata, et string) {
 	}
 	delete(md.Extra, et)
 }
+
+// subordinateHasKeys checks if a subordinate has any JWKS keys defined.
+func subordinateHasKeys(info *model.ExtendedSubordinateInfo) bool {
+	if info == nil {
+		return false
+	}
+	return info.JWKS.Keys.Set != nil && info.JWKS.Keys.Len() > 0
+}
+
+// jwksHasKeys checks if a JWKS has any keys defined.
+func jwksHasKeys(jwks *model.JWKS) bool {
+	if jwks == nil {
+		return false
+	}
+	return jwks.Keys.Set != nil && jwks.Keys.Len() > 0
+}

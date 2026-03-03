@@ -2679,6 +2679,10 @@ paths:
     put:
       tags:
         - Subordinates
+      summary: Change subordinate status
+      description: |
+        Change the status of a subordinate entity.
+        Note: Setting status to "active" requires the subordinate to have at least one key in its JWKS.
       requestBody:
         content:
           application/json:
@@ -2693,13 +2697,19 @@ paths:
                 $ref: '#/components/schemas/Subordinate'
           description: Successfully changed subordinate status.
         '400':
-          $ref: '#/components/responses/BadRequestError'
+          description: |
+            Bad request. This can occur if:
+            - The status value is invalid
+            - Attempting to set status to "active" when the subordinate has no keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: changeSubordinateStatus
-      summary: Change subordinate status
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
   /api/v1/admin/subordinates/{subordinateID}/history:
@@ -4528,7 +4538,10 @@ components:
           - openid_provider
           - openid_relying_party
     AddSubordinate:
-      description: Data to create a new subordinate entity.
+      description: |
+        Data to create a new subordinate entity.
+        Note: Status "active" requires the subordinate to have at least one key in jwks.
+        If no status is provided, defaults to "active" (requires jwks to be provided).
       required:
         - entity_id
       type: object
@@ -4537,7 +4550,9 @@ components:
           $ref: '#/components/schemas/EntityID'
           description: The Entity ID (identifier) of the subordinate.
         status:
-          description: Initial status of the subordinate. Defaults to "active" if not provided.
+          description: |
+            Initial status of the subordinate. Defaults to "active" if not provided.
+            Note: "active" status requires jwks with at least one key.
           type: string
           enum:
             - active
@@ -4555,10 +4570,10 @@ components:
             type: string
         jwks:
           $ref: '#/components/schemas/Jwks'
-          description: Optional JWKS for the subordinate.
+          description: JWKS for the subordinate. Required if status is "active".
       example:
         entity_id: https://subordinate.example.com
-        status: active
+        status: pending
         description: My subordinate entity
         registered_entity_types:
           - openid_provider

@@ -94,6 +94,10 @@ func handleCreateSubordinate(subordinates model.SubordinateStorageBackend) fiber
 		if !req.Status.Valid() {
 			return writeBadRequest(c, "invalid status")
 		}
+		// Active status requires at least one key
+		if req.Status == model.StatusActive && !jwksHasKeys(&req.JWKS) {
+			return writeBadRequest(c, "status cannot be active without keys")
+		}
 		if err := subordinates.Add(req); err != nil {
 			return writeServerError(c, err)
 		}
@@ -170,6 +174,22 @@ func handleUpdateSubordinateStatus(subordinates model.SubordinateStorageBackend)
 		var status model.Status
 		if err := c.BodyParser(&status); err != nil {
 			return writeBadBody(c)
+		}
+		if !status.Valid() {
+			return writeBadRequest(c, "invalid status")
+		}
+		// Check if setting to active - need to verify subordinate has keys
+		if status == model.StatusActive {
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return writeServerError(c, err)
+			}
+			if info == nil {
+				return writeNotFound(c, "subordinate not found")
+			}
+			if !subordinateHasKeys(info) {
+				return writeBadRequest(c, "status cannot be active without keys")
+			}
 		}
 		if err := subordinates.UpdateStatusByDBID(id, status); err != nil {
 			return writeServerError(c, err)
