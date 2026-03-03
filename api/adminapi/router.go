@@ -104,6 +104,7 @@ func Register(
 	registerGeneralSubordinateLifetime(r, storages.KV)
 	registerGeneralAdditionalClaims(r, storages.KV)
 	registerSubordinates(r, storages.Subordinates)
+	registerSubordinateStatement(r, storages.Subordinates, storages.KV, fedEntity)
 	// Subordinate metadata, policies, constraints, keys, additional claims
 	registerSubordinateMetadata(r, storages.Subordinates)
 	registerSubordinateMetadataPolicies(r, storages.Subordinates, storages.KV)

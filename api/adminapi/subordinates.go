@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
@@ -176,7 +178,8 @@ func registerSubordinates(r fiber.Router, subordinates model.SubordinateStorageB
 			return c.JSON(info)
 		},
 	)
-	g.Get("/:subordinateID/statement", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"statement": fiber.Map{}}) })
+
+	// Subordinate history (placeholder)
 	g.Get(
 		"/:subordinateID/history", func(c *fiber.Ctx) error {
 			// Placeholder: hook into events model.SubordinateEvent when available
@@ -185,6 +188,122 @@ func registerSubordinates(r fiber.Router, subordinates model.SubordinateStorageB
 	)
 
 	// Subordinate additional claims - handlers registered separately in registerSubordinateAdditionalClaims
+}
+
+// registerSubordinateStatement adds the handler for previewing subordinate statement data.
+func registerSubordinateStatement(
+	r fiber.Router,
+	subordinates model.SubordinateStorageBackend,
+	kv model.KeyValueStore,
+	fedEntity oidfed.FederationEntity,
+) {
+	r.Get(
+		"/subordinates/:subordinateID/statement", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := subordinates.GetByDBID(id)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if info == nil {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("subordinate not found"))
+			}
+
+			// Build the statement payload (same logic as CreateSubordinateStatement in lighthouse.go)
+			payload := buildSubordinateStatementPayload(info, kv, fedEntity.EntityID())
+			return c.JSON(payload)
+		},
+	)
+}
+
+// buildSubordinateStatementPayload creates an EntityStatementPayload for preview purposes.
+// This mirrors the logic in lighthouse.CreateSubordinateStatement but without SourceEndpoint
+// since that's only known at the fetch endpoint.
+func buildSubordinateStatementPayload(
+	subordinate *model.ExtendedSubordinateInfo,
+	kv model.KeyValueStore,
+	issuer string,
+) oidfed.EntityStatementPayload {
+	now := time.Now()
+	lifetime, err := storage.GetSubordinateStatementLifetime(kv)
+	if err != nil {
+		lifetime = storage.DefaultSubordinateStatementLifetime
+	}
+
+	// Build extra claims and critical extensions from subordinate additional claims
+	extra := make(map[string]any)
+	var criticalExtensions []string
+	for _, claim := range subordinate.SubordinateAdditionalClaims {
+		extra[claim.Claim] = claim.Value
+		if claim.Crit {
+			criticalExtensions = append(criticalExtensions, claim.Claim)
+		}
+	}
+
+	// Load metadata policy crit from KV store and filter to only used operators
+	var configuredCritOperators []oidfed.PolicyOperatorName
+	_, _ = kv.GetAs(
+		model.KeyValueScopeSubordinateStatement,
+		model.KeyValueKeyMetadataPolicyCrit,
+		&configuredCritOperators,
+	)
+	metadataPolicyCrit := filterUsedPolicyOperators(subordinate.MetadataPolicy, configuredCritOperators)
+
+	return oidfed.EntityStatementPayload{
+		Issuer:             issuer,
+		Subject:            subordinate.EntityID,
+		IssuedAt:           unixtime.Unixtime{Time: now},
+		ExpiresAt:          unixtime.Unixtime{Time: now.Add(lifetime)},
+		JWKS:               subordinate.JWKS.Keys,
+		Metadata:           subordinate.Metadata,
+		MetadataPolicy:     subordinate.MetadataPolicy,
+		Constraints:        subordinate.Constraints,
+		CriticalExtensions: criticalExtensions,
+		MetadataPolicyCrit: metadataPolicyCrit,
+		Extra:              extra,
+	}
+}
+
+// filterUsedPolicyOperators returns only the operators from configuredCrit that are actually
+// used in the given metadata policy.
+func filterUsedPolicyOperators(mp *oidfed.MetadataPolicies, configuredCrit []oidfed.PolicyOperatorName) []oidfed.PolicyOperatorName {
+	if mp == nil || len(configuredCrit) == 0 {
+		return nil
+	}
+
+	// Collect all operators used in the metadata policy
+	usedOperators := make(map[oidfed.PolicyOperatorName]bool)
+	collectOperatorsFromPolicy := func(policy oidfed.MetadataPolicy) {
+		if policy == nil {
+			return
+		}
+		for _, entry := range policy {
+			for op := range entry {
+				usedOperators[op] = true
+			}
+		}
+	}
+
+	// Check all standard entity type policies
+	collectOperatorsFromPolicy(mp.OpenIDProvider)
+	collectOperatorsFromPolicy(mp.RelyingParty)
+	collectOperatorsFromPolicy(mp.OAuthAuthorizationServer)
+	collectOperatorsFromPolicy(mp.OAuthClient)
+	collectOperatorsFromPolicy(mp.OAuthProtectedResource)
+	collectOperatorsFromPolicy(mp.FederationEntity)
+
+	// Check extra policies
+	for _, policy := range mp.Extra {
+		collectOperatorsFromPolicy(policy)
+	}
+
+	// Filter configured crit operators to only those actually used
+	var result []oidfed.PolicyOperatorName
+	for _, op := range configuredCrit {
+		if usedOperators[op] {
+			result = append(result, op)
+		}
+	}
+	return result
 }
 
 // General metadata policies (no subordinateID)
