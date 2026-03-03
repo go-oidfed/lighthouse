@@ -70,7 +70,7 @@ func (s *SubordinateStorage) Get(entityID string) (*model.ExtendedSubordinateInf
 	var dbInfo model.ExtendedSubordinateInfo
 	result := s.db.Where(
 		"entity_id = ?", entityID,
-	).Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").Preload("MetadataPolicyCrit").First(&dbInfo)
+	).Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").First(&dbInfo)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -86,7 +86,7 @@ func (s *SubordinateStorage) Get(entityID string) (*model.ExtendedSubordinateInf
 // GetByDBID retrieves a subordinate by DB primary key
 func (s *SubordinateStorage) GetByDBID(id string) (*model.ExtendedSubordinateInfo, error) {
 	var dbInfo model.ExtendedSubordinateInfo
-	result := s.db.Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").Preload("MetadataPolicyCrit").First(&dbInfo, id)
+	result := s.db.Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").First(&dbInfo, id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil

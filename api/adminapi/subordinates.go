@@ -2216,15 +2216,105 @@ func registerSubordinateKeys(r fiber.Router, subordinates model.SubordinateStora
 	)
 }
 
-// Subordinate crit is managed via the additional-claims endpoints; no separate crit endpoints
-
-func registerSubordinateMetadataPolicyCrit(r fiber.Router) {
+// registerSubordinateMetadataPolicyCrit adds handlers for the general metadata policy crit endpoints.
+// These are stored in the KV store and apply to all subordinate statements.
+func registerSubordinateMetadataPolicyCrit(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/metadata-policy-crit")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
-	g.Get("/", func(c *fiber.Ctx) error { return c.JSON([]string{}) })
-	withCacheWipe.Put("/", func(c *fiber.Ctx) error { return c.JSON([]string{}) })
-	withCacheWipe.Post("/", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusCreated) })
-	withCacheWipe.Delete("/:operator", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+
+	// Helper to load crit operators from KV
+	loadCrit := func() ([]string, error) {
+		var operators []string
+		found, err := kv.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicyCrit, &operators)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return []string{}, nil
+		}
+		return operators, nil
+	}
+
+	// Helper to save crit operators to KV
+	saveCrit := func(operators []string) error {
+		return kv.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicyCrit, operators)
+	}
+
+	// GET / - List all critical metadata policy operators
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			operators, err := loadCrit()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(operators)
+		},
+	)
+
+	// PUT / - Replace all critical metadata policy operators
+	withCacheWipe.Put(
+		"/", func(c *fiber.Ctx) error {
+			var operators []string
+			if err := c.BodyParser(&operators); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if err := saveCrit(operators); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(operators)
+		},
+	)
+
+	// POST / - Add a critical metadata policy operator
+	withCacheWipe.Post(
+		"/", func(c *fiber.Ctx) error {
+			var operator string
+			if err := c.BodyParser(&operator); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			operators, err := loadCrit()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			// Check if already exists
+			for _, op := range operators {
+				if op == operator {
+					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("operator already exists"))
+				}
+			}
+			operators = append(operators, operator)
+			if err := saveCrit(operators); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.Status(fiber.StatusCreated).JSON(operator)
+		},
+	)
+
+	// DELETE /:operator - Remove a critical metadata policy operator
+	withCacheWipe.Delete(
+		"/:operator", func(c *fiber.Ctx) error {
+			operator := c.Params("operator")
+			operators, err := loadCrit()
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			found := -1
+			for i, op := range operators {
+				if op == operator {
+					found = i
+					break
+				}
+			}
+			if found == -1 {
+				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("operator not found"))
+			}
+			operators = append(operators[:found], operators[found+1:]...)
+			if err := saveCrit(operators); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		},
+	)
 }
 
 // registerGeneralSubordinateLifetime adds handlers for the general subordinate lifetime endpoints.

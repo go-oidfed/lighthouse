@@ -373,6 +373,20 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSubo
 		}
 	}
 
+	// Load metadata policy crit from KV store (global setting for all subordinates)
+	// and filter to only include operators that are actually used in the metadata policy
+	var configuredCritOperators []oidfed.PolicyOperatorName
+	if _, err := fed.storages.KV.GetAs(
+		model.KeyValueScopeSubordinateStatement,
+		model.KeyValueKeyMetadataPolicyCrit,
+		&configuredCritOperators,
+	); err != nil {
+		log.WithError(err).Warn("failed to get metadata policy crit from KV store")
+	}
+
+	// Filter to only include operators actually used in the metadata policy
+	metadataPolicyCrit := filterUsedOperators(subordinate.MetadataPolicy, configuredCritOperators)
+
 	return oidfed.EntityStatementPayload{
 		Issuer:             fed.FederationEntity.EntityID(),
 		Subject:            subordinate.EntityID,
@@ -384,9 +398,52 @@ func (fed LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSubo
 		MetadataPolicy:     subordinate.MetadataPolicy,
 		Constraints:        subordinate.Constraints,
 		CriticalExtensions: criticalExtensions,
-		MetadataPolicyCrit: subordinate.MetadataPolicyCrit.ToPolicyOperatorNames(),
+		MetadataPolicyCrit: metadataPolicyCrit,
 		Extra:              extra,
 	}
+}
+
+// filterUsedOperators returns only the operators from configuredCrit that are actually
+// used in the given metadata policy.
+func filterUsedOperators(mp *oidfed.MetadataPolicies, configuredCrit []oidfed.PolicyOperatorName) []oidfed.PolicyOperatorName {
+	if mp == nil || len(configuredCrit) == 0 {
+		return nil
+	}
+
+	// Collect all operators used in the metadata policy
+	usedOperators := make(map[oidfed.PolicyOperatorName]bool)
+	collectOperatorsFromPolicy := func(policy oidfed.MetadataPolicy) {
+		if policy == nil {
+			return
+		}
+		for _, entry := range policy {
+			for op := range entry {
+				usedOperators[op] = true
+			}
+		}
+	}
+
+	// Check all standard entity type policies
+	collectOperatorsFromPolicy(mp.OpenIDProvider)
+	collectOperatorsFromPolicy(mp.RelyingParty)
+	collectOperatorsFromPolicy(mp.OAuthAuthorizationServer)
+	collectOperatorsFromPolicy(mp.OAuthClient)
+	collectOperatorsFromPolicy(mp.OAuthProtectedResource)
+	collectOperatorsFromPolicy(mp.FederationEntity)
+
+	// Check extra policies
+	for _, policy := range mp.Extra {
+		collectOperatorsFromPolicy(policy)
+	}
+
+	// Filter configured crit operators to only those actually used
+	var result []oidfed.PolicyOperatorName
+	for _, op := range configuredCrit {
+		if usedOperators[op] {
+			result = append(result, op)
+		}
+	}
+	return result
 }
 
 // AdminAPIOptions controls initialization of the admin API.

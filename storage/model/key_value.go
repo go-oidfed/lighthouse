@@ -11,15 +11,16 @@ const (
 	KeyValueScopeSubordinateStatement = "subordinate_statement"
 	KeyValueScopeSigning              = "signing"
 
-	KeyValueKeyLifetime         = "lifetime"
-	KeyValueKeyMetadataPolicy   = "metadata_policy"
-	KeyValueKeyMetadata         = "metadata"
-	KeyValueKeyConstraints      = "constraints"
-	KeyValueKeyCriticalClaims   = "crit"
-	KeyValueKeyAlg              = "alg"
-	KeyValueKeyRSAKeyLen        = "rsa_key_len"
-	KeyValueKeyKeyRotation      = "key_rotation"
-	KeyValueKeyAdditionalClaims = "additional_claims"
+	KeyValueKeyLifetime           = "lifetime"
+	KeyValueKeyMetadataPolicy     = "metadata_policy"
+	KeyValueKeyMetadata           = "metadata"
+	KeyValueKeyConstraints        = "constraints"
+	KeyValueKeyCriticalClaims     = "crit"
+	KeyValueKeyAlg                = "alg"
+	KeyValueKeyRSAKeyLen          = "rsa_key_len"
+	KeyValueKeyKeyRotation        = "key_rotation"
+	KeyValueKeyAdditionalClaims   = "additional_claims"
+	KeyValueKeyMetadataPolicyCrit = "metadata_policy_crit"
 )
 
 // KeyValue stores arbitrary key-value data.

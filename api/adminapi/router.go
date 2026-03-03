@@ -110,7 +110,7 @@ func Register(
 	registerSubordinateConstraints(r, storages.Subordinates, storages.KV)
 	registerSubordinateKeys(r, storages.Subordinates)
 	registerSubordinateAdditionalClaims(r, storages.Subordinates)
-	registerSubordinateMetadataPolicyCrit(r)
+	registerSubordinateMetadataPolicyCrit(r, storages.KV)
 	// Trust Mark Types and Issuance
 	registerTrustMarkTypes(r, storages.TrustMarkTypes)
 	// Global Owners and Issuers

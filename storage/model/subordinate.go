@@ -9,6 +9,7 @@ import (
 
 // ExtendedSubordinateInfo holds information about a subordinate for storage
 // Table name is set to `subordinates` to replace legacy `subordinate_infos`.
+// Note: MetadataPolicyCrit is stored globally in the KV store, not per-subordinate.
 type ExtendedSubordinateInfo struct {
 	BasicSubordinateInfo
 	JWKSID                      uint                            `json:"-"`
@@ -16,7 +17,6 @@ type ExtendedSubordinateInfo struct {
 	Metadata                    *oidfed.Metadata                `gorm:"serializer:json" json:"metadata,omitempty"`
 	MetadataPolicy              *oidfed.MetadataPolicies        `gorm:"serializer:json" json:"metadata_policy,omitempty"`
 	Constraints                 *oidfed.ConstraintSpecification `gorm:"serializer:json" json:"constraints,omitempty"`
-	MetadataPolicyCrit          PolicyOperators                 `gorm:"many2many:subordinates_policy_operators" json:"metadata_policy_crit,omitempty"`
 	SubordinateAdditionalClaims []SubordinateAdditionalClaim    `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"additional_claims,omitempty"`
 }
 
