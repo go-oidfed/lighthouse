@@ -356,11 +356,16 @@ func (fed LightHouse) Start() {
 // CreateSubordinateStatement returns an oidfed.EntityStatementPayload for the passed storage.ExtendedSubordinateInfo
 func (fed LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSubordinateInfo) oidfed.EntityStatementPayload {
 	now := time.Now()
+	lifetime, err := storage.GetSubordinateStatementLifetime(fed.storages.KV)
+	if err != nil {
+		log.WithError(err).Warn("failed to get subordinate statement lifetime, using default")
+		lifetime = storage.DefaultSubordinateStatementLifetime
+	}
 	return oidfed.EntityStatementPayload{
 		Issuer:         fed.FederationEntity.EntityID(),
 		Subject:        subordinate.EntityID,
 		IssuedAt:       unixtime.Unixtime{Time: now},
-		ExpiresAt:      unixtime.Unixtime{Time: now.Add(fed.SubordinateStatementLifetime)},
+		ExpiresAt:      unixtime.Unixtime{Time: now.Add(lifetime)},
 		SourceEndpoint: fed.fedMetadata.FederationFetchEndpoint,
 		JWKS:           subordinate.JWKS.Keys,
 		Metadata:       subordinate.Metadata,

@@ -9,6 +9,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/go-oidfed/lighthouse/storage"
 	smodel "github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -129,8 +130,8 @@ func registerEntityConfiguration(
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			if !found {
-				seconds = 0
+			if !found || seconds <= 0 {
+				seconds = int(storage.DefaultEntityConfigurationLifetime.Seconds())
 			}
 			return c.JSON(seconds)
 		},

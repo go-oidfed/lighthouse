@@ -55,10 +55,16 @@ func GetAuthorityHints(store model.AuthorityHintsStore) ([]string, error) {
 	return hints, nil
 }
 
+// DefaultEntityConfigurationLifetime is the default lifetime for entity configurations (24 hours)
+const DefaultEntityConfigurationLifetime = 24 * time.Hour
+
+// DefaultSubordinateStatementLifetime is the default lifetime for subordinate statements (600000 seconds)
+const DefaultSubordinateStatementLifetime = 600000 * time.Second
+
 // GetEntityConfigurationLifetime returns the entity configuration lifetime
 func GetEntityConfigurationLifetime(kvStorage model.KeyValueStore) (time.Duration, error) {
 	if kvStorage == nil {
-		return 0, nil
+		return DefaultEntityConfigurationLifetime, nil
 	}
 	var seconds int
 	found, err := kvStorage.GetAs(model.KeyValueScopeEntityConfiguration, model.KeyValueKeyLifetime, &seconds)
@@ -66,7 +72,23 @@ func GetEntityConfigurationLifetime(kvStorage model.KeyValueStore) (time.Duratio
 		return 0, err
 	}
 	if !found || seconds <= 0 {
-		return 24 * time.Hour, nil
+		return DefaultEntityConfigurationLifetime, nil
+	}
+	return time.Duration(seconds) * time.Second, nil
+}
+
+// GetSubordinateStatementLifetime returns the subordinate statement lifetime
+func GetSubordinateStatementLifetime(kvStorage model.KeyValueStore) (time.Duration, error) {
+	if kvStorage == nil {
+		return DefaultSubordinateStatementLifetime, nil
+	}
+	var seconds int
+	found, err := kvStorage.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, &seconds)
+	if err != nil {
+		return 0, err
+	}
+	if !found || seconds <= 0 {
+		return DefaultSubordinateStatementLifetime, nil
 	}
 	return time.Duration(seconds) * time.Second, nil
 }

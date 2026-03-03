@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 
+	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -2100,124 +2101,132 @@ func registerSubordinateKeys(r fiber.Router, subordinates model.SubordinateStora
 	}
 
 	// GET subordinate JWKS
-	g.Get("/", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	g.Get(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		// Return empty JWKS if none exists
-		if info.JWKS.Keys.Set == nil {
-			return c.JSON(fiber.Map{"keys": []any{}})
-		}
-		return c.JSON(info.JWKS)
-	})
+			// Return empty JWKS if none exists
+			if info.JWKS.Keys.Set == nil {
+				return c.JSON(fiber.Map{"keys": []any{}})
+			}
+			return c.JSON(info.JWKS)
+		},
+	)
 
 	// PUT replace subordinate JWKS
-	withCacheWipe.Put("/", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		// Verify subordinate exists
-		if _, err := getSub(id); err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	withCacheWipe.Put(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			// Verify subordinate exists
+			if _, err := getSub(id); err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		var body model.JWKS
-		if err := c.BodyParser(&body); err != nil {
-			return writeBadBody(c)
-		}
-		updatedJWKS, err := subordinates.UpdateJWKSByDBID(id, body)
-		if err != nil {
-			return writeServerError(c, err)
-		}
-		return c.JSON(updatedJWKS)
-	})
+			var body model.JWKS
+			if err := c.BodyParser(&body); err != nil {
+				return writeBadBody(c)
+			}
+			updatedJWKS, err := subordinates.UpdateJWKSByDBID(id, body)
+			if err != nil {
+				return writeServerError(c, err)
+			}
+			return c.JSON(updatedJWKS)
+		},
+	)
 
 	// POST add JWK to subordinate JWKS
-	withCacheWipe.Post("/", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	withCacheWipe.Post(
+		"/", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		// Parse single JWK from body
-		var jwkMap map[string]any
-		if err := json.Unmarshal(c.Body(), &jwkMap); err != nil {
-			return writeBadBody(c)
-		}
-		// Convert to jwk.Key
-		keyData, err := json.Marshal(jwkMap)
-		if err != nil {
-			return writeBadBody(c)
-		}
-		key, err := jwk.ParseKey(keyData)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid JWK: " + err.Error()))
-		}
-		// Initialize JWKS if nil
-		if info.JWKS.Keys.Set == nil {
-			info.JWKS.Keys = jwx.NewJWKS()
-		}
-		// Add key to set
-		if err := info.JWKS.Keys.AddKey(key); err != nil {
-			return writeServerError(c, err)
-		}
-		// Use UpdateJWKSByDBID to properly persist and get correct ID
-		updatedJWKS, err := subordinates.UpdateJWKSByDBID(id, info.JWKS)
-		if err != nil {
-			return writeServerError(c, err)
-		}
-		return c.Status(fiber.StatusCreated).JSON(updatedJWKS)
-	})
+			// Parse single JWK from body
+			var jwkMap map[string]any
+			if err := json.Unmarshal(c.Body(), &jwkMap); err != nil {
+				return writeBadBody(c)
+			}
+			// Convert to jwk.Key
+			keyData, err := json.Marshal(jwkMap)
+			if err != nil {
+				return writeBadBody(c)
+			}
+			key, err := jwk.ParseKey(keyData)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid JWK: " + err.Error()))
+			}
+			// Initialize JWKS if nil
+			if info.JWKS.Keys.Set == nil {
+				info.JWKS.Keys = jwx.NewJWKS()
+			}
+			// Add key to set
+			if err := info.JWKS.Keys.AddKey(key); err != nil {
+				return writeServerError(c, err)
+			}
+			// Use UpdateJWKSByDBID to properly persist and get correct ID
+			updatedJWKS, err := subordinates.UpdateJWKSByDBID(id, info.JWKS)
+			if err != nil {
+				return writeServerError(c, err)
+			}
+			return c.Status(fiber.StatusCreated).JSON(updatedJWKS)
+		},
+	)
 
 	// DELETE remove JWK by kid from subordinate JWKS
-	withCacheWipe.Delete("/:kid", func(c *fiber.Ctx) error {
-		id := c.Params("subordinateID")
-		kid := c.Params("kid")
-		info, err := getSub(id)
-		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
-				return writeNotFound(c, err.Error())
+	withCacheWipe.Delete(
+		"/:kid", func(c *fiber.Ctx) error {
+			id := c.Params("subordinateID")
+			kid := c.Params("kid")
+			info, err := getSub(id)
+			if err != nil {
+				var nf model.NotFoundError
+				if errors.As(err, &nf) {
+					return writeNotFound(c, err.Error())
+				}
+				return writeServerError(c, err)
 			}
-			return writeServerError(c, err)
-		}
-		if info.JWKS.Keys.Set == nil {
+			if info.JWKS.Keys.Set == nil {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			// Find and remove the key with matching kid
+			found := false
+			for i := 0; i < info.JWKS.Keys.Len(); i++ {
+				key, ok := info.JWKS.Keys.Key(i)
+				if !ok {
+					continue
+				}
+				keyID, _ := key.KeyID()
+				if keyID == kid {
+					_ = info.JWKS.Keys.RemoveKey(key)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return c.SendStatus(fiber.StatusNoContent)
+			}
+			// Persist the updated JWKS
+			if _, err = subordinates.UpdateJWKSByDBID(id, info.JWKS); err != nil {
+				return writeServerError(c, err)
+			}
 			return c.SendStatus(fiber.StatusNoContent)
-		}
-		// Find and remove the key with matching kid
-		found := false
-		for i := 0; i < info.JWKS.Keys.Len(); i++ {
-			key, ok := info.JWKS.Keys.Key(i)
-			if !ok {
-				continue
-			}
-			keyID, _ := key.KeyID()
-			if keyID == kid {
-				_ = info.JWKS.Keys.RemoveKey(key)
-				found = true
-				break
-			}
-		}
-		if !found {
-			return c.SendStatus(fiber.StatusNoContent)
-		}
-		// Persist the updated JWKS
-		if _, err = subordinates.UpdateJWKSByDBID(id, info.JWKS); err != nil {
-			return writeServerError(c, err)
-		}
-		return c.SendStatus(fiber.StatusNoContent)
-	})
+		},
+	)
 }
 
 // Subordinate crit is managed via the additional-claims endpoints; no separate crit endpoints
@@ -2229,4 +2238,47 @@ func registerSubordinateMetadataPolicyCrit(r fiber.Router) {
 	withCacheWipe.Put("/", func(c *fiber.Ctx) error { return c.JSON([]string{}) })
 	withCacheWipe.Post("/", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusCreated) })
 	withCacheWipe.Delete("/:operator", func(c *fiber.Ctx) error { return c.SendStatus(fiber.StatusNoContent) })
+}
+
+// registerGeneralSubordinateLifetime adds handlers for the general subordinate lifetime endpoints.
+func registerGeneralSubordinateLifetime(r fiber.Router, kv model.KeyValueStore) {
+	g := r.Group("/subordinates")
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+
+	// GET /subordinates/lifetime - Get general subordinate lifetime in seconds
+	g.Get(
+		"/lifetime", func(c *fiber.Ctx) error {
+			var seconds int
+			found, err := kv.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, &seconds)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if !found || seconds <= 0 {
+				seconds = int(storage.DefaultSubordinateStatementLifetime.Seconds())
+			}
+			return c.JSON(seconds)
+		},
+	)
+
+	// PUT /subordinates/lifetime - Update general subordinate lifetime in seconds
+	withCacheWipe.Put(
+		"/lifetime", func(c *fiber.Ctx) error {
+			if len(c.Body()) == 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
+			}
+			var seconds int
+			if err := json.Unmarshal(c.Body(), &seconds); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			}
+			if seconds < 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("lifetime must be non-negative"))
+			}
+			if err := kv.SetAny(
+				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, seconds,
+			); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			return c.JSON(seconds)
+		},
+	)
 }
