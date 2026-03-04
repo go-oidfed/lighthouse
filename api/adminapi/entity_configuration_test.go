@@ -28,11 +28,11 @@ func (m *mockFederationEntity) EntityID() string { return m.entityID }
 func (m *mockFederationEntity) EntityConfigurationPayload() (*oidfed.EntityStatementPayload, error) {
 	return m.entityConfigurationPayloadFn()
 }
-func (m *mockFederationEntity) EntityConfigurationJWT() ([]byte, error) { return nil, nil }
-func (m *mockFederationEntity) SignEntityStatement(_ oidfed.EntityStatementPayload) ([]byte, error) {
+func (_ *mockFederationEntity) EntityConfigurationJWT() ([]byte, error) { return nil, nil }
+func (_ *mockFederationEntity) SignEntityStatement(_ oidfed.EntityStatementPayload) ([]byte, error) {
 	return nil, nil
 }
-func (m *mockFederationEntity) SignEntityStatementWithHeaders(_ oidfed.EntityStatementPayload, _ jws.Headers) ([]byte, error) {
+func (_ *mockFederationEntity) SignEntityStatementWithHeaders(_ oidfed.EntityStatementPayload, _ jws.Headers) ([]byte, error) {
 	return nil, nil
 }
 
