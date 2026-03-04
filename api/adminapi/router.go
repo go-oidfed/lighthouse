@@ -108,6 +108,11 @@ func Register(
 	if opts == nil || opts.UsersEnabled {
 		registerUsers(r, storages.Users)
 	}
+	// Stats API (if stats storage is available)
+	if storages.Stats != nil {
+		statsAPI := NewStatsAPI(storages.Stats)
+		statsAPI.RegisterRoutes(r.Group("/stats"))
+	}
 	return nil
 }
 

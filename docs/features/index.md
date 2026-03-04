@@ -41,3 +41,12 @@
     - [X] Automatic, configurable Checks for Trust Mark Issuance  
 - [X] Automatically refresh trust marks in Entity Configuration  
 - [X] Support for multiple signing keys
+- [X] Statistics & Analytics
+    - [X] Capture request metrics (timing, status, errors)
+    - [X] Client tracking (IP, User-Agent, country via GeoIP)
+    - [X] Query parameter tracking
+    - [X] REST API for statistics queries
+    - [X] CLI commands for statistics
+    - [X] CSV/JSON export
+    - [X] Automatic daily aggregation
+    - [X] Configurable data retention

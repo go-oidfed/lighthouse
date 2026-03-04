@@ -106,6 +106,7 @@ The following is an example `config.yaml` file:
 - [:material-signature-freehand: Signing](signing.md)
 - [:material-routes: Endpoints](endpoints.md)
 - [:simple-openid: Federation Data](federation_data.md)
+- [:material-chart-line: Statistics](stats.md)
 
 </div>
 

@@ -10,6 +10,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 
+	"github.com/go-oidfed/lighthouse/internal/stats"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -40,6 +41,13 @@ var models = []any{
 	&model.User{},
 }
 
+// statsModels contains models for the stats feature.
+// These are migrated separately when stats is enabled.
+var statsModels = []any{
+	&stats.RequestLog{},
+	&stats.DailyStats{},
+}
+
 // NewStorage creates a new GORM-based storage
 func NewStorage(config Config) (*Storage, error) {
 	db, err := Connect(config)
@@ -62,6 +70,25 @@ func NewStorage(config Config) (*Storage, error) {
 		db:         db,
 		userParams: params,
 	}, nil
+}
+
+// MigrateStats migrates the stats-related tables.
+// This is called separately when stats collection is enabled.
+func MigrateStats(db *gorm.DB) error {
+	return db.AutoMigrate(statsModels...)
+}
+
+// MigrateStatsFromBackends migrates stats tables using a StatsStorage backend.
+// This is a convenience function for when you only have access to Backends.
+func MigrateStatsFromBackends(backends model.Backends) error {
+	if backends.Stats == nil {
+		return nil
+	}
+	// Try to get the underlying db from the stats storage
+	if ss, ok := backends.Stats.(*StatsStorage); ok {
+		return MigrateStats(ss.db)
+	}
+	return nil
 }
 
 // SubordinateStorage returns a SubordinateStorageBackend

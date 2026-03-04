@@ -161,6 +161,7 @@ func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool) model.Backen
 		PKStorages: func(typeID string) public.PublicKeyStorage {
 			return NewDBPublicKeyStorage(db, typeID)
 		},
+		Stats: NewStatsStorage(db),
 	}
 
 	if withTransaction {

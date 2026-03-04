@@ -76,6 +76,29 @@ func main() {
 	// 	}
 	// }
 
+	// Build stats options from config
+	statsOpts := lighthouse.StatsOptions{
+		Enabled:             c.Stats.Enabled,
+		BufferSize:          c.Stats.Buffer.Size,
+		FlushInterval:       c.Stats.Buffer.FlushInterval,
+		FlushThreshold:      c.Stats.Buffer.FlushThreshold,
+		CaptureClientIP:     c.Stats.Capture.ClientIP,
+		CaptureUserAgent:    c.Stats.Capture.UserAgent,
+		CaptureQueryParams:  c.Stats.Capture.QueryParams,
+		GeoIPEnabled:        c.Stats.Capture.GeoIP.Enabled,
+		GeoIPDBPath:         c.Stats.Capture.GeoIP.DatabasePath,
+		DetailedRetention:   c.Stats.DetailedRetention(),
+		AggregatedRetention: c.Stats.AggregatedRetention(),
+		Endpoints:           c.Stats.Endpoints,
+	}
+
+	// Migrate stats tables if stats is enabled
+	if c.Stats.Enabled {
+		if err := storage.MigrateStatsFromBackends(backs); err != nil {
+			log.WithError(err).Warn("failed to migrate stats tables")
+		}
+	}
+
 	lh, err := lighthouse.NewLightHouse(
 		config.Get().Server,
 		c.Federation.EntityID,
@@ -90,6 +113,7 @@ func main() {
 			UsersEnabled: c.API.Admin.UsersEnabled,
 			Port:         c.API.Admin.Port,
 		},
+		statsOpts,
 	)
 	if err != nil {
 		panic(err)

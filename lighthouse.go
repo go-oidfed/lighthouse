@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
 	"github.com/go-oidfed/lighthouse/internal"
+	"github.com/go-oidfed/lighthouse/internal/stats"
 	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/internal/version"
 	"github.com/go-oidfed/lighthouse/storage"
@@ -68,6 +69,7 @@ type LightHouse struct {
 	LogoBanner     bool
 	VersionBanner  bool
 	storages       model.Backends
+	statsCollector *stats.Collector
 }
 
 // SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
@@ -99,6 +101,7 @@ func NewLightHouse(
 	stmtConfig SubordinateStatementsConfig,
 	storages model.Backends,
 	admin AdminAPIOptions,
+	statsOpts StatsOptions,
 ) (
 	*LightHouse,
 	error,
@@ -142,6 +145,33 @@ func NewLightHouse(
 	server.Use(compress.New())
 	server.Use(logger.New())
 	server.Use(requestid.New())
+
+	// Initialize stats collector if enabled
+	var statsCollector *stats.Collector
+	if statsOpts.Enabled && storages.Stats != nil {
+		statsCollector, err = stats.NewCollector(stats.Config{
+			Enabled:             true,
+			BufferSize:          statsOpts.BufferSize,
+			FlushInterval:       statsOpts.FlushInterval,
+			FlushThreshold:      statsOpts.FlushThreshold,
+			CaptureClientIP:     statsOpts.CaptureClientIP,
+			CaptureUserAgent:    statsOpts.CaptureUserAgent,
+			CaptureQueryParams:  statsOpts.CaptureQueryParams,
+			GeoIPEnabled:        statsOpts.GeoIPEnabled,
+			GeoIPDBPath:         statsOpts.GeoIPDBPath,
+			DetailedRetention:   statsOpts.DetailedRetention,
+			AggregatedRetention: statsOpts.AggregatedRetention,
+			Endpoints:           statsOpts.Endpoints,
+		}, storages.Stats)
+		if err != nil {
+			log.WithError(err).Warn("failed to initialize stats collector, statistics disabled")
+			statsCollector = nil
+		} else {
+			// Add stats middleware to capture request metrics
+			server.Use(statsCollector.Middleware())
+		}
+	}
+
 	entity := &LightHouse{
 		TrustMarkIssuer:             oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
 		GeneralJWTSigner:            generalSigner,
@@ -152,6 +182,7 @@ func NewLightHouse(
 		VersionBanner:               true,
 		keyManagement:               keyManagement,
 		storages:                    storages,
+		statsCollector:              statsCollector,
 	}
 
 	entity.FederationEntity = &oidfed.DynamicFederationEntity{
@@ -320,6 +351,11 @@ func (fed LightHouse) banner() {
 func (fed LightHouse) Start() {
 	fed.banner()
 
+	// Start stats collector if enabled
+	if fed.statsCollector != nil {
+		fed.statsCollector.Start()
+	}
+
 	conf := fed.serverConf
 	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
 		log.WithField("port", conf.AdminAPIPort).Info("starting admin api server")
@@ -351,6 +387,29 @@ func (fed LightHouse) Start() {
 	time.Sleep(time.Millisecond) // This is just for a more pretty output with the tls header printed after the http one
 	log.Info("TLS enabled, starting https server on port 443")
 	log.WithError(fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key)).Fatal()
+}
+
+// Stop gracefully shuts down the LightHouse server and its components.
+func (fed *LightHouse) Stop() error {
+	// Stop stats collector if running
+	if fed.statsCollector != nil {
+		if err := fed.statsCollector.Stop(); err != nil {
+			log.WithError(err).Warn("error stopping stats collector")
+		}
+	}
+
+	// Shutdown fiber servers
+	if err := fed.server.Shutdown(); err != nil {
+		return err
+	}
+
+	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
+		if err := fed.adminAPIServer.Shutdown(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // CreateSubordinateStatement returns an oidfed.EntityStatementPayload for the passed storage.ExtendedSubordinateInfo
@@ -452,4 +511,43 @@ type AdminAPIOptions struct {
 	UsersEnabled bool
 	// Port: 0 mounts on main server under /api/v1/admin; >0 starts a separate server on this port
 	Port int
+}
+
+// StatsOptions controls initialization of statistics collection.
+type StatsOptions struct {
+	// Enabled controls whether statistics collection is active.
+	Enabled bool
+
+	// BufferSize is the maximum number of entries in the ring buffer.
+	BufferSize int
+
+	// FlushInterval is how often the buffer is flushed to the database.
+	FlushInterval time.Duration
+
+	// FlushThreshold triggers a flush when the buffer is this percentage full.
+	FlushThreshold float64
+
+	// CaptureClientIP enables recording client IP addresses.
+	CaptureClientIP bool
+
+	// CaptureUserAgent enables recording User-Agent headers.
+	CaptureUserAgent bool
+
+	// CaptureQueryParams enables recording URL query parameters.
+	CaptureQueryParams bool
+
+	// GeoIPEnabled enables country lookup from IP addresses.
+	GeoIPEnabled bool
+
+	// GeoIPDBPath is the path to a MaxMind GeoLite2-Country.mmdb file.
+	GeoIPDBPath string
+
+	// DetailedRetention is how long to keep individual request logs.
+	DetailedRetention time.Duration
+
+	// AggregatedRetention is how long to keep daily aggregated statistics.
+	AggregatedRetention time.Duration
+
+	// Endpoints is a list of endpoint paths to track. Empty means all federation endpoints.
+	Endpoints []string
 }

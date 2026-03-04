@@ -24,6 +24,7 @@ type Backends struct {
 	KV                KeyValueStore
 	Users             UsersStore
 	PKStorages        func(string) public.PublicKeyStorage
+	Stats             StatsStorageBackend
 
 	// Transaction wraps multiple storage operations in a single DB transaction.
 	// All backends provided to the TransactionFunc operate within the same transaction.
