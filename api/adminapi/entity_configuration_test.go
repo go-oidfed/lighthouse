@@ -1571,3 +1571,540 @@ func TestDeleteMetadataClaim(t *testing.T) {
 		}
 	})
 }
+
+func TestGetMetadataEntityType(t *testing.T) {
+	stubFedEntity := &mockFederationEntity{
+		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
+			return &oidfed.EntityStatementPayload{}, nil
+		},
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{"openid_provider":{"issuer":"https://example.com"}}`), nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+		var got map[string]json.RawMessage
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("failed to decode: %v", err)
+		}
+		if string(got["issuer"]) != `"https://example.com"` {
+			t.Errorf("expected url, got %s", got["issuer"])
+		}
+	})
+
+	t.Run("NoMetadataStored", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if string(body) != "{}" {
+			t.Errorf("expected {}, got %s", body)
+		}
+	})
+
+	t.Run("EntityTypeNotFound", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{"oauth_client":{"x":1}}`), nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if string(body) != "{}" {
+			t.Errorf("expected {}, got %s", body)
+		}
+	})
+
+	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{bad-json`), nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, errors.New("db error")
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestPutMetadataEntityType(t *testing.T) {
+	stubFedEntity := &mockFederationEntity{
+		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
+			return &oidfed.EntityStatementPayload{}, nil
+		},
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{"openid_provider":{"old":1},"other":{}}`), nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					s := string(value)
+					if strings.Contains(s, `"old":1`) {
+						t.Errorf("should have replaced openid_provider entirely: %s", s)
+					}
+					if !strings.Contains(s, `"new":2`) {
+						t.Errorf("should contain new value: %s", s)
+					}
+					if !strings.Contains(s, `"other"`) {
+						t.Errorf("should retain other types: %s", s)
+					}
+					return nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{},
+		)
+
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`not-json`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreGetError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, errors.New("db error")
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreSetError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					return errors.New("db error")
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{bad-json`), nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestPostMetadataEntityType(t *testing.T) {
+	stubFedEntity := &mockFederationEntity{
+		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
+			return &oidfed.EntityStatementPayload{}, nil
+		},
+	}
+
+	t.Run("Success_MergesInto", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{"openid_provider":{"old":1}}`), nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					s := string(value)
+					if !strings.Contains(s, `"old":1`) || !strings.Contains(s, `"new":2`) {
+						t.Errorf("should merge existing and new: %s", s)
+					}
+					return nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("Success_CreatesNew", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					s := string(value)
+					if !strings.Contains(s, `"openid_provider":{"new":2}`) {
+						t.Errorf("should create new: %s", s)
+					}
+					return nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{},
+		)
+
+		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`not-json`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreGetError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, errors.New("db error")
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreSetError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					return errors.New("db error")
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{bad-json`), nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestDeleteMetadataEntityType(t *testing.T) {
+	stubFedEntity := &mockFederationEntity{
+		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
+			return &oidfed.EntityStatementPayload{}, nil
+		},
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{"openid_provider":{"target":123},"other":{}}`), nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					s := string(value)
+					if strings.Contains(s, `"openid_provider"`) {
+						t.Errorf("entity type was not deleted: %s", s)
+					}
+					if !strings.Contains(s, `"other"`) {
+						t.Errorf("wrong entity type deleted: %s", s)
+					}
+					return nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NoMetadataStored", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{bad-json`), nil
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreGetError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return nil, errors.New("db error")
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreSetError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{"openid_provider":{"target":123}}`), nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					return errors.New("db error")
+				},
+			},
+		)
+
+		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+}
