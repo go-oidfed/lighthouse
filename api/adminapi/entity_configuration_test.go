@@ -550,3 +550,131 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 		}
 	})
 }
+
+func TestPutAdditionalClaimByID(t *testing.T) {
+	stubFedEntity := &mockFederationEntity{
+		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
+			return &oidfed.EntityStatementPayload{}, nil
+		},
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{
+				updateFn: func(ident string, item smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
+					return &smodel.EntityConfigurationAdditionalClaim{
+						ID: 5, Claim: item.Claim, Value: item.Value, Crit: item.Crit,
+					}, nil
+				},
+			},
+			&mockKeyValueStore{},
+		)
+
+		body := `{"claim":"org_name","value":"UpdatedACME","crit":true}`
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		var got smodel.EntityConfigurationAdditionalClaim
+		if err := json.Unmarshal(respBody, &got); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
+		if got.Claim != "org_name" || got.Crit != true {
+			t.Errorf("unexpected response: %+v", got)
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{},
+		)
+
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader("bad"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{
+				updateFn: func(_ string, _ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
+					return nil, smodel.NotFoundError("not found")
+				},
+			},
+			&mockKeyValueStore{},
+		)
+
+		body := `{"claim":"org_name","value":"X","crit":false}`
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/999", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("expected status 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("AlreadyExists", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{
+				updateFn: func(_ string, _ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
+					return nil, smodel.AlreadyExistsError("duplicate claim")
+				},
+			},
+			&mockKeyValueStore{},
+		)
+
+		body := `{"claim":"org_name","value":"X","crit":false}`
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusConflict {
+			t.Fatalf("expected status 409, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{
+				updateFn: func(_ string, _ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
+					return nil, errors.New("db down")
+				},
+			},
+			&mockKeyValueStore{},
+		)
+
+		body := `{"claim":"org_name","value":"X","crit":false}`
+		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+}
