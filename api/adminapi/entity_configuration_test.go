@@ -197,3 +197,68 @@ func TestGetEntityConfiguration(t *testing.T) {
 		}
 	})
 }
+
+func TestGetAdditionalClaims(t *testing.T) {
+	stubFedEntity := &mockFederationEntity{
+		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
+			return &oidfed.EntityStatementPayload{}, nil
+		},
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		claims := []smodel.EntityConfigurationAdditionalClaim{
+			{ID: 1, Claim: "org_name", Value: "ACME", Crit: false},
+			{ID: 2, Claim: "policy_uri", Value: "https://example.com/policy", Crit: true},
+		}
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{
+				listFn: func() ([]smodel.EntityConfigurationAdditionalClaim, error) {
+					return claims, nil
+				},
+			},
+			&mockKeyValueStore{},
+		)
+
+		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/additional-claims", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		var got []smodel.EntityConfigurationAdditionalClaim
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
+		if len(got) != 2 {
+			t.Fatalf("expected 2 claims, got %d", len(got))
+		}
+		if got[0].Claim != "org_name" {
+			t.Errorf("expected first claim %q, got %q", "org_name", got[0].Claim)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			stubFedEntity,
+			&mockAdditionalClaimsStore{
+				listFn: func() ([]smodel.EntityConfigurationAdditionalClaim, error) {
+					return nil, errors.New("db down")
+				},
+			},
+			&mockKeyValueStore{},
+		)
+
+		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/additional-claims", nil)
+		resp, err := app.Test(req, -1)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		}
+	})
+}
