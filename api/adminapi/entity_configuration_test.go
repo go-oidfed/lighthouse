@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -16,9 +17,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-// ---------------------------------------------------------------------------
-// Mock: FederationEntity
-// ---------------------------------------------------------------------------
+// --- MOCKS ---
 
 type mockFederationEntity struct {
 	entityID                     string
@@ -36,10 +35,6 @@ func (m *mockFederationEntity) SignEntityStatement(_ oidfed.EntityStatementPaylo
 func (m *mockFederationEntity) SignEntityStatementWithHeaders(_ oidfed.EntityStatementPayload, _ jws.Headers) ([]byte, error) {
 	return nil, nil
 }
-
-// ---------------------------------------------------------------------------
-// Mock: AdditionalClaimsStore
-// ---------------------------------------------------------------------------
 
 type mockAdditionalClaimsStore struct {
 	listFn   func() ([]smodel.EntityConfigurationAdditionalClaim, error)
@@ -69,10 +64,6 @@ func (m *mockAdditionalClaimsStore) Delete(ident string) error {
 	return m.deleteFn(ident)
 }
 
-// ---------------------------------------------------------------------------
-// Mock: KeyValueStore
-// ---------------------------------------------------------------------------
-
 type mockKeyValueStore struct {
 	getFn    func(scope, key string) (datatypes.JSON, error)
 	getAsFn  func(scope, key string, out any) (bool, error)
@@ -97,9 +88,7 @@ func (m *mockKeyValueStore) Delete(scope, key string) error {
 	return m.deleteFn(scope, key)
 }
 
-// ---------------------------------------------------------------------------
-// Test helper: create a Fiber app with the entity configuration routes
-// ---------------------------------------------------------------------------
+// --- TEST HELPERS ---
 
 func setupEntityConfigTestApp(
 	fedEntity oidfed.FederationEntity,
@@ -111,9 +100,31 @@ func setupEntityConfigTestApp(
 	return app
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+// doRequest executes an HTTP request against a Fiber app and returns the
+// response plus the fully-read body.
+func doRequest(t *testing.T, app *fiber.App, req *http.Request) (*http.Response, []byte) {
+	t.Helper()
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("Request %s %s failed: %v", req.Method, req.URL.Path, err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+	return resp, body
+}
+
+// newStubFedEntity creates a mock FederationEntity that returns an empty payload.
+func newStubFedEntity() *mockFederationEntity {
+	return &mockFederationEntity{
+		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
+			return &oidfed.EntityStatementPayload{}, nil
+		},
+	}
+}
+
+// --- TESTS ---
 
 func TestIsUniqueConstraintError(t *testing.T) {
 	tests := []struct {
@@ -156,17 +167,13 @@ func TestGetEntityConfiguration(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
 		var got oidfed.EntityStatementPayload
-		if err := json.Unmarshal(body, &got); err != nil {
+		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to unmarshal response: %v", err)
 		}
 		if got.Issuer != "https://example.com" {
@@ -188,31 +195,22 @@ func TestGetEntityConfiguration(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestGetAdditionalClaims(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		claims := []smodel.EntityConfigurationAdditionalClaim{
 			{ID: 1, Claim: "org_name", Value: "ACME", Crit: false},
 			{ID: 2, Claim: "policy_uri", Value: "https://example.com/policy", Crit: true},
 		}
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				listFn: func() ([]smodel.EntityConfigurationAdditionalClaim, error) {
 					return claims, nil
@@ -221,17 +219,13 @@ func TestGetAdditionalClaims(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/additional-claims", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/additional-claims", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
 		var got []smodel.EntityConfigurationAdditionalClaim
-		if err := json.Unmarshal(body, &got); err != nil {
+		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to unmarshal response: %v", err)
 		}
 		if len(got) != 2 {
@@ -244,7 +238,7 @@ func TestGetAdditionalClaims(t *testing.T) {
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				listFn: func() ([]smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, errors.New("db down")
@@ -253,27 +247,18 @@ func TestGetAdditionalClaims(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/additional-claims", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/additional-claims", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestPutAdditionalClaims(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				setFn: func(items []smodel.AddAdditionalClaim) ([]smodel.EntityConfigurationAdditionalClaim, error) {
 					return []smodel.EntityConfigurationAdditionalClaim{
@@ -285,16 +270,12 @@ func TestPutAdditionalClaims(t *testing.T) {
 		)
 
 		body := `[{"claim":"org_name","value":"ACME","crit":false}]`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		respBody, _ := io.ReadAll(resp.Body)
 		var got []smodel.EntityConfigurationAdditionalClaim
 		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to unmarshal response: %v", err)
@@ -306,25 +287,22 @@ func TestPutAdditionalClaims(t *testing.T) {
 
 	t.Run("InvalidBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims", strings.NewReader("not-json"))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims", strings.NewReader("not-json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("UniqueConstraintError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				setFn: func(_ []smodel.AddAdditionalClaim) ([]smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, errors.New("UNIQUE constraint failed: claims.claim")
@@ -334,20 +312,17 @@ func TestPutAdditionalClaims(t *testing.T) {
 		)
 
 		body := `[{"claim":"org_name","value":"ACME","crit":false}]`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusConflict {
-			t.Fatalf("expected status 409, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 409 {
+			t.Fatalf("Expected status 409, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				setFn: func(_ []smodel.AddAdditionalClaim) ([]smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, errors.New("db down")
@@ -357,28 +332,19 @@ func TestPutAdditionalClaims(t *testing.T) {
 		)
 
 		body := `[{"claim":"org_name","value":"ACME","crit":false}]`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestPostAdditionalClaim(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				createFn: func(item smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return &smodel.EntityConfigurationAdditionalClaim{
@@ -390,16 +356,12 @@ func TestPostAdditionalClaim(t *testing.T) {
 		)
 
 		body := `{"claim":"org_name","value":"ACME","crit":false}`
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/additional-claims", strings.NewReader(body))
+		req := httptest.NewRequest("POST", "/entity-configuration/additional-claims", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 201 {
+			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusCreated {
-			t.Fatalf("expected status 201, got %d", resp.StatusCode)
-		}
-		respBody, _ := io.ReadAll(resp.Body)
 		var got smodel.EntityConfigurationAdditionalClaim
 		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to unmarshal response: %v", err)
@@ -411,25 +373,22 @@ func TestPostAdditionalClaim(t *testing.T) {
 
 	t.Run("InvalidBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/additional-claims", strings.NewReader("bad"))
+		req := httptest.NewRequest("POST", "/entity-configuration/additional-claims", strings.NewReader("bad"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				createFn: func(_ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, smodel.AlreadyExistsError("claim already exists")
@@ -439,20 +398,17 @@ func TestPostAdditionalClaim(t *testing.T) {
 		)
 
 		body := `{"claim":"org_name","value":"ACME","crit":false}`
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/additional-claims", strings.NewReader(body))
+		req := httptest.NewRequest("POST", "/entity-configuration/additional-claims", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusConflict {
-			t.Fatalf("expected status 409, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 409 {
+			t.Fatalf("Expected status 409, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				createFn: func(_ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, errors.New("db down")
@@ -462,28 +418,19 @@ func TestPostAdditionalClaim(t *testing.T) {
 		)
 
 		body := `{"claim":"org_name","value":"ACME","crit":false}`
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/additional-claims", strings.NewReader(body))
+		req := httptest.NewRequest("POST", "/entity-configuration/additional-claims", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestGetAdditionalClaimByID(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				getFn: func(ident string) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return &smodel.EntityConfigurationAdditionalClaim{
@@ -494,15 +441,11 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/additional-claims/42", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/additional-claims/42", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		respBody, _ := io.ReadAll(resp.Body)
 		var got smodel.EntityConfigurationAdditionalClaim
 		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to unmarshal response: %v", err)
@@ -514,24 +457,21 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 
 	t.Run("InvalidID", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/additional-claims/abc", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/additional-claims/abc", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				getFn: func(_ string) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, errors.New("not found")
@@ -540,27 +480,18 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/additional-claims/99", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("expected status 404, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/additional-claims/99", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 404 {
+			t.Fatalf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestPutAdditionalClaimByID(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				updateFn: func(ident string, item smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return &smodel.EntityConfigurationAdditionalClaim{
@@ -572,16 +503,12 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 		)
 
 		body := `{"claim":"org_name","value":"UpdatedACME","crit":true}`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims/5", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		respBody, _ := io.ReadAll(resp.Body)
 		var got smodel.EntityConfigurationAdditionalClaim
 		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to unmarshal response: %v", err)
@@ -593,25 +520,22 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 
 	t.Run("InvalidBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader("bad"))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims/5", strings.NewReader("bad"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				updateFn: func(_ string, _ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, smodel.NotFoundError("not found")
@@ -621,20 +545,17 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 		)
 
 		body := `{"claim":"org_name","value":"X","crit":false}`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/999", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims/999", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("expected status 404, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 404 {
+			t.Fatalf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				updateFn: func(_ string, _ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, smodel.AlreadyExistsError("duplicate claim")
@@ -644,20 +565,17 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 		)
 
 		body := `{"claim":"org_name","value":"X","crit":false}`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims/5", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusConflict {
-			t.Fatalf("expected status 409, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 409 {
+			t.Fatalf("Expected status 409, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				updateFn: func(_ string, _ smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return nil, errors.New("db down")
@@ -667,28 +585,19 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 		)
 
 		body := `{"claim":"org_name","value":"X","crit":false}`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/additional-claims/5", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims/5", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestDeleteAdditionalClaimByID(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				deleteFn: func(ident string) error {
 					return nil
@@ -697,36 +606,30 @@ func TestDeleteAdditionalClaimByID(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/additional-claims/42", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/additional-claims/42", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 204 {
+			t.Fatalf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("InvalidID", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/additional-claims/abc", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/additional-claims/abc", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
 				deleteFn: func(_ string) error {
 					return errors.New("not found error from db")
@@ -735,27 +638,18 @@ func TestDeleteAdditionalClaimByID(t *testing.T) {
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/additional-claims/99", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("expected status 404, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/additional-claims/99", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 404 {
+			t.Fatalf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestGetLifetime(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getAsFn: func(scope, key string, out any) (bool, error) {
@@ -769,23 +663,19 @@ func TestGetLifetime(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/lifetime", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/lifetime", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) != "3600" {
-			t.Errorf("expected 3600, got %q", string(body))
+		if string(respBody) != "3600" {
+			t.Errorf("expected 3600, got %q", string(respBody))
 		}
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getAsFn: func(scope, key string, out any) (bool, error) {
@@ -794,23 +684,19 @@ func TestGetLifetime(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/lifetime", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/lifetime", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) != "86400" {
-			t.Errorf("expected 86400, got %q", string(body))
+		if string(respBody) != "86400" {
+			t.Errorf("expected 86400, got %q", string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getAsFn: func(scope, key string, out any) (bool, error) {
@@ -819,27 +705,41 @@ func TestGetLifetime(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/lifetime", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/lifetime", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+	})
+
+	t.Run("ZeroValueReturnsDefault", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			newStubFedEntity(),
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getAsFn: func(scope, key string, out any) (bool, error) {
+					ptr := out.(*int)
+					*ptr = 0
+					return true, nil
+				},
+			},
+		)
+
+		req := httptest.NewRequest("GET", "/entity-configuration/lifetime", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+		if string(respBody) != "86400" {
+			t.Errorf("expected default 86400 for zero stored value, got %q", string(respBody))
 		}
 	})
 }
 
 func TestPutLifetime(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				setAnyFn: func(scope, key string, v any) error {
@@ -854,78 +754,65 @@ func TestPutLifetime(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/lifetime", strings.NewReader("7200"))
+		req := httptest.NewRequest("PUT", "/entity-configuration/lifetime", strings.NewReader("7200"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) != "7200" {
-			t.Errorf("expected 7200 in response, got %q", string(body))
+		if string(respBody) != "7200" {
+			t.Errorf("expected 7200 in response, got %q", string(respBody))
 		}
 	})
 
 	t.Run("EmptyBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/lifetime", strings.NewReader(""))
+		req := httptest.NewRequest("PUT", "/entity-configuration/lifetime", strings.NewReader(""))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/lifetime", strings.NewReader(`"not-int"`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/lifetime", strings.NewReader(`"not-int"`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400 for string body, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("NegativeValue", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/lifetime", strings.NewReader("-3600"))
+		req := httptest.NewRequest("PUT", "/entity-configuration/lifetime", strings.NewReader("-3600"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400 for negative, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				setAnyFn: func(scope, key string, v any) error {
@@ -934,28 +821,44 @@ func TestPutLifetime(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/lifetime", strings.NewReader("3600"))
+		req := httptest.NewRequest("PUT", "/entity-configuration/lifetime", strings.NewReader("3600"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+	})
+
+	t.Run("ZeroValueSuccess", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			newStubFedEntity(),
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				setAnyFn: func(scope, key string, v any) error {
+					if v.(int) != 0 {
+						t.Errorf("expected 0 to be saved, got %v", v)
+					}
+					return nil
+				},
+			},
+		)
+
+		req := httptest.NewRequest("PUT", "/entity-configuration/lifetime", strings.NewReader("0"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
+		}
+		if string(respBody) != "0" {
+			t.Errorf("expected 0 in response, got %q", string(respBody))
 		}
 	})
 }
 
 func TestGetMetadata(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -967,16 +870,13 @@ func TestGetMetadata(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 		var got oidfed.Metadata
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to parse metadata: %v", err)
 		}
 		if got.OpenIDProvider == nil || got.OpenIDProvider.Issuer != "https://example.com" {
@@ -986,7 +886,7 @@ func TestGetMetadata(t *testing.T) {
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -995,23 +895,19 @@ func TestGetMetadata(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) != "{}" {
-			t.Errorf("expected {}, got %q", string(body))
+		if string(respBody) != "{}" {
+			t.Errorf("expected {}, got %q", string(respBody))
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1020,19 +916,16 @@ func TestGetMetadata(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1041,27 +934,18 @@ func TestGetMetadata(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestPutMetadata(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				setFn: func(scope, key string, value datatypes.JSON) error {
@@ -1076,38 +960,32 @@ func TestPutMetadata(t *testing.T) {
 		)
 
 		body := `{"openid_provider":{"issuer":"https://example.com"}}`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata", strings.NewReader(`"not-an-object"`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata", strings.NewReader(`"not-an-object"`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				setFn: func(scope, key string, value datatypes.JSON) error {
@@ -1117,30 +995,21 @@ func TestPutMetadata(t *testing.T) {
 		)
 
 		body := `{"openid_provider":{"issuer":"https://example.com"}}`
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata", strings.NewReader(body))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestGetMetadataClaim(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	metaJSON := `{"openid_provider":{"issuer":"https://example.com","some_claim":123}}`
 
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1149,23 +1018,19 @@ func TestGetMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider/issuer", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider/issuer", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) != `"https://example.com"` {
-			t.Errorf("expected string JSON, got %s", body)
+		if string(respBody) != `"https://example.com"` {
+			t.Errorf("expected string JSON, got %s", respBody)
 		}
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1174,19 +1039,16 @@ func TestGetMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider/issuer", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("expected status 404, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider/issuer", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 404 {
+			t.Fatalf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("EntityTypeNotFound", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1195,19 +1057,16 @@ func TestGetMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/oauth_client/issuer", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("expected status 404, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/oauth_client/issuer", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 404 {
+			t.Fatalf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("ClaimNotFound", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1216,19 +1075,16 @@ func TestGetMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider/missing", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("expected status 404, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider/missing", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 404 {
+			t.Fatalf("Expected status 404, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1237,19 +1093,16 @@ func TestGetMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider/issuer", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider/issuer", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1258,27 +1111,18 @@ func TestGetMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider/issuer", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider/issuer", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestPutMetadataClaim(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success_ExistingMeta", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1294,20 +1138,17 @@ func TestPutMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("Success_NoExistingMeta", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1322,38 +1163,32 @@ func TestPutMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("EmptyBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider/new", strings.NewReader(""))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider/new", strings.NewReader(""))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400 for empty body, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1362,20 +1197,17 @@ func TestPutMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1387,20 +1219,17 @@ func TestPutMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1409,28 +1238,19 @@ func TestPutMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider/new", strings.NewReader(`456`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestDeleteMetadataClaim(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1449,19 +1269,41 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider/target", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider/target", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 204 {
+			t.Fatalf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+	})
+
+	t.Run("LastClaimRemovesEntityType", func(t *testing.T) {
+		app := setupEntityConfigTestApp(
+			newStubFedEntity(),
+			&mockAdditionalClaimsStore{},
+			&mockKeyValueStore{
+				getFn: func(scope, key string) (datatypes.JSON, error) {
+					return datatypes.JSON(`{"openid_provider":{"only_claim":1}}`), nil
+				},
+				setFn: func(scope, key string, value datatypes.JSON) error {
+					s := string(value)
+					if strings.Contains(s, `"openid_provider"`) {
+						t.Errorf("entity type should be removed when its last claim is deleted: %s", s)
+					}
+					return nil
+				},
+			},
+		)
+
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider/only_claim", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 204 {
+			t.Fatalf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1470,19 +1312,16 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider/target", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider/target", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 204 {
+			t.Fatalf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("EntityTypeNotInMeta", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1495,19 +1334,16 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider/target", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider/target", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 204 {
+			t.Fatalf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1516,19 +1352,16 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider/target", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider/target", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1537,19 +1370,16 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider/target", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider/target", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1561,27 +1391,18 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider/target", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider/target", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestGetMetadataEntityType(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1590,16 +1411,13 @@ func TestGetMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 		var got map[string]json.RawMessage
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		if err := json.Unmarshal(respBody, &got); err != nil {
 			t.Fatalf("failed to decode: %v", err)
 		}
 		if string(got["issuer"]) != `"https://example.com"` {
@@ -1609,7 +1427,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1618,23 +1436,19 @@ func TestGetMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) != "{}" {
-			t.Errorf("expected {}, got %s", body)
+		if string(respBody) != "{}" {
+			t.Errorf("expected {}, got %s", respBody)
 		}
 	})
 
 	t.Run("EntityTypeNotFound", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1643,23 +1457,19 @@ func TestGetMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
-		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) != "{}" {
-			t.Errorf("expected {}, got %s", body)
+		if string(respBody) != "{}" {
+			t.Errorf("expected {}, got %s", respBody)
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1668,19 +1478,16 @@ func TestGetMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1689,27 +1496,18 @@ func TestGetMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodGet, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("GET", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestPutMetadataEntityType(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1731,38 +1529,32 @@ func TestPutMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`not-json`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider", strings.NewReader(`not-json`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1771,20 +1563,17 @@ func TestPutMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1796,20 +1585,17 @@ func TestPutMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1818,28 +1604,19 @@ func TestPutMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPut, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("PUT", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestPostMetadataEntityType(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success_MergesInto", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1855,20 +1632,17 @@ func TestPostMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("POST", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("Success_CreatesNew", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1884,38 +1658,32 @@ func TestPostMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("POST", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 200 {
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{},
 		)
 
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`not-json`))
+		req := httptest.NewRequest("POST", "/entity-configuration/metadata/openid_provider", strings.NewReader(`not-json`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 400 {
+			t.Fatalf("Expected status 400, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1924,20 +1692,17 @@ func TestPostMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("POST", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1949,20 +1714,17 @@ func TestPostMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("POST", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -1971,28 +1733,19 @@ func TestPostMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodPost, "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
+		req := httptest.NewRequest("POST", "/entity-configuration/metadata/openid_provider", strings.NewReader(`{"new":2}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
 
 func TestDeleteMetadataEntityType(t *testing.T) {
-	stubFedEntity := &mockFederationEntity{
-		entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
-			return &oidfed.EntityStatementPayload{}, nil
-		},
-	}
-
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -2011,19 +1764,16 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 204 {
+			t.Fatalf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -2032,19 +1782,16 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("expected status 204, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 204 {
+			t.Fatalf("Expected status 204, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -2053,19 +1800,16 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -2074,19 +1818,16 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
-			stubFedEntity,
+			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
 				getFn: func(scope, key string) (datatypes.JSON, error) {
@@ -2098,13 +1839,10 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			},
 		)
 
-		req, _ := http.NewRequest(http.MethodDelete, "/entity-configuration/metadata/openid_provider", nil)
-		resp, err := app.Test(req, -1)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Fatalf("expected status 500, got %d", resp.StatusCode)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/metadata/openid_provider", http.NoBody)
+		resp, respBody := doRequest(t, app, req)
+		if resp.StatusCode != 500 {
+			t.Fatalf("Expected status 500, got %d. Body: %s", resp.StatusCode, string(respBody))
 		}
 	})
 }
