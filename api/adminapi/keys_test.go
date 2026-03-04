@@ -25,7 +25,7 @@ type mockBasicKMS struct {
 	kms.BasicKeyManagementSystem
 }
 
-func (_ *mockBasicKMS) GetDefaultAlg() jwa.SignatureAlgorithm {
+func (*mockBasicKMS) GetDefaultAlg() jwa.SignatureAlgorithm {
 	return jwa.ES256()
 }
 
@@ -35,16 +35,16 @@ type mockFullKMS struct {
 	kms.KeyManagementSystem
 }
 
-func (_ *mockFullKMS) ChangeKeyRotationConfig(_ kms.KeyRotationConfig) error { return nil }
-func (_ *mockFullKMS) ChangeRSAKeyLength(_ int) error                        { return nil }
-func (_ *mockFullKMS) RotateAllKeys(_ bool, _ string) error                  { return nil }
-func (_ *mockFullKMS) ChangeAlgsAt(_ []jwa.SignatureAlgorithm, _ unixtime.Unixtime, _ time.Duration) error {
+func (*mockFullKMS) ChangeKeyRotationConfig(_ kms.KeyRotationConfig) error { return nil }
+func (*mockFullKMS) ChangeRSAKeyLength(_ int) error                        { return nil }
+func (*mockFullKMS) RotateAllKeys(_ bool, _ string) error                  { return nil }
+func (*mockFullKMS) ChangeAlgsAt(_ []jwa.SignatureAlgorithm, _ unixtime.Unixtime, _ time.Duration) error {
 	return nil
 }
-func (_ *mockFullKMS) ChangeDefaultAlgorithmAt(_ jwa.SignatureAlgorithm, _ unixtime.Unixtime) error {
+func (*mockFullKMS) ChangeDefaultAlgorithmAt(_ jwa.SignatureAlgorithm, _ unixtime.Unixtime) error {
 	return nil
 }
-func (_ *mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
+func (*mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
 	return nil, nil
 }
 
@@ -235,7 +235,7 @@ func TestGetPublicKeys(t *testing.T) {
 		injectTestKey(t, app, "key-1")
 		injectTestKey(t, app, "key-2")
 
-		req := httptest.NewRequest("GET", "/entity-configuration/keys/", nil)
+		req := httptest.NewRequest("GET", "/entity-configuration/keys/", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -255,7 +255,7 @@ func TestGetPublicKeys(t *testing.T) {
 	t.Run("EmptyWhenNoKeys", func(t *testing.T) {
 		app, _, _ := setupPublicKeyApp(t)
 
-		req := httptest.NewRequest("GET", "/entity-configuration/keys/", nil)
+		req := httptest.NewRequest("GET", "/entity-configuration/keys/", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -282,7 +282,7 @@ func TestDeletePublicKey(t *testing.T) {
 			t.Fatal("Setup failed: key was not inserted")
 		}
 
-		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/key-to-delete", nil)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/key-to-delete", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 204 {
@@ -303,7 +303,7 @@ func TestDeletePublicKey(t *testing.T) {
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-to-revoke")
 
-		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/key-to-revoke?revoke=true&reason=compromised", nil)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/key-to-revoke?revoke=true&reason=compromised", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 204 {
@@ -327,7 +327,7 @@ func TestDeletePublicKey(t *testing.T) {
 		app, _, _ := setupPublicKeyApp(t)
 
 		// Deleting a non-existent key should still return 204 (idempotent)
-		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/does-not-exist", nil)
+		req := httptest.NewRequest("DELETE", "/entity-configuration/keys/does-not-exist", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != 204 {
@@ -551,7 +551,7 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 
 		injectTestKey(t, app, "jwks-key-1")
 
-		req := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
+		req := httptest.NewRequest("GET", "/entity-configuration/jwks", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -587,7 +587,7 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
 
-		req := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
+		req := httptest.NewRequest("GET", "/entity-configuration/jwks", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -630,7 +630,7 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 		doRequest(t, app, expReq)
 
 		// JWKS should not include the expired key
-		req := httptest.NewRequest("GET", "/entity-configuration/jwks", nil)
+		req := httptest.NewRequest("GET", "/entity-configuration/jwks", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -661,7 +661,7 @@ func TestGetKMSInfo(t *testing.T) {
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
 
-		req := httptest.NewRequest("GET", "/kms", nil)
+		req := httptest.NewRequest("GET", "/kms", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -697,7 +697,7 @@ func TestGetKMSInfo(t *testing.T) {
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
 
-		req := httptest.NewRequest("GET", "/kms", nil)
+		req := httptest.NewRequest("GET", "/kms", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -722,7 +722,7 @@ type mockFullKMSWithPending struct {
 	mockFullKMS
 }
 
-func (_ *mockFullKMSWithPending) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
+func (*mockFullKMSWithPending) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
 	return nil, &kms.PendingDefaultChange{
 		Alg:         jwa.ES384(),
 		EffectiveAt: unixtime.Unixtime{Time: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
@@ -904,7 +904,7 @@ func TestGetKMSRotation(t *testing.T) {
 			t.Fatalf("Failed to set initial rotation config: %v", err)
 		}
 
-		req := httptest.NewRequest("GET", "/kms/rotation", nil)
+		req := httptest.NewRequest("GET", "/kms/rotation", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 200 {
@@ -929,7 +929,7 @@ func TestGetKMSRotation(t *testing.T) {
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
 
-		req := httptest.NewRequest("GET", "/kms/rotation", nil)
+		req := httptest.NewRequest("GET", "/kms/rotation", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 400 {
@@ -1107,7 +1107,7 @@ func TestPostKMSRotateAll(t *testing.T) {
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
 
-		req := httptest.NewRequest("POST", "/kms/rotate", nil)
+		req := httptest.NewRequest("POST", "/kms/rotate", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != fiber.StatusAccepted {
@@ -1124,7 +1124,7 @@ func TestPostKMSRotateAll(t *testing.T) {
 		app := fiber.New()
 		registerKeys(app, km, store.KeyValue())
 
-		req := httptest.NewRequest("POST", "/kms/rotate", nil)
+		req := httptest.NewRequest("POST", "/kms/rotate", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != 400 {
