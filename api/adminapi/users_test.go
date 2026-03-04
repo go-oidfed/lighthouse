@@ -102,7 +102,7 @@ func TestListUsers(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/", nil)
+		resp := doRequest(t, app, "GET", "/api/v1/admin/users/", http.NoBody)
 		assertStatus(t, resp, fiber.StatusOK)
 
 		list := decodeJSONArray(t, resp)
