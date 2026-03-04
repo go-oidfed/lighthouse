@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -112,7 +113,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("MissingAuthorizationHeader", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
 		if resp.StatusCode != fiber.StatusUnauthorized {
@@ -122,7 +123,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("HeaderWithoutBasicPrefix", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Bearer token")
 		resp, _ := app.Test(req)
 
@@ -133,7 +134,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("InvalidBase64Encoding", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Basic !@#invalidbase64")
 		resp, _ := app.Test(req)
 
@@ -144,7 +145,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("MissingColonInDecodedCredentials", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		encoded := base64.StdEncoding.EncodeToString([]byte("usernamepassword"))
 		req.Header.Set("Authorization", "Basic "+encoded)
 		resp, _ := app.Test(req)
@@ -156,7 +157,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("ValidCredentials", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
 		resp, _ := app.Test(req)
 
@@ -174,7 +175,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("EmptyPassword", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", ""))
 		resp, _ := app.Test(req)
 
@@ -192,7 +193,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("EmptyUsername", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("", "password"))
 		resp, _ := app.Test(req)
 
@@ -207,7 +208,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("PasswordWithColons", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "pass:word:123"))
 		resp, _ := app.Test(req)
 
@@ -225,7 +226,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("CaseSensitivePrefix", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		encoded := base64.StdEncoding.EncodeToString([]byte("admin:secret"))
 		req.Header.Set("Authorization", "basic "+encoded) // lowercase "basic"
 		resp, _ := app.Test(req)
@@ -237,7 +238,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("EmptyAuthorizationHeader", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "")
 		resp, _ := app.Test(req)
 
@@ -248,7 +249,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("BasicPrefixOnly", func(t *testing.T) {
 		app := setupApp()
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Basic ")
 		resp, _ := app.Test(req)
 
@@ -277,7 +278,7 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 		})
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
 		if resp.StatusCode != fiber.StatusInternalServerError {
@@ -296,7 +297,7 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 		})
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
 		if resp.StatusCode != fiber.StatusOK {
@@ -311,7 +312,7 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 		})
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
 		if resp.StatusCode != fiber.StatusUnauthorized {
@@ -342,7 +343,7 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 		})
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "wrongpassword"))
 		resp, _ := app.Test(req)
 
@@ -374,7 +375,7 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 		})
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
 		resp, _ := app.Test(req)
 
@@ -395,7 +396,7 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 		})
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
 		resp, _ := app.Test(req)
 
@@ -418,7 +419,7 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 		})
 
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("user2", "pass2"))
 		resp, _ := app.Test(req)
 
