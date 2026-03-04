@@ -25,7 +25,7 @@ type mockBasicKMS struct {
 	kms.BasicKeyManagementSystem
 }
 
-func (m *mockBasicKMS) GetDefaultAlg() jwa.SignatureAlgorithm {
+func (_ *mockBasicKMS) GetDefaultAlg() jwa.SignatureAlgorithm {
 	return jwa.ES256()
 }
 
@@ -35,16 +35,16 @@ type mockFullKMS struct {
 	kms.KeyManagementSystem
 }
 
-func (m *mockFullKMS) ChangeKeyRotationConfig(_ kms.KeyRotationConfig) error { return nil }
-func (m *mockFullKMS) ChangeRSAKeyLength(_ int) error                        { return nil }
-func (m *mockFullKMS) RotateAllKeys(_ bool, _ string) error                  { return nil }
-func (m *mockFullKMS) ChangeAlgsAt(_ []jwa.SignatureAlgorithm, _ unixtime.Unixtime, _ time.Duration) error {
+func (_ *mockFullKMS) ChangeKeyRotationConfig(_ kms.KeyRotationConfig) error { return nil }
+func (_ *mockFullKMS) ChangeRSAKeyLength(_ int) error                        { return nil }
+func (_ *mockFullKMS) RotateAllKeys(_ bool, _ string) error                  { return nil }
+func (_ *mockFullKMS) ChangeAlgsAt(_ []jwa.SignatureAlgorithm, _ unixtime.Unixtime, _ time.Duration) error {
 	return nil
 }
-func (m *mockFullKMS) ChangeDefaultAlgorithmAt(_ jwa.SignatureAlgorithm, _ unixtime.Unixtime) error {
+func (_ *mockFullKMS) ChangeDefaultAlgorithmAt(_ jwa.SignatureAlgorithm, _ unixtime.Unixtime) error {
 	return nil
 }
-func (m *mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
+func (_ *mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
 	return nil, nil
 }
 
@@ -722,7 +722,7 @@ type mockFullKMSWithPending struct {
 	mockFullKMS
 }
 
-func (m *mockFullKMSWithPending) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
+func (_ *mockFullKMSWithPending) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefaultChange) {
 	return nil, &kms.PendingDefaultChange{
 		Alg:         jwa.ES384(),
 		EffectiveAt: unixtime.Unixtime{Time: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
