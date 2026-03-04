@@ -24,6 +24,9 @@ type Options struct {
 	UsersEnabled bool
 	// Port, when > 0, is used to adapt the serverURL to the admin API port for docs.
 	Port int
+	// TrustMarkConfigInvalidator is called when entity configuration trust marks are modified
+	// to invalidate any cached configurations. Can be nil if not using trust mark refresh.
+	TrustMarkConfigInvalidator TrustMarkConfigInvalidator
 }
 
 // Register mounts all admin API routes under the provided group.
@@ -95,7 +98,11 @@ func Register(
 	// Keys (with transaction support for key rotation)
 	registerKeys(r, keyManagement, storages.KV, storages)
 	// Entity Configuration Trust Marks
-	registerEntityTrustMarks(r)
+	var trustMarkInvalidator TrustMarkConfigInvalidator
+	if opts != nil {
+		trustMarkInvalidator = opts.TrustMarkConfigInvalidator
+	}
+	registerEntityTrustMarks(r, storages.PublishedTrustMarks, trustMarkInvalidator)
 	// Subordinates - all handlers registered via single entry point (with transaction support)
 	RegisterSubordinateHandlers(r, storages, fedEntity)
 	// Trust Mark Types and Issuance (with transaction support)

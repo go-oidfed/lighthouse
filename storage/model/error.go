@@ -26,3 +26,12 @@ func (e AlreadyExistsError) Error() string { return string(e) }
 func AlreadyExistsErrorFmt(format string, params ...any) AlreadyExistsError {
 	return AlreadyExistsError(fmt.Sprintf(format, params...))
 }
+
+// ValidationError signals invalid input data
+type ValidationError string
+
+func (e ValidationError) Error() string { return string(e) }
+
+func ValidationErrorFmt(format string, params ...any) ValidationError {
+	return ValidationError(fmt.Sprintf(format, params...))
+}

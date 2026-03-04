@@ -148,16 +148,17 @@ func (s *Storage) Backends() model.Backends {
 // wrapping multiple operations in a single database transaction.
 func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool) model.Backends {
 	backends := model.Backends{
-		Subordinates:      &SubordinateStorage{db: db},
-		SubordinateEvents: NewSubordinateEventsStorage(db),
-		TrustMarks:        &TrustMarkedEntitiesStorage{db: db},
-		AuthorityHints:    &AuthorityHintsStorage{db: db},
-		TrustMarkTypes:    &TrustMarkTypesStorage{db: db},
-		TrustMarkOwners:   &TrustMarkOwnersStorage{db: db},
-		TrustMarkIssuers:  &TrustMarkIssuersStorage{db: db},
-		AdditionalClaims:  &AdditionalClaimsStorage{db: db},
-		KV:                &KeyValueStorage{db: db},
-		Users:             &UsersStorage{db: db, params: s.userParams},
+		Subordinates:        &SubordinateStorage{db: db},
+		SubordinateEvents:   NewSubordinateEventsStorage(db),
+		TrustMarks:          &TrustMarkedEntitiesStorage{db: db},
+		AuthorityHints:      &AuthorityHintsStorage{db: db},
+		TrustMarkTypes:      &TrustMarkTypesStorage{db: db},
+		TrustMarkOwners:     &TrustMarkOwnersStorage{db: db},
+		TrustMarkIssuers:    &TrustMarkIssuersStorage{db: db},
+		AdditionalClaims:    &AdditionalClaimsStorage{db: db},
+		PublishedTrustMarks: &PublishedTrustMarksStorage{db: db},
+		KV:                  &KeyValueStorage{db: db},
+		Users:               &UsersStorage{db: db, params: s.userParams},
 		PKStorages: func(typeID string) public.PublicKeyStorage {
 			return NewDBPublicKeyStorage(db, typeID)
 		},

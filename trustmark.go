@@ -17,7 +17,12 @@ func (fed *LightHouse) AddTrustMarkEndpoint(
 	store model.TrustMarkedEntitiesStorageBackend,
 	checkers map[string]EntityChecker,
 ) {
-	fed.fedMetadata.FederationTrustMarkEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+	trustMarkEndpointURL := endpoint.ValidateURL(fed.FederationEntity.EntityID())
+	fed.fedMetadata.FederationTrustMarkEndpoint = trustMarkEndpointURL
+	// Update the trust mark config provider with the endpoint URL
+	if fed.trustMarkConfigProvider != nil {
+		fed.trustMarkConfigProvider.SetTrustMarkEndpoint(trustMarkEndpointURL)
+	}
 	if endpoint.Path == "" {
 		return
 	}
@@ -109,13 +114,11 @@ func (fed *LightHouse) AddTrustMarkEndpoint(
 func issueAndSendTrustMark(
 	ctx *fiber.Ctx, fedEntity *LightHouse, trustMarkType, sub string,
 ) error {
-	tm, err := fedEntity.IssueTrustMark(trustMarkType, sub)
+	tm, _, err := fedEntity.IssueTrustMark(trustMarkType, sub)
 	if err != nil {
-		if err != nil {
-			ctx.Status(fiber.StatusInternalServerError)
-			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-		}
+		ctx.Status(fiber.StatusInternalServerError)
+		return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeTrustMark)
-	return ctx.SendString(tm.TrustMarkJWT)
+	return ctx.SendString(tm)
 }

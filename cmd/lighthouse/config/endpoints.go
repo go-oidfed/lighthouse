@@ -143,7 +143,6 @@ func (e *extendedTrustMarkSpec) UnmarshalYAML(node *yaml.Node) error {
 	mm.Extra = extra
 	e.TrustMarkSpec = mm
 	e.CheckerConfig = fc.CheckerConfig
-	e.IncludeExtraClaimsInInfo = true
 	return nil
 }
 

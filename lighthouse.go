@@ -61,15 +61,16 @@ type LightHouse struct {
 	*oidfed.TrustMarkIssuer
 	*jwx.GeneralJWTSigner
 	SubordinateStatementsConfig
-	server         *fiber.App
-	adminAPIServer *fiber.App
-	serverConf     ServerConf
-	fedMetadata    oidfed.FederationEntityMetadata
-	keyManagement  adminapi.KeyManagement
-	LogoBanner     bool
-	VersionBanner  bool
-	storages       model.Backends
-	statsCollector *stats.Collector
+	server                  *fiber.App
+	adminAPIServer          *fiber.App
+	serverConf              ServerConf
+	fedMetadata             oidfed.FederationEntityMetadata
+	keyManagement           adminapi.KeyManagement
+	LogoBanner              bool
+	VersionBanner           bool
+	storages                model.Backends
+	statsCollector          *stats.Collector
+	trustMarkConfigProvider *storage.TrustMarkConfigProvider
 }
 
 // SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
@@ -172,6 +173,14 @@ func NewLightHouse(
 		}
 	}
 
+	// Create trust mark config provider for entity configuration trust marks
+	trustMarkConfigProvider := storage.NewTrustMarkConfigProvider(
+		storages.PublishedTrustMarks,
+		entityID,
+		"", // Trust mark endpoint set later via AddTrustMarkEndpoint
+		func() *jwx.TrustMarkSigner { return generalSigner.TrustMarkSigner() },
+	)
+
 	entity := &LightHouse{
 		TrustMarkIssuer:             oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
 		GeneralJWTSigner:            generalSigner,
@@ -183,6 +192,7 @@ func NewLightHouse(
 		keyManagement:               keyManagement,
 		storages:                    storages,
 		statsCollector:              statsCollector,
+		trustMarkConfigProvider:     trustMarkConfigProvider,
 	}
 
 	entity.FederationEntity = &oidfed.DynamicFederationEntity{
@@ -243,7 +253,9 @@ func NewLightHouse(
 		EntityStatementSigner: func() (*jwx.EntityStatementSigner, error) {
 			return generalSigner.EntityStatementSigner(), nil
 		},
-		TrustMarks: nil, //TODO
+		TrustMarks: func() ([]*oidfed.EntityConfigurationTrustMarkConfig, error) {
+			return trustMarkConfigProvider.GetConfigs()
+		},
 		TrustMarkIssuers: func() (oidfed.AllowedTrustMarkIssuers, error) {
 			return storages.TrustMarkTypes.IssuersByType()
 		},
@@ -311,8 +323,9 @@ func NewLightHouse(
 			entity.FederationEntity,
 			keyManagement,
 			&adminapi.Options{
-				UsersEnabled: admin.UsersEnabled,
-				Port:         admin.Port,
+				UsersEnabled:               admin.UsersEnabled,
+				Port:                       admin.Port,
+				TrustMarkConfigInvalidator: trustMarkConfigProvider,
 			},
 		); err != nil {
 			return nil, err

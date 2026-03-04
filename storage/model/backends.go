@@ -13,18 +13,19 @@ type TransactionFunc func(txBackends *Backends) error
 // It provides a single struct that can be passed around instead of
 // multiple return values for each storage backend.
 type Backends struct {
-	Subordinates      SubordinateStorageBackend
-	SubordinateEvents SubordinateEventStore
-	TrustMarks        TrustMarkedEntitiesStorageBackend
-	AuthorityHints    AuthorityHintsStore
-	TrustMarkTypes    TrustMarkTypesStore
-	TrustMarkOwners   TrustMarkOwnersStore
-	TrustMarkIssuers  TrustMarkIssuersStore
-	AdditionalClaims  AdditionalClaimsStore
-	KV                KeyValueStore
-	Users             UsersStore
-	PKStorages        func(string) public.PublicKeyStorage
-	Stats             StatsStorageBackend
+	Subordinates        SubordinateStorageBackend
+	SubordinateEvents   SubordinateEventStore
+	TrustMarks          TrustMarkedEntitiesStorageBackend
+	AuthorityHints      AuthorityHintsStore
+	TrustMarkTypes      TrustMarkTypesStore
+	TrustMarkOwners     TrustMarkOwnersStore
+	TrustMarkIssuers    TrustMarkIssuersStore
+	AdditionalClaims    AdditionalClaimsStore
+	PublishedTrustMarks PublishedTrustMarksStore
+	KV                  KeyValueStore
+	Users               UsersStore
+	PKStorages          func(string) public.PublicKeyStorage
+	Stats               StatsStorageBackend
 
 	// Transaction wraps multiple storage operations in a single DB transaction.
 	// All backends provided to the TransactionFunc operate within the same transaction.

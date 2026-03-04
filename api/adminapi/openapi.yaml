@@ -539,9 +539,12 @@ paths:
   /api/v1/admin/entity-configuration/trust-marks:
     summary: Path used to manage trust marks in the entity configuration.
     description: >-
-      Endpoints to list and create trust marks. To create a trust mark one must either provide
-      `trust_mark_type` and `trust_mark_issuer` or the `trust_mark` (as a JWT). Adding a trust mark
-      can result in a conflict if the trust mark type was already added.
+      Endpoints to list and create trust marks. To create a trust mark, provide one of:
+      (1) `trust_mark_type` and `trust_mark_issuer` to configure external trust mark fetching,
+      (2) `trust_mark` (as a JWT) directly, or
+      (3) `self_issuance_spec` for self-issued trust marks.
+      Optionally enable automatic refresh with `refresh: true` and configure refresh behavior.
+      Adding a trust mark can result in a conflict if the trust mark type was already added.
     get:
       tags:
         - Entity Configuration Trust Marks
@@ -553,26 +556,60 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TrustMark'
-          description: Successful response - returns an array of trust marks. Each entry includes id, trust_mark_type, trust_mark_issuer, trust_mark.
+          description: Successful response - returns an array of trust marks with their configuration.
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: listEntityConfigurationTrustMarks
       summary: List trust marks in the entity configuration
     post:
       requestBody:
-        description: Create a trust mark. Provide either `trust_mark_type` and `trust_mark_issuer`, or `trust_mark` (JWT).
+        description: >-
+          Create a trust mark. Provide one of:
+          (1) `trust_mark_type` and `trust_mark_issuer` for external fetching,
+          (2) `trust_mark` (JWT) directly, or
+          (3) `self_issuance_spec` for self-issued trust marks.
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AddTrustMark'
             examples:
-              by_type_and_issuer:
+              by_type_and_issuer_no_refresh:
+                summary: External trust mark (no refresh)
                 value:
                   trust_mark_type: https://example.org/trust-mark-types/op
                   trust_mark_issuer: https://issuer.example.org
-              by_jwt:
+              by_type_and_issuer_with_refresh:
+                summary: External trust mark with refresh
+                value:
+                  trust_mark_type: https://example.org/trust-mark-types/op
+                  trust_mark_issuer: https://issuer.example.org
+                  refresh: true
+                  min_lifetime: 3600
+                  refresh_grace_period: 86400
+              by_jwt_no_refresh:
+                summary: Provide JWT directly (no refresh)
+                value:
+                  trust_mark_type: https://example.org/trust-mark-types/op
+                  trust_mark: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+              by_jwt_with_refresh:
+                summary: Provide JWT with refresh enabled
                 value:
                   trust_mark: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refresh: true
+                  min_lifetime: 3600
+                  refresh_grace_period: 86400
+                  refresh_rate_limit: 300
+              self_issued:
+                summary: Self-issued trust mark (always refreshes)
+                value:
+                  trust_mark_type: https://example.org/trust-mark-types/self-certified
+                  self_issuance_spec:
+                    lifetime: 86400
+                    logo_uri: https://example.org/assets/self-certified-logo.png
+                    additional_claims:
+                      organization_name: Example Organization
+                      certification_level: gold
+                    include_extra_claims_in_info: true
         required: true
       tags:
         - Entity Configuration Trust Marks
@@ -610,18 +647,77 @@ paths:
       summary: Get a trust mark
     put:
       requestBody:
-        description: Update a trust mark. Only `trust_mark_issuer` and/or `trust_mark` can be updated.
+        description: >-
+          Replace a trust mark configuration entirely. All fields should be provided;
+          omitted fields will be reset to defaults or cleared.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustMark'
+            examples:
+              replace_with_external:
+                summary: Replace with external trust mark
+                value:
+                  trust_mark_type: https://example.org/trust-mark-types/op
+                  trust_mark_issuer: https://new-issuer.example.org
+                  refresh: true
+                  min_lifetime: 3600
+                  refresh_grace_period: 86400
+              replace_with_self_issued:
+                summary: Replace with self-issued trust mark
+                value:
+                  trust_mark_type: https://example.org/trust-mark-types/self-certified
+                  self_issuance_spec:
+                    lifetime: 86400
+                    logo_uri: https://example.org/assets/logo.png
+        required: true
+      tags:
+        - Entity Configuration Trust Marks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustMark'
+          description: Successful response - returns the replaced trust mark.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: replaceEntityConfigurationTrustMark
+      summary: Replace a trust mark
+    patch:
+      requestBody:
+        description: >-
+          Partially update a trust mark configuration. Only provided fields will be updated.
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateTrustMark'
             examples:
               update_issuer:
+                summary: Change issuer
                 value:
                   trust_mark_issuer: https://new-issuer.example.org
               update_jwt:
+                summary: Update JWT directly
                 value:
                   trust_mark: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+              enable_refresh:
+                summary: Enable refresh with options
+                value:
+                  refresh: true
+                  min_lifetime: 3600
+                  refresh_grace_period: 86400
+                  refresh_rate_limit: 300
+              update_self_issuance:
+                summary: Update self-issuance spec
+                value:
+                  self_issuance_spec:
+                    lifetime: 172800
+                    logo_uri: https://example.org/assets/new-logo.png
         required: true
       tags:
         - Entity Configuration Trust Marks
@@ -638,8 +734,8 @@ paths:
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
-      operationId: updateEntityConfigurationTrustMark
-      summary: Update a trust mark
+      operationId: patchEntityConfigurationTrustMark
+      summary: Partially update a trust mark
     delete:
       tags:
         - Entity Configuration Trust Marks
@@ -4920,12 +5016,10 @@ components:
           description: Optional owner to set for this trust mark type.
           $ref: '#/components/schemas/AddTrustMarkOwner'
     TrustMark:
-      description: A trust mark entry.
+      description: A trust mark entry in the entity configuration.
       required:
         - id
         - trust_mark_type
-        - trust_mark_issuer
-        - trust_mark
       type: object
       properties:
         id:
@@ -4936,12 +5030,35 @@ components:
           description: The trust mark type identifier.
         trust_mark_issuer:
           type: string
-          description: The issuer of the trust mark.
+          description: The issuer of the trust mark. Required when not using self-issuance.
         trust_mark:
           type: string
-          description: The trust mark JWT.
+          description: The trust mark JWT. May be empty if refresh is enabled and trust mark has not yet been fetched.
+        refresh:
+          type: boolean
+          description: Whether automatic refresh of this trust mark is enabled.
+        min_lifetime:
+          type: integer
+          minimum: 0
+          description: Minimum remaining lifetime (in seconds) before a refresh is triggered.
+        refresh_grace_period:
+          type: integer
+          minimum: 0
+          description: Grace period (in seconds) after expiration during which refresh is still attempted.
+        refresh_rate_limit:
+          type: integer
+          minimum: 0
+          description: Minimum time (in seconds) between refresh attempts.
+        self_issuance_spec:
+          $ref: '#/components/schemas/SelfIssuedTrustMarkSpec'
+          description: Specification for self-issued trust marks. If set, the entity issues this trust mark to itself.
     AddTrustMark:
-      description: Data to add or update a trust mark.
+      description: >-
+        Data to create a trust mark entry. Provide either:
+        (1) `trust_mark_type` and `trust_mark_issuer` to configure external trust mark fetching,
+        (2) `trust_mark` (JWT) directly, or
+        (3) `self_issuance_spec` for self-issued trust marks.
+        Self-issued trust marks always refresh automatically based on the configured lifetime.
       type: object
       properties:
         trust_mark_type:
@@ -4949,10 +5066,29 @@ components:
           description: The trust mark type identifier.
         trust_mark_issuer:
           type: string
-          description: The issuer of the trust mark.
+          description: The issuer of the trust mark. Required when using external trust mark fetching.
         trust_mark:
           type: string
-          description: The trust mark JWT.
+          description: The trust mark JWT. Provide this if you already have the JWT.
+        refresh:
+          type: boolean
+          description: Whether automatic refresh of this trust mark is enabled.
+          default: false
+        min_lifetime:
+          type: integer
+          minimum: 0
+          description: Minimum remaining lifetime (in seconds) before a refresh is triggered.
+        refresh_grace_period:
+          type: integer
+          minimum: 0
+          description: Grace period (in seconds) after expiration during which refresh is still attempted.
+        refresh_rate_limit:
+          type: integer
+          minimum: 0
+          description: Minimum time (in seconds) between refresh attempts.
+        self_issuance_spec:
+          $ref: '#/components/schemas/SelfIssuedTrustMarkSpec'
+          description: Specification for self-issued trust marks. If set, the entity issues this trust mark to itself.
     UpdateTrustMark:
       description: Data to update a trust mark.
       type: object
@@ -4963,6 +5099,56 @@ components:
         trust_mark:
           type: string
           description: The trust mark JWT.
+        refresh:
+          type: boolean
+          description: Whether automatic refresh of this trust mark is enabled.
+        min_lifetime:
+          type: integer
+          minimum: 0
+          description: Minimum remaining lifetime (in seconds) before a refresh is triggered.
+        refresh_grace_period:
+          type: integer
+          minimum: 0
+          description: Grace period (in seconds) after expiration during which refresh is still attempted.
+        refresh_rate_limit:
+          type: integer
+          minimum: 0
+          description: Minimum time (in seconds) between refresh attempts.
+        self_issuance_spec:
+          $ref: '#/components/schemas/SelfIssuedTrustMarkSpec'
+          description: Specification for self-issued trust marks. If set, the entity issues this trust mark to itself.
+    SelfIssuedTrustMarkSpec:
+      description: >-
+        Specification for a self-issued trust mark. Used when the entity issues trust marks to itself.
+        Self-issued trust marks always refresh automatically based on the configured lifetime.
+      type: object
+      properties:
+        lifetime:
+          type: integer
+          minimum: 0
+          description: Lifetime of the self-issued trust mark, in seconds.
+          example: 86400
+        ref:
+          type: string
+          format: uri
+          description: URL reference with details about the trust mark type.
+          example: https://example.org/specs/trust-marks/self-certified
+        logo_uri:
+          type: string
+          format: uri
+          description: URL to the logo associated with this trust mark type.
+          example: https://example.org/assets/self-certified-logo.png
+        additional_claims:
+          type: object
+          additionalProperties: true
+          description: Additional custom claims (key-value pairs) to include in the self-issued trust mark.
+          example:
+            organization_name: Example Organization
+            certification_level: gold
+        include_extra_claims_in_info:
+          type: boolean
+          description: Whether to include additional claims in the trust mark info endpoint response.
+          default: false
     TrustMarkSpec:
       description: Specification describing a trust mark type that can be issued.
       type: object
