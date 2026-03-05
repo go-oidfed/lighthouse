@@ -28,11 +28,12 @@ func (m *mockFederationEntity) EntityID() string { return m.entityID }
 func (m *mockFederationEntity) EntityConfigurationPayload() (*oidfed.EntityStatementPayload, error) {
 	return m.entityConfigurationPayloadFn()
 }
-func (_ *mockFederationEntity) EntityConfigurationJWT() ([]byte, error) { return nil, nil }
-func (_ *mockFederationEntity) SignEntityStatement(_ oidfed.EntityStatementPayload) ([]byte, error) {
+func (*mockFederationEntity) EntityConfigurationJWT() ([]byte, error) { return nil, nil }
+func (*mockFederationEntity) SignEntityStatement(_ oidfed.EntityStatementPayload) ([]byte, error) {
 	return nil, nil
 }
-func (_ *mockFederationEntity) SignEntityStatementWithHeaders(_ oidfed.EntityStatementPayload, _ jws.Headers) ([]byte, error) {
+
+func (*mockFederationEntity) SignEntityStatementWithHeaders(_ oidfed.EntityStatementPayload, _ jws.Headers) ([]byte, error) {
 	return nil, nil
 }
 
@@ -48,18 +49,23 @@ type mockAdditionalClaimsStore struct {
 func (m *mockAdditionalClaimsStore) List() ([]smodel.EntityConfigurationAdditionalClaim, error) {
 	return m.listFn()
 }
+
 func (m *mockAdditionalClaimsStore) Set(items []smodel.AddAdditionalClaim) ([]smodel.EntityConfigurationAdditionalClaim, error) {
 	return m.setFn(items)
 }
+
 func (m *mockAdditionalClaimsStore) Create(item smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 	return m.createFn(item)
 }
+
 func (m *mockAdditionalClaimsStore) Get(ident string) (*smodel.EntityConfigurationAdditionalClaim, error) {
 	return m.getFn(ident)
 }
+
 func (m *mockAdditionalClaimsStore) Update(ident string, item smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 	return m.updateFn(ident, item)
 }
+
 func (m *mockAdditionalClaimsStore) Delete(ident string) error {
 	return m.deleteFn(ident)
 }
@@ -75,15 +81,19 @@ type mockKeyValueStore struct {
 func (m *mockKeyValueStore) Get(scope, key string) (datatypes.JSON, error) {
 	return m.getFn(scope, key)
 }
+
 func (m *mockKeyValueStore) GetAs(scope, key string, out any) (bool, error) {
 	return m.getAsFn(scope, key, out)
 }
+
 func (m *mockKeyValueStore) Set(scope, key string, value datatypes.JSON) error {
 	return m.setFn(scope, key, value)
 }
+
 func (m *mockKeyValueStore) SetAny(scope, key string, v any) error {
 	return m.setAnyFn(scope, key, v)
 }
+
 func (m *mockKeyValueStore) Delete(scope, key string) error {
 	return m.deleteFn(scope, key)
 }
