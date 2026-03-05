@@ -259,7 +259,7 @@ func (h *metadataHandlers) putClaim(c *fiber.Ctx) error {
 	if _, ok := meta[entityType]; !ok {
 		meta[entityType] = make(map[string]json.RawMessage)
 	}
-	meta[entityType][claim] = json.RawMessage(c.Body())
+	meta[entityType][claim] = c.Body()
 
 	if err := h.store.save(meta); err != nil {
 		return serverError(c, err.Error())
@@ -372,7 +372,10 @@ func registerEntityConfiguration(
 	claimsHandlers := &additionalClaimsHandlers{store: addClaimsStore}
 	ltHandlers := &lifetimeHandlers{kv: kv}
 	metaStore := &metadataStore{kv: kv}
-	metaHandlers := &metadataHandlers{store: metaStore, kv: kv}
+	metaHandlers := &metadataHandlers{
+		store: metaStore,
+		kv:    kv,
+	}
 
 	// Entity configuration
 	g.Get("/", ecHandlers.get)

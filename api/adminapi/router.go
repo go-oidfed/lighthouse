@@ -124,7 +124,7 @@ func Register(
 }
 
 func updateOpenAPIServers(doc []byte, serverURL string) []byte {
-	if len(serverURL) == 0 {
+	if serverURL == "" {
 		return doc
 	}
 	// Unmarshal full doc
@@ -148,7 +148,7 @@ func updateOpenAPIServers(doc []byte, serverURL string) []byte {
 // adaptServerURLPort updates or adds the port to the provided serverURL.
 // If the input is invalid, it returns the original serverURL.
 func adaptServerURLPort(serverURL string, port int) string {
-	if len(serverURL) == 0 || port <= 0 {
+	if serverURL == "" || port <= 0 {
 		return serverURL
 	}
 	u, err := neturl.Parse(serverURL)

@@ -10,333 +10,286 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
+// trustMarkSpecHandlers groups handlers for TrustMarkSpec CRUD endpoints.
+type trustMarkSpecHandlers struct {
+	store model.TrustMarkSpecStore
+}
+
+func (h *trustMarkSpecHandlers) list(c *fiber.Ctx) error {
+	items, err := h.store.List()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+	}
+	return c.JSON(items)
+}
+
+func (h *trustMarkSpecHandlers) create(c *fiber.Ctx) error {
+	var spec model.TrustMarkSpec
+	if err := c.BodyParser(&spec); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	if spec.TrustMarkType == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("trust_mark_type is required"))
+	}
+	created, err := h.store.Create(&spec)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.Status(fiber.StatusCreated).JSON(created)
+}
+
+func (h *trustMarkSpecHandlers) get(c *fiber.Ctx) error {
+	item, err := h.store.Get(c.Params("trustMarkSpecID"))
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(item)
+}
+
+func (h *trustMarkSpecHandlers) update(c *fiber.Ctx) error {
+	var spec model.TrustMarkSpec
+	if err := c.BodyParser(&spec); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	if spec.TrustMarkType == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("trust_mark_type is required"))
+	}
+	updated, err := h.store.Update(c.Params("trustMarkSpecID"), &spec)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(updated)
+}
+
+func (h *trustMarkSpecHandlers) patch(c *fiber.Ctx) error {
+	var updates map[string]any
+	if err := c.BodyParser(&updates); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	patched, err := h.store.Patch(c.Params("trustMarkSpecID"), updates)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(patched)
+}
+
+func (h *trustMarkSpecHandlers) delete(c *fiber.Ctx) error {
+	if err := h.store.Delete(c.Params("trustMarkSpecID")); err != nil {
+		return h.handleError(c, err)
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *trustMarkSpecHandlers) handleError(c *fiber.Ctx, err error) error {
+	var notFound model.NotFoundError
+	if errors.As(err, &notFound) {
+		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
+	}
+	var alreadyExists model.AlreadyExistsError
+	if errors.As(err, &alreadyExists) {
+		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
+	}
+	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+}
+
+// trustMarkSubjectHandlers groups handlers for TrustMarkSubject CRUD endpoints.
+type trustMarkSubjectHandlers struct {
+	store model.TrustMarkSpecStore
+}
+
+func (h *trustMarkSubjectHandlers) list(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	var statusFilter *model.Status
+	if statusStr := c.Query("status"); statusStr != "" {
+		s, err := model.ParseStatus(statusStr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+		}
+		statusFilter = &s
+	}
+	subjects, err := h.store.ListSubjects(specID, statusFilter)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(subjects)
+}
+
+func (h *trustMarkSubjectHandlers) create(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	var subject model.TrustMarkSubject
+	if err := c.BodyParser(&subject); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	if subject.EntityID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
+	}
+	if !subject.Status.Valid() {
+		subject.Status = model.StatusActive
+	}
+	created, err := h.store.CreateSubject(specID, &subject)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.Status(fiber.StatusCreated).JSON(created)
+}
+
+func (h *trustMarkSubjectHandlers) get(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	subjectID := c.Params("trustMarkSubjectID")
+	subject, err := h.store.GetSubject(specID, subjectID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(subject)
+}
+
+func (h *trustMarkSubjectHandlers) update(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	subjectID := c.Params("trustMarkSubjectID")
+	var subject model.TrustMarkSubject
+	if err := c.BodyParser(&subject); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	if subject.EntityID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
+	}
+	updated, err := h.store.UpdateSubject(specID, subjectID, &subject)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(updated)
+}
+
+func (h *trustMarkSubjectHandlers) delete(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	subjectID := c.Params("trustMarkSubjectID")
+	if err := h.store.DeleteSubject(specID, subjectID); err != nil {
+		return h.handleError(c, err)
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *trustMarkSubjectHandlers) updateStatus(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	subjectID := c.Params("trustMarkSubjectID")
+
+	statusStr := strings.TrimSpace(string(c.Body()))
+	if statusStr == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("status is required"))
+	}
+	status, err := model.ParseStatus(statusStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	updated, err := h.store.ChangeSubjectStatus(specID, subjectID, status)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	return c.JSON(updated)
+}
+
+func (h *trustMarkSubjectHandlers) getAdditionalClaims(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	subjectID := c.Params("trustMarkSubjectID")
+	subject, err := h.store.GetSubject(specID, subjectID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	if subject.AdditionalClaims == nil {
+		return c.JSON(map[string]any{})
+	}
+	return c.JSON(subject.AdditionalClaims)
+}
+
+func (h *trustMarkSubjectHandlers) putAdditionalClaims(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	subjectID := c.Params("trustMarkSubjectID")
+	var claims map[string]any
+	if err := c.BodyParser(&claims); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	subject, err := h.store.GetSubject(specID, subjectID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	subject.AdditionalClaims = claims
+	updated, err := h.store.UpdateSubject(specID, subjectID, subject)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+	}
+	return c.JSON(updated.AdditionalClaims)
+}
+
+func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
+	specID := c.Params("trustMarkSpecID")
+	subjectID := c.Params("trustMarkSubjectID")
+
+	spec, err := h.store.Get(specID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	subject, err := h.store.GetSubject(specID, subjectID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+
+	// Merge spec's additional claims into subject claims
+	// Start with spec claims as base, then overlay existing subject claims
+	mergedClaims := make(map[string]any)
+	for k, v := range spec.AdditionalClaims {
+		mergedClaims[k] = v
+	}
+	for k, v := range subject.AdditionalClaims {
+		mergedClaims[k] = v
+	}
+
+	subject.AdditionalClaims = mergedClaims
+	updated, err := h.store.UpdateSubject(specID, subjectID, subject)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+	}
+	return c.JSON(updated.AdditionalClaims)
+}
+
+func (h *trustMarkSubjectHandlers) handleError(c *fiber.Ctx, err error) error {
+	var notFound model.NotFoundError
+	if errors.As(err, &notFound) {
+		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
+	}
+	var alreadyExists model.AlreadyExistsError
+	if errors.As(err, &alreadyExists) {
+		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
+	}
+	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+}
+
+// registerTrustMarkIssuance registers TrustMarkSpec and TrustMarkSubject endpoints.
 func registerTrustMarkIssuance(r fiber.Router, store model.TrustMarkSpecStore) {
 	specBase := "/trust-marks/issuance-spec"
 	subjectBase := specBase + "/:trustMarkSpecID/subjects"
 
-	// ===== TrustMarkSpec CRUD =====
+	specH := &trustMarkSpecHandlers{store: store}
+	subjectH := &trustMarkSubjectHandlers{store: store}
 
-	// GET /trust-marks/issuance-spec - List all specs
-	r.Get(specBase, func(c *fiber.Ctx) error {
-		items, err := store.List()
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(items)
-	})
+	// TrustMarkSpec CRUD
+	r.Get(specBase, specH.list)
+	r.Post(specBase, specH.create)
+	r.Get(specBase+"/:trustMarkSpecID", specH.get)
+	r.Put(specBase+"/:trustMarkSpecID", specH.update)
+	r.Patch(specBase+"/:trustMarkSpecID", specH.patch)
+	r.Delete(specBase+"/:trustMarkSpecID", specH.delete)
 
-	// POST /trust-marks/issuance-spec - Create a spec
-	r.Post(specBase, func(c *fiber.Ctx) error {
-		var spec model.TrustMarkSpec
-		if err := c.BodyParser(&spec); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		if spec.TrustMarkType == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("trust_mark_type is required"))
-		}
-		created, err := store.Create(&spec)
-		if err != nil {
-			var alreadyExists model.AlreadyExistsError
-			if errors.As(err, &alreadyExists) {
-				return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.Status(fiber.StatusCreated).JSON(created)
-	})
+	// TrustMarkSubject CRUD
+	r.Get(subjectBase, subjectH.list)
+	r.Post(subjectBase, subjectH.create)
+	r.Get(subjectBase+"/:trustMarkSubjectID", subjectH.get)
+	r.Put(subjectBase+"/:trustMarkSubjectID", subjectH.update)
+	r.Delete(subjectBase+"/:trustMarkSubjectID", subjectH.delete)
+	r.Put(subjectBase+"/:trustMarkSubjectID/status", subjectH.updateStatus)
 
-	// GET /trust-marks/issuance-spec/:trustMarkSpecID - Get a spec
-	r.Get(specBase+"/:trustMarkSpecID", func(c *fiber.Ctx) error {
-		item, err := store.Get(c.Params("trustMarkSpecID"))
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(item)
-	})
-
-	// PUT /trust-marks/issuance-spec/:trustMarkSpecID - Update a spec (full replacement)
-	r.Put(specBase+"/:trustMarkSpecID", func(c *fiber.Ctx) error {
-		var spec model.TrustMarkSpec
-		if err := c.BodyParser(&spec); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		if spec.TrustMarkType == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("trust_mark_type is required"))
-		}
-		updated, err := store.Update(c.Params("trustMarkSpecID"), &spec)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			var alreadyExists model.AlreadyExistsError
-			if errors.As(err, &alreadyExists) {
-				return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(updated)
-	})
-
-	// PATCH /trust-marks/issuance-spec/:trustMarkSpecID - Partially update a spec
-	r.Patch(specBase+"/:trustMarkSpecID", func(c *fiber.Ctx) error {
-		var updates map[string]any
-		if err := c.BodyParser(&updates); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		patched, err := store.Patch(c.Params("trustMarkSpecID"), updates)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			var alreadyExists model.AlreadyExistsError
-			if errors.As(err, &alreadyExists) {
-				return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(patched)
-	})
-
-	// DELETE /trust-marks/issuance-spec/:trustMarkSpecID - Delete a spec
-	r.Delete(specBase+"/:trustMarkSpecID", func(c *fiber.Ctx) error {
-		if err := store.Delete(c.Params("trustMarkSpecID")); err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.SendStatus(fiber.StatusNoContent)
-	})
-
-	// ===== TrustMarkSubject CRUD =====
-
-	// GET /trust-marks/issuance-spec/:trustMarkSpecID/subjects - List subjects
-	r.Get(subjectBase, func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		var statusFilter *model.Status
-		if statusStr := c.Query("status"); statusStr != "" {
-			s, err := model.ParseStatus(statusStr)
-			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-			}
-			statusFilter = &s
-		}
-		subjects, err := store.ListSubjects(specID, statusFilter)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(subjects)
-	})
-
-	// POST /trust-marks/issuance-spec/:trustMarkSpecID/subjects - Create a subject
-	r.Post(subjectBase, func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		var subject model.TrustMarkSubject
-		if err := c.BodyParser(&subject); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		if subject.EntityID == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
-		}
-		if !subject.Status.Valid() {
-			subject.Status = model.StatusActive
-		}
-		created, err := store.CreateSubject(specID, &subject)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			var alreadyExists model.AlreadyExistsError
-			if errors.As(err, &alreadyExists) {
-				return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.Status(fiber.StatusCreated).JSON(created)
-	})
-
-	// GET /trust-marks/issuance-spec/:trustMarkSpecID/subjects/:trustMarkSubjectID - Get a subject
-	r.Get(subjectBase+"/:trustMarkSubjectID", func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		subjectID := c.Params("trustMarkSubjectID")
-		subject, err := store.GetSubject(specID, subjectID)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(subject)
-	})
-
-	// PUT /trust-marks/issuance-spec/:trustMarkSpecID/subjects/:trustMarkSubjectID - Update a subject
-	r.Put(subjectBase+"/:trustMarkSubjectID", func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		subjectID := c.Params("trustMarkSubjectID")
-		var subject model.TrustMarkSubject
-		if err := c.BodyParser(&subject); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		if subject.EntityID == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
-		}
-		updated, err := store.UpdateSubject(specID, subjectID, &subject)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			var alreadyExists model.AlreadyExistsError
-			if errors.As(err, &alreadyExists) {
-				return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(updated)
-	})
-
-	// DELETE /trust-marks/issuance-spec/:trustMarkSpecID/subjects/:trustMarkSubjectID - Delete a subject
-	r.Delete(subjectBase+"/:trustMarkSubjectID", func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		subjectID := c.Params("trustMarkSubjectID")
-		if err := store.DeleteSubject(specID, subjectID); err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.SendStatus(fiber.StatusNoContent)
-	})
-
-	// PUT /trust-marks/issuance-spec/:trustMarkSpecID/subjects/:trustMarkSubjectID/status - Change status
-	r.Put(subjectBase+"/:trustMarkSubjectID/status", func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		subjectID := c.Params("trustMarkSubjectID")
-
-		// Parse status from plain text body
-		statusStr := strings.TrimSpace(string(c.Body()))
-		if statusStr == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("status is required"))
-		}
-		status, err := model.ParseStatus(statusStr)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		updated, err := store.ChangeSubjectStatus(specID, subjectID, status)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(updated)
-	})
-
-	// ===== Subject Additional Claims (simplified - just get/set the map) =====
-
-	// GET /.../:trustMarkSubjectID/additional-claims
-	r.Get(subjectBase+"/:trustMarkSubjectID/additional-claims", func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		subjectID := c.Params("trustMarkSubjectID")
-		subject, err := store.GetSubject(specID, subjectID)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		if subject.AdditionalClaims == nil {
-			return c.JSON(map[string]any{})
-		}
-		return c.JSON(subject.AdditionalClaims)
-	})
-
-	// PUT /.../:trustMarkSubjectID/additional-claims
-	r.Put(subjectBase+"/:trustMarkSubjectID/additional-claims", func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		subjectID := c.Params("trustMarkSubjectID")
-		var claims map[string]any
-		if err := c.BodyParser(&claims); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		subject, err := store.GetSubject(specID, subjectID)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		subject.AdditionalClaims = claims
-		updated, err := store.UpdateSubject(specID, subjectID, subject)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(updated.AdditionalClaims)
-	})
-
-	// POST /.../:trustMarkSubjectID/additional-claims - Copy general claims from spec to subject
-	// Merges spec claims into subject claims; existing subject claims take precedence on conflict
-	r.Post(subjectBase+"/:trustMarkSubjectID/additional-claims", func(c *fiber.Ctx) error {
-		specID := c.Params("trustMarkSpecID")
-		subjectID := c.Params("trustMarkSubjectID")
-
-		// Get the spec to retrieve general claims
-		spec, err := store.Get(specID)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-
-		// Get the subject
-		subject, err := store.GetSubject(specID, subjectID)
-		if err != nil {
-			var notFound model.NotFoundError
-			if errors.As(err, &notFound) {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-
-		// Merge spec's additional claims into subject claims
-		// Start with spec claims as base, then overlay existing subject claims
-		mergedClaims := make(map[string]any)
-
-		// First, copy all spec claims
-		for k, v := range spec.AdditionalClaims {
-			mergedClaims[k] = v
-		}
-
-		// Then, overlay existing subject claims (subject takes precedence)
-		for k, v := range subject.AdditionalClaims {
-			mergedClaims[k] = v
-		}
-
-		subject.AdditionalClaims = mergedClaims
-
-		updated, err := store.UpdateSubject(specID, subjectID, subject)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-		}
-		return c.JSON(updated.AdditionalClaims)
-	})
+	// Subject additional claims
+	r.Get(subjectBase+"/:trustMarkSubjectID/additional-claims", subjectH.getAdditionalClaims)
+	r.Put(subjectBase+"/:trustMarkSubjectID/additional-claims", subjectH.putAdditionalClaims)
+	r.Post(subjectBase+"/:trustMarkSubjectID/additional-claims", subjectH.copyAdditionalClaims)
 }

@@ -43,7 +43,7 @@ func (h *subordinateConstraintsHandlers) getAll(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	if info.Constraints == nil {
+	if info == nil || info.Constraints == nil {
 		return c.JSON(oidfed.ConstraintSpecification{})
 	}
 	return c.JSON(info.Constraints)
@@ -59,17 +59,19 @@ func (h *subordinateConstraintsHandlers) putAll(c *fiber.Ctx) error {
 		return writeBadRequest(c, "max_path_length must be >= 0")
 	}
 
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		info.Constraints = &body
-		if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated)
-	})
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
+			}
+			info.Constraints = &body
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -81,27 +83,31 @@ func (h *subordinateConstraintsHandlers) postAll(c *fiber.Ctx) error {
 	var result *oidfed.ConstraintSpecification
 	store := &generalConstraintsStore{kv: h.storages.KV}
 
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		general, found, err := store.load()
-		if err != nil {
-			return err
-		}
-		if !found || general == nil {
-			info.Constraints = &oidfed.ConstraintSpecification{}
-		} else {
-			copied := *general
-			info.Constraints = &copied
-		}
-		if err = tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		result = info.Constraints
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("copied from general"))
-	})
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
+			}
+			general, found, err := store.load()
+			if err != nil {
+				return err
+			}
+			if !found || general == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			} else {
+				copied := *general
+				info.Constraints = &copied
+			}
+			if err = tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			result = info.Constraints
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("copied from general"),
+			)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -111,17 +117,19 @@ func (h *subordinateConstraintsHandlers) postAll(c *fiber.Ctx) error {
 func (h *subordinateConstraintsHandlers) deleteAll(c *fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		info.Constraints = nil
-		if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted)
-	})
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
+			}
+			info.Constraints = nil
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -133,7 +141,8 @@ func (h *subordinateConstraintsHandlers) getMaxPathLength(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	if info.Constraints == nil || info.Constraints.MaxPathLength == nil {
+	if info == nil || info.Constraints == nil || info.Constraints.
+		MaxPathLength == nil {
 		return writeNotFound(c, "max_path_length not set")
 	}
 	return c.JSON(*info.Constraints.MaxPathLength)
@@ -152,20 +161,24 @@ func (h *subordinateConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
 		return writeBadRequest(c, "max_path_length must be >= 0")
 	}
 
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		if info.Constraints == nil {
-			info.Constraints = &oidfed.ConstraintSpecification{}
-		}
-		info.Constraints.MaxPathLength = &mpl
-		if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("max_path_length"))
-	})
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
+			}
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			info.Constraints.MaxPathLength = &mpl
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("max_path_length"),
+			)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -175,20 +188,24 @@ func (h *subordinateConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
 func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		if info.Constraints != nil {
-			info.Constraints.MaxPathLength = nil
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("max_path_length"))
-		}
-		return nil
-	})
+			if info.Constraints != nil {
+				info.Constraints.MaxPathLength = nil
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				return RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("max_path_length"),
+				)
+			}
+			return nil
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -200,7 +217,8 @@ func (h *subordinateConstraintsHandlers) getNamingConstraints(c *fiber.Ctx) erro
 	if err != nil {
 		return err
 	}
-	if info.Constraints == nil || info.Constraints.NamingConstraints == nil {
+	if info == nil || info.Constraints == nil || info.Constraints.
+		NamingConstraints == nil {
 		return writeNotFound(c, "naming_constraints not set")
 	}
 	return c.JSON(info.Constraints.NamingConstraints)
@@ -213,20 +231,24 @@ func (h *subordinateConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) erro
 		return writeBadBody(c)
 	}
 
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		if info.Constraints == nil {
-			info.Constraints = &oidfed.ConstraintSpecification{}
-		}
-		info.Constraints.NamingConstraints = &body
-		if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("naming_constraints"))
-	})
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
+			}
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			info.Constraints.NamingConstraints = &body
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("naming_constraints"),
+			)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -236,20 +258,24 @@ func (h *subordinateConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) erro
 func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		if info.Constraints != nil {
-			info.Constraints.NamingConstraints = nil
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("naming_constraints"))
-		}
-		return nil
-	})
+			if info.Constraints != nil {
+				info.Constraints.NamingConstraints = nil
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				return RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("naming_constraints"),
+				)
+			}
+			return nil
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -261,7 +287,8 @@ func (h *subordinateConstraintsHandlers) getAllowedEntityTypes(c *fiber.Ctx) err
 	if err != nil {
 		return err
 	}
-	if info.Constraints == nil || info.Constraints.AllowedEntityTypes == nil {
+	if info == nil || info.Constraints == nil || info.Constraints.
+		AllowedEntityTypes == nil {
 		return writeNotFound(c, "allowed_entity_types not set")
 	}
 	return c.JSON(info.Constraints.AllowedEntityTypes)
@@ -275,21 +302,25 @@ func (h *subordinateConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) err
 	}
 
 	var result []string
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		if info.Constraints == nil {
-			info.Constraints = &oidfed.ConstraintSpecification{}
-		}
-		info.Constraints.AllowedEntityTypes = body
-		if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		result = info.Constraints.AllowedEntityTypes
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"))
-	})
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
+			}
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			info.Constraints.AllowedEntityTypes = body
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			result = info.Constraints.AllowedEntityTypes
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"),
+			)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -304,27 +335,31 @@ func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) er
 	entityType := string(c.Body())
 
 	var result []string
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		if info.Constraints == nil {
-			info.Constraints = &oidfed.ConstraintSpecification{}
-		}
-		for _, t := range info.Constraints.AllowedEntityTypes {
-			if t == entityType {
-				result = info.Constraints.AllowedEntityTypes
-				return nil
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
 			}
-		}
-		info.Constraints.AllowedEntityTypes = append(info.Constraints.AllowedEntityTypes, entityType)
-		if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		result = info.Constraints.AllowedEntityTypes
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"))
-	})
+			if info.Constraints == nil {
+				info.Constraints = &oidfed.ConstraintSpecification{}
+			}
+			for _, t := range info.Constraints.AllowedEntityTypes {
+				if t == entityType {
+					result = info.Constraints.AllowedEntityTypes
+					return nil
+				}
+			}
+			info.Constraints.AllowedEntityTypes = append(info.Constraints.AllowedEntityTypes, entityType)
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
+			result = info.Constraints.AllowedEntityTypes
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"),
+			)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
@@ -336,35 +371,39 @@ func (h *subordinateConstraintsHandlers) deleteAllowedEntityType(c *fiber.Ctx) e
 	entityType := c.Params("entityType")
 
 	var result []string
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		info, err := getSubordinateByDBID(tx.Subordinates, id)
-		if err != nil {
-			return err
-		}
-		if info.Constraints == nil {
-			result = nil
-			return nil
-		}
-		updated := make([]string, 0, len(info.Constraints.AllowedEntityTypes))
-		removed := false
-		for _, t := range info.Constraints.AllowedEntityTypes {
-			if t == entityType {
-				removed = true
-				continue
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			if err != nil {
+				return err
 			}
-			updated = append(updated, t)
-		}
-		if !removed {
+			if info.Constraints == nil {
+				result = nil
+				return nil
+			}
+			updated := make([]string, 0, len(info.Constraints.AllowedEntityTypes))
+			removed := false
+			for _, t := range info.Constraints.AllowedEntityTypes {
+				if t == entityType {
+					removed = true
+					continue
+				}
+				updated = append(updated, t)
+			}
+			if !removed {
+				result = info.Constraints.AllowedEntityTypes
+				return nil
+			}
+			info.Constraints.AllowedEntityTypes = updated
+			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+				return err
+			}
 			result = info.Constraints.AllowedEntityTypes
-			return nil
-		}
-		info.Constraints.AllowedEntityTypes = updated
-		if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-			return err
-		}
-		result = info.Constraints.AllowedEntityTypes
-		return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("allowed_entity_types"))
-	})
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("allowed_entity_types"),
+			)
+		},
+	)
 	if err != nil {
 		return handleTxError(c, err)
 	}
