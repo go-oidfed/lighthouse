@@ -187,7 +187,7 @@ paths:
     put:
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
               $ref: '#/components/schemas/SignatureAlgorithm'
         required: true
@@ -211,7 +211,7 @@ paths:
     put:
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
               type: integer
               description: RSA key length in bits.
@@ -768,7 +768,7 @@ paths:
     put:
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
               $ref: '#/components/schemas/LifetimeSeconds'
         required: true
@@ -805,7 +805,7 @@ paths:
     put:
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
               $ref: '#/components/schemas/LifetimeSeconds'
         required: true
@@ -1761,7 +1761,7 @@ paths:
         - Federation Trust Marks
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
               $ref: '#/components/schemas/InternalID'
         required: true
@@ -1906,7 +1906,7 @@ paths:
         - Federation Trust Marks
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
               $ref: '#/components/schemas/InternalID'
         required: true

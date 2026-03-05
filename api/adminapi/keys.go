@@ -3,6 +3,8 @@ package adminapi
 import (
 	"errors"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -276,9 +278,9 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing signing alg dynamically"))
 			}
-			var alg string
-			if err := c.BodyParser(&alg); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			alg := strings.TrimSpace(string(c.Body()))
+			if alg == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
 			}
 			jwaAlg, ok := jwa.LookupSignatureAlgorithm(alg)
 			if !ok {
@@ -327,9 +329,9 @@ func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.
 			if keyManagement.Keys == nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing RSA key length dynamically"))
 			}
-			var rsaKeyLen int
-			if err := c.BodyParser(&rsaKeyLen); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			rsaKeyLen, err := strconv.Atoi(strings.TrimSpace(string(c.Body())))
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected integer"))
 			}
 			if err := storage.SetRSAKeyLen(kvStorage, rsaKeyLen); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))

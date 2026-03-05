@@ -138,13 +138,13 @@ func registerEntityConfiguration(
 	)
 	withCacheWipe.Put(
 		"/lifetime", func(c *fiber.Ctx) error {
-			// Expect body to be a JSON integer
+			// Expect body to be a plain text integer
 			if len(c.Body()) == 0 {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
 			}
-			var seconds int
-			if err := json.Unmarshal(c.Body(), &seconds); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			seconds, err := strconv.Atoi(strings.TrimSpace(string(c.Body())))
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected integer"))
 			}
 			if seconds < 0 {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("lifetime must be non-negative"))

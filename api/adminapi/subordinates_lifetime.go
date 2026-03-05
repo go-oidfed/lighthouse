@@ -1,7 +1,8 @@
 package adminapi
 
 import (
-	"encoding/json"
+	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -40,8 +41,8 @@ func handlePutSubordinateLifetime(kv model.KeyValueStore) fiber.Handler {
 		if len(c.Body()) == 0 {
 			return writeBadRequest(c, "empty body")
 		}
-		var seconds int
-		if err := json.Unmarshal(c.Body(), &seconds); err != nil {
+		seconds, err := strconv.Atoi(strings.TrimSpace(string(c.Body())))
+		if err != nil {
 			return writeBadBody(c)
 		}
 		if seconds < 0 {

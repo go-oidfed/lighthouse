@@ -3,6 +3,7 @@ package adminapi
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -129,10 +130,11 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 	)
 	withCacheWipe.Post(
 		"/:ownerID/types", func(c *fiber.Ctx) error {
-			var ident uint
-			if err := c.BodyParser(&ident); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			identInt, err := strconv.ParseUint(strings.TrimSpace(string(c.Body())), 10, 64)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected integer"))
 			}
+			ident := uint(identInt)
 			ids, err := owners.AddType(c.Params("ownerID"), ident)
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -286,10 +288,11 @@ func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStor
 	)
 	withCacheWipe.Post(
 		"/:issuerID/types", func(c *fiber.Ctx) error {
-			var ident uint
-			if err := c.BodyParser(&ident); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
+			identInt, err := strconv.ParseUint(strings.TrimSpace(string(c.Body())), 10, 64)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected integer"))
 			}
+			ident := uint(identInt)
 			ids, err := issuers.AddType(c.Params("issuerID"), ident)
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
