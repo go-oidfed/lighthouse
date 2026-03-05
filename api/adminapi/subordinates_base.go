@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -243,16 +244,18 @@ func handleUpdateSubordinateStatus(storages model.Backends) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id := c.Params("subordinateID")
 
-		var status model.Status
-		if err := c.BodyParser(&status); err != nil {
-			return writeBadBody(c)
+		// Parse status from plain text body
+		statusStr := strings.TrimSpace(string(c.Body()))
+		if statusStr == "" {
+			return writeBadRequest(c, "status is required")
 		}
-		if !status.Valid() {
-			return writeBadRequest(c, "invalid status")
+		status, err := model.ParseStatus(statusStr)
+		if err != nil {
+			return writeBadRequest(c, err.Error())
 		}
 
 		var result *model.ExtendedSubordinateInfo
-		err := storages.InTransaction(
+		err = storages.InTransaction(
 			func(tx *model.Backends) error {
 				// Get existing info to record old status
 				existing, err := tx.Subordinates.GetByDBID(id)

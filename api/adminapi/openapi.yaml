@@ -2218,11 +2218,22 @@ paths:
     put:
       tags:
         - Trust Mark Issuance
+      summary: Change TrustMarkSubject status
+      description: |
+        Change the status of a TrustMarkSubject.
+        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
-              $ref: '#/components/schemas/TrustMarkSubjectStatus'
+              type: string
+              enum:
+                - active
+                - blocked
+                - pending
+                - inactive
+              description: The status value to set.
+              example: active
         required: true
       parameters:
         - $ref: '#/components/parameters/TrustMarkSpecIDParam'
@@ -2241,7 +2252,6 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: changeTrustMarkSubjectStatus
-      summary: Change TrustMarkSubject status
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims:
     summary: Manage subject-specific additional custom claims.
     description: |
@@ -2769,11 +2779,20 @@ paths:
       description: |
         Change the status of a subordinate entity.
         Note: Setting status to "active" requires the subordinate to have at least one key in its JWKS.
+        
+        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
       requestBody:
         content:
-          application/json:
+          text/plain:
             schema:
-              $ref: '#/components/schemas/SubordinateStatus'
+              type: string
+              enum:
+                - active
+                - blocked
+                - pending
+                - inactive
+              description: The status value to set.
+              example: active
         required: true
       responses:
         '200':
@@ -4805,17 +4824,6 @@ components:
           max_path_length: 2
         additional_claims:
           custom_claim: custom_value
-    
-    SubordinateStatus:
-      description: New status to set for a subordinate.
-      required:
-        - status
-      type: object
-      properties:
-        status:
-          type: string
-          description: The status value to set.
-          example: active
     SubordinateHistory:
       description: History of events related to a subordinate with pagination information.
       type: object
@@ -5307,16 +5315,6 @@ components:
           type: object
           additionalProperties: true
           description: Per-subject additional claims that override general claims.
-    
-    TrustMarkSubjectStatus:
-      description: New status to set for a TrustMarkSubject.
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          description: The status value to set.
 
     TrustMarkIssuer:
       description: A trust mark issuer object.

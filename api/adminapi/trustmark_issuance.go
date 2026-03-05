@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"errors"
+	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -225,16 +226,13 @@ func registerTrustMarkIssuance(r fiber.Router, store model.TrustMarkSpecStore) {
 	r.Put(subjectBase+"/:trustMarkSubjectID/status", func(c *fiber.Ctx) error {
 		specID := c.Params("trustMarkSpecID")
 		subjectID := c.Params("trustMarkSubjectID")
-		var req struct {
-			Status string `json:"status"`
-		}
-		if err := c.BodyParser(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-		}
-		if req.Status == "" {
+
+		// Parse status from plain text body
+		statusStr := strings.TrimSpace(string(c.Body()))
+		if statusStr == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("status is required"))
 		}
-		status, err := model.ParseStatus(req.Status)
+		status, err := model.ParseStatus(statusStr)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 		}
