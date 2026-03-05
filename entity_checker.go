@@ -81,6 +81,47 @@ func EntityCheckerFromEntityCheckerConfig(c EntityCheckerConfig) (
 	return checker, nil
 }
 
+// EntityCheckerFromJSONConfig creates an EntityChecker from a JSON-style config
+// (using map[string]any instead of yaml.Node). This is used when loading
+// config from database.
+func EntityCheckerFromJSONConfig(checkerType string, config map[string]any) (EntityChecker, error) {
+	checkerConstructor := entityCheckerRegistry[checkerType]
+	if checkerConstructor == nil {
+		return nil, errors.Errorf("unknown entity check type: %s", checkerType)
+	}
+	checker := checkerConstructor()
+
+	// Convert map to yaml.Node by marshaling and unmarshaling
+	if config != nil {
+		yamlBytes, err := yaml.Marshal(config)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marshal config to yaml")
+		}
+		var node yaml.Node
+		if err = yaml.Unmarshal(yamlBytes, &node); err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal yaml to node")
+		}
+		// The root node is a document node, we need the first content node
+		if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
+			if err = checker.UnmarshalYAML(node.Content[0]); err != nil {
+				return nil, errors.WithStack(err)
+			}
+		} else {
+			if err = checker.UnmarshalYAML(&node); err != nil {
+				return nil, errors.WithStack(err)
+			}
+		}
+	} else {
+		// No config, use empty node
+		var emptyNode yaml.Node
+		if err := checker.UnmarshalYAML(&emptyNode); err != nil {
+			return nil, errors.WithStack(err)
+		}
+	}
+
+	return checker, nil
+}
+
 // EntityCheckerNone is a type implementing EntityChecker but that checks
 // nothing
 type EntityCheckerNone struct{}

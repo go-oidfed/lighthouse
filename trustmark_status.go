@@ -7,15 +7,15 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddTrustMarkStatusEndpoint adds a trust mark status endpoint
 func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 	endpoint EndpointConf,
-	store storage.TrustMarkedEntitiesStorageBackend,
+	store model.TrustMarkedEntitiesStorageBackend,
 ) {
-	fed.Metadata.FederationEntity.FederationTrustMarkStatusEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.FederationTrustMarkStatusEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}

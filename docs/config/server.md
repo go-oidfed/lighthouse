@@ -4,6 +4,21 @@ icon: material/server-network
 
 Under the `server` config option the (http) server can be configured.
 
+## `ip_listen`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">0.0.0.0</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `ip_listen` config option is used to set the network address to which to bind to.
+If omitted `0.0.0.0` is used.
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        ip_listen: 127.0.0.1
+    ```
+
 ## `port`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">7672</span>

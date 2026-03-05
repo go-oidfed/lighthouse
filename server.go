@@ -1,7 +1,9 @@
 package lighthouse
 
 type ServerConf struct {
+	IPListen          string   `yaml:"ip_listen"`
 	Port              int      `yaml:"port"`
+	AdminAPIPort      int      `yaml:"-"`
 	TLS               tlsConf  `yaml:"tls"`
 	TrustedProxies    []string `yaml:"trusted_proxies"`
 	ForwardedIPHeader string   `yaml:"forwarded_ip_header"`

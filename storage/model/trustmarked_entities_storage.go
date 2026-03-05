@@ -1,4 +1,4 @@
-package storage
+package model
 
 // TrustMarkedEntitiesStorageBackend is an interface to store information
 // about trust marked entities

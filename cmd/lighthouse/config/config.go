@@ -17,9 +17,11 @@ type Config struct {
 	Logging    loggingConf           `yaml:"logging"`
 	Storage    storageConf           `yaml:"storage"`
 	Caching    cachingConf           `yaml:"cache"`
-	Signing    signingConf           `yaml:"signing"`
+	Signing    SigningConf           `yaml:"signing"`
 	Endpoints  Endpoints             `yaml:"endpoints"`
 	Federation federationConf        `yaml:"federation_data"`
+	API        apiConf               `yaml:"api"`
+	Stats      StatsConf             `yaml:"stats"`
 }
 
 type configValidator interface {
@@ -45,10 +47,11 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
-	if c.Signing.AutomaticKeyRollover.Interval < c.Federation.ConfigurationLifetime {
-		c.Signing.AutomaticKeyRollover.Interval = c.Federation.ConfigurationLifetime
-	}
-	c.Signing.AutomaticKeyRollover.KeepHistory = c.Endpoints.HistoricalKeysEndpoint.IsSet()
+	// TODO make sure that this check is still applied,
+	//  but interval will also be configurable through the api
+	// if c.Signing.KeyRotation.Interval < c.Federation.ConfigurationLifetime {
+	// 	c.Signing.KeyRotation.Interval = c.Federation.ConfigurationLifetime
+	// }
 	return nil
 }
 
@@ -59,6 +62,8 @@ var c = Config{
 	Signing:    defaultSigningConf,
 	Endpoints:  defaultEndpointConf,
 	Federation: defaultFederationConf,
+	API:        defaultAPIConf,
+	Stats:      defaultStatsConf,
 }
 
 // Get returns the Config
@@ -78,24 +83,33 @@ var possibleConfigLocations = []string{
 }
 
 // Load loads the config from the given file
-func Load(filename string) {
+func Load(filename string) error {
 	var content []byte
 	if filename != "" {
 		var err error
 		content, err = fileutils.ReadFile(filename)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	} else {
 		content, _ = fileutils.ReadFileFromLocations("config.yaml", possibleConfigLocations)
 		if content == nil {
-			log.WithField("filepath", filename).Fatal("could not find config file in any of the possible locations")
+			return errors.Errorf("could not find config file in any of the possible locations")
 		}
 	}
 	if err := yaml.Unmarshal(content, &c); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if err := c.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MustLoad loads the config from the given file and panics on error.
+// This should only be called from main() or init() functions.
+func MustLoad(filename string) {
+	if err := Load(filename); err != nil {
 		log.Fatal(err)
 	}
 }
