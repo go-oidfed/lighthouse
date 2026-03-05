@@ -4,7 +4,7 @@ go 1.25.1
 
 require (
 	github.com/adam-hanna/arrayOperations v1.0.1
-	github.com/dgraph-io/badger/v4 v4.8.0
+	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/fatih/structs v1.1.0
 	github.com/go-oidfed/lib v0.9.2-0.20260305100125-651f8eab6a55
 	github.com/gofiber/fiber/v2 v2.52.12
@@ -13,7 +13,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/sirupsen/logrus v1.9.4
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/zachmann/go-utils v0.0.0-20251216142941-208653c379f5
 	golang.org/x/crypto v0.48.0
