@@ -303,7 +303,7 @@ func (h *historyHandlers) getHistory(c *fiber.Ctx) error {
 	})
 }
 
-func (h *historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, error) {
+func (*historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, error) {
 	var opts model.EventQueryOpts
 
 	if limitStr := c.Query("limit"); limitStr != "" {
@@ -345,7 +345,7 @@ func (h *historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, er
 	return opts, nil
 }
 
-func (h *historyHandlers) normalizeLimit(limit int) int {
+func (*historyHandlers) normalizeLimit(limit int) int {
 	if limit <= 0 {
 		return 50
 	}

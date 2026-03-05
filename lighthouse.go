@@ -292,12 +292,14 @@ func NewLightHouse(
 				return ctx.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			jwt, err := entity.SignEntityStatement(*ec)
-			err = cache.Set(
+			if err != nil {
+				return ctx.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if cacheErr := cache.Set(
 				internal.CacheKeyEntityConfiguration, jwt,
 				min(MaximumEntityConfigurationCachePeriod, time.Until(ec.ExpiresAt.Time.Add(-1*time.Minute))),
-			)
-			if err != nil {
-				log.WithError(err).Error("failed to cache entity configuration")
+			); cacheErr != nil {
+				log.WithError(cacheErr).Error("failed to cache entity configuration")
 			}
 			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 			return ctx.Send(jwt)
@@ -335,20 +337,20 @@ func NewLightHouse(
 }
 
 // HttpHandlerFunc returns an http.HandlerFunc for serving all the necessary endpoints
-func (fed LightHouse) HttpHandlerFunc() http.HandlerFunc {
+func (fed *LightHouse) HttpHandlerFunc() http.HandlerFunc {
 	return adaptor.FiberApp(fed.server)
 }
 
 // Listen starts an http server at the specific address for serving all the
 // necessary endpoints
-func (fed LightHouse) Listen(addr string) error {
+func (fed *LightHouse) Listen(addr string) error {
 	return fed.server.Listen(addr)
 }
 
 //go:embed banner.txt
 var bannerTxt string
 
-func (fed LightHouse) banner() {
+func (fed *LightHouse) banner() {
 	bannerWidth := 0
 	if fed.LogoBanner {
 		bannerWidth = 104
@@ -361,7 +363,7 @@ func (fed LightHouse) banner() {
 	}
 }
 
-func (fed LightHouse) Start() {
+func (fed *LightHouse) Start() {
 	fed.banner()
 
 	// Start stats collector if enabled
@@ -426,7 +428,7 @@ func (fed *LightHouse) Stop() error {
 }
 
 // CreateSubordinateStatement returns an oidfed.EntityStatementPayload for the passed storage.ExtendedSubordinateInfo
-func (fed LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSubordinateInfo) oidfed.EntityStatementPayload {
+func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSubordinateInfo) oidfed.EntityStatementPayload {
 	now := time.Now()
 	lifetime, err := storage.GetSubordinateStatementLifetime(fed.storages.KV)
 	if err != nil {

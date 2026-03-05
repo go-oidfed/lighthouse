@@ -204,7 +204,7 @@ func (s *TrustMarkedEntitiesStorage) Delete(trustMarkType, entityID string) erro
 }
 
 // Load is a no-op for GORM storage
-func (s *TrustMarkedEntitiesStorage) Load() error {
+func (*TrustMarkedEntitiesStorage) Load() error {
 	// Nothing to do for GORM as it's already connected to the database
 	return nil
 }

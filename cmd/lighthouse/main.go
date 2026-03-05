@@ -21,7 +21,7 @@ func main() {
 	if len(os.Args) > 1 {
 		configFile = os.Args[1]
 	}
-	config.Load(configFile)
+	config.MustLoad(configFile)
 	logger.Init()
 	log.Info("Loaded Config")
 	c := config.Get()

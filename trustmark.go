@@ -30,10 +30,12 @@ func (fed *LightHouse) AddTrustMarkEndpoint(
 	checkers map[string]EntityChecker,
 ) {
 	// Use the new implementation with a config struct
-	fed.AddTrustMarkEndpointWithConfig(endpoint, TrustMarkEndpointConfig{
-		Store:    store,
-		Checkers: checkers,
-	})
+	fed.AddTrustMarkEndpointWithConfig(
+		endpoint, TrustMarkEndpointConfig{
+			Store:    store,
+			Checkers: checkers,
+		},
+	)
 }
 
 // AddTrustMarkEndpointWithConfig adds a trust mark endpoint with full configuration
@@ -105,20 +107,24 @@ func (fed *LightHouse) handleTrustMarkRequest(
 				return fed.issueAndSendTrustMarkWithClaims(ctx, trustMarkType, sub, dbSpec, config)
 			}
 			ctx.Status(httpCode)
-			return ctx.JSON(&oidfed.Error{
-				Error:            "not_eligible",
-				ErrorDescription: reason,
-			})
+			return ctx.JSON(
+				&oidfed.Error{
+					Error:            "not_eligible",
+					ErrorDescription: reason,
+				},
+			)
 		}
 	}
 
 	// Run eligibility check based on mode
-	eligible, httpCode, reason := fed.checkEligibility(ctx, trustMarkType, sub, dbSpec, eligibilityConfig, config)
+	eligible, httpCode, reason := fed.checkEligibility(trustMarkType, sub, eligibilityConfig, config)
 
 	// Cache result if caching is enabled
 	if config.Cache != nil && eligibilityConfig.CheckCacheTTL > 0 {
-		config.Cache.Set(trustMarkType, sub, eligible, httpCode, reason,
-			time.Duration(eligibilityConfig.CheckCacheTTL)*time.Second)
+		config.Cache.Set(
+			trustMarkType, sub, eligible, httpCode, reason,
+			time.Duration(eligibilityConfig.CheckCacheTTL)*time.Second,
+		)
 	}
 
 	if eligible {
@@ -126,17 +132,17 @@ func (fed *LightHouse) handleTrustMarkRequest(
 	}
 
 	ctx.Status(httpCode)
-	return ctx.JSON(&oidfed.Error{
-		Error:            "not_eligible",
-		ErrorDescription: reason,
-	})
+	return ctx.JSON(
+		&oidfed.Error{
+			Error:            "not_eligible",
+			ErrorDescription: reason,
+		},
+	)
 }
 
 // checkEligibility checks if a subject is eligible for a trust mark based on the eligibility mode
 func (fed *LightHouse) checkEligibility(
-	ctx *fiber.Ctx,
 	trustMarkType, sub string,
-	dbSpec *model.TrustMarkSpec,
 	eligibilityConfig *model.EligibilityConfig,
 	config TrustMarkEndpointConfig,
 ) (eligible bool, httpCode int, reason string) {
@@ -170,7 +176,7 @@ func (fed *LightHouse) checkEligibility(
 }
 
 // checkDBEligibility checks if a subject is eligible based on the database status
-func (fed *LightHouse) checkDBEligibility(
+func (*LightHouse) checkDBEligibility(
 	trustMarkType, sub string,
 	config TrustMarkEndpointConfig,
 ) (eligible bool, httpCode int, reason string) {
@@ -196,7 +202,7 @@ func (fed *LightHouse) checkDBEligibility(
 }
 
 // runChecker runs an entity checker against a subject
-func (fed *LightHouse) runChecker(
+func (*LightHouse) runChecker(
 	trustMarkType, sub string,
 	checkerConfig *model.CheckerConfig,
 	config TrustMarkEndpointConfig,
@@ -213,10 +219,12 @@ func (fed *LightHouse) runChecker(
 
 		// If it's a contextual checker (like db_list), set the context
 		if contextual, ok := checker.(ContextualEntityChecker); ok {
-			contextual.SetContext(CheckerContext{
-				Store:         config.Store,
-				TrustMarkType: trustMarkType,
-			})
+			contextual.SetContext(
+				CheckerContext{
+					Store:         config.Store,
+					TrustMarkType: trustMarkType,
+				},
+			)
 		}
 	}
 
@@ -272,22 +280,11 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 
 	// Use IssueTrustMarkWithOptions which handles claim merging
 	// (spec.Extra claims are already loaded via the TrustMarkSpecProvider)
-	tm, _, err := fed.IssueTrustMarkWithOptions(trustMarkType, sub, oidfed.IssueTrustMarkOptions{
-		SubjectClaims: subjectClaims,
-	})
-	if err != nil {
-		ctx.Status(fiber.StatusInternalServerError)
-		return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-	}
-	ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeTrustMark)
-	return ctx.SendString(tm)
-}
-
-// issueAndSendTrustMark is kept for backward compatibility
-func issueAndSendTrustMark(
-	ctx *fiber.Ctx, fedEntity *LightHouse, trustMarkType, sub string,
-) error {
-	tm, _, err := fedEntity.IssueTrustMark(trustMarkType, sub)
+	tm, _, err := fed.IssueTrustMarkWithOptions(
+		trustMarkType, sub, oidfed.IssueTrustMarkOptions{
+			SubjectClaims: subjectClaims,
+		},
+	)
 	if err != nil {
 		ctx.Status(fiber.StatusInternalServerError)
 		return ctx.JSON(oidfed.ErrorServerError(err.Error()))

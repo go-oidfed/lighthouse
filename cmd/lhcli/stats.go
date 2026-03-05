@@ -217,7 +217,7 @@ func parseDate(s string) (time.Time, error) {
 	return time.Time{}, errors.Errorf("cannot parse date: %s", s)
 }
 
-func showStatsSummary(cmd *cobra.Command, args []string) error {
+func showStatsSummary(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func showStatsSummary(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func showTopEndpoints(cmd *cobra.Command, args []string) error {
+func showTopEndpoints(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -281,7 +281,7 @@ func showTopEndpoints(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func showTopUserAgents(cmd *cobra.Command, args []string) error {
+func showTopUserAgents(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -301,7 +301,7 @@ func showTopUserAgents(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func showTopClients(cmd *cobra.Command, args []string) error {
+func showTopClients(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func showTopClients(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func showTopCountries(cmd *cobra.Command, args []string) error {
+func showTopCountries(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -366,7 +366,7 @@ func printTopEntries(entries []stats.TopEntry) {
 	}
 }
 
-func showTimeseries(cmd *cobra.Command, args []string) error {
+func showTimeseries(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -398,7 +398,7 @@ func showTimeseries(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func showLatency(cmd *cobra.Command, args []string) error {
+func showLatency(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -430,7 +430,7 @@ func showLatency(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func exportStats(cmd *cobra.Command, args []string) error {
+func exportStats(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -470,7 +470,7 @@ func exportStats(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func purgeStats(cmd *cobra.Command, args []string) error {
+func purgeStats(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}
@@ -502,7 +502,7 @@ func purgeStats(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func aggregateStats(cmd *cobra.Command, args []string) error {
+func aggregateStats(_ *cobra.Command, _ []string) error {
 	if err := loadStatsStorage(); err != nil {
 		return err
 	}

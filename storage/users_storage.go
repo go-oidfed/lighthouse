@@ -59,7 +59,7 @@ func (s *UsersStorage) Get(username string) (*model.User, error) {
 
 // Create creates a user with an Argon2id-hashed password
 func (s *UsersStorage) Create(username, password, displayName string) (*model.User, error) {
-	if len(username) == 0 || len(password) == 0 {
+	if username == "" || password == "" {
 		return nil, errors.Errorf("username and password are required")
 	}
 	var existing int64
@@ -94,7 +94,7 @@ func (s *UsersStorage) Update(username string, displayName *string, newPassword 
 		u.Disabled = *disabled
 	}
 	if newPassword != nil {
-		if len(*newPassword) == 0 {
+		if *newPassword == "" {
 			return nil, errors.Errorf("password cannot be empty")
 		}
 		hash, err := hashPasswordArgon2id(*newPassword, s.params)

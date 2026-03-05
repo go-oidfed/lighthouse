@@ -80,7 +80,7 @@ func init() {
 	rootCmd.AddCommand(subordinatesCmd)
 }
 
-func addSubordinate(cmd *cobra.Command, args []string) error {
+func addSubordinate(_ *cobra.Command, args []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func addSubordinate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func removeSubordinate(cmd *cobra.Command, args []string) error {
+func removeSubordinate(_ *cobra.Command, args []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func removeSubordinate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func blockSubordinate(cmd *cobra.Command, args []string) error {
+func blockSubordinate(_ *cobra.Command, args []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func blockSubordinate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
+func manageSubordinateRequests(_ *cobra.Command, _ []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -220,9 +220,9 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			if err = promptInSubordinateRequest(info.EntityID, printStr); err != nil {
-				return err
-			}
+		}
+		if err = promptInSubordinateRequest(info.EntityID, printStr); err != nil {
+			return err
 		}
 	}
 	return nil

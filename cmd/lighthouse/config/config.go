@@ -83,24 +83,33 @@ var possibleConfigLocations = []string{
 }
 
 // Load loads the config from the given file
-func Load(filename string) {
+func Load(filename string) error {
 	var content []byte
 	if filename != "" {
 		var err error
 		content, err = fileutils.ReadFile(filename)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	} else {
 		content, _ = fileutils.ReadFileFromLocations("config.yaml", possibleConfigLocations)
 		if content == nil {
-			log.WithField("filepath", filename).Fatal("could not find config file in any of the possible locations")
+			return errors.Errorf("could not find config file in any of the possible locations")
 		}
 	}
 	if err := yaml.Unmarshal(content, &c); err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if err := c.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MustLoad loads the config from the given file and panics on error.
+// This should only be called from main() or init() functions.
+func MustLoad(filename string) {
+	if err := Load(filename); err != nil {
 		log.Fatal(err)
 	}
 }

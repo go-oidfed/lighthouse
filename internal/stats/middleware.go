@@ -104,25 +104,10 @@ func Middleware(cfg MiddlewareConfig) fiber.Handler {
 }
 
 // normalizeEndpoint converts a path to a normalized endpoint name.
-// Examples:
-//   - "/.well-known/openid-federation" -> "well-known"
-//   - "/fetch" -> "fetch"
-//   - "/api/v1/admin/subordinates" -> "api" (admin API, typically not tracked)
 func normalizeEndpoint(path string) string {
 	// Remove leading slash and lowercase
 	path = strings.TrimPrefix(path, "/")
 	path = strings.ToLower(path)
-
-	// Handle well-known specially
-	if strings.HasPrefix(path, ".well-known/") {
-		return "well-known"
-	}
-
-	// Get first path segment
-	if idx := strings.Index(path, "/"); idx > 0 {
-		path = path[:idx]
-	}
-
 	return path
 }
 
@@ -131,7 +116,7 @@ func shouldTrack(endpoint string, tracked map[string]bool) bool {
 	// If no filter, track all non-API endpoints
 	if len(tracked) == 0 {
 		// Exclude API endpoints by default
-		return endpoint != "api"
+		return !strings.HasPrefix(endpoint, "api")
 	}
 
 	return tracked[endpoint]
@@ -141,9 +126,10 @@ func shouldTrack(endpoint string, tracked map[string]bool) bool {
 func captureQueryParams(c *fiber.Ctx) map[string]string {
 	params := make(map[string]string)
 
-	c.Request().URI().QueryArgs().VisitAll(func(key, value []byte) {
+	queryArgs := c.Request().URI().QueryArgs()
+	for key, value := range queryArgs.All() {
 		params[string(key)] = string(value)
-	})
+	}
 
 	return params
 }
@@ -200,20 +186,6 @@ func categorizeStatusCode(code int) string {
 	default:
 		return ""
 	}
-}
-
-// EndpointNames contains the standard federation endpoint names for filtering.
-var EndpointNames = map[string]bool{
-	"well-known":        true, // /.well-known/openid-federation
-	"fetch":             true,
-	"resolve":           true,
-	"list":              true,
-	"trustmark":         true,
-	"trustmark-request": true,
-	"enroll":            true,
-	"enroll-request":    true,
-	"historical-keys":   true,
-	"entity-collection": true,
 }
 
 // BuildTrackedEndpoints converts a list of endpoint path patterns to a map of endpoint names.

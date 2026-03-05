@@ -21,21 +21,22 @@ var subordinateStorage model.SubordinateStorageBackend
 var trustMarkedEntitiesStorage model.TrustMarkedEntitiesStorageBackend
 
 func loadConfig() error {
-	config.Load(configFile)
+	if err := config.Load(configFile); err != nil {
+		return err
+	}
 	log.Println("Loaded Config")
 	c := config.Get()
 
-	var err error
 	backs, err := config.LoadStorageBackends(c.Storage)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	subordinateStorage = backs.Subordinates
 	trustMarkedEntitiesStorage = backs.TrustMarks
 	return nil
 }
 
-func rootRunE(cmd *cobra.Command, args []string) error {
+func rootRunE(_ *cobra.Command, _ []string) error {
 	return loadConfig()
 }
 

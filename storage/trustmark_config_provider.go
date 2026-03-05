@@ -143,7 +143,7 @@ func (p *TrustMarkConfigProvider) loadConfigs() error {
 }
 
 // convertToConfig converts a storage model to a library EntityConfigurationTrustMarkConfig.
-func (p *TrustMarkConfigProvider) convertToConfig(tm model.PublishedTrustMark) *oidfed.EntityConfigurationTrustMarkConfig {
+func (*TrustMarkConfigProvider) convertToConfig(tm model.PublishedTrustMark) *oidfed.EntityConfigurationTrustMarkConfig {
 	config := &oidfed.EntityConfigurationTrustMarkConfig{
 		TrustMarkType:   tm.TrustMarkType,
 		TrustMarkIssuer: tm.TrustMarkIssuer,

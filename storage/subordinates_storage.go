@@ -349,7 +349,7 @@ func (s *SubordinateStorage) fetchByIDsBasic(ids []uint) ([]model.BasicSubordina
 }
 
 // Load is a no-op for GORM storage
-func (s *SubordinateStorage) Load() error { return nil }
+func (*SubordinateStorage) Load() error { return nil }
 
 // ListAdditionalClaims returns all additional claims for a subordinate.
 func (s *SubordinateStorage) ListAdditionalClaims(subordinateDBID string) ([]model.SubordinateAdditionalClaim, error) {
@@ -510,7 +510,7 @@ func (s *SubordinateStorage) DeleteAdditionalClaim(subordinateDBID string, claim
 }
 
 // parseSubordinateID parses the subordinate DB ID string to uint.
-func (s *SubordinateStorage) parseSubordinateID(subordinateDBID string) (uint, error) {
+func (*SubordinateStorage) parseSubordinateID(subordinateDBID string) (uint, error) {
 	var subID uint
 	if _, err := fmt.Sscanf(subordinateDBID, "%d", &subID); err != nil {
 		return 0, model.NotFoundErrorFmt("invalid subordinate ID: %s", subordinateDBID)
@@ -543,7 +543,7 @@ func isUniqueConstraintErr(err error) bool {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+	return len(s) >= len(substr) && (s == substr || s != "" && containsHelper(s, substr))
 }
 
 func containsHelper(s, substr string) bool {

@@ -187,7 +187,7 @@ func (s *PublishedTrustMarksStorage) Delete(ident string) error {
 
 // validateAndExtractFromJWT validates the input and extracts trust_mark_type and issuer from JWT if needed.
 // Returns the resolved trust_mark_type and trust_mark_issuer.
-func (s *PublishedTrustMarksStorage) validateAndExtractFromJWT(add *model.AddTrustMark) (trustMarkType, trustMarkIssuer string, err error) {
+func (*PublishedTrustMarksStorage) validateAndExtractFromJWT(add *model.AddTrustMark) (trustMarkType, trustMarkIssuer string, err error) {
 	hasTrustMarkIssuer := add.TrustMarkIssuer != ""
 	hasTrustMarkJWT := add.TrustMark != ""
 	hasSelfIssuance := add.SelfIssuanceSpec != nil

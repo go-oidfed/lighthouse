@@ -80,7 +80,7 @@ func (h *trustMarkSpecHandlers) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *trustMarkSpecHandlers) handleError(c *fiber.Ctx, err error) error {
+func (*trustMarkSpecHandlers) handleError(c *fiber.Ctx, err error) error {
 	var notFound model.NotFoundError
 	if errors.As(err, &notFound) {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
@@ -252,7 +252,7 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
 	return c.JSON(updated.AdditionalClaims)
 }
 
-func (h *trustMarkSubjectHandlers) handleError(c *fiber.Ctx, err error) error {
+func (*trustMarkSubjectHandlers) handleError(c *fiber.Ctx, err error) error {
 	var notFound model.NotFoundError
 	if errors.As(err, &notFound) {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))

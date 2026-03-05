@@ -92,7 +92,7 @@ func (h *trustMarkTypesHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (h *trustMarkTypesHandlers) updateOwnerInTx(txStore model.TrustMarkTypesStore, trustMarkTypeID string, req model.AddTrustMarkType) error {
+func (*trustMarkTypesHandlers) updateOwnerInTx(txStore model.TrustMarkTypesStore, trustMarkTypeID string, req model.AddTrustMarkType) error {
 	if _, err := txStore.UpdateOwner(trustMarkTypeID, *req.TrustMarkOwner); err != nil {
 		var nf model.NotFoundError
 		if errors.As(err, &nf) {
@@ -120,7 +120,7 @@ func (h *trustMarkTypesHandlers) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *trustMarkTypesHandlers) handleTxError(c *fiber.Ctx, err error) error {
+func (*trustMarkTypesHandlers) handleTxError(c *fiber.Ctx, err error) error {
 	var notFoundError model.NotFoundError
 	if errors.As(err, &notFoundError) {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))

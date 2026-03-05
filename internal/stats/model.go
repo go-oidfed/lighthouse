@@ -76,7 +76,7 @@ func (DailyStats) TableName() string {
 }
 
 // BeforeCreate sets the date to midnight UTC.
-func (d *DailyStats) BeforeCreate(tx *gorm.DB) error {
+func (d *DailyStats) BeforeCreate(_ *gorm.DB) error {
 	d.Date = time.Date(d.Date.Year(), d.Date.Month(), d.Date.Day(), 0, 0, 0, 0, time.UTC)
 	return nil
 }

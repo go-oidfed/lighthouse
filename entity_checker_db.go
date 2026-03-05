@@ -38,7 +38,7 @@ func (c *DBListEntityChecker) SetContext(ctx CheckerContext) {
 // Check implements the EntityChecker interface
 func (c *DBListEntityChecker) Check(
 	entityConfiguration *oidfed.EntityStatement,
-	entityTypes []string,
+	_ []string,
 ) (bool, int, *oidfed.Error) {
 	if c.context == nil || c.context.Store == nil {
 		return false, fiber.StatusInternalServerError,
@@ -72,7 +72,7 @@ func (c *DBListEntityChecker) Check(
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface
-func (c *DBListEntityChecker) UnmarshalYAML(_ *yaml.Node) error {
+func (*DBListEntityChecker) UnmarshalYAML(_ *yaml.Node) error {
 	// No configuration needed for db_list checker
 	return nil
 }

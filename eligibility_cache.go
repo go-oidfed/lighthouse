@@ -28,7 +28,7 @@ func NewEligibilityCache() *EligibilityCache {
 }
 
 // cacheKey generates a unique key for a trust mark type and subject combination
-func (c *EligibilityCache) cacheKey(trustMarkType, subject string) string {
+func (*EligibilityCache) cacheKey(trustMarkType, subject string) string {
 	return trustMarkType + "|" + subject
 }
 

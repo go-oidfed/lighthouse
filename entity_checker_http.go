@@ -36,7 +36,7 @@ type HTTPListEntityChecker struct {
 // Check implements the EntityChecker interface
 func (c *HTTPListEntityChecker) Check(
 	entityConfiguration *oidfed.EntityStatement,
-	entityTypes []string,
+	_ []string,
 ) (bool, int, *oidfed.Error) {
 	list, err := c.getList()
 	if err != nil {
@@ -96,7 +96,7 @@ func (c *HTTPListEntityChecker) fetchList() ([]string, error) {
 	}
 
 	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
-	req, err := http.NewRequest(method, c.URL, nil)
+	req, err := http.NewRequest(method, c.URL, http.NoBody)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create HTTP request")
 	}
@@ -128,12 +128,23 @@ func (c *HTTPListEntityChecker) fetchList() ([]string, error) {
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface
 func (c *HTTPListEntityChecker) UnmarshalYAML(node *yaml.Node) error {
-	type Alias HTTPListEntityChecker
-	alias := Alias(*c)
+	// Use a struct without the mutex to avoid copying lock
+	type AliasFields struct {
+		URL      string            `yaml:"url" json:"url"`
+		Method   string            `yaml:"method" json:"method"`
+		Headers  map[string]string `yaml:"headers" json:"headers"`
+		Timeout  int               `yaml:"timeout" json:"timeout"`
+		CacheTTL int               `yaml:"cache_ttl" json:"cache_ttl"`
+	}
+	var alias AliasFields
 	if err := node.Decode(&alias); err != nil {
 		return errors.WithStack(err)
 	}
-	*c = HTTPListEntityChecker(alias)
+	c.URL = alias.URL
+	c.Method = alias.Method
+	c.Headers = alias.Headers
+	c.Timeout = alias.Timeout
+	c.CacheTTL = alias.CacheTTL
 	return nil
 }
 
@@ -174,7 +185,7 @@ type HTTPListJWTEntityChecker struct {
 // Check implements the EntityChecker interface
 func (c *HTTPListJWTEntityChecker) Check(
 	entityConfiguration *oidfed.EntityStatement,
-	entityTypes []string,
+	_ []string,
 ) (bool, int, *oidfed.Error) {
 	list, err := c.getList()
 	if err != nil {
@@ -270,7 +281,7 @@ func (c *HTTPListJWTEntityChecker) fetchJWT() (string, error) {
 	}
 
 	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
-	req, err := http.NewRequest(method, c.URL, nil)
+	req, err := http.NewRequest(method, c.URL, http.NoBody)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create HTTP request")
 	}
@@ -384,12 +395,27 @@ func toStringSlice(v any) ([]string, error) {
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface
 func (c *HTTPListJWTEntityChecker) UnmarshalYAML(node *yaml.Node) error {
-	type Alias HTTPListJWTEntityChecker
-	alias := Alias(*c)
+	// Use a struct without the mutex to avoid copying lock
+	type AliasFields struct {
+		URL          string            `yaml:"url" json:"url"`
+		Method       string            `yaml:"method" json:"method"`
+		Headers      map[string]string `yaml:"headers" json:"headers"`
+		Timeout      int               `yaml:"timeout" json:"timeout"`
+		CacheTTL     int               `yaml:"cache_ttl" json:"cache_ttl"`
+		ListClaim    string            `yaml:"list_claim" json:"list_claim"`
+		Verification JWTVerification   `yaml:"verification" json:"verification"`
+	}
+	var alias AliasFields
 	if err := node.Decode(&alias); err != nil {
 		return errors.WithStack(err)
 	}
-	*c = HTTPListJWTEntityChecker(alias)
+	c.URL = alias.URL
+	c.Method = alias.Method
+	c.Headers = alias.Headers
+	c.Timeout = alias.Timeout
+	c.CacheTTL = alias.CacheTTL
+	c.ListClaim = alias.ListClaim
+	c.Verification = alias.Verification
 	return nil
 }
 

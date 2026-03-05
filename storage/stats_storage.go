@@ -362,7 +362,7 @@ func (s *StatsStorage) GetTimeSeries(from, to time.Time, endpoint string, interv
 }
 
 // Date truncation helpers for different databases
-func (s *StatsStorage) postgresDateTrunc(interval stats.Interval) string {
+func (*StatsStorage) postgresDateTrunc(interval stats.Interval) string {
 	switch interval {
 	case stats.IntervalMinute:
 		return "date_trunc('minute', timestamp)"
@@ -379,7 +379,7 @@ func (s *StatsStorage) postgresDateTrunc(interval stats.Interval) string {
 	}
 }
 
-func (s *StatsStorage) mysqlDateTrunc(interval stats.Interval) string {
+func (*StatsStorage) mysqlDateTrunc(interval stats.Interval) string {
 	switch interval {
 	case stats.IntervalMinute:
 		return "DATE_FORMAT(timestamp, '%Y-%m-%d %H:%i:00')"
@@ -396,7 +396,7 @@ func (s *StatsStorage) mysqlDateTrunc(interval stats.Interval) string {
 	}
 }
 
-func (s *StatsStorage) sqliteDateTrunc(interval stats.Interval) string {
+func (*StatsStorage) sqliteDateTrunc(interval stats.Interval) string {
 	switch interval {
 	case stats.IntervalMinute:
 		return "strftime('%Y-%m-%d %H:%M:00', timestamp)"
