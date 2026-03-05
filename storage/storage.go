@@ -154,7 +154,10 @@ func (s *TrustMarkedEntitiesStorage) Request(trustMarkType, entityID string) err
 // TrustMarkedStatus returns the status of a trust mark for an entity
 func (s *TrustMarkedEntitiesStorage) TrustMarkedStatus(trustMarkType, entityID string) (model.Status, error) {
 	var entity model.TrustMarkSubject
-	err := s.db.Where("trust_mark_type = ? AND entity_id = ?", trustMarkType, entityID).First(&entity).Error
+	err := s.db.
+		Joins("JOIN trust_mark_specs ON trust_mark_specs.id = trust_mark_subjects.trust_mark_spec_id").
+		Where("trust_mark_specs.trust_mark_type = ? AND trust_mark_subjects.entity_id = ?", trustMarkType, entityID).
+		First(&entity).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return model.StatusInactive, nil
@@ -182,8 +185,17 @@ func (s *TrustMarkedEntitiesStorage) Pending(trustMarkType string) ([]string, er
 
 // Delete removes a trust mark for an entity
 func (s *TrustMarkedEntitiesStorage) Delete(trustMarkType, entityID string) error {
+	// First find the TrustMarkSpec by type
+	var spec model.TrustMarkSpec
+	if err := s.db.Where("trust_mark_type = ?", trustMarkType).First(&spec).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil // Nothing to delete if spec doesn't exist
+		}
+		return errors.Wrap(err, "failed to find trust mark spec")
+	}
+	// Delete the subject
 	err := s.db.Where(
-		"trust_mark_type = ? AND entity_id = ?", trustMarkType, entityID,
+		"trust_mark_spec_id = ? AND entity_id = ?", spec.ID, entityID,
 	).Delete(&model.TrustMarkSubject{}).Error
 	if err != nil {
 		return errors.Wrap(err, "failed to delete trust marked entity")
@@ -201,7 +213,8 @@ func (s *TrustMarkedEntitiesStorage) Load() error {
 func (s *TrustMarkedEntitiesStorage) HasTrustMark(trustMarkType, entityID string) (bool, error) {
 	var count int64
 	if err := s.db.Model(&model.TrustMarkSubject{}).
-		Where("trust_mark_type = ? AND entity_id = ? AND status = ?", trustMarkType, entityID, model.StatusActive).
+		Joins("JOIN trust_mark_specs ON trust_mark_specs.id = trust_mark_subjects.trust_mark_spec_id").
+		Where("trust_mark_specs.trust_mark_type = ? AND trust_mark_subjects.entity_id = ? AND trust_mark_subjects.status = ?", trustMarkType, entityID, model.StatusActive).
 		Count(&count).Error; err != nil {
 		return false, errors.Wrap(err, "failed to check if entity has trust mark")
 	}
@@ -236,13 +249,15 @@ func (s *TrustMarkedEntitiesStorage) trustMarkedEntities(trustMarkType string, s
 	[]string, error,
 ) {
 	var entityIDs []string
-	query := s.db.Model(&model.TrustMarkSubject{}).Where("status = ?", status)
+	query := s.db.Model(&model.TrustMarkSubject{}).Where("trust_mark_subjects.status = ?", status)
 
 	if trustMarkType != "" {
-		query = query.Where("trust_mark_type = ?", trustMarkType)
+		query = query.
+			Joins("JOIN trust_mark_specs ON trust_mark_specs.id = trust_mark_subjects.trust_mark_spec_id").
+			Where("trust_mark_specs.trust_mark_type = ?", trustMarkType)
 	}
 
-	if err := query.Pluck("entity_id", &entityIDs).Error; err != nil {
+	if err := query.Pluck("trust_mark_subjects.entity_id", &entityIDs).Error; err != nil {
 		return nil, errors.Wrap(err, "failed to get trust marked entities")
 	}
 
@@ -905,4 +920,218 @@ func (s *TrustMarkIssuersStorage) DeleteType(ident string, typeID uint) ([]uint,
 		return nil, errors.Wrap(err, "trust_mark_issuers: delete type failed")
 	}
 	return s.Types(ident)
+}
+
+// TrustMarkSpecStorage returns a TrustMarkSpecStorage
+func (s *Storage) TrustMarkSpecStorage() *TrustMarkSpecStorage {
+	return &TrustMarkSpecStorage{db: s.db}
+}
+
+// TrustMarkSpecStorage provides CRUD for TrustMarkSpec entities
+type TrustMarkSpecStorage struct {
+	db *gorm.DB
+}
+
+// List returns all TrustMarkSpecs
+func (s *TrustMarkSpecStorage) List() ([]model.TrustMarkSpec, error) {
+	var items []model.TrustMarkSpec
+	if err := s.db.Find(&items).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_specs: list failed")
+	}
+	return items, nil
+}
+
+// Create creates a new TrustMarkSpec
+func (s *TrustMarkSpecStorage) Create(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+	if err := s.db.Create(spec).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, model.AlreadyExistsError("trust mark spec already exists for this type")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: create failed")
+	}
+	return spec, nil
+}
+
+// findByIdent finds a TrustMarkSpec by ID or trust_mark_type
+func (s *TrustMarkSpecStorage) findByIdent(ident string) (*model.TrustMarkSpec, error) {
+	var item model.TrustMarkSpec
+	// Try numeric ID first
+	if id, err := strconv.ParseUint(ident, 10, 64); err == nil {
+		if tx := s.db.First(&item, uint(id)); tx.Error == nil {
+			return &item, nil
+		}
+	}
+	// Fallback to trust_mark_type
+	if err := s.db.Where("trust_mark_type = ?", ident).First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.NotFoundError("trust mark spec not found")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: get failed")
+	}
+	return &item, nil
+}
+
+// Get returns a TrustMarkSpec by ID or trust_mark_type
+func (s *TrustMarkSpecStorage) Get(ident string) (*model.TrustMarkSpec, error) {
+	return s.findByIdent(ident)
+}
+
+// GetByType returns a TrustMarkSpec by trust_mark_type
+func (s *TrustMarkSpecStorage) GetByType(trustMarkType string) (*model.TrustMarkSpec, error) {
+	var item model.TrustMarkSpec
+	if err := s.db.Where("trust_mark_type = ?", trustMarkType).First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.NotFoundError("trust mark spec not found")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: get by type failed")
+	}
+	return &item, nil
+}
+
+// Update updates an existing TrustMarkSpec (full replacement)
+func (s *TrustMarkSpecStorage) Update(ident string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+	existing, err := s.findByIdent(ident)
+	if err != nil {
+		return nil, err
+	}
+	spec.ID = existing.ID
+	spec.CreatedAt = existing.CreatedAt
+	if err = s.db.Save(spec).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, model.AlreadyExistsError("trust mark spec already exists for this type")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: update failed")
+	}
+	return spec, nil
+}
+
+// Patch partially updates a TrustMarkSpec
+func (s *TrustMarkSpecStorage) Patch(ident string, updates map[string]any) (*model.TrustMarkSpec, error) {
+	existing, err := s.findByIdent(ident)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.db.Model(existing).Updates(updates).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, model.AlreadyExistsError("trust mark spec already exists for this type")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: patch failed")
+	}
+	return existing, nil
+}
+
+// Delete deletes a TrustMarkSpec
+func (s *TrustMarkSpecStorage) Delete(ident string) error {
+	existing, err := s.findByIdent(ident)
+	if err != nil {
+		return err
+	}
+	if err = s.db.Delete(existing).Error; err != nil {
+		return errors.Wrap(err, "trust_mark_specs: delete failed")
+	}
+	return nil
+}
+
+// ListSubjects returns all TrustMarkSubjects for a TrustMarkSpec
+func (s *TrustMarkSpecStorage) ListSubjects(specIdent string, status *model.Status) ([]model.TrustMarkSubject, error) {
+	spec, err := s.findByIdent(specIdent)
+	if err != nil {
+		return nil, err
+	}
+	query := s.db.Where("trust_mark_spec_id = ?", spec.ID)
+	if status != nil {
+		query = query.Where("status = ?", *status)
+	}
+	var subjects []model.TrustMarkSubject
+	if err = query.Find(&subjects).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_specs: list subjects failed")
+	}
+	return subjects, nil
+}
+
+// CreateSubject creates a new TrustMarkSubject for a TrustMarkSpec
+func (s *TrustMarkSpecStorage) CreateSubject(specIdent string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+	spec, err := s.findByIdent(specIdent)
+	if err != nil {
+		return nil, err
+	}
+	subject.TrustMarkSpecID = spec.ID
+	if err = s.db.Create(subject).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, model.AlreadyExistsError("subject already exists for this trust mark spec")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: create subject failed")
+	}
+	return subject, nil
+}
+
+// findSubjectByIdent finds a TrustMarkSubject by ID or entity_id within a spec
+func (s *TrustMarkSpecStorage) findSubjectByIdent(specIdent, subjectIdent string) (*model.TrustMarkSubject, error) {
+	spec, err := s.findByIdent(specIdent)
+	if err != nil {
+		return nil, err
+	}
+	var subject model.TrustMarkSubject
+	// Try numeric ID first
+	if id, err := strconv.ParseUint(subjectIdent, 10, 64); err == nil {
+		if tx := s.db.Where("trust_mark_spec_id = ?", spec.ID).First(&subject, uint(id)); tx.Error == nil {
+			return &subject, nil
+		}
+	}
+	// Fallback to entity_id
+	if err := s.db.Where("trust_mark_spec_id = ? AND entity_id = ?", spec.ID, subjectIdent).First(&subject).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, model.NotFoundError("trust mark subject not found")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: get subject failed")
+	}
+	return &subject, nil
+}
+
+// GetSubject returns a TrustMarkSubject by ID or entity_id
+func (s *TrustMarkSpecStorage) GetSubject(specIdent, subjectIdent string) (*model.TrustMarkSubject, error) {
+	return s.findSubjectByIdent(specIdent, subjectIdent)
+}
+
+// UpdateSubject updates an existing TrustMarkSubject
+func (s *TrustMarkSpecStorage) UpdateSubject(specIdent, subjectIdent string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	if err != nil {
+		return nil, err
+	}
+	subject.ID = existing.ID
+	subject.TrustMarkSpecID = existing.TrustMarkSpecID
+	subject.CreatedAt = existing.CreatedAt
+	if err = s.db.Save(subject).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, model.AlreadyExistsError("subject already exists for this trust mark spec")
+		}
+		return nil, errors.Wrap(err, "trust_mark_specs: update subject failed")
+	}
+	return subject, nil
+}
+
+// DeleteSubject deletes a TrustMarkSubject
+func (s *TrustMarkSpecStorage) DeleteSubject(specIdent, subjectIdent string) error {
+	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	if err != nil {
+		return err
+	}
+	if err = s.db.Delete(existing).Error; err != nil {
+		return errors.Wrap(err, "trust_mark_specs: delete subject failed")
+	}
+	return nil
+}
+
+// ChangeSubjectStatus changes the status of a TrustMarkSubject
+func (s *TrustMarkSpecStorage) ChangeSubjectStatus(specIdent, subjectIdent string, status model.Status) (*model.TrustMarkSubject, error) {
+	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	if err != nil {
+		return nil, err
+	}
+	existing.Status = status
+	if err = s.db.Save(existing).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_specs: change subject status failed")
+	}
+	return existing, nil
 }

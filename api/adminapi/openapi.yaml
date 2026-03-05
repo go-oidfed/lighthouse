@@ -2244,7 +2244,14 @@ paths:
       summary: Change TrustMarkSubject status
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims:
     summary: Manage subject-specific additional custom claims.
-    description: Endpoints to list and update additional custom claims for a specific TrustMarkSubject.
+    description: |
+      Get, replace, or copy the additional claims map for a specific TrustMarkSubject.
+      
+      When a trust mark is issued:
+      - If the subject has additional claims set (non-null), ONLY the subject's claims are used.
+      - If the subject has no additional claims (null), the spec's general claims are used.
+      
+      Use POST to copy the general claims from the spec to the subject as a starting point.
     get:
       tags:
         - Trust Mark Issuance
@@ -2253,20 +2260,31 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdditionalClaims'
-          description: Successful response returning all subject-specific additional claims.
+                type: object
+                additionalProperties: true
+                description: A key-value map of additional claims for this subject.
+                example:
+                  org_name: "Example Organization"
+                  level: "premium"
+                  certified_since: "2024-01-15"
+          description: Successful response returning the subject's additional claims map.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: getTrustMarkSubjectAdditionalClaims
-      summary: List subject-specific additional claims
+      summary: Get subject additional claims
     put:
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AdditionalClaims'
+              type: object
+              additionalProperties: true
+              description: A key-value map of additional claims to set for this subject.
+              example:
+                org_name: "Example Organization"
+                level: "premium"
         required: true
       tags:
         - Trust Mark Issuance
@@ -2275,8 +2293,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdditionalClaims'
-          description: Successfully updated the complete subject-specific additional claims object.
+                type: object
+                additionalProperties: true
+                description: The updated additional claims map.
+                example:
+                  org_name: "Example Organization"
+                  level: "premium"
+          description: Successfully replaced the subject's additional claims.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -2284,14 +2307,8 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: updateTrustMarkSubjectAdditionalClaims
-      summary: Update subject-specific additional claims
-    parameters:
-      - $ref: '#/components/parameters/TrustMarkSpecIDParam'
-      - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
-  /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims/{additionalClaimsID}:
-    summary: Manage a single subject-specific additional claim.
-    description: Get, update, or delete a single subject-specific additional claim.
-    get:
+      summary: Replace subject additional claims
+    post:
       tags:
         - Trust Mark Issuance
       responses:
@@ -2299,59 +2316,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdditionalClaim'
-          description: Successful response returning the claim row.
+                type: object
+                additionalProperties: true
+                description: The merged additional claims map.
+                example:
+                  org_name: "Federation Default"
+                  level: "premium"
+                  custom_field: "subject-specific"
+          description: Successfully merged the spec's general claims into the subject's claims.
         '404':
           $ref: '#/components/responses/NotFoundError'
         '500':
           $ref: '#/components/responses/ServerError'
-      operationId: getTrustMarkSubjectAdditionalClaim
-      summary: Get a subject additional claim row
-    put:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AddAdditionalClaim'
-        required: true
-      tags:
-        - Trust Mark Issuance
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdditionalClaim'
-          description: Successfully updated the claim row.
-        '400':
-          $ref: '#/components/responses/BadRequestError'
-        '404':
-          $ref: '#/components/responses/NotFoundError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-      operationId: updateTrustMarkSubjectAdditionalClaim
-      summary: Update a subject additional claim row
-    delete:
-      tags:
-        - Trust Mark Issuance
-      responses:
-        '204':
-          description: Successfully deleted the subject additional claim.
-        '404':
-          $ref: '#/components/responses/NotFoundError'
-        '500':
-          $ref: '#/components/responses/ServerError'
-      operationId: deleteTrustMarkSubjectAdditionalClaim
-      summary: Delete a subject additional claim
+      operationId: copyTrustMarkSubjectAdditionalClaims
+      summary: Copy general claims from spec to subject
+      description: |
+        Merges the additional claims from the TrustMarkSpec into the subject's existing claims.
+        The spec's claims are used as a base, and the subject's existing claims are overlaid on top.
+        This means existing subject claims take precedence on conflict.
+        
+        Example:
+        - Spec claims: {"org_name": "Default", "level": "standard"}
+        - Subject claims: {"level": "premium", "custom": "value"}
+        - Result: {"org_name": "Default", "level": "premium", "custom": "value"}
     parameters:
       - $ref: '#/components/parameters/TrustMarkSpecIDParam'
       - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
-      - name: additionalClaimsID
-        in: path
-        required: true
-        description: The ID of the subject-specific additional claim row.
-        schema:
-          type: integer
   /api/v1/admin/trust-marks/types/{trustMarkTypeID}/owner:
     summary: Path used to manage the single owner of a trust mark type.
     description: Manage the single TrustMarkOwner associated with a trust mark type (or none).
@@ -5186,8 +5176,14 @@ components:
           type: string
           description: The delegation JWT issued by the trust mark owner if this trust mark uses delegation.
         additional_claims:
-          $ref: '#/components/schemas/AdditionalClaims'
-          description: Additional custom claims to include in the trust mark.
+          type: object
+          additionalProperties: true
+          description: |
+            General additional claims (simple key-value map) included in all trust marks of this type.
+            Example: {"org_name": "Federation", "level": "standard"}
+        eligibility_config:
+          $ref: '#/components/schemas/EligibilityConfig'
+          description: Configuration for determining trust mark eligibility.
     AddTrustMarkSpec:
       description: Data to create or update a TrustMarkSpec.
       type: object
@@ -5198,6 +5194,9 @@ components:
           type: string
           description: The trust mark type identifier.
           example: https://example.org/trust-marks/foobar
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkSpec.
         lifetime:
           type: integer
           minimum: 0
@@ -5217,8 +5216,12 @@ components:
           type: string
           description: The delegation JWT issued by the trust mark owner if this trust mark uses delegation.
         additional_claims:
-          $ref: '#/components/schemas/AdditionalClaims'
-          description: Additional custom claims to include in the trust mark.
+          type: object
+          additionalProperties: true
+          description: General additional claims (simple key-value map).
+        eligibility_config:
+          $ref: '#/components/schemas/EligibilityConfig'
+          description: Configuration for determining trust mark eligibility.
     PatchTrustMarkSpec:
       description: Partial fields to update on a TrustMarkSpec.
       type: object
@@ -5227,6 +5230,9 @@ components:
           type: string
           description: The trust mark type identifier.
           example: https://example.org/trust-marks/foobar
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkSpec.
         lifetime:
           type: integer
           minimum: 0
@@ -5246,8 +5252,12 @@ components:
           type: string
           description: The delegation JWT issued by the trust mark owner if this trust mark uses delegation.
         additional_claims:
-          $ref: '#/components/schemas/AdditionalClaims'
-          description: Additional custom claims to include in the trust mark.
+          type: object
+          additionalProperties: true
+          description: General additional claims (simple key-value map).
+        eligibility_config:
+          $ref: '#/components/schemas/EligibilityConfig'
+          description: Configuration for determining trust mark eligibility.
     TrustMarkSubject:
       description: Subject eligible for a specific trust mark issuance.
       type: object
@@ -5271,8 +5281,11 @@ components:
           type: string
           description: Optional human-readable description for this TrustMarkSubject.
         additional_claims:
-          $ref: '#/components/schemas/AdditionalClaims'
-          description: Additional custom claims to include for this subject's trust mark.
+          type: object
+          additionalProperties: true
+          description: |
+            Per-subject additional claims (simple key-value map) that override general claims.
+            Example: {"level": "premium"} would override a general {"level": "standard"}
     AddTrustMarkSubject:
       description: Data to create or update a TrustMarkSubject.
       type: object
@@ -5287,9 +5300,13 @@ components:
           type: string
           description: Current status of the subject.
           example: active
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkSubject.
         additional_claims:
-          $ref: '#/components/schemas/AdditionalClaims'
-          description: Additional custom claims to include for this subject's trust mark.
+          type: object
+          additionalProperties: true
+          description: Per-subject additional claims that override general claims.
     
     TrustMarkSubjectStatus:
       description: New status to set for a TrustMarkSubject.
@@ -5357,6 +5374,123 @@ components:
       example:
         issuer: https://issuer.example.org
         description: Trusted Issuer Inc.
+
+    EligibilityConfig:
+      description: |
+        Configuration for determining trust mark eligibility.
+        Defines how dynamic entity checks are combined with the database subject list.
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+            - db_only
+            - check_only
+            - db_or_check
+            - db_and_check
+            - custom
+          default: db_only
+          description: |
+            How eligibility is determined:
+            - db_only: Only subjects in TrustMarkSubject DB with active status (default)
+            - check_only: Only run entity checker, ignore DB
+            - db_or_check: DB active status OR checker passes
+            - db_and_check: DB active status AND checker passes
+            - custom: Fully custom checker composition (db_list can be a sub-checker)
+        checker:
+          $ref: '#/components/schemas/EntityCheckerConfig'
+          description: Entity checker configuration (used based on mode).
+        check_cache_ttl:
+          type: integer
+          minimum: 0
+          default: 10
+          description: |
+            Seconds to cache eligibility check results for unknown subjects.
+            0 = no caching. Default: 10 seconds.
+      example:
+        mode: db_or_check
+        checker:
+          type: trust_path
+          config:
+            trust_anchors:
+              - entity_id: https://trust-anchor.example.org
+        check_cache_ttl: 30
+
+    EntityCheckerConfig:
+      description: |
+        Configuration for an entity checker that validates entities for trust mark eligibility.
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: |
+            Checker type. Built-in types:
+            - none: always passes
+            - db_list: checks TrustMarkSubject table for active status
+            - trust_mark: entity must have specific trust mark
+            - trust_path: entity must have valid trust path to trust anchors
+            - authority_hints: entity must have specific authority hints
+            - entity_id: entity ID must be in allowed list
+            - http_list: fetch entity list from HTTP endpoint (JSON array)
+            - http_list_jwt: fetch signed JWT entity list from HTTP endpoint
+            - multiple_and: all sub-checkers must pass
+            - multiple_or: any sub-checker passes
+        config:
+          type: object
+          additionalProperties: true
+          description: |
+            Type-specific configuration. Examples:
+            - trust_path: {"trust_anchors": [{"entity_id": "https://ta.example.org"}]}
+            - entity_id: {"entity_ids": ["https://entity1.example.org", "https://entity2.example.org"]}
+            - http_list: {"url": "https://api.example.org/entities", "cache_ttl": 300}
+            - http_list_jwt: {"url": "...", "verification": {"mode": "trust_anchor", "trust_anchors": [...]}}
+            - multiple_and/multiple_or: array of EntityCheckerConfig objects
+      examples:
+        trust_path:
+          summary: Trust path checker
+          value:
+            type: trust_path
+            config:
+              trust_anchors:
+                - entity_id: https://trust-anchor.example.org
+        entity_id_list:
+          summary: Entity ID allowlist
+          value:
+            type: entity_id
+            config:
+              entity_ids:
+                - https://allowed1.example.org
+                - https://allowed2.example.org
+        http_list:
+          summary: HTTP entity list
+          value:
+            type: http_list
+            config:
+              url: https://registry.example.org/api/entities
+              cache_ttl: 300
+        http_list_jwt:
+          summary: HTTP JWT entity list with federation verification
+          value:
+            type: http_list_jwt
+            config:
+              url: https://registry.example.org/api/entities-signed
+              list_claim: entities
+              verification:
+                mode: trust_anchor
+                trust_anchors:
+                  - entity_id: https://trust-anchor.example.org
+        combined:
+          summary: Combined checkers (OR logic)
+          value:
+            type: multiple_or
+            config:
+              - type: db_list
+              - type: trust_path
+                config:
+                  trust_anchors:
+                    - entity_id: https://trust-anchor.example.org
 
   responses:
     BadRequestError:

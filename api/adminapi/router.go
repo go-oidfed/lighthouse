@@ -110,7 +110,7 @@ func Register(
 	// Global Owners and Issuers
 	registerTrustMarkOwners(r, storages.TrustMarkOwners, storages.TrustMarkTypes)
 	registerTrustMarkIssuers(r, storages.TrustMarkIssuers, storages.TrustMarkTypes)
-	registerTrustMarkIssuance(r)
+	registerTrustMarkIssuance(r, storages.TrustMarkSpecs)
 	// Users management
 	if opts == nil || opts.UsersEnabled {
 		registerUsers(r, storages.Users)

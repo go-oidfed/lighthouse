@@ -6,7 +6,7 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.8.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.9.1-0.20260304114401-e3f5ffa78271
+	github.com/go-oidfed/lib v0.9.1-0.20260305082405-5f3e4f9cd156
 	github.com/gofiber/fiber/v2 v2.52.12
 	github.com/lestrrat-go/jwx/v3 v3.0.13
 	github.com/oschwald/maxminddb-golang v1.13.1
@@ -32,7 +32,6 @@ require (
 	github.com/TwiN/gocache/v2 v2.4.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect

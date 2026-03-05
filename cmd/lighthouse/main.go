@@ -150,6 +150,15 @@ func main() {
 			specs,
 		)
 	}
+
+	// Set up DB-based TrustMarkSpecProvider for dynamic trust mark specs
+	// This allows trust marks created via the admin API to be issued
+	if backs.TrustMarkSpecs != nil {
+		dbProvider := lighthouse.NewDBTrustMarkSpecProvider(backs.TrustMarkSpecs)
+		lh.TrustMarkIssuer.SetProvider(dbProvider)
+		log.Info("Configured DB-based TrustMarkSpecProvider")
+	}
+
 	log.Println("Initialized Entity")
 
 	if endpoint := c.Endpoints.FetchEndpoint; endpoint.IsSet() {
@@ -184,7 +193,18 @@ func main() {
 		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarks)
 	}
 	if endpoint := c.Endpoints.TrustMarkEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkEndpoint(endpoint.EndpointConf, backs.TrustMarks, trustMarkCheckerMap)
+		// Initialize eligibility cache for trust mark issuance
+		eligibilityCache := lighthouse.NewEligibilityCache()
+		// Start cleanup routine (every 5 minutes)
+		stopCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
+		defer stopCacheCleanup()
+
+		lh.AddTrustMarkEndpointWithConfig(endpoint.EndpointConf, lighthouse.TrustMarkEndpointConfig{
+			Store:     backs.TrustMarks,
+			SpecStore: backs.TrustMarkSpecs,
+			Checkers:  trustMarkCheckerMap,
+			Cache:     eligibilityCache,
+		})
 	}
 	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {
 		lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks)
