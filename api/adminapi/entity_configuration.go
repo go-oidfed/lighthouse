@@ -13,366 +13,392 @@ import (
 	smodel "github.com/go-oidfed/lighthouse/storage/model"
 )
 
+// metadataStore wraps KV operations for metadata to reduce duplication.
+type metadataStore struct {
+	kv smodel.KeyValueStore
+}
+
+func (m *metadataStore) load() (map[string]map[string]json.RawMessage, error) {
+	rawAll, err := m.kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
+	if err != nil {
+		return nil, err
+	}
+	if rawAll == nil {
+		return make(map[string]map[string]json.RawMessage), nil
+	}
+	var meta map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(rawAll, &meta); err != nil {
+		return nil, errors.New("invalid stored metadata")
+	}
+	return meta, nil
+}
+
+func (m *metadataStore) save(meta map[string]map[string]json.RawMessage) error {
+	buf, _ := json.Marshal(meta)
+	return m.kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf)
+}
+
+// Error response helpers
+func serverError(c *fiber.Ctx, msg string) error {
+	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(msg))
+}
+
+func badRequest(c *fiber.Ctx, msg string) error {
+	return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(msg))
+}
+
+func notFound(c *fiber.Ctx, msg string) error {
+	return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(msg))
+}
+
+func conflict(c *fiber.Ctx, msg string) error {
+	return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(msg))
+}
+
+// entityConfigHandlers groups handlers for entity configuration endpoints.
+type entityConfigHandlers struct {
+	fedEntity oidfed.FederationEntity
+}
+
+func (h *entityConfigHandlers) get(c *fiber.Ctx) error {
+	payload, err := h.fedEntity.EntityConfigurationPayload()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	return c.JSON(payload)
+}
+
+// additionalClaimsHandlers groups handlers for additional claims endpoints.
+type additionalClaimsHandlers struct {
+	store smodel.AdditionalClaimsStore
+}
+
+func (h *additionalClaimsHandlers) list(c *fiber.Ctx) error {
+	values, err := h.store.List()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	return c.JSON(values)
+}
+
+func (h *additionalClaimsHandlers) set(c *fiber.Ctx) error {
+	var req []smodel.AddAdditionalClaim
+	if err := c.BodyParser(&req); err != nil {
+		return badRequest(c, "invalid body")
+	}
+	updated, err := h.store.Set(req)
+	if err != nil {
+		if isUniqueConstraintError(err) {
+			return conflict(c, "additional claim already exists")
+		}
+		return serverError(c, err.Error())
+	}
+	return c.JSON(updated)
+}
+
+func (h *additionalClaimsHandlers) create(c *fiber.Ctx) error {
+	var req smodel.AddAdditionalClaim
+	if err := c.BodyParser(&req); err != nil {
+		return badRequest(c, "invalid body")
+	}
+	row, err := h.store.Create(req)
+	if err != nil {
+		var alreadyExists smodel.AlreadyExistsError
+		if errors.As(err, &alreadyExists) {
+			return conflict(c, "additional claim already exists")
+		}
+		return serverError(c, err.Error())
+	}
+	return c.Status(fiber.StatusCreated).JSON(row)
+}
+
+func (h *additionalClaimsHandlers) get(c *fiber.Ctx) error {
+	idStr := c.Params("additionalClaimsID")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		return badRequest(c, "invalid additionalClaimsID")
+	}
+	row, err := h.store.Get(strconv.FormatUint(id, 10))
+	if err != nil {
+		return notFound(c, "additional claim not found")
+	}
+	return c.JSON(row)
+}
+
+func (h *additionalClaimsHandlers) update(c *fiber.Ctx) error {
+	id := c.Params("additionalClaimsID")
+	var req smodel.AddAdditionalClaim
+	if err := c.BodyParser(&req); err != nil {
+		return badRequest(c, "invalid body")
+	}
+	updated, err := h.store.Update(id, req)
+	if err != nil {
+		var notFoundErr smodel.NotFoundError
+		if errors.As(err, &notFoundErr) {
+			return notFound(c, "additional claim not found")
+		}
+		var alreadyExists smodel.AlreadyExistsError
+		if errors.As(err, &alreadyExists) {
+			return conflict(c, "additional claim already exists")
+		}
+		return serverError(c, err.Error())
+	}
+	return c.JSON(updated)
+}
+
+func (h *additionalClaimsHandlers) delete(c *fiber.Ctx) error {
+	idStr := c.Params("additionalClaimsID")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		return badRequest(c, "invalid additionalClaimsID")
+	}
+	if err := h.store.Delete(strconv.FormatUint(id, 10)); err != nil {
+		return notFound(c, "additional claim not found")
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// lifetimeHandlers groups handlers for lifetime endpoints.
+type lifetimeHandlers struct {
+	kv smodel.KeyValueStore
+}
+
+func (h *lifetimeHandlers) get(c *fiber.Ctx) error {
+	var seconds int
+	found, err := h.kv.GetAs(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyLifetime, &seconds)
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	if !found || seconds <= 0 {
+		seconds = int(storage.DefaultEntityConfigurationLifetime.Seconds())
+	}
+	return c.JSON(seconds)
+}
+
+func (h *lifetimeHandlers) put(c *fiber.Ctx) error {
+	if len(c.Body()) == 0 {
+		return badRequest(c, "empty body")
+	}
+	seconds, err := strconv.Atoi(strings.TrimSpace(string(c.Body())))
+	if err != nil {
+		return badRequest(c, "invalid body: expected integer")
+	}
+	if seconds < 0 {
+		return badRequest(c, "lifetime must be non-negative")
+	}
+	if err := h.kv.SetAny(
+		smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyLifetime, seconds,
+	); err != nil {
+		return serverError(c, err.Error())
+	}
+	return c.JSON(seconds)
+}
+
+// metadataHandlers groups handlers for metadata endpoints.
+type metadataHandlers struct {
+	store *metadataStore
+	kv    smodel.KeyValueStore
+}
+
+func (h *metadataHandlers) getAll(c *fiber.Ctx) error {
+	rawAll, err := h.kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	if rawAll == nil {
+		return c.JSON(fiber.Map{})
+	}
+	var meta oidfed.Metadata
+	if err := json.Unmarshal(rawAll, &meta); err != nil {
+		return serverError(c, "invalid stored metadata")
+	}
+	return c.JSON(meta)
+}
+
+func (h *metadataHandlers) putAll(c *fiber.Ctx) error {
+	var meta oidfed.Metadata
+	if err := c.BodyParser(&meta); err != nil {
+		return badRequest(c, "invalid body")
+	}
+	buf, _ := json.Marshal(meta)
+	if err := h.kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
+		return serverError(c, err.Error())
+	}
+	return c.JSON(meta)
+}
+
+func (h *metadataHandlers) getClaim(c *fiber.Ctx) error {
+	entityType := c.Params("entityType")
+	claim := c.Params("claim")
+
+	meta, err := h.store.load()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	if m, ok := meta[entityType]; ok {
+		if v, ok := m[claim]; ok {
+			c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
+			return c.Send(v)
+		}
+	}
+	return notFound(c, "metadata not found")
+}
+
+func (h *metadataHandlers) putClaim(c *fiber.Ctx) error {
+	entityType := c.Params("entityType")
+	claim := c.Params("claim")
+
+	if len(c.Body()) == 0 {
+		return badRequest(c, "empty body")
+	}
+
+	meta, err := h.store.load()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	if _, ok := meta[entityType]; !ok {
+		meta[entityType] = make(map[string]json.RawMessage)
+	}
+	meta[entityType][claim] = json.RawMessage(c.Body())
+
+	if err := h.store.save(meta); err != nil {
+		return serverError(c, err.Error())
+	}
+	c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
+	return c.Send(c.Body())
+}
+
+func (h *metadataHandlers) deleteClaim(c *fiber.Ctx) error {
+	entityType := c.Params("entityType")
+	claim := c.Params("claim")
+
+	meta, err := h.store.load()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	if m, ok := meta[entityType]; ok {
+		delete(m, claim)
+		if len(m) == 0 {
+			delete(meta, entityType)
+		}
+		if err := h.store.save(meta); err != nil {
+			return serverError(c, err.Error())
+		}
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *metadataHandlers) getEntityType(c *fiber.Ctx) error {
+	entityType := c.Params("entityType")
+
+	meta, err := h.store.load()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	claims := meta[entityType]
+	if claims == nil {
+		claims = map[string]json.RawMessage{}
+	}
+	return c.JSON(claims)
+}
+
+func (h *metadataHandlers) putEntityType(c *fiber.Ctx) error {
+	entityType := c.Params("entityType")
+	var body map[string]json.RawMessage
+	if err := c.BodyParser(&body); err != nil {
+		return badRequest(c, "invalid body")
+	}
+
+	meta, err := h.store.load()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	meta[entityType] = body
+
+	if err := h.store.save(meta); err != nil {
+		return serverError(c, err.Error())
+	}
+	return c.JSON(body)
+}
+
+func (h *metadataHandlers) postEntityType(c *fiber.Ctx) error {
+	entityType := c.Params("entityType")
+	var body map[string]json.RawMessage
+	if err := c.BodyParser(&body); err != nil {
+		return badRequest(c, "invalid body")
+	}
+
+	meta, err := h.store.load()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	if _, ok := meta[entityType]; !ok {
+		meta[entityType] = make(map[string]json.RawMessage)
+	}
+	for claim, raw := range body {
+		meta[entityType][claim] = raw
+	}
+
+	if err := h.store.save(meta); err != nil {
+		return serverError(c, err.Error())
+	}
+	return c.JSON(body)
+}
+
+func (h *metadataHandlers) deleteEntityType(c *fiber.Ctx) error {
+	entityType := c.Params("entityType")
+
+	meta, err := h.store.load()
+	if err != nil {
+		return serverError(c, err.Error())
+	}
+	delete(meta, entityType)
+
+	if err := h.store.save(meta); err != nil {
+		return serverError(c, err.Error())
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 func registerEntityConfiguration(
 	r fiber.Router, addClaimsStore smodel.AdditionalClaimsStore, kv smodel.KeyValueStore,
 	fedEntity oidfed.FederationEntity,
 ) {
 	g := r.Group("/entity-configuration")
 	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
-	g.Get(
-		"/", func(c *fiber.Ctx) error {
-			payload, err := fedEntity.EntityConfigurationPayload()
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(payload)
-		},
-	)
 
-	// Additional Claims collection (claim, value, crit)
-	g.Get(
-		"/additional-claims", func(c *fiber.Ctx) error {
-			values, err := addClaimsStore.List()
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(values)
-		},
-	)
-	withCacheWipe.Put(
-		"/additional-claims", func(c *fiber.Ctx) error {
-			var req []smodel.AddAdditionalClaim
-			if err := c.BodyParser(&req); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
-			}
-			updated, err := addClaimsStore.Set(req)
-			if err != nil {
-				if isUniqueConstraintError(err) {
-					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("additional claim already exists"))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(updated)
-		},
-	)
-	withCacheWipe.Post(
-		"/additional-claims", func(c *fiber.Ctx) error {
-			var req smodel.AddAdditionalClaim
-			if err := c.BodyParser(&req); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
-			}
-			row, err := addClaimsStore.Create(req)
-			if err != nil {
-				var alreadyExists smodel.AlreadyExistsError
-				if errors.As(err, &alreadyExists) {
-					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("additional claim already exists"))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.Status(fiber.StatusCreated).JSON(row)
-		},
-	)
-	g.Get(
-		"/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error {
-			idStr := c.Params("additionalClaimsID")
-			id, err := strconv.ParseUint(idStr, 10, 64)
-			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid additionalClaimsID"))
-			}
-			row, err := addClaimsStore.Get(strconv.FormatUint(id, 10))
-			if err != nil {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("additional claim not found"))
-			}
-			return c.JSON(row)
-		},
-	)
-	withCacheWipe.Put(
-		"/additional-claims/:additionalClaimsID", func(c *fiber.Ctx) error {
-			id := c.Params("additionalClaimsID")
-			var req smodel.AddAdditionalClaim
-			if err := c.BodyParser(&req); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
-			}
-			updated, err := addClaimsStore.Update(id, req)
-			if err != nil {
-				var notFound smodel.NotFoundError
-				if errors.As(err, &notFound) {
-					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("additional claim not found"))
-				}
-				var alreadyExists smodel.AlreadyExistsError
-				if errors.As(err, &alreadyExists) {
-					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("additional claim already exists"))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(updated)
-		},
-	)
-	withCacheWipe.Delete(
-		"/additional-claims/:additionalClaimsID",
-		func(c *fiber.Ctx) error {
-			idStr := c.Params("additionalClaimsID")
-			id, err := strconv.ParseUint(idStr, 10, 64)
-			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid additionalClaimsID"))
-			}
-			if err := addClaimsStore.Delete(strconv.FormatUint(id, 10)); err != nil {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("additional claim not found"))
-			}
-			return c.SendStatus(fiber.StatusNoContent)
-		},
-	)
+	// Initialize handlers
+	ecHandlers := &entityConfigHandlers{fedEntity: fedEntity}
+	claimsHandlers := &additionalClaimsHandlers{store: addClaimsStore}
+	ltHandlers := &lifetimeHandlers{kv: kv}
+	metaStore := &metadataStore{kv: kv}
+	metaHandlers := &metadataHandlers{store: metaStore, kv: kv}
 
-	g.Get(
-		"/lifetime", func(c *fiber.Ctx) error {
-			var seconds int
-			found, err := kv.GetAs(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyLifetime, &seconds)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if !found || seconds <= 0 {
-				seconds = int(storage.DefaultEntityConfigurationLifetime.Seconds())
-			}
-			return c.JSON(seconds)
-		},
-	)
-	withCacheWipe.Put(
-		"/lifetime", func(c *fiber.Ctx) error {
-			// Expect body to be a plain text integer
-			if len(c.Body()) == 0 {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
-			}
-			seconds, err := strconv.Atoi(strings.TrimSpace(string(c.Body())))
-			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected integer"))
-			}
-			if seconds < 0 {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("lifetime must be non-negative"))
-			}
-			if err := kv.SetAny(
-				smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyLifetime, seconds,
-			); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(seconds)
-		},
-	)
+	// Entity configuration
+	g.Get("/", ecHandlers.get)
+
+	// Additional claims
+	g.Get("/additional-claims", claimsHandlers.list)
+	withCacheWipe.Put("/additional-claims", claimsHandlers.set)
+	withCacheWipe.Post("/additional-claims", claimsHandlers.create)
+	g.Get("/additional-claims/:additionalClaimsID", claimsHandlers.get)
+	withCacheWipe.Put("/additional-claims/:additionalClaimsID", claimsHandlers.update)
+	withCacheWipe.Delete("/additional-claims/:additionalClaimsID", claimsHandlers.delete)
+
+	// Lifetime
+	g.Get("/lifetime", ltHandlers.get)
+	withCacheWipe.Put("/lifetime", ltHandlers.put)
 
 	// Metadata
-	g.Get(
-		"/metadata", func(c *fiber.Ctx) error {
-			rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if rawAll == nil {
-				return c.JSON(fiber.Map{})
-			}
-			var meta oidfed.Metadata
-			if err := json.Unmarshal(rawAll, &meta); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-			}
-			return c.JSON(meta)
-		},
-	)
-	withCacheWipe.Put(
-		"/metadata", func(c *fiber.Ctx) error {
-			var meta oidfed.Metadata
-			if err := c.BodyParser(&meta); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
-			}
-			buf, _ := json.Marshal(meta)
-			if err := kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(meta)
-		},
-	)
-	g.Get(
-		"/metadata/:entityType/:claim", func(c *fiber.Ctx) error {
-			entityType := c.Params("entityType")
-			claim := c.Params("claim")
-			rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if rawAll == nil {
-				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("metadata not found"))
-			}
-			var meta map[string]map[string]json.RawMessage
-			if err := json.Unmarshal(rawAll, &meta); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-			}
-			if m, ok := meta[entityType]; ok {
-				if v, ok := m[claim]; ok {
-					c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
-					return c.Send(v)
-				}
-			}
-			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("metadata not found"))
-		},
-	)
-	withCacheWipe.Put(
-		"/metadata/:entityType/:claim", func(c *fiber.Ctx) error {
-			entityType := c.Params("entityType")
-			claim := c.Params("claim")
-			if len(c.Body()) == 0 {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("empty body"))
-			}
-			var meta map[string]map[string]json.RawMessage
-			if rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			} else if rawAll != nil {
-				if err := json.Unmarshal(rawAll, &meta); err != nil {
-					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-				}
-			}
-			if meta == nil {
-				meta = make(map[string]map[string]json.RawMessage)
-			}
-			if _, ok := meta[entityType]; !ok {
-				meta[entityType] = make(map[string]json.RawMessage)
-			}
-			meta[entityType][claim] = json.RawMessage(c.Body())
-			buf, _ := json.Marshal(meta)
-			if err := kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
-			return c.Send(c.Body())
-		},
-	)
-	withCacheWipe.Delete(
-		"/metadata/:entityType/:claim", func(c *fiber.Ctx) error {
-			entityType := c.Params("entityType")
-			claim := c.Params("claim")
-			var meta map[string]map[string]json.RawMessage
-			rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if rawAll == nil {
-				return c.SendStatus(fiber.StatusNoContent)
-			}
-			if err := json.Unmarshal(rawAll, &meta); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-			}
-			if m, ok := meta[entityType]; ok {
-				delete(m, claim)
-				if len(m) == 0 {
-					delete(meta, entityType)
-				}
-				buf, _ := json.Marshal(meta)
-				if err := kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
-					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-				}
-			}
-			return c.SendStatus(fiber.StatusNoContent)
-		},
-	)
-	g.Get(
-		"/metadata/:entityType", func(c *fiber.Ctx) error {
-			entityType := c.Params("entityType")
-			var meta map[string]map[string]json.RawMessage
-			if rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			} else if rawAll != nil {
-				if err := json.Unmarshal(rawAll, &meta); err != nil {
-					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-				}
-			}
-			if meta == nil {
-				meta = make(map[string]map[string]json.RawMessage)
-			}
-			claims := meta[entityType]
-			if claims == nil {
-				claims = map[string]json.RawMessage{}
-			}
-			return c.JSON(claims)
-		},
-	)
-	withCacheWipe.Put(
-		"/metadata/:entityType", func(c *fiber.Ctx) error {
-			entityType := c.Params("entityType")
-			var body map[string]json.RawMessage
-			if err := c.BodyParser(&body); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
-			}
-			var meta map[string]map[string]json.RawMessage
-			if rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			} else if rawAll != nil {
-				if err := json.Unmarshal(rawAll, &meta); err != nil {
-					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-				}
-			}
-			if meta == nil {
-				meta = make(map[string]map[string]json.RawMessage)
-			}
-			meta[entityType] = body
-			buf, _ := json.Marshal(meta)
-			if err := kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(body)
-		},
-	)
-	withCacheWipe.Post(
-		"/metadata/:entityType", func(c *fiber.Ctx) error {
-			entityType := c.Params("entityType")
-			var body map[string]json.RawMessage
-			if err := c.BodyParser(&body); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
-			}
-			var meta map[string]map[string]json.RawMessage
-			if rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			} else if rawAll != nil {
-				if err := json.Unmarshal(rawAll, &meta); err != nil {
-					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-				}
-			}
-			if meta == nil {
-				meta = make(map[string]map[string]json.RawMessage)
-			}
-			if _, ok := meta[entityType]; !ok {
-				meta[entityType] = make(map[string]json.RawMessage)
-			}
-			for claim, raw := range body {
-				meta[entityType][claim] = raw
-			}
-			buf, _ := json.Marshal(meta)
-			if err := kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			return c.JSON(body)
-		},
-	)
-	withCacheWipe.Delete(
-		"/metadata/:entityType", func(c *fiber.Ctx) error {
-			entityType := c.Params("entityType")
-			var meta map[string]map[string]json.RawMessage
-			rawAll, err := kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if rawAll == nil {
-				return c.SendStatus(fiber.StatusNoContent)
-			}
-			if err := json.Unmarshal(rawAll, &meta); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("invalid stored metadata"))
-			}
-			if meta != nil {
-				delete(meta, entityType)
-				buf, _ := json.Marshal(meta)
-				if err := kv.Set(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata, buf); err != nil {
-					return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
-				}
-			}
-			return c.SendStatus(fiber.StatusNoContent)
-		},
-	)
-
+	g.Get("/metadata", metaHandlers.getAll)
+	withCacheWipe.Put("/metadata", metaHandlers.putAll)
+	g.Get("/metadata/:entityType/:claim", metaHandlers.getClaim)
+	withCacheWipe.Put("/metadata/:entityType/:claim", metaHandlers.putClaim)
+	withCacheWipe.Delete("/metadata/:entityType/:claim", metaHandlers.deleteClaim)
+	g.Get("/metadata/:entityType", metaHandlers.getEntityType)
+	withCacheWipe.Put("/metadata/:entityType", metaHandlers.putEntityType)
+	withCacheWipe.Post("/metadata/:entityType", metaHandlers.postEntityType)
+	withCacheWipe.Delete("/metadata/:entityType", metaHandlers.deleteEntityType)
 }
 
 // isUniqueConstraintError performs a cheap check across supported drivers.
@@ -381,14 +407,16 @@ func isUniqueConstraintError(err error) bool {
 		return false
 	}
 	msg := err.Error()
-	// sqlite | mysql | postgres common markers
-	if
 	// SQLite
-	(strings.Contains(msg, "UNIQUE constraint failed") || strings.Contains(msg, "constraint failed")) ||
-		// MySQL
-		(strings.Contains(msg, "Duplicate entry") || strings.Contains(msg, "Error 1062")) ||
-		// Postgres
-		(strings.Contains(msg, "duplicate key value") || strings.Contains(msg, "violates unique constraint")) {
+	if strings.Contains(msg, "UNIQUE constraint failed") || strings.Contains(msg, "constraint failed") {
+		return true
+	}
+	// MySQL
+	if strings.Contains(msg, "Duplicate entry") || strings.Contains(msg, "Error 1062") {
+		return true
+	}
+	// Postgres
+	if strings.Contains(msg, "duplicate key value") || strings.Contains(msg, "violates unique constraint") {
 		return true
 	}
 	return false
