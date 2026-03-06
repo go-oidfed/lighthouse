@@ -27,6 +27,7 @@ type mockTrustMarkTypesStore struct {
 	setIssuersFn        func(id string, issuers []model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error)
 	addIssuerFn         func(id string, issuer model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error)
 	deleteIssuerByIDFn  func(id string, issuerID uint) ([]model.TrustMarkIssuer, error)
+	deleteIssuerByStringFn func(id string, issuer string) ([]model.TrustMarkIssuer, error)
 	getOwnerFn          func(id string) (*model.TrustMarkOwner, error)
 	createOwnerFn       func(id string, req model.AddTrustMarkOwner) (*model.TrustMarkOwner, error)
 	updateOwnerFn       func(id string, req model.AddTrustMarkOwner) (*model.TrustMarkOwner, error)
@@ -87,6 +88,12 @@ func (m *mockTrustMarkTypesStore) AddIssuer(id string, issuer model.AddTrustMark
 func (m *mockTrustMarkTypesStore) DeleteIssuerByID(id string, issuerID uint) ([]model.TrustMarkIssuer, error) {
 	if m.deleteIssuerByIDFn != nil {
 		return m.deleteIssuerByIDFn(id, issuerID)
+	}
+	return nil, nil
+}
+func (m *mockTrustMarkTypesStore) DeleteIssuerByString(id string, issuer string) ([]model.TrustMarkIssuer, error) {
+	if m.deleteIssuerByStringFn != nil {
+		return m.deleteIssuerByStringFn(id, issuer)
 	}
 	return nil, nil
 }
@@ -441,6 +448,267 @@ func TestTrustMarkTypesHandlers_Delete(t *testing.T) {
 		app := setupTrustMarkTypesApp(mockStore)
 
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1", http.NoBody)
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkIssuersHandlers_List(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			listIssuersFn: func(id string) ([]model.TrustMarkIssuer, error) {
+				return []model.TrustMarkIssuer{{Issuer: "iss1"}}, nil
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/types/1/issuers", http.NoBody)
+		resp, body := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(body), "iss1") {
+			t.Errorf("Expected response to contain 'iss1'")
+		}
+	})
+
+	t.Run("TypeNotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			listIssuersFn: func(id string) ([]model.TrustMarkIssuer, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/types/1/issuers", http.NoBody)
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			listIssuersFn: func(id string) ([]model.TrustMarkIssuer, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/types/1/issuers", http.NoBody)
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkIssuersHandlers_Set(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			setIssuersFn: func(id string, issuers []model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
+				return []model.TrustMarkIssuer{{Issuer: "iss2"}}, nil
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/types/1/issuers", strings.NewReader(`[{"issuer": "iss2"}]`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, body := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(body), "iss2") {
+			t.Errorf("Expected response to contain 'iss2'")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app := setupTrustMarkTypesApp(&mockTrustMarkTypesStore{})
+
+		req := httptest.NewRequest("PUT", "/trust-marks/types/1/issuers", strings.NewReader(`invalid`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("TypeNotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			setIssuersFn: func(id string, issuers []model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/types/1/issuers", strings.NewReader(`[{"issuer": "iss2"}]`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			setIssuersFn: func(id string, issuers []model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/types/1/issuers", strings.NewReader(`[{"issuer": "iss2"}]`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkIssuersHandlers_Add(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			addIssuerFn: func(id string, issuer model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
+				return []model.TrustMarkIssuer{{Issuer: "iss3"}}, nil
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("POST", "/trust-marks/types/1/issuers", strings.NewReader(`{"issuer": "iss3"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, body := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusCreated {
+			t.Errorf("Expected 201, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(body), "iss3") {
+			t.Errorf("Expected response to contain 'iss3'")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app := setupTrustMarkTypesApp(&mockTrustMarkTypesStore{})
+
+		req := httptest.NewRequest("POST", "/trust-marks/types/1/issuers", strings.NewReader(`invalid`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("TypeNotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			addIssuerFn: func(id string, issuer model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("POST", "/trust-marks/types/1/issuers", strings.NewReader(`{"issuer": "iss3"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			addIssuerFn: func(id string, issuer model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("POST", "/trust-marks/types/1/issuers", strings.NewReader(`{"issuer": "iss3"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkIssuersHandlers_Delete(t *testing.T) {
+	t.Run("SuccessNumericID", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			deleteIssuerByIDFn: func(id string, issuerID uint) ([]model.TrustMarkIssuer, error) {
+				return []model.TrustMarkIssuer{}, nil
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/42", http.NoBody)
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("SuccessStringIssuer", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			addIssuerFn: func(id string, issuer model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
+				return []model.TrustMarkIssuer{{ID: 42, Issuer: "notanumber"}}, nil
+			},
+			listIssuersFn: func(id string) ([]model.TrustMarkIssuer, error) {
+				return []model.TrustMarkIssuer{{ID: 42, Issuer: "notanumber"}}, nil
+			},
+			deleteIssuerByIDFn: func(id string, issuerID uint) ([]model.TrustMarkIssuer, error) {
+				return []model.TrustMarkIssuer{}, nil
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/notanumber", http.NoBody)
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("IssuerNotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			deleteIssuerByIDFn: func(id string, issuerID uint) ([]model.TrustMarkIssuer, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/42", http.NoBody)
+		resp, _ := doTrustMarkTypesReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("DeleteError", func(t *testing.T) {
+		mockStore := &mockTrustMarkTypesStore{
+			deleteIssuerByIDFn: func(id string, issuerID uint) ([]model.TrustMarkIssuer, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkTypesApp(mockStore)
+
+		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/42", http.NoBody)
 		resp, _ := doTrustMarkTypesReq(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
