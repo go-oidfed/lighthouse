@@ -87,16 +87,8 @@ lighthouse/
             path: "/resolve"
         trust_mark:
             path: "/trustmark"
-            trust_mark_specs:
-              - trust_mark_type: "https://tm.example.org"
-                lifetime: 3600
-                ref: "https://tm.example.org/ref"
-                logo_uri: "https://tm.example.org/logo"
-                checker:
-                    type: trust_path
-                    config:
-                        trust_anchors:
-                            - entity_id: "https://lighthouse.example.com"
+            # trust_mark_specs is deprecated - use Admin API to manage trust mark specs
+            # See: POST /admin/api/v1/trustmark-specs
         trust_mark_list:
             path: "/trustmark/list"
     ```

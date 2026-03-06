@@ -63,15 +63,8 @@ The following is an example `config.yaml` file:
             interval: 8h
         trust_mark:
             path: "/trustmark"
-            trust_mark_specs:
-                - trust_mark_type: "https://tm.example.org"
-                  lifetime: 3600
-                  ref: "https://tm.example.org/ref"
-                  logo_uri: "https://tm.example.org/logo"
-                  extra_claim: "example"
-                  delegation_jwt:
-                - trust_mark_type: "https://edugain.org"
-                  lifetime: 86400
+            # trust_mark_specs is deprecated - use Admin API to manage trust mark specs
+            # See: POST /admin/api/v1/trustmark-specs
         trust_mark_status:
             path: "/trustmark/status"
         trust_mark_list:

@@ -8,8 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
-	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 )
 
 var tmCmd = &cobra.Command{
@@ -136,8 +134,17 @@ func manageTrustMarkRequests(cmd *cobra.Command, _ []string) error {
 	if trustMarkType != "" {
 		return manageTrustMarkRequestsForID(trustMarkType)
 	}
-	for _, c := range config.Get().Endpoints.TrustMarkEndpoint.TrustMarkSpecs {
-		if err := manageTrustMarkRequestsForID(c.TrustMarkType); err != nil {
+
+	// Fetch trust mark types from database instead of config
+	if trustMarkSpecsStorage == nil {
+		return errors.New("trust mark specs storage not initialized")
+	}
+	specs, err := trustMarkSpecsStorage.List()
+	if err != nil {
+		return errors.Wrap(err, "failed to list trust mark specs from database")
+	}
+	for _, spec := range specs {
+		if err := manageTrustMarkRequestsForID(spec.TrustMarkType); err != nil {
 			return err
 		}
 	}

@@ -298,40 +298,49 @@ in the Entity Configuration. This option is usually not set. There are two cases
 
 ### `trust_mark_specs`
 <span class="badge badge-purple" title="Value Type">list</span>
-<span class="badge badge-red" title="If this option is required or optional">required, if trust marks should be issued</span>
+<span class="badge badge-yellow" title="Deprecation status">deprecated</span>
 
-The `trust_mark_specs` option is used to configure which Trust Marks can be issued.
-Each list element has the following configuration options defined:
+!!! warning "Deprecated"
+    The `trust_mark_specs` configuration option is **deprecated** and will be ignored.
+    Trust Mark specifications should now be managed via the Admin API.
+    
+    Use the following Admin API endpoints to manage trust mark specs:
+    
+    - `POST /admin/api/v1/trustmark-specs` - Create a new trust mark spec
+    - `GET /admin/api/v1/trustmark-specs` - List all trust mark specs
+    - `GET /admin/api/v1/trustmark-specs/{id}` - Get a specific trust mark spec
+    - `PUT /admin/api/v1/trustmark-specs/{id}` - Update a trust mark spec
+    - `DELETE /admin/api/v1/trustmark-specs/{id}` - Delete a trust mark spec
+    
+    See [Trust Marks](../features/trustmarks.md) for more details on managing trust marks.
+
+The `trust_mark_specs` option was previously used to configure which Trust Marks can be issued.
+Each list element had the following configuration options defined:
 
 #### `trust_mark_type`
 <span class="badge badge-purple" title="Value Type">string</span>
-<span class="badge badge-red" title="If this option is required or optional">required</span>
 
 The `trust_mark_type` option sets the Trust Mark Type (ID) of the Trust Mark.
 
 #### `lifetime`
 <span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
-<span class="badge badge-orange" title="If this option is required or optional">required, if the Trust Mark should expire</span>
 
 The `lifetime` option is used to set the lifetime of each Trust Mark JWT.
 
 #### `ref`
 <span class="badge badge-purple" title="Value Type">uri</span>
-<span class="badge badge-green" title="If this option is required or optional">optional</span>
 
 The `ref` option is used to set the ref uri inside the Trust Mark JWT, as defined in the OpenID Federation 
 Specification.
 
 #### `logo_uri`
 <span class="badge badge-purple" title="Value Type">uri</span>
-<span class="badge badge-green" title="If this option is required or optional">optional</span>
 
 The `logo_uri` option is used to set the logo uri inside the Trust Mark JWT, as defined in the OpenID Federation
 Specification.
 
 #### `delegation_jwt`
 <span class="badge badge-purple" title="Value Type">string</span>
-<span class="badge badge-orange" title="If this option is required or optional">required, if delegation is used</span>
 
 The `delegation_jwt` option is used to set the delegation JWT inside the Trust Mark JWT, as defined in the OpenID 
 Federation Specification. The delegation JWT is required if this LightHouse instance is not the Trust Mark Owner, 
@@ -342,12 +351,10 @@ Additional claims can be provided. Any provided claim that is not defined here w
 
 #### `checker`
 <span class="badge badge-purple" title="Value Type">object / mapping</span>
-<span class="badge badge-green" title="If this option is required or optional">optional</span>
 
-The `checker` option is used to configure [Entity Checks](../features/entity_checks.md) that can be used to 
-dynamically issue Trust Marks to Entities. Check the [Entity Checks](../features/entity_checks.md) documentation on 
-the configuration format. Also see [Trust Marks](../features/trustmarks.md) for some more details on how Trust Mark 
-issuance works with LightHouse.
+The `checker` option was used to configure [Entity Checks](../features/entity_checks.md) that can be used to 
+dynamically issue Trust Marks to Entities. This is now configured via the `eligibility_config` field when creating
+trust mark specs via the Admin API.
 
 ## `trust_mark_request`
 Under the `trust_mark_request` option a custom / proprietary endpoint can be configured. This endpoint allows an 

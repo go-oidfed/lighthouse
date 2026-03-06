@@ -146,6 +146,16 @@ func (e *extendedTrustMarkSpec) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// validate implements configValidator for trustMarkEndpointConf
+func (c *trustMarkEndpointConf) validate() error {
+	if len(c.TrustMarkSpecs) > 0 {
+		log.Warn("DEPRECATED: 'trust_mark_specs' in config file is deprecated and will be ignored. " +
+			"Use the Admin API to manage trust mark specs in the database. " +
+			"A migration tool will be provided in a future release.")
+	}
+	return nil
+}
+
 var defaultEndpointConf = Endpoints{
 	FetchEndpoint: fetchEndpointConf{
 		StatementLifetime: duration.DurationOption(600000 * time.Second),

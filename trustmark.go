@@ -21,7 +21,11 @@ type TrustMarkEndpointConfig struct {
 	SpecStore model.TrustMarkSpecStore
 	// InstanceStore for tracking issued trust mark instances
 	InstanceStore model.IssuedTrustMarkInstanceStore
-	// Checkers map for backward compatibility (config-based checkers)
+	// Checkers map for backward compatibility (config-based checkers).
+	//
+	// Deprecated: This field is no longer used. Checkers should be configured
+	// per TrustMarkSpec via EligibilityConfig in the database using the Admin API.
+	// This field will be removed in a future version.
 	Checkers map[string]EntityChecker
 	// Cache for eligibility results
 	Cache *EligibilityCache
@@ -233,11 +237,6 @@ func (*LightHouse) runChecker(
 				},
 			)
 		}
-	}
-
-	// Fall back to config-provided checkers (backward compatibility)
-	if checker == nil && config.Checkers != nil {
-		checker = config.Checkers[trustMarkType]
 	}
 
 	// No checker means not eligible

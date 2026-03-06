@@ -19,6 +19,7 @@ var rootCmd = &cobra.Command{
 var configFile string
 var subordinateStorage model.SubordinateStorageBackend
 var trustMarkedEntitiesStorage model.TrustMarkedEntitiesStorageBackend
+var trustMarkSpecsStorage model.TrustMarkSpecStore
 
 func loadConfig() error {
 	if err := config.Load(configFile); err != nil {
@@ -33,6 +34,7 @@ func loadConfig() error {
 	}
 	subordinateStorage = backs.Subordinates
 	trustMarkedEntitiesStorage = backs.TrustMarks
+	trustMarkSpecsStorage = backs.TrustMarkSpecs
 	return nil
 }
 

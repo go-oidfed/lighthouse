@@ -128,28 +128,11 @@ func main() {
 	// lh.TrustMarkIssuers = c.Federation.TrustMarkIssuers
 	// lh.TrustMarkOwners = c.Federation.TrustMarkOwners
 
-	var trustMarkCheckerMap map[string]lighthouse.EntityChecker
-	if specLen := len(c.Endpoints.TrustMarkEndpoint.TrustMarkSpecs); specLen > 0 {
-		specs := make([]oidfed.TrustMarkSpec, specLen)
-		for i, s := range c.Endpoints.TrustMarkEndpoint.TrustMarkSpecs {
-			specs[i] = s.TrustMarkSpec
-			if s.CheckerConfig.Type != "" {
-				if trustMarkCheckerMap == nil {
-					trustMarkCheckerMap = make(map[string]lighthouse.EntityChecker)
-				}
-				trustMarkCheckerMap[s.TrustMarkType], err = lighthouse.EntityCheckerFromEntityCheckerConfig(
-					s.CheckerConfig,
-				)
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
-		lh.TrustMarkIssuer = oidfed.NewTrustMarkIssuer(
-			c.Federation.EntityID, lh.GeneralJWTSigner.TrustMarkSigner(),
-			specs,
-		)
-	}
+	// Initialize TrustMarkIssuer - specs are loaded dynamically from DB via provider
+	lh.TrustMarkIssuer = oidfed.NewTrustMarkIssuer(
+		c.Federation.EntityID, lh.GeneralJWTSigner.TrustMarkSigner(),
+		nil, // No static specs - all loaded from DB
+	)
 
 	// Set up DB-based TrustMarkSpecProvider for dynamic trust mark specs
 	// This allows trust marks created via the admin API to be issued
@@ -210,7 +193,6 @@ func main() {
 			Store:                backs.TrustMarks,
 			SpecStore:            backs.TrustMarkSpecs,
 			InstanceStore:        backs.TrustMarkInstances,
-			Checkers:             trustMarkCheckerMap,
 			Cache:                eligibilityCache,
 			IssuedTrustMarkCache: issuedTrustMarkCache,
 		})
