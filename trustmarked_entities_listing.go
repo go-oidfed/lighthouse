@@ -5,15 +5,17 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-// AddTrustMarkedEntitiesListingEndpoint adds a trust marked entities endpoint
+// AddTrustMarkedEntitiesListingEndpoint adds a trust marked entities listing endpoint.
+// Per OIDC Federation spec, this endpoint lists all entities for which trust marks
+// have been issued and are still valid (non-revoked, non-expired).
 func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 	endpoint EndpointConf,
-	store model.TrustMarkedEntitiesStorageBackend,
+	instanceStore model.IssuedTrustMarkInstanceStore,
 ) {
 	fed.fedMetadata.FederationTrustMarkListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
@@ -40,27 +42,32 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 					oidfed.ErrorNotFound("'trust_mark_type' not known"),
 				)
 			}
+
 			entities := make([]string, 0)
 			var err error
+
 			if sub != "" {
-				hasTM, err := store.HasTrustMark(trustMarkType, sub)
+				// Check if specific entity has an active (valid) trust mark instance
+				hasActive, err := instanceStore.HasActiveInstance(trustMarkType, sub)
 				if err != nil {
 					ctx.Status(fiber.StatusInternalServerError)
 					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 				}
-				if hasTM {
+				if hasActive {
 					entities = []string{sub}
 				}
 			} else {
-				entities, err = store.Active(trustMarkType)
+				// List all entities with active (valid) trust mark instances
+				entities, err = instanceStore.ListActiveSubjects(trustMarkType)
 				if err != nil {
 					ctx.Status(fiber.StatusInternalServerError)
 					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 				}
-				if len(entities) == 0 {
+				if entities == nil {
 					entities = make([]string, 0)
 				}
 			}
+
 			return ctx.JSON(entities)
 		},
 	)

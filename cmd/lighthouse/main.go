@@ -192,7 +192,7 @@ func main() {
 		})
 	}
 	if endpoint := c.Endpoints.TrustMarkedEntitiesListingEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarks)
+		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarkInstances)
 	}
 	if endpoint := c.Endpoints.TrustMarkEndpoint; endpoint.IsSet() {
 		// Initialize eligibility cache for trust mark issuance

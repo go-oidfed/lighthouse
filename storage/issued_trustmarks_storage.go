@@ -113,6 +113,38 @@ func (s *IssuedTrustMarkInstanceStorage) ListBySubject(trustMarkType, entityID s
 	return instances, nil
 }
 
+// ListActiveSubjects returns distinct entity IDs that have valid (non-revoked, non-expired)
+// trust marks for the given trust mark type. Used by the trust marked entities listing endpoint.
+func (s *IssuedTrustMarkInstanceStorage) ListActiveSubjects(trustMarkType string) ([]string, error) {
+	var subjects []string
+	now := int(time.Now().Unix())
+	err := s.db.Model(&model.IssuedTrustMarkInstance{}).
+		Select("DISTINCT subject").
+		Where("trust_mark_type = ? AND revoked = ? AND (expires_at = 0 OR expires_at > ?)",
+			trustMarkType, false, now).
+		Pluck("subject", &subjects).Error
+	if err != nil {
+		return nil, errors.Wrap(err, "issued_trust_mark_instances: list active subjects failed")
+	}
+	return subjects, nil
+}
+
+// HasActiveInstance checks if an entity has a valid (non-revoked, non-expired)
+// trust mark instance for the given trust mark type.
+func (s *IssuedTrustMarkInstanceStorage) HasActiveInstance(trustMarkType, entityID string) (bool, error) {
+	var count int64
+	now := int(time.Now().Unix())
+	err := s.db.Model(&model.IssuedTrustMarkInstance{}).
+		Where("trust_mark_type = ? AND subject = ? AND revoked = ? AND (expires_at = 0 OR expires_at > ?)",
+			trustMarkType, entityID, false, now).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false, errors.Wrap(err, "issued_trust_mark_instances: has active instance failed")
+	}
+	return count > 0, nil
+}
+
 // DeleteExpired removes expired instances older than the given retention period.
 // Returns the number of deleted records.
 func (s *IssuedTrustMarkInstanceStorage) DeleteExpired(retentionDays int) (int64, error) {

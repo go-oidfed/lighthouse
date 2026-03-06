@@ -113,6 +113,12 @@ type IssuedTrustMarkInstanceStore interface {
 	GetStatus(jti string) (TrustMarkInstanceStatus, error)
 	// ListBySubject returns all instances for a given trust mark type and subject
 	ListBySubject(trustMarkType, entityID string) ([]IssuedTrustMarkInstance, error)
+	// ListActiveSubjects returns distinct entity IDs that have valid (non-revoked, non-expired)
+	// trust marks for the given trust mark type. Used by the trust marked entities listing endpoint.
+	ListActiveSubjects(trustMarkType string) ([]string, error)
+	// HasActiveInstance checks if an entity has a valid (non-revoked, non-expired)
+	// trust mark instance for the given trust mark type
+	HasActiveInstance(trustMarkType, entityID string) (bool, error)
 	// DeleteExpired removes expired instances older than the given retention period
 	DeleteExpired(retentionDays int) (int64, error)
 	// FindSubjectID looks up the TrustMarkSubjectID for a given trust mark type and entity
