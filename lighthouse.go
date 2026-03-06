@@ -139,8 +139,10 @@ func NewLightHouse(
 	if tps := serverConf.TrustedProxies; len(tps) > 0 {
 		FiberServerConfig.TrustedProxies = serverConf.TrustedProxies
 		FiberServerConfig.EnableTrustedProxyCheck = true
+		// Only use proxy header when trusted proxies are configured,
+		// otherwise Fiber's c.IP() may return empty for direct connections
+		FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	}
-	FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
 	server.Use(compress.New())
