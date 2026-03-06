@@ -3,8 +3,10 @@ package storage
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -1111,19 +1113,24 @@ func (s *TrustMarkSpecStorage) UpdateSubject(specIdent, subjectIdent string, sub
 	return subject, nil
 }
 
-// DeleteSubject deletes a TrustMarkSubject
+// DeleteSubject deletes a TrustMarkSubject and revokes all associated trust mark instances.
 func (s *TrustMarkSpecStorage) DeleteSubject(specIdent, subjectIdent string) error {
 	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
 	if err != nil {
 		return err
 	}
+
+	// Revoke all issued trust mark instances for this subject before deletion
+	s.revokeInstancesForSubject(existing.ID, existing.EntityID, specIdent)
+
 	if err = s.db.Delete(existing).Error; err != nil {
 		return errors.Wrap(err, "trust_mark_specs: delete subject failed")
 	}
 	return nil
 }
 
-// ChangeSubjectStatus changes the status of a TrustMarkSubject
+// ChangeSubjectStatus changes the status of a TrustMarkSubject.
+// If the new status is blocked or inactive, all associated trust mark instances are revoked.
 func (s *TrustMarkSpecStorage) ChangeSubjectStatus(specIdent, subjectIdent string, status model.Status) (*model.TrustMarkSubject, error) {
 	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
 	if err != nil {
@@ -1133,5 +1140,41 @@ func (s *TrustMarkSpecStorage) ChangeSubjectStatus(specIdent, subjectIdent strin
 	if err = s.db.Save(existing).Error; err != nil {
 		return nil, errors.Wrap(err, "trust_mark_specs: change subject status failed")
 	}
+
+	// Revoke all issued trust mark instances if status is blocked or inactive
+	if status == model.StatusBlocked || status == model.StatusInactive {
+		s.revokeInstancesForSubject(existing.ID, existing.EntityID, specIdent)
+	}
+
 	return existing, nil
+}
+
+// revokeInstancesForSubject revokes all issued trust mark instances for a subject.
+// This is called when a subject's status changes to blocked/inactive or when deleted.
+func (s *TrustMarkSpecStorage) revokeInstancesForSubject(subjectID uint, entityID, specIdent string) {
+	now := int(time.Now().Unix())
+	result := s.db.Model(&model.IssuedTrustMarkInstance{}).
+		Where("trust_mark_subject_id = ? AND revoked = ?", subjectID, false).
+		Updates(map[string]any{
+			"revoked":    true,
+			"updated_at": now,
+		})
+
+	if result.Error != nil {
+		log.WithError(result.Error).WithFields(log.Fields{
+			"subject_id": subjectID,
+			"entity_id":  entityID,
+			"spec_ident": specIdent,
+		}).Error("failed to revoke trust mark instances for subject")
+		return
+	}
+
+	if result.RowsAffected > 0 {
+		log.WithFields(log.Fields{
+			"subject_id":    subjectID,
+			"entity_id":     entityID,
+			"spec_ident":    specIdent,
+			"revoked_count": result.RowsAffected,
+		}).Info("automatically revoked trust mark instances due to subject status change")
+	}
 }

@@ -187,7 +187,9 @@ func main() {
 		lh.AddResolveEndpoint(endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver)
 	}
 	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkStatusEndpoint(endpoint, backs.TrustMarks)
+		lh.AddTrustMarkStatusEndpoint(endpoint, lighthouse.TrustMarkStatusConfig{
+			InstanceStore: backs.TrustMarkInstances,
+		})
 	}
 	if endpoint := c.Endpoints.TrustMarkedEntitiesListingEndpoint; endpoint.IsSet() {
 		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarks)
@@ -200,10 +202,11 @@ func main() {
 		defer stopCacheCleanup()
 
 		lh.AddTrustMarkEndpointWithConfig(endpoint.EndpointConf, lighthouse.TrustMarkEndpointConfig{
-			Store:     backs.TrustMarks,
-			SpecStore: backs.TrustMarkSpecs,
-			Checkers:  trustMarkCheckerMap,
-			Cache:     eligibilityCache,
+			Store:         backs.TrustMarks,
+			SpecStore:     backs.TrustMarkSpecs,
+			InstanceStore: backs.TrustMarkInstances,
+			Checkers:      trustMarkCheckerMap,
+			Cache:         eligibilityCache,
 		})
 	}
 	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {

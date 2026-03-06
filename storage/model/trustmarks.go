@@ -59,23 +59,64 @@ type TrustMarkSubject struct {
 	CreatedAt        int            `json:"created_at"`
 	UpdatedAt        int            `json:"updated_at"`
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
-	TrustMarkSpecID  uint           `gorm:"index:,unique,composite:tmspec_subject" json:"trust_mark_spec_id"`
-	TrustMarkSpec    TrustMarkSpec  `json:"trust_mark_spec"`
+	TrustMarkSpecID  uint           `gorm:"index:,unique,composite:tmspec_subject" json:"-"`
+	TrustMarkSpec    TrustMarkSpec  `json:"-"`
 	EntityID         string         `gorm:"index:unique,composite:tmspec_subject" json:"entity_id"`
 	Status           Status         `gorm:"index" json:"status"`
-	AdditionalClaims map[string]any `gorm:"serializer:json" json:"additional_claims"`
-	Description      string         `gorm:"type:text" json:"description"`
+	AdditionalClaims map[string]any `gorm:"serializer:json" json:"additional_claims,omitempty"`
+	Description      string         `gorm:"type:text" json:"description,omitempty"`
 }
 
 // IssuedTrustMarkInstance represents an instance of a TrustMark in the database.
+// Each record tracks a specific trust mark JWT that was issued, enabling
+// revocation checking and status queries per the OIDC Federation spec.
 type IssuedTrustMarkInstance struct {
 	JTI                string           `gorm:"primaryKey" json:"jti"`
 	CreatedAt          int              `json:"created_at"`
 	UpdatedAt          int              `json:"updated_at"`
 	ExpiresAt          int              `gorm:"index" json:"expires_at"`
 	Revoked            bool             `gorm:"index" json:"revoked"`
-	TrustMarkSubjectID uint             `json:"trust_mark_subject_id"`
+	TrustMarkSubjectID uint             `gorm:"index" json:"trust_mark_subject_id"`
 	TrustMarkSubject   TrustMarkSubject `json:"trust_mark_subject"`
+	// TrustMarkType is denormalized for efficient lookups without joins
+	TrustMarkType string `gorm:"index" json:"trust_mark_type"`
+	// Subject is the entity ID that received this trust mark (denormalized)
+	Subject string `gorm:"index" json:"subject"`
+}
+
+// TrustMarkInstanceStatus represents the status of an issued trust mark instance
+type TrustMarkInstanceStatus string
+
+const (
+	// TrustMarkStatusActive indicates the trust mark is valid and active
+	TrustMarkStatusActive TrustMarkInstanceStatus = "active"
+	// TrustMarkStatusExpired indicates the trust mark has expired
+	TrustMarkStatusExpired TrustMarkInstanceStatus = "expired"
+	// TrustMarkStatusRevoked indicates the trust mark was revoked
+	TrustMarkStatusRevoked TrustMarkInstanceStatus = "revoked"
+	// TrustMarkStatusInvalid indicates the trust mark signature validation failed
+	TrustMarkStatusInvalid TrustMarkInstanceStatus = "invalid"
+)
+
+// IssuedTrustMarkInstanceStore provides operations for tracking issued trust mark instances
+type IssuedTrustMarkInstanceStore interface {
+	// Create records a new issued trust mark instance
+	Create(instance *IssuedTrustMarkInstance) error
+	// GetByJTI retrieves an instance by its JTI (JWT ID)
+	GetByJTI(jti string) (*IssuedTrustMarkInstance, error)
+	// Revoke marks a trust mark instance as revoked
+	Revoke(jti string) error
+	// RevokeBySubjectID revokes all instances for a given TrustMarkSubjectID.
+	// Returns the number of revoked instances.
+	RevokeBySubjectID(subjectID uint) (int64, error)
+	// GetStatus returns the status of a trust mark instance
+	GetStatus(jti string) (TrustMarkInstanceStatus, error)
+	// ListBySubject returns all instances for a given trust mark type and subject
+	ListBySubject(trustMarkType, entityID string) ([]IssuedTrustMarkInstance, error)
+	// DeleteExpired removes expired instances older than the given retention period
+	DeleteExpired(retentionDays int) (int64, error)
+	// FindSubjectID looks up the TrustMarkSubjectID for a given trust mark type and entity
+	FindSubjectID(trustMarkType, entityID string) (uint, error)
 }
 
 // TrustMarkSpecStore provides CRUD for TrustMarkSpec and TrustMarkSubject entities

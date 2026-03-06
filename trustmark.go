@@ -5,6 +5,8 @@ import (
 
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 
 	oidfed "github.com/go-oidfed/lib"
 
@@ -17,6 +19,8 @@ type TrustMarkEndpointConfig struct {
 	Store model.TrustMarkedEntitiesStorageBackend
 	// SpecStore for loading TrustMarkSpec from DB (new)
 	SpecStore model.TrustMarkSpecStore
+	// InstanceStore for tracking issued trust mark instances
+	InstanceStore model.IssuedTrustMarkInstanceStore
 	// Checkers map for backward compatibility (config-based checkers)
 	Checkers map[string]EntityChecker
 	// Cache for eligibility results
@@ -278,9 +282,18 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 		}
 	}
 
+	// Generate JTI (JWT ID) for this issuance
+	jti := uuid.New().String()
+
+	// Merge JTI into subject claims
+	if subjectClaims == nil {
+		subjectClaims = make(map[string]any)
+	}
+	subjectClaims["jti"] = jti
+
 	// Use IssueTrustMarkWithOptions which handles claim merging
 	// (spec.Extra claims are already loaded via the TrustMarkSpecProvider)
-	tm, _, err := fed.IssueTrustMarkWithOptions(
+	tm, expiresAt, err := fed.IssueTrustMarkWithOptions(
 		trustMarkType, sub, oidfed.IssueTrustMarkOptions{
 			SubjectClaims: subjectClaims,
 		},
@@ -289,6 +302,36 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 		ctx.Status(fiber.StatusInternalServerError)
 		return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 	}
+
+	// Persist the issued instance for status tracking and revocation
+	if config.InstanceStore != nil {
+		instance := &model.IssuedTrustMarkInstance{
+			JTI:           jti,
+			TrustMarkType: trustMarkType,
+			Subject:       sub,
+			Revoked:       false,
+		}
+
+		// Set expiration if available
+		if expiresAt != nil {
+			instance.ExpiresAt = int(expiresAt.Time.Unix())
+		}
+
+		// Try to link to TrustMarkSubject record if it exists
+		if subjectID, err := config.InstanceStore.FindSubjectID(trustMarkType, sub); err == nil && subjectID > 0 {
+			instance.TrustMarkSubjectID = subjectID
+		}
+
+		if err := config.InstanceStore.Create(instance); err != nil {
+			// Log the error but don't fail the request - the trust mark was issued successfully
+			log.WithError(err).WithFields(log.Fields{
+				"jti":             jti,
+				"trust_mark_type": trustMarkType,
+				"subject":         sub,
+			}).Warn("failed to persist issued trust mark instance")
+		}
+	}
+
 	ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeTrustMark)
 	return ctx.SendString(tm)
 }

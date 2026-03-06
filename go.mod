@@ -6,8 +6,9 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.9.2-0.20260305100125-651f8eab6a55
+	github.com/go-oidfed/lib v0.9.2-0.20260306074050-7bafc4a1e859
 	github.com/gofiber/fiber/v2 v2.52.12
+	github.com/google/uuid v1.6.0
 	github.com/lestrrat-go/jwx/v3 v3.0.13
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/pkg/errors v0.9.1
@@ -46,7 +47,6 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/google/flatbuffers v25.9.23+incompatible // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

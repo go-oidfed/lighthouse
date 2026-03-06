@@ -152,6 +152,7 @@ func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool) model.Backen
 		SubordinateEvents:   NewSubordinateEventsStorage(db),
 		TrustMarks:          &TrustMarkedEntitiesStorage{db: db},
 		TrustMarkSpecs:      &TrustMarkSpecStorage{db: db},
+		TrustMarkInstances:  NewIssuedTrustMarkInstanceStorage(db),
 		AuthorityHints:      &AuthorityHintsStorage{db: db},
 		TrustMarkTypes:      &TrustMarkTypesStorage{db: db},
 		TrustMarkOwners:     &TrustMarkOwnersStorage{db: db},

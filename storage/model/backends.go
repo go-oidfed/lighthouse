@@ -17,6 +17,7 @@ type Backends struct {
 	SubordinateEvents   SubordinateEventStore
 	TrustMarks          TrustMarkedEntitiesStorageBackend
 	TrustMarkSpecs      TrustMarkSpecStore
+	TrustMarkInstances  IssuedTrustMarkInstanceStore
 	AuthorityHints      AuthorityHintsStore
 	TrustMarkTypes      TrustMarkTypesStore
 	TrustMarkOwners     TrustMarkOwnersStore
