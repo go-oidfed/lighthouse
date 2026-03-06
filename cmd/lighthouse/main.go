@@ -103,10 +103,6 @@ func main() {
 		config.Get().Server,
 		c.Federation.EntityID,
 		signingConf.SigningConf,
-		lighthouse.SubordinateStatementsConfig{
-			SubordinateStatementLifetime: c.Endpoints.FetchEndpoint.StatementLifetime.Duration(),
-			// TODO read all of this from config or a storage backend
-		},
 		backs,
 		lighthouse.AdminAPIOptions{
 			Enabled:      c.API.Admin.Enabled,
@@ -121,9 +117,9 @@ func main() {
 	lh.LogoBanner = c.Logging.Banner.Logo
 	lh.VersionBanner = c.Logging.Banner.Version
 
-	lh.Constraints = c.Federation.Constraints
-	lh.CriticalExtensions = c.Federation.CriticalExtensions
-	lh.MetadataPolicyCrit = c.Federation.MetadataPolicyCrit
+	// lh.Constraints = c.Federation.Constraints
+	// lh.CriticalExtensions = c.Federation.CriticalExtensions
+	// lh.MetadataPolicyCrit = c.Federation.MetadataPolicyCrit
 	// lh.TrustMarks = c.Federation.TrustMarks
 	// lh.TrustMarkIssuers = c.Federation.TrustMarkIssuers
 	// lh.TrustMarkOwners = c.Federation.TrustMarkOwners
@@ -170,9 +166,11 @@ func main() {
 		lh.AddResolveEndpoint(endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver)
 	}
 	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkStatusEndpoint(endpoint, lighthouse.TrustMarkStatusConfig{
-			InstanceStore: backs.TrustMarkInstances,
-		})
+		lh.AddTrustMarkStatusEndpoint(
+			endpoint, lighthouse.TrustMarkStatusConfig{
+				InstanceStore: backs.TrustMarkInstances,
+			},
+		)
 	}
 	if endpoint := c.Endpoints.TrustMarkedEntitiesListingEndpoint; endpoint.IsSet() {
 		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarkInstances)
@@ -189,13 +187,15 @@ func main() {
 		stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
 		defer stopIssuedCacheCleanup()
 
-		lh.AddTrustMarkEndpointWithConfig(endpoint.EndpointConf, lighthouse.TrustMarkEndpointConfig{
-			Store:                backs.TrustMarks,
-			SpecStore:            backs.TrustMarkSpecs,
-			InstanceStore:        backs.TrustMarkInstances,
-			Cache:                eligibilityCache,
-			IssuedTrustMarkCache: issuedTrustMarkCache,
-		})
+		lh.AddTrustMarkEndpointWithConfig(
+			endpoint.EndpointConf, lighthouse.TrustMarkEndpointConfig{
+				Store:                backs.TrustMarks,
+				SpecStore:            backs.TrustMarkSpecs,
+				InstanceStore:        backs.TrustMarkInstances,
+				Cache:                eligibilityCache,
+				IssuedTrustMarkCache: issuedTrustMarkCache,
+			},
+		)
 	}
 	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {
 		lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks)

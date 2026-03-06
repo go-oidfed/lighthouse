@@ -60,7 +60,6 @@ type LightHouse struct {
 	oidfed.FederationEntity
 	*oidfed.TrustMarkIssuer
 	*jwx.GeneralJWTSigner
-	SubordinateStatementsConfig
 	server                  *fiber.App
 	adminAPIServer          *fiber.App
 	serverConf              ServerConf
@@ -99,7 +98,6 @@ func NewLightHouse(
 	serverConf ServerConf,
 	entityID string,
 	signingConf SigningConf,
-	stmtConfig SubordinateStatementsConfig,
 	storages model.Backends,
 	admin AdminAPIOptions,
 	statsOpts StatsOptions,
@@ -152,20 +150,22 @@ func NewLightHouse(
 	// Initialize stats collector if enabled
 	var statsCollector *stats.Collector
 	if statsOpts.Enabled && storages.Stats != nil {
-		statsCollector, err = stats.NewCollector(stats.Config{
-			Enabled:             true,
-			BufferSize:          statsOpts.BufferSize,
-			FlushInterval:       statsOpts.FlushInterval,
-			FlushThreshold:      statsOpts.FlushThreshold,
-			CaptureClientIP:     statsOpts.CaptureClientIP,
-			CaptureUserAgent:    statsOpts.CaptureUserAgent,
-			CaptureQueryParams:  statsOpts.CaptureQueryParams,
-			GeoIPEnabled:        statsOpts.GeoIPEnabled,
-			GeoIPDBPath:         statsOpts.GeoIPDBPath,
-			DetailedRetention:   statsOpts.DetailedRetention,
-			AggregatedRetention: statsOpts.AggregatedRetention,
-			Endpoints:           statsOpts.Endpoints,
-		}, storages.Stats)
+		statsCollector, err = stats.NewCollector(
+			stats.Config{
+				Enabled:             true,
+				BufferSize:          statsOpts.BufferSize,
+				FlushInterval:       statsOpts.FlushInterval,
+				FlushThreshold:      statsOpts.FlushThreshold,
+				CaptureClientIP:     statsOpts.CaptureClientIP,
+				CaptureUserAgent:    statsOpts.CaptureUserAgent,
+				CaptureQueryParams:  statsOpts.CaptureQueryParams,
+				GeoIPEnabled:        statsOpts.GeoIPEnabled,
+				GeoIPDBPath:         statsOpts.GeoIPDBPath,
+				DetailedRetention:   statsOpts.DetailedRetention,
+				AggregatedRetention: statsOpts.AggregatedRetention,
+				Endpoints:           statsOpts.Endpoints,
+			}, storages.Stats,
+		)
 		if err != nil {
 			log.WithError(err).Warn("failed to initialize stats collector, statistics disabled")
 			statsCollector = nil
@@ -184,17 +184,16 @@ func NewLightHouse(
 	)
 
 	entity := &LightHouse{
-		TrustMarkIssuer:             oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
-		GeneralJWTSigner:            generalSigner,
-		SubordinateStatementsConfig: stmtConfig,
-		server:                      server,
-		serverConf:                  serverConf,
-		LogoBanner:                  true,
-		VersionBanner:               true,
-		keyManagement:               keyManagement,
-		storages:                    storages,
-		statsCollector:              statsCollector,
-		trustMarkConfigProvider:     trustMarkConfigProvider,
+		TrustMarkIssuer:         oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
+		GeneralJWTSigner:        generalSigner,
+		server:                  server,
+		serverConf:              serverConf,
+		LogoBanner:              true,
+		VersionBanner:           true,
+		keyManagement:           keyManagement,
+		storages:                storages,
+		statsCollector:          statsCollector,
+		trustMarkConfigProvider: trustMarkConfigProvider,
 	}
 
 	entity.FederationEntity = &oidfed.DynamicFederationEntity{
@@ -481,7 +480,9 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 
 // filterUsedOperators returns only the operators from configuredCrit that are actually
 // used in the given metadata policy.
-func filterUsedOperators(mp *oidfed.MetadataPolicies, configuredCrit []oidfed.PolicyOperatorName) []oidfed.PolicyOperatorName {
+func filterUsedOperators(
+	mp *oidfed.MetadataPolicies, configuredCrit []oidfed.PolicyOperatorName,
+) []oidfed.PolicyOperatorName {
 	if mp == nil || len(configuredCrit) == 0 {
 		return nil
 	}
