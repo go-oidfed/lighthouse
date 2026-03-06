@@ -13,6 +13,7 @@ import (
 
 // Config holds configuration for the entity
 type Config struct {
+	EntityID   string                `yaml:"entity_id"`
 	Server     lighthouse.ServerConf `yaml:"server"`
 	Logging    loggingConf           `yaml:"logging"`
 	Storage    storageConf           `yaml:"storage"`
@@ -52,6 +53,10 @@ func (c *Config) Validate() error {
 	// if c.Signing.KeyRotation.Interval < c.Federation.ConfigurationLifetime {
 	// 	c.Signing.KeyRotation.Interval = c.Federation.ConfigurationLifetime
 	// }
+
+	if c.EntityID == "" {
+		return errors.New("entity_id must be specified")
+	}
 	return nil
 }
 

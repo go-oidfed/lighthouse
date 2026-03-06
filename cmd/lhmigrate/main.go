@@ -19,9 +19,10 @@ func usage() {
 	_, _ = fmt.Fprintf(os.Stderr, "lhmigrate: migrate legacy data and keys to new formats\n")
 	_, _ = fmt.Fprintf(os.Stderr, "\n")
 	_, _ = fmt.Fprintf(os.Stderr, "Subcommands:\n")
-	_, _ = fmt.Fprintf(os.Stderr, "  keys     Migrate signing keys (subcommands: public, kms) [alias: signing]\n")
-	_, _ = fmt.Fprintf(os.Stderr, "  db       Migrate legacy storage data to GORM-based database (NOT IMPLEMENTED)\n")
-	_, _ = fmt.Fprintf(os.Stderr, "  config   Migrate or update configuration to new format (NOT IMPLEMENTED)\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  keys      Migrate signing keys (subcommands: public, kms) [alias: signing]\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  config2db Migrate config file values to database\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  db        Migrate legacy storage data (JSON/Badger) to GORM-based database\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  config    Migrate or update configuration to new format\n")
 	_, _ = fmt.Fprintf(os.Stderr, "\n")
 	_, _ = fmt.Fprintf(os.Stderr, "Use 'lhmigrate <subcommand> -h' for help on a subcommand.\n")
 }
@@ -268,78 +269,14 @@ func keysCmd(args []string) int {
 	}
 }
 
-// dbCmd is a stub for future database migration support.
-// It currently parses common flags and reports that the feature is not implemented.
+// dbCmd delegates to the database migration implementation in db.go
 func dbCmd(args []string) int {
-	fs := flag.NewFlagSet("db", flag.ExitOnError)
-	var (
-		srcType  = fs.String("source-type", "", "Source storage type (e.g., json, badger)")
-		srcDir   = fs.String("source-dir", "", "Source data directory")
-		destType = fs.String("dest-type", "", "Destination database type (e.g., sqlite, mysql, postgres)")
-		destDir  = fs.String("dest-dir", "", "Destination data directory (for sqlite)")
-		destDSN  = fs.String("dest-dsn", "", "Destination DSN (for mysql/postgres)")
-		dryRun   = fs.Bool("dry-run", false, "Perform a dry run without writing to destination")
-		v        = fs.Bool("v", false, "Verbose logging")
-	)
-	fs.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate db --source-type=<json|badger> --source-dir=<dir> --dest-type=<sqlite|mysql|postgres> [--dest-dir=<dir>|--dest-dsn=<dsn>] [--dry-run] [--v]\n")
-		fs.PrintDefaults()
-	}
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-	if *v {
-		log.SetLevel(log.DebugLevel)
-	}
-	// Minimal validation to help users before we return the placeholder error.
-	if *srcType == "" || *srcDir == "" || *destType == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "--source-type, --source-dir, and --dest-type are required")
-		fs.Usage()
-		return 2
-	}
-	// Log intent and return not implemented.
-	log.WithFields(log.Fields{
-		"source-type": *srcType,
-		"source-dir":  *srcDir,
-		"dest-type":   *destType,
-		"dest-dir":    *destDir,
-		"dest-dsn":    *destDSN,
-		"dry-run":     *dryRun,
-	}).Info("db migration requested")
-	_, _ = fmt.Fprintln(os.Stderr, "db migration is not implemented yet")
-	return 3
+	return runDBMigration(args)
 }
 
-// configCmd is a stub for future configuration migration support.
-// It currently parses common flags and reports that the feature is not implemented.
+// configCmd delegates to the config transformation implementation in config.go
 func configCmd(args []string) int {
-	fs := flag.NewFlagSet("config", flag.ExitOnError)
-	var (
-		in  = fs.String("in", "", "Path to existing configuration file")
-		out = fs.String("out", "", "Path to write updated configuration")
-		v   = fs.Bool("v", false, "Verbose logging")
-	)
-	fs.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate config --in=<config.yaml> [--out=<updated.yaml>] [--v]\n")
-		fs.PrintDefaults()
-	}
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-	if *v {
-		log.SetLevel(log.DebugLevel)
-	}
-	if *in == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "--in is required")
-		fs.Usage()
-		return 2
-	}
-	log.WithFields(log.Fields{
-		"in":  *in,
-		"out": *out,
-	}).Info("config migration requested")
-	_, _ = fmt.Fprintln(os.Stderr, "config migration is not implemented yet")
-	return 3
+	return runConfigMigration(args)
 }
 
 func main() {
@@ -352,6 +289,8 @@ func main() {
 	switch sub {
 	case "keys", "signing":
 		code = keysCmd(os.Args[2:])
+	case "config2db":
+		code = config2dbCmd(os.Args[2:])
 	case "db":
 		code = dbCmd(os.Args[2:])
 	case "config":

@@ -60,16 +60,10 @@ func main() {
 	}
 
 	signingConf := c.Signing
-	signingConf.KeyRotation.EntityConfigurationLifetimeFunc = func() (time.Duration, error) {
-		return storage.GetEntityConfigurationLifetime(backs.KV)
-	}
-	if err = signingConf.OverwriteDBValues(backs.KV); err != nil {
-		log.Fatal(err)
-	}
 
 	// for _, tmc := range c.Federation.TrustMarks {
 	// 	if err = tmc.Verify(
-	// 		c.Federation.EntityID, c.Endpoints.TrustMarkEndpoint.ValidateURL(c.Federation.EntityID),
+	// 		c.EntityID, c.Endpoints.TrustMarkEndpoint.ValidateURL(c.EntityID),
 	// 		jwx.NewTrustMarkSigner(keys.Federation()),
 	// 	); err != nil {
 	// 		log.Fatal(err)
@@ -101,7 +95,7 @@ func main() {
 
 	lh, err := lighthouse.NewLightHouse(
 		config.Get().Server,
-		c.Federation.EntityID,
+		c.EntityID,
 		signingConf.SigningConf,
 		backs,
 		lighthouse.AdminAPIOptions{
@@ -126,7 +120,7 @@ func main() {
 
 	// Initialize TrustMarkIssuer - specs are loaded dynamically from DB via provider
 	lh.TrustMarkIssuer = oidfed.NewTrustMarkIssuer(
-		c.Federation.EntityID, lh.GeneralJWTSigner.TrustMarkSigner(),
+		c.EntityID, lh.GeneralJWTSigner.TrustMarkSigner(),
 		nil, // No static specs - all loaded from DB
 	)
 
@@ -150,7 +144,7 @@ func main() {
 	if endpoint := c.Endpoints.ResolveEndpoint; endpoint.IsSet() {
 		if endpoint.ProactiveResolver.Enabled {
 			proactiveResolver = &oidfed.ProactiveResolver{
-				EntityID: c.Federation.EntityID,
+				EntityID: c.EntityID,
 				Store: oidfed.ResolveStore{
 					BaseDir:   endpoint.ProactiveResolver.ResponseStorage.Dir,
 					StoreJWT:  endpoint.ProactiveResolver.ResponseStorage.StoreJWT,

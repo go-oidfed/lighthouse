@@ -253,3 +253,76 @@ func SetKeyRotation(kvStorage model.KeyValueStore, keyRotation kms.KeyRotationCo
 	}
 	return kvStorage.SetAny(model.KeyValueScopeSigning, model.KeyValueKeyKeyRotation, keyRotation)
 }
+
+// SetEntityConfigurationLifetime sets the entity configuration lifetime in seconds
+func SetEntityConfigurationLifetime(kvStorage model.KeyValueStore, d time.Duration) error {
+	if kvStorage == nil {
+		return errors.New("key value store is not set")
+	}
+	return kvStorage.SetAny(model.KeyValueScopeEntityConfiguration, model.KeyValueKeyLifetime, int(d.Seconds()))
+}
+
+// GetConstraints returns the global subordinate statement constraints
+func GetConstraints(kvStorage model.KeyValueStore) (*oidfed.ConstraintSpecification, error) {
+	if kvStorage == nil {
+		return nil, nil
+	}
+	var cs oidfed.ConstraintSpecification
+	found, err := kvStorage.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &cs)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return &cs, nil
+}
+
+// SetConstraints sets the global subordinate statement constraints
+func SetConstraints(kvStorage model.KeyValueStore, cs *oidfed.ConstraintSpecification) error {
+	if kvStorage == nil {
+		return errors.New("key value store is not set")
+	}
+	if cs == nil {
+		return kvStorage.Delete(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints)
+	}
+	return kvStorage.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, cs)
+}
+
+// GetMetadataPolicyCrit returns the metadata policy crit operators
+func GetMetadataPolicyCrit(kvStorage model.KeyValueStore) ([]oidfed.PolicyOperatorName, error) {
+	if kvStorage == nil {
+		return nil, nil
+	}
+	var ops []oidfed.PolicyOperatorName
+	found, err := kvStorage.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicyCrit, &ops)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return ops, nil
+}
+
+// SetMetadataPolicyCrit sets the metadata policy crit operators
+func SetMetadataPolicyCrit(kvStorage model.KeyValueStore, ops []oidfed.PolicyOperatorName) error {
+	if kvStorage == nil {
+		return errors.New("key value store is not set")
+	}
+	if ops == nil {
+		return kvStorage.Delete(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicyCrit)
+	}
+	return kvStorage.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicyCrit, ops)
+}
+
+// SetMetadata sets the entity configuration metadata
+func SetMetadata(kvStorage model.KeyValueStore, m *oidfed.Metadata) error {
+	if kvStorage == nil {
+		return errors.New("key value store is not set")
+	}
+	if m == nil {
+		return kvStorage.Delete(model.KeyValueScopeEntityConfiguration, model.KeyValueKeyMetadata)
+	}
+	return kvStorage.SetAny(model.KeyValueScopeEntityConfiguration, model.KeyValueKeyMetadata, m)
+}

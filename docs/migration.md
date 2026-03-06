@@ -175,9 +175,16 @@ Examples:
 
 ## Data (DB) migration
 
-The `db` subcommand will migrate legacy storage (e.g., JSON/Badger) to the new GORM‑based storage backends. This is not implemented yet.
+The `db` subcommand migrates legacy storage (JSON file or BadgerDB) to the new GORM‑based storage backends.
 
-Planned CLI (subject to change):
+### Data migration sections
+
+The following data is migrated:
+
+- **subordinates** - Subordinate entities and their JWKS, metadata, policies, and constraints
+- **trust_marked_entities** - Trust mark subject eligibility status (active, blocked, pending)
+
+### CLI Usage
 
 ```bash
 ./lhmigrate db \
@@ -186,22 +193,216 @@ Planned CLI (subject to change):
   --dest-type <sqlite|mysql|postgres> \
   [--dest-dir /path/to/sqlite] \
   [--dest-dsn "dsn for mysql/postgres"] \
-  [--dry-run] [-v]
+  [--force] \
+  [--dry-run] \
+  [--only=<sections>] \
+  [--skip=<sections>] \
+  [-v]
 ```
 
-Status: Not implemented yet; running this subcommand prints a clear message and exits.
+### Flags
+
+- `--source-type`: Source storage type (`json` or `badger`) - **required**
+- `--source-dir`: Path to legacy data directory - **required**
+- `--dest-type`: Destination database type (`sqlite`, `mysql`, or `postgres`) - default: `sqlite`
+- `--dest-dir`: Destination data directory (for SQLite)
+- `--dest-dsn`: Destination DSN (for MySQL/PostgreSQL)
+- `--db-debug`: Enable GORM debug logging
+- `--force`: Overwrite existing records
+- `--dry-run`: Preview only, don't make changes
+- `--only`: Comma-separated list of sections to migrate (default: all)
+- `--skip`: Comma-separated list of sections to skip
+- `-v`: Verbose logging
+
+### Examples
+
+```bash
+# Migrate JSON file storage to SQLite
+./lhmigrate db \
+  --source-type=json \
+  --source-dir=/var/lib/lighthouse/legacy \
+  --dest-type=sqlite \
+  --dest-dir=/var/lib/lighthouse
+
+# Migrate BadgerDB to PostgreSQL
+./lhmigrate db \
+  --source-type=badger \
+  --source-dir=/var/lib/lighthouse/badger \
+  --dest-type=postgres \
+  --dest-dsn='host=localhost user=lighthouse password=secret dbname=lighthouse'
+
+# Dry run to preview migration
+./lhmigrate db \
+  --source-type=json \
+  --source-dir=/var/lib/lighthouse/legacy \
+  --dest-dir=/var/lib/lighthouse \
+  --dry-run -v
+
+# Migrate only subordinates, skip trust marked entities
+./lhmigrate db \
+  --source-type=json \
+  --source-dir=/var/lib/lighthouse/legacy \
+  --dest-dir=/var/lib/lighthouse \
+  --only=subordinates
+```
+
+### Important Notes
+
+- Trust marked entities require trust mark specs to exist in the database first. Run `lhmigrate config2db` before `lhmigrate db` if you have trust mark specs in your config file.
+- Per-subordinate `MetadataPolicyCrit` is no longer supported. A warning will be logged if this field is present in legacy data; consider migrating to the global setting via `config2db`.
+- Existing records are skipped by default. Use `--force` to overwrite.
 
 ## Config migration
 
-The `config` subcommand will assist with migrating or updating configuration files to the latest format. This is not implemented yet.
+The `config` subcommand transforms legacy configuration files to the new format compatible with LightHouse 0.20.0+.
 
-Planned CLI (subject to change):
+### Transformations applied
+
+| Old Config | New Config | Notes |
+|------------|------------|-------|
+| `storage.backend` (json\|badger) | `storage.driver` (sqlite) | Legacy backends no longer supported |
+| `signing.automatic_key_rollover` | `signing.key_rotation` | Renamed |
+| `federation_data.entity_id` | `entity_id` | Moved to top level |
+
+Deprecated fields are preserved with comments indicating they should be migrated to the database.
+
+### Fields moved to database
+
+The following fields are now managed in the database via the Admin API or `lhmigrate config2db`:
+
+| Config Path | Migration Section | Description |
+|-------------|-------------------|-------------|
+| `signing.alg` | `alg` | Signing algorithm (e.g., ES256, RS256) |
+| `signing.rsa_key_len` | `rsa_key_len` | RSA key length (e.g., 2048, 4096) |
+| `signing.key_rotation` | `key_rotation` | Key rotation settings (enabled, interval, overlap) |
+| `federation_data.authority_hints` | `authority_hints` | List of authority hint entity IDs |
+| `federation_data.federation_entity_metadata` | `metadata` | Federation entity metadata (name, contacts, etc.) |
+| `federation_data.constraints` | `constraints` | Subordinate statement constraints |
+| `federation_data.metadata_policy_crit` | `metadata_crit` | Critical metadata policy operators |
+| `federation_data.configuration_lifetime` | `config_lifetime` | Entity configuration JWT lifetime |
+| `federation_data.trust_mark_issuers` | `trust_mark_issuers` | Allowed trust mark issuers per type |
+| `federation_data.trust_mark_owners` | `trust_mark_owners` | Trust mark owners per type |
+| `endpoints.trust_mark.trust_mark_specs` | `trust_mark_specs` | Trust mark issuance specifications |
+
+### Fields that remain in config
+
+The following fields remain in the configuration file:
+
+| Config Path | Description |
+|-------------|-------------|
+| `entity_id` | The entity identifier (URI) - **required** |
+| `server.*` | Server settings (port, TLS, trusted proxies) |
+| `storage.*` | Storage driver configuration (sqlite, mysql, postgres) |
+| `signing.kms` | Key management system (filesystem, pkcs11) |
+| `signing.pk_backend` | Public key storage backend (filesystem, db) |
+| `signing.auto_generate_keys` | Auto-generate missing keys |
+| `signing.filesystem.*` | Filesystem KMS settings |
+| `signing.pkcs11.*` | PKCS#11 HSM settings |
+| `federation_data.trust_anchors` | Trust anchors for resolution |
+| `federation_data.metadata_policy_file` | Path to metadata policy JSON file |
+| `federation_data.trust_marks` | Trust marks to include in entity configuration |
+| `endpoints.*` | Endpoint paths and settings |
+| `api.*` | Admin API settings |
+| `stats.*` | Statistics collection settings |
+| `logging.*` | Logging configuration |
+| `cache.*` | Caching configuration |
+
+### CLI Usage
 
 ```bash
-./lhmigrate config --in config.yaml [--out updated.yaml] [-v]
+./lhmigrate config \
+  --in <config.yaml> \
+  [--out <updated.yaml>] \
+  [--run-config2db] \
+  [--db-driver <sqlite|mysql|postgres>] \
+  [--db-dir <path>] \
+  [--db-dsn <dsn>] \
+  [--force] \
+  [--dry-run] \
+  [-v]
 ```
 
-Status: Not implemented yet; running this subcommand prints a clear message and exits.
+### Flags
+
+- `--in`: Path to existing configuration file - **required**
+- `--out`: Path to write updated configuration (default: stdout)
+- `--run-config2db`: Also run config2db migration after transformation
+- `--db-driver`: Database driver for config2db (`sqlite`, `mysql`, `postgres`)
+- `--db-dir`: Data directory for config2db (for SQLite)
+- `--db-dsn`: Database DSN for config2db (for MySQL/PostgreSQL)
+- `--db-debug`: Enable GORM debug logging for config2db
+- `--force`: Force overwrite in config2db
+- `--dry-run`: Preview only, don't make changes
+- `-v`: Verbose logging
+
+### Examples
+
+```bash
+# Transform config and output to stdout
+./lhmigrate config --in=old-config.yaml
+
+# Transform and write to new file
+./lhmigrate config --in=old-config.yaml --out=new-config.yaml
+
+# Transform and also migrate values to database
+./lhmigrate config \
+  --in=old-config.yaml \
+  --out=new-config.yaml \
+  --run-config2db \
+  --db-dir=/var/lib/lighthouse
+
+# Dry run to preview changes
+./lhmigrate config --in=old-config.yaml --dry-run -v
+```
+
+## Config to Database migration (config2db)
+
+The `config2db` subcommand migrates configuration file values directly to the database without modifying the config file.
+
+### Sections
+
+- `alg` - Signing algorithm
+- `rsa_key_len` - RSA key length
+- `key_rotation` - Key rotation configuration
+- `constraints` - Subordinate statement constraints
+- `metadata_crit` - Metadata policy crit operators
+- `config_lifetime` - Entity configuration lifetime
+- `authority_hints` - Authority hints
+- `metadata` - Federation entity metadata
+- `trust_mark_specs` - Trust mark specifications
+- `trust_mark_issuers` - Trust mark issuers
+- `trust_mark_owners` - Trust mark owners
+
+### CLI Usage
+
+```bash
+./lhmigrate config2db \
+  --config=<config.yaml> \
+  [--db-driver <sqlite|mysql|postgres>] \
+  [--db-dir <path>] \
+  [--db-dsn <dsn>] \
+  [--only=<sections>] \
+  [--skip=<sections>] \
+  [--force] \
+  [--dry-run] \
+  [-v]
+```
+
+### Examples
+
+```bash
+# Migrate all config values to SQLite
+./lhmigrate config2db --config=config.yaml --db-dir=/var/lib/lighthouse
+
+# Migrate only signing options
+./lhmigrate config2db \
+  --config=config.yaml \
+  --db-dir=/var/lib/lighthouse \
+  --only=alg,rsa_key_len,key_rotation
+
+# Dry run with verbose output
+./lhmigrate config2db --config=config.yaml --db-dir=/var/lib/lighthouse --dry-run -v
+```
 
 ## After migration
 

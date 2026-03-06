@@ -1,19 +1,46 @@
 server:
   port: 7672
-signing:
-  key_file: "/signing.key"
-federation_data:
-  entity_id: "https://ta.example.lh"
-  authority_hints:
-    - "https://trust-anchor.spid-cie.fedservice.lh/"
-  federation_entity_metadata:
-    display_name: "Example Federation TA"
-    organization_name: "Example Organization"
-  metadata_policy_file: "/metadata-policy.json"
-storage:
-  backend: json
-  data_dir: "/data"
 
+# Entity identifier
+entity_id: "https://ta.example.lh"
+
+# Signing configuration
+# Note: alg, rsa_key_len, and key_rotation are managed in the database.
+# Use 'lhmigrate config2db' to migrate these values, or the Admin API to manage them.
+signing:
+  kms: filesystem
+  pk_backend: db
+  auto_generate_keys: true
+  filesystem:
+    key_dir: "/data/keys"
+  # For PKCS#11 HSM support:
+  # kms: pkcs11
+  # pkcs11:
+  #   module_path: "/usr/lib/softhsm/libsofthsm2.so"
+  #   token_label: "lighthouse"
+  #   pin: "1234"
+  #   storage_dir: "/data/pkcs11"
+
+# Federation data
+# Note: Most federation options are now managed in the database.
+# Use 'lhmigrate config2db' to migrate these values from an existing config file.
+federation_data:
+  # The following options are now managed via 'lhmigrate config2db' or Admin API:
+  # - authority_hints
+  # - federation_entity_metadata
+  # - constraints
+  # - metadata_policy_crit
+  # - configuration_lifetime
+
+# Storage configuration
+storage:
+  driver: sqlite  # Options: sqlite, mysql, postgres
+  data_dir: "/data"
+  # For MySQL/PostgreSQL:
+  # driver: postgres
+  # dsn: "host=localhost user=lighthouse password=secret dbname=lighthouse"
+
+# Admin API configuration
 api:
   admin:
     enabled: true
@@ -28,6 +55,7 @@ api:
       key_len: 64
       salt_len: 32
 
+# Endpoints configuration
 endpoints:
   fetch:
     path: "/fetch"
@@ -43,18 +71,9 @@ endpoints:
   trust_mark:
     path: "/trustmark"
     # DEPRECATED: trust_mark_specs should be managed via the Admin API.
+    # Use 'lhmigrate config2db' to migrate existing specs from config.
     # Configure trust mark specs using:
     #   POST /admin/api/v1/trustmark-specs
-    # See documentation for details.
-    # trust_mark_specs:
-    #   - trust_mark_type: "https://tm.example.org"
-    #     lifetime: 3600
-    #     ref: "https://tm.example.org/ref"
-    #     logo_uri: "https://tm.example.org/logo"
-    #     extra_claim: "example"
-    #     delegation_jwt:
-    #   - trust_mark_type: "https://edugain.org"
-    #     lifetime: 86400
   trust_mark_status:
     path: "/trustmark/status"
   trust_mark_list:
@@ -75,3 +94,21 @@ endpoints:
             trust_anchors:
               - entity_id: https://example.com
               - entity_id: https://foo.bar.com
+
+# Statistics collection (optional)
+# stats:
+#   enabled: false
+#   buffer:
+#     size: 10000
+#     flush_interval: 5s
+#     flush_threshold: 0.8
+#   capture:
+#     client_ip: true
+#     user_agent: true
+#     query_params: true
+#     geo_ip:
+#       enabled: false
+#       database_path: /path/to/GeoLite2-Country.mmdb
+#   retention:
+#     detailed_days: 90
+#     aggregated_days: 365

@@ -12,7 +12,6 @@ import (
 )
 
 type federationConf struct {
-	EntityID                     string                                       `yaml:"entity_id"`
 	TrustAnchors                 oidfed.TrustAnchors                          `yaml:"trust_anchors"`
 	AuthorityHints               []string                                     `yaml:"authority_hints"`
 	Metadata                     federationMetadataConf                       `yaml:"federation_entity_metadata"`
@@ -47,9 +46,6 @@ var defaultFederationConf = federationConf{
 }
 
 func (c *federationConf) validate() error {
-	if c.EntityID == "" {
-		return errors.New("error in federation conf: entity_id must be specified")
-	}
 	if c.MetadataPolicyFile == "" {
 		log.Warn("federation conf: metadata_policy_file not set")
 	} else {
