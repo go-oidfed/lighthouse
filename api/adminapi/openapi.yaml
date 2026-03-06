@@ -5192,6 +5192,22 @@ components:
         eligibility_config:
           $ref: '#/components/schemas/EligibilityConfig'
           description: Configuration for determining trust mark eligibility.
+        cache_ttl:
+          type: integer
+          minimum: 0
+          default: 0
+          description: |
+            How long to cache issued trust marks for this type, in seconds.
+            When a trust mark is requested, if a cached version exists and has not expired,
+            it will be returned instead of issuing a new one. This reduces signing operations
+            and database writes for repeated requests.
+            
+            The actual cache duration is the minimum of this value and the time until the
+            trust mark expires (based on the `lifetime` field).
+            
+            Set to 0 (default) to disable caching - a new trust mark JWT will be issued
+            and persisted for each request.
+          example: 300
     AddTrustMarkSpec:
       description: Data to create or update a TrustMarkSpec.
       type: object
@@ -5230,6 +5246,14 @@ components:
         eligibility_config:
           $ref: '#/components/schemas/EligibilityConfig'
           description: Configuration for determining trust mark eligibility.
+        cache_ttl:
+          type: integer
+          minimum: 0
+          default: 0
+          description: |
+            How long to cache issued trust marks for this type, in seconds.
+            Set to 0 (default) to disable caching.
+          example: 300
     PatchTrustMarkSpec:
       description: Partial fields to update on a TrustMarkSpec.
       type: object
@@ -5266,6 +5290,13 @@ components:
         eligibility_config:
           $ref: '#/components/schemas/EligibilityConfig'
           description: Configuration for determining trust mark eligibility.
+        cache_ttl:
+          type: integer
+          minimum: 0
+          description: |
+            How long to cache issued trust marks for this type, in seconds.
+            Set to 0 to disable caching.
+          example: 300
     TrustMarkSubject:
       description: Subject eligible for a specific trust mark issuance.
       type: object

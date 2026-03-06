@@ -198,15 +198,21 @@ func main() {
 		// Initialize eligibility cache for trust mark issuance
 		eligibilityCache := lighthouse.NewEligibilityCache()
 		// Start cleanup routine (every 5 minutes)
-		stopCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
-		defer stopCacheCleanup()
+		stopEligibilityCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
+		defer stopEligibilityCacheCleanup()
+
+		// Initialize issued trust mark cache (TTL is configured per-spec via admin API)
+		issuedTrustMarkCache := lighthouse.NewIssuedTrustMarkCache()
+		stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
+		defer stopIssuedCacheCleanup()
 
 		lh.AddTrustMarkEndpointWithConfig(endpoint.EndpointConf, lighthouse.TrustMarkEndpointConfig{
-			Store:         backs.TrustMarks,
-			SpecStore:     backs.TrustMarkSpecs,
-			InstanceStore: backs.TrustMarkInstances,
-			Checkers:      trustMarkCheckerMap,
-			Cache:         eligibilityCache,
+			Store:                backs.TrustMarks,
+			SpecStore:            backs.TrustMarkSpecs,
+			InstanceStore:        backs.TrustMarkInstances,
+			Checkers:             trustMarkCheckerMap,
+			Cache:                eligibilityCache,
+			IssuedTrustMarkCache: issuedTrustMarkCache,
 		})
 	}
 	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {

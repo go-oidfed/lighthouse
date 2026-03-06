@@ -25,6 +25,9 @@ type TrustMarkEndpointConfig struct {
 	Checkers map[string]EntityChecker
 	// Cache for eligibility results
 	Cache *EligibilityCache
+	// IssuedTrustMarkCache caches issued trust mark JWTs to avoid repeated signing.
+	// The TTL is configured per trust mark type via the TrustMarkSpec.CacheTTL field.
+	IssuedTrustMarkCache *IssuedTrustMarkCache
 }
 
 // AddTrustMarkEndpoint adds a trust mark endpoint
@@ -265,13 +268,28 @@ func (*LightHouse) runChecker(
 	return true, 0, ""
 }
 
-// issueAndSendTrustMarkWithClaims issues a trust mark with merged additional claims
+// issueAndSendTrustMarkWithClaims issues a trust mark with merged additional claims.
+// If caching is enabled (via TrustMarkSpec.CacheTTL), it will return a cached trust mark if available.
 func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 	ctx *fiber.Ctx,
 	trustMarkType, sub string,
 	dbSpec *model.TrustMarkSpec,
 	config TrustMarkEndpointConfig,
 ) error {
+	// Get cache TTL from spec (0 means no caching)
+	var cacheTTLSeconds int
+	if dbSpec != nil {
+		cacheTTLSeconds = dbSpec.CacheTTL
+	}
+
+	// Check cache first if caching is enabled for this trust mark type
+	if config.IssuedTrustMarkCache != nil && cacheTTLSeconds > 0 {
+		if cachedTM, found := config.IssuedTrustMarkCache.Get(trustMarkType, sub); found {
+			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeTrustMark)
+			return ctx.SendString(cachedTM)
+		}
+	}
+
 	// Get subject-specific additional claims
 	var subjectClaims map[string]any
 	if dbSpec != nil && config.SpecStore != nil {
@@ -330,6 +348,19 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 				"subject":         sub,
 			}).Warn("failed to persist issued trust mark instance")
 		}
+	}
+
+	// Cache the issued trust mark if caching is enabled for this trust mark type
+	if config.IssuedTrustMarkCache != nil && cacheTTLSeconds > 0 {
+		cacheTTL := time.Duration(cacheTTLSeconds) * time.Second
+		// If the trust mark has an expiration, don't cache longer than that
+		if expiresAt != nil {
+			timeUntilExpiry := time.Until(expiresAt.Time)
+			if timeUntilExpiry > 0 && timeUntilExpiry < cacheTTL {
+				cacheTTL = timeUntilExpiry
+			}
+		}
+		config.IssuedTrustMarkCache.Set(trustMarkType, sub, tm, cacheTTL)
 	}
 
 	ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeTrustMark)

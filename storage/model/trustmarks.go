@@ -51,6 +51,10 @@ type TrustMarkSpec struct {
 	Description      string         `gorm:"type:text" json:"description,omitempty"`
 	// EligibilityConfig defines how eligibility for this trust mark is determined
 	EligibilityConfig *EligibilityConfig `gorm:"serializer:json" json:"eligibility_config,omitempty"`
+	// CacheTTL is how long to cache issued trust marks for this type (in seconds).
+	// This reduces signing operations and database writes for repeated requests.
+	// 0 = no caching (default)
+	CacheTTL int `json:"cache_ttl,omitempty"`
 }
 
 // TrustMarkSubject represents a subject eligible for a specific trust mark issuance.
