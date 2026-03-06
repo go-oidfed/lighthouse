@@ -499,3 +499,531 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 		}
 	})
 }
+
+func TestTrustMarkSubjectHandlers_List(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			listSubjectsFn: func(specID string, status *model.Status) ([]model.TrustMarkSubject, error) {
+				return []model.TrustMarkSubject{{EntityID: "sub1"}}, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects", http.NoBody)
+		resp, body := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(body), "sub1") {
+			t.Errorf("Expected response to contain 'sub1'")
+		}
+	})
+
+	t.Run("InvalidStatusFilter", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects?status=invalid", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			listSubjectsFn: func(specID string, status *model.Status) ([]model.TrustMarkSubject, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			createSubjectFn: func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return subject, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		body := `{"entity_id": "sub1"}`
+		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusCreated {
+			t.Errorf("Expected 201, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(respBody), "sub1") {
+			t.Errorf("Expected response to contain 'sub1'")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(`invalid`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("MissingEntityID", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			createSubjectFn: func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(`{"entity_id": "sub1"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{EntityID: "sub1"}, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
+		resp, body := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(body), "sub1") {
+			t.Errorf("Expected response to contain 'sub1'")
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return subject, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		body := `{"entity_id": "sub2"}`
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(respBody), "sub2") {
+			t.Errorf("Expected response to contain 'sub2'")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`invalid`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("MissingEntityID", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`{"entity_id": "sub2"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`{"entity_id": "sub2"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			deleteSubjectFn: func(specID, subjectID string) error {
+				return nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Errorf("Expected 204, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			deleteSubjectFn: func(specID, subjectID string) error {
+				return model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			deleteSubjectFn: func(specID, subjectID string) error {
+				return errors.New("db error")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{Status: status}, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("inactive"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, body := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(body), "inactive") {
+			t.Errorf("Expected response to contain 'inactive'")
+		}
+	})
+
+	t.Run("MissingStatus", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("   "))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("InvalidStatus", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("unknown"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("active"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("StoreError", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
+				return nil, errors.New("db error")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("active"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
+	t.Run("GetAdditionalClaims_SuccessWithClaims", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{AdditionalClaims: map[string]any{"claim1": "val1"}}, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
+		resp, body := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(body), "claim1") {
+			t.Errorf("Expected response to contain 'claim1'")
+		}
+	})
+
+	t.Run("GetAdditionalClaims_SuccessEmptyClaims", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{AdditionalClaims: nil}, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
+		resp, body := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if string(body) != "{}" {
+			t.Errorf("Expected empty object, got %s", string(body))
+		}
+	})
+
+	t.Run("GetAdditionalClaims_NotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return nil, model.NotFoundError("not found")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PutAdditionalClaims_Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{}, nil
+			},
+			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return subject, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		body := `{"claim1": "val1"}`
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, respBody := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(respBody), "claim1") {
+			t.Errorf("Expected response to contain 'claim1'")
+		}
+	})
+
+	t.Run("PutAdditionalClaims_InvalidBody", func(t *testing.T) {
+		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
+
+		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", strings.NewReader(`invalid`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("CopyAdditionalClaims_Success", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getFn: func(id string) (*model.TrustMarkSpec, error) {
+				return &model.TrustMarkSpec{AdditionalClaims: map[string]any{"spec_claim": "spec_val"}}, nil
+			},
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{AdditionalClaims: map[string]any{"subj_claim": "subj_val"}}, nil
+			},
+			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return subject, nil
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
+		resp, respBody := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected 200, got %d", resp.StatusCode)
+		}
+		if !strings.Contains(string(respBody), "spec_claim") || !strings.Contains(string(respBody), "subj_claim") {
+			t.Errorf("Expected response to contain both claims, got %s", string(respBody))
+		}
+	})
+
+	t.Run("CopyAdditionalClaims_SpecNotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getFn: func(id string) (*model.TrustMarkSpec, error) {
+				return nil, model.NotFoundError("spec not found")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("CopyAdditionalClaims_SubjectNotFound", func(t *testing.T) {
+		mockStore := &mockTrustMarkSpecStore{
+			getFn: func(id string) (*model.TrustMarkSpec, error) {
+				return &model.TrustMarkSpec{}, nil
+			},
+			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+				return nil, model.NotFoundError("subj not found")
+			},
+		}
+		app := setupTrustMarkIssuanceApp(mockStore)
+
+		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
+		resp, _ := doTrustMarkReq(t, app, req)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404, got %d", resp.StatusCode)
+		}
+	})
+}
