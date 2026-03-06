@@ -6,7 +6,7 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.9.2-0.20260306074050-7bafc4a1e859
+	github.com/go-oidfed/lib v0.9.2-0.20260306100134-f261c25da15a
 	github.com/gofiber/fiber/v2 v2.52.12
 	github.com/google/uuid v1.6.0
 	github.com/lestrrat-go/jwx/v3 v3.0.13
