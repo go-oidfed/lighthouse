@@ -1102,8 +1102,16 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when policies are missing, got %d", resp.StatusCode)
+		// General policies behave differently than subordinate-specific policies.
+		// If no global policy is found in KV, the store returns an empty MetadataPolicies struct,
+		// and the handler returns 200 OK with `{}`, not a 404.
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200 (returning empty object) when global policies are missing, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		if string(body) != "{}" {
+			t.Errorf("Expected empty JSON object '{}', got %s", string(body))
 		}
 	})
 }
