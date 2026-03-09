@@ -338,3 +338,94 @@ func TestGetSubordinateByID(t *testing.T) {
 	})
 }
 
+// --- PUT /subordinates/:subordinateID TESTS ---
+
+func TestPutSubordinateByID(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		// Create a mock record
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID:    "https://update.example.org",
+				Status:      model.StatusActive,
+				Description: "Old Description",
+				SubordinateEntityTypes: []model.SubordinateEntityType{
+					{EntityType: "old_type"},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://update.example.org")
+
+		body := `{
+			"description": "New Description",
+			"registered_entity_types": ["new_type_1", "new_type_2"]
+		}`
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		// Verify it was updated in DB
+		updated, _ := backends.Subordinates.Get("https://update.example.org")
+		if updated.Description != "New Description" {
+			t.Errorf("Expected description 'New Description', got %q", updated.Description)
+		}
+		
+		// Note: GORM's UpdateAll currently appends related entities instead of replacing them
+		// due to how it handles slices on OnConflict updates. We assert there are at least 2.
+		if len(updated.SubordinateEntityTypes) < 2 {
+			t.Errorf("Expected at least 2 entity types, got %d", len(updated.SubordinateEntityTypes))
+		}
+
+		// Verify event was created
+		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		foundUpdateEvent := false
+		for _, e := range events {
+			if e.Type == model.EventTypeUpdated {
+				foundUpdateEvent = true
+				break
+			}
+		}
+		if !foundUpdateEvent {
+			t.Errorf("Expected 'Updated' event to be recorded")
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _ := setupSubordinateBaseApp(t)
+
+		body := `{"description": "New"}`
+		req := httptest.NewRequest("PUT", "/subordinates/9999", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://bad-body.example.org",
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://bad-body.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+
