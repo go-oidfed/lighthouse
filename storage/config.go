@@ -63,12 +63,29 @@ func DSN(driver DriverType, conf DSNConf) (string, error) {
 // It contains common connection parameters used across different database drivers
 // including MySQL and PostgreSQL. When used with the DSN function, this struct
 // helps generate proper connection strings based on the selected driver type.
+//
+// Environment variables (with prefix LH_STORAGE_):
+//   - LH_STORAGE_USER: Database username
+//   - LH_STORAGE_PASSWORD: Database password
+//   - LH_STORAGE_HOST: Database host
+//   - LH_STORAGE_PORT: Database port
+//   - LH_STORAGE_DB: Database name
 type DSNConf struct {
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	DB       string `yaml:"db"`
+	// User is the database username.
+	// Env: LH_STORAGE_USER
+	User string `yaml:"user" envconfig:"USER"`
+	// Password is the database password.
+	// Env: LH_STORAGE_PASSWORD
+	Password string `yaml:"password" envconfig:"PASSWORD"`
+	// Host is the database host.
+	// Env: LH_STORAGE_HOST
+	Host string `yaml:"host" envconfig:"HOST"`
+	// Port is the database port.
+	// Env: LH_STORAGE_PORT
+	Port int `yaml:"port" envconfig:"PORT"`
+	// DB is the database name.
+	// Env: LH_STORAGE_DB
+	DB string `yaml:"db" envconfig:"DB"`
 }
 
 // Config represents the database configuration
@@ -88,13 +105,30 @@ type Config struct {
 	UsersHash Argon2idParams
 }
 
-// Argon2idParams configures Argon2id hashing parameters
+// Argon2idParams configures Argon2id hashing parameters.
+//
+// Environment variables (with prefix LH_API_ADMIN_PASSWORD_HASHING_):
+//   - LH_API_ADMIN_PASSWORD_HASHING_TIME: Argon2id time parameter
+//   - LH_API_ADMIN_PASSWORD_HASHING_MEMORY_KIB: Argon2id memory in KiB
+//   - LH_API_ADMIN_PASSWORD_HASHING_PARALLELISM: Argon2id parallelism
+//   - LH_API_ADMIN_PASSWORD_HASHING_KEY_LEN: Argon2id key length
+//   - LH_API_ADMIN_PASSWORD_HASHING_SALT_LEN: Argon2id salt length
 type Argon2idParams struct {
-	Time        uint32
-	MemoryKiB   uint32
-	Parallelism uint8
-	KeyLen      uint32
-	SaltLen     uint32
+	// Time is the Argon2id time parameter.
+	// Env: LH_API_ADMIN_PASSWORD_HASHING_TIME
+	Time uint32 `envconfig:"TIME"`
+	// MemoryKiB is the Argon2id memory in KiB.
+	// Env: LH_API_ADMIN_PASSWORD_HASHING_MEMORY_KIB
+	MemoryKiB uint32 `envconfig:"MEMORY_KIB"`
+	// Parallelism is the Argon2id parallelism.
+	// Env: LH_API_ADMIN_PASSWORD_HASHING_PARALLELISM
+	Parallelism uint8 `envconfig:"PARALLELISM"`
+	// KeyLen is the Argon2id key length.
+	// Env: LH_API_ADMIN_PASSWORD_HASHING_KEY_LEN
+	KeyLen uint32 `envconfig:"KEY_LEN"`
+	// SaltLen is the Argon2id salt length.
+	// Env: LH_API_ADMIN_PASSWORD_HASHING_SALT_LEN
+	SaltLen uint32 `envconfig:"SALT_LEN"`
 }
 
 // Connect establishes a connection to the database based on the configuration

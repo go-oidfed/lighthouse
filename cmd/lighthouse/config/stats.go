@@ -9,6 +9,20 @@ import (
 
 // StatsConf holds all statistics collection configuration.
 //
+// Environment variables (with prefix LH_STATS_):
+//   - LH_STATS_ENABLED: Enable statistics collection
+//   - LH_STATS_ENDPOINTS: Endpoints to track (comma-separated)
+//   - LH_STATS_BUFFER_SIZE: Ring buffer size
+//   - LH_STATS_BUFFER_FLUSH_INTERVAL: Flush interval (e.g., "5s")
+//   - LH_STATS_BUFFER_FLUSH_THRESHOLD: Flush threshold (0-1)
+//   - LH_STATS_CAPTURE_CLIENT_IP: Capture client IP
+//   - LH_STATS_CAPTURE_USER_AGENT: Capture User-Agent
+//   - LH_STATS_CAPTURE_QUERY_PARAMS: Capture query parameters
+//   - LH_STATS_CAPTURE_GEO_IP_ENABLED: Enable GeoIP lookup
+//   - LH_STATS_CAPTURE_GEO_IP_DATABASE_PATH: Path to GeoLite2 database
+//   - LH_STATS_RETENTION_DETAILED_DAYS: Days to keep detailed logs
+//   - LH_STATS_RETENTION_AGGREGATED_DAYS: Days to keep aggregated stats
+//
 // YAML example:
 //
 //	stats:
@@ -30,71 +44,107 @@ import (
 //	  endpoints: []
 type StatsConf struct {
 	// Enabled controls whether statistics collection is active.
-	Enabled bool `yaml:"enabled"`
+	// Env: LH_STATS_ENABLED
+	Enabled bool `yaml:"enabled" envconfig:"ENABLED"`
 
 	// Buffer configures the in-memory ring buffer for request logs.
-	Buffer StatsBufferConf `yaml:"buffer"`
+	// Env prefix: LH_STATS_BUFFER_
+	Buffer StatsBufferConf `yaml:"buffer" envconfig:"BUFFER"`
 
 	// Capture controls what data is collected from each request.
-	Capture StatsCaptureConf `yaml:"capture"`
+	// Env prefix: LH_STATS_CAPTURE_
+	Capture StatsCaptureConf `yaml:"capture" envconfig:"CAPTURE"`
 
 	// Retention defines how long data is kept.
-	Retention StatsRetentionConf `yaml:"retention"`
+	// Env prefix: LH_STATS_RETENTION_
+	Retention StatsRetentionConf `yaml:"retention" envconfig:"RETENTION"`
 
 	// Endpoints is a list of endpoint paths to track.
 	// If empty, all federation endpoints are tracked.
 	// Example: ["/.well-known/openid-federation", "/fetch", "/resolve"]
-	Endpoints []string `yaml:"endpoints"`
+	// Env: LH_STATS_ENDPOINTS (comma-separated)
+	Endpoints []string `yaml:"endpoints" envconfig:"ENDPOINTS"`
 }
 
 // StatsBufferConf configures the in-memory ring buffer.
+//
+// Environment variables (with prefix LH_STATS_BUFFER_):
+//   - LH_STATS_BUFFER_SIZE: Ring buffer size
+//   - LH_STATS_BUFFER_FLUSH_INTERVAL: Flush interval (e.g., "5s")
+//   - LH_STATS_BUFFER_FLUSH_THRESHOLD: Flush threshold (0-1)
 type StatsBufferConf struct {
 	// Size is the maximum number of entries in the ring buffer.
 	// Default: 10000
-	Size int `yaml:"size"`
+	// Env: LH_STATS_BUFFER_SIZE
+	Size int `yaml:"size" envconfig:"SIZE"`
 
 	// FlushInterval is how often the buffer is flushed to the database.
 	// Default: 5s
-	FlushInterval time.Duration `yaml:"flush_interval"`
+	// Env: LH_STATS_BUFFER_FLUSH_INTERVAL
+	FlushInterval time.Duration `yaml:"flush_interval" envconfig:"FLUSH_INTERVAL"`
 
 	// FlushThreshold triggers a flush when the buffer is this percentage full.
 	// Value between 0 and 1. Default: 0.8
-	FlushThreshold float64 `yaml:"flush_threshold"`
+	// Env: LH_STATS_BUFFER_FLUSH_THRESHOLD
+	FlushThreshold float64 `yaml:"flush_threshold" envconfig:"FLUSH_THRESHOLD"`
 }
 
 // StatsCaptureConf controls what request data is captured.
+//
+// Environment variables (with prefix LH_STATS_CAPTURE_):
+//   - LH_STATS_CAPTURE_CLIENT_IP: Capture client IP
+//   - LH_STATS_CAPTURE_USER_AGENT: Capture User-Agent
+//   - LH_STATS_CAPTURE_QUERY_PARAMS: Capture query parameters
+//   - LH_STATS_CAPTURE_GEO_IP_ENABLED: Enable GeoIP lookup
+//   - LH_STATS_CAPTURE_GEO_IP_DATABASE_PATH: Path to GeoLite2 database
 type StatsCaptureConf struct {
 	// ClientIP records the client's IP address.
-	ClientIP bool `yaml:"client_ip"`
+	// Env: LH_STATS_CAPTURE_CLIENT_IP
+	ClientIP bool `yaml:"client_ip" envconfig:"CLIENT_IP"`
 
 	// UserAgent records the User-Agent header.
-	UserAgent bool `yaml:"user_agent"`
+	// Env: LH_STATS_CAPTURE_USER_AGENT
+	UserAgent bool `yaml:"user_agent" envconfig:"USER_AGENT"`
 
 	// QueryParams records URL query parameters as JSON.
-	QueryParams bool `yaml:"query_params"`
+	// Env: LH_STATS_CAPTURE_QUERY_PARAMS
+	QueryParams bool `yaml:"query_params" envconfig:"QUERY_PARAMS"`
 
 	// GeoIP enables country lookup from IP addresses.
-	GeoIP StatsGeoIPConf `yaml:"geo_ip"`
+	// Env prefix: LH_STATS_CAPTURE_GEO_IP_
+	GeoIP StatsGeoIPConf `yaml:"geo_ip" envconfig:"GEO_IP"`
 }
 
 // StatsGeoIPConf configures GeoIP lookup.
+//
+// Environment variables (with prefix LH_STATS_CAPTURE_GEO_IP_):
+//   - LH_STATS_CAPTURE_GEO_IP_ENABLED: Enable GeoIP lookup
+//   - LH_STATS_CAPTURE_GEO_IP_DATABASE_PATH: Path to GeoLite2 database
 type StatsGeoIPConf struct {
 	// Enabled turns on GeoIP country lookup.
-	Enabled bool `yaml:"enabled"`
+	// Env: LH_STATS_CAPTURE_GEO_IP_ENABLED
+	Enabled bool `yaml:"enabled" envconfig:"ENABLED"`
 
 	// DatabasePath is the path to a MaxMind GeoLite2-Country.mmdb file.
-	DatabasePath string `yaml:"database_path"`
+	// Env: LH_STATS_CAPTURE_GEO_IP_DATABASE_PATH
+	DatabasePath string `yaml:"database_path" envconfig:"DATABASE_PATH"`
 }
 
 // StatsRetentionConf defines data retention periods.
+//
+// Environment variables (with prefix LH_STATS_RETENTION_):
+//   - LH_STATS_RETENTION_DETAILED_DAYS: Days to keep detailed logs
+//   - LH_STATS_RETENTION_AGGREGATED_DAYS: Days to keep aggregated stats
 type StatsRetentionConf struct {
 	// DetailedDays is how many days to keep individual request logs.
 	// Default: 90
-	DetailedDays int `yaml:"detailed_days"`
+	// Env: LH_STATS_RETENTION_DETAILED_DAYS
+	DetailedDays int `yaml:"detailed_days" envconfig:"DETAILED_DAYS"`
 
 	// AggregatedDays is how many days to keep daily aggregated statistics.
 	// Default: 365
-	AggregatedDays int `yaml:"aggregated_days"`
+	// Env: LH_STATS_RETENTION_AGGREGATED_DAYS
+	AggregatedDays int `yaml:"aggregated_days" envconfig:"AGGREGATED_DAYS"`
 }
 
 // validate checks the stats configuration for errors.

@@ -8,6 +8,7 @@ Under the `server` config option the (http) server can be configured.
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-blue" title="Default Value">0.0.0.0</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_IP_LISTEN`</span>
 
 The `ip_listen` config option is used to set the network address to which to bind to.
 If omitted `0.0.0.0` is used.
@@ -23,6 +24,7 @@ If omitted `0.0.0.0` is used.
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">7672</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_PORT`</span>
 
 The `port` config option is used to set the port at which LightHouse starts 
 the webserver and listens for incoming requests.
@@ -59,6 +61,7 @@ If `tls` is enabled port `443` will be used.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_ENABLED`</span>
 
 If set to `false` `tls` will be disabled. Otherwise, it will automatically be 
 enabled, if `cert` and `key` are set.
@@ -67,6 +70,7 @@ enabled, if `cert` and `key` are set.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_REDIRECT_HTTP`</span>
 
 The `redirect_http` option determines if port `80` should be redirected to 
 port `443` or not.
@@ -74,18 +78,21 @@ port `443` or not.
 ### `cert`
 <span class="badge badge-purple" title="Value Type">file path</span>
 <span class="badge badge-green" title="If this option is required or optional">required for TLS</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_CERT`</span>
 
 The `cert` option is set to the tls `cert` file.
 
 ### `key`
 <span class="badge badge-purple" title="Value Type">file path</span>
 <span class="badge badge-green" title="If this option is required or optional">required for TLS</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_KEY`</span>
 
 The `key` option is set to the tls `key` file.
 
 ## `trusted_proxies`
 <span class="badge badge-purple" title="Value Type">list of strings</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TRUSTED_PROXIES`</span>
 
 The `trusted_proxies` option is used to configure a list of trusted proxies
 by IP address or network range (CIDR notation).
@@ -110,11 +117,16 @@ headers, which might be spoofed.
             - "fc00::/7"
     ```
 
-## `forwarded_ip_header`
+```bash
+# Environment variable (comma-separated)
+export LH_SERVER_TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+```
 
+## `forwarded_ip_header`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-blue" title="Default Value">`X-Forwarded-For`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_FORWARDED_IP_HEADER`</span>
 
 The `forwarded_ip_header` option specifies which HTTP header to use for getting the client's real IP address when behind
 a proxy.

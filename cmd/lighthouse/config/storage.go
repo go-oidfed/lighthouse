@@ -8,13 +8,37 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
+// storageConf holds storage/database configuration.
+//
+// Environment variables (with prefix LH_STORAGE_):
+//   - LH_STORAGE_DRIVER: Database driver (sqlite, mysql, postgres)
+//   - LH_STORAGE_DATA_DIR: Directory for SQLite database files
+//   - LH_STORAGE_DSN: Database connection string
+//   - LH_STORAGE_USER: Database username (for DSN building)
+//   - LH_STORAGE_PASSWORD: Database password
+//   - LH_STORAGE_HOST: Database host
+//   - LH_STORAGE_PORT: Database port
+//   - LH_STORAGE_DB: Database name
+//   - LH_STORAGE_DEBUG: Enable debug logging
 type storageConf struct {
-	BackendType backendType        `yaml:"backend"`
-	Driver      storage.DriverType `yaml:"driver"`
-	DataDir     string             `yaml:"data_dir"`
-	DSN         string             `yaml:"dsn"`
+	// BackendType is deprecated and will be ignored.
+	// Env: - (not supported, deprecated)
+	BackendType backendType `yaml:"backend" envconfig:"-"`
+	// Driver is the database driver type.
+	// Env: LH_STORAGE_DRIVER
+	Driver storage.DriverType `yaml:"driver" envconfig:"DRIVER"`
+	// DataDir is the directory for SQLite database files.
+	// Env: LH_STORAGE_DATA_DIR
+	DataDir string `yaml:"data_dir" envconfig:"DATA_DIR"`
+	// DSN is the database connection string.
+	// Env: LH_STORAGE_DSN
+	DSN string `yaml:"dsn" envconfig:"DSN"`
+	// DSNConf provides individual connection parameters (embedded).
+	// Env: LH_STORAGE_USER, LH_STORAGE_PASSWORD, LH_STORAGE_HOST, LH_STORAGE_PORT, LH_STORAGE_DB
 	storage.DSNConf
-	Debug bool `yaml:"debug"`
+	// Debug enables debug logging.
+	// Env: LH_STORAGE_DEBUG
+	Debug bool `yaml:"debug" envconfig:"DEBUG"`
 }
 
 // users hashing parameters moved under api.admin.users_hash

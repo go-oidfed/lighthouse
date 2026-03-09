@@ -10,45 +10,90 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
+// SigningConf holds signing configuration.
+//
+// Environment variables (with prefix LH_SIGNING_):
+//   - LH_SIGNING_KMS: Key management system ("filesystem" or "pkcs11")
+//   - LH_SIGNING_PK_BACKEND: Public key storage backend ("filesystem" or "db")
+//   - LH_SIGNING_AUTO_GENERATE_KEYS: Auto-generate keys if missing (bool)
+//   - LH_SIGNING_FILESYSTEM_KEY_FILE: Path to single key file
+//   - LH_SIGNING_FILESYSTEM_KEY_DIR: Directory for key files
+//   - LH_SIGNING_PKCS11_STORAGE_DIR: PKCS#11 storage directory
+//   - LH_SIGNING_PKCS11_MODULE_PATH: Path to PKCS#11 module
+//   - LH_SIGNING_PKCS11_TOKEN_LABEL: HSM token label
+//   - LH_SIGNING_PKCS11_TOKEN_SERIAL: HSM token serial
+//   - LH_SIGNING_PKCS11_TOKEN_SLOT: HSM slot number
+//   - LH_SIGNING_PKCS11_PIN: HSM user PIN
+//   - LH_SIGNING_PKCS11_MAX_SESSIONS: Maximum concurrent sessions
+//   - LH_SIGNING_PKCS11_USER_TYPE: User type for login
+//   - LH_SIGNING_PKCS11_NO_LOGIN: Token doesn't support login (bool)
+//   - LH_SIGNING_PKCS11_LABEL_PREFIX: Prefix for object labels
+//   - LH_SIGNING_PKCS11_LOAD_LABELS: Extra labels to load (comma-separated)
 type SigningConf struct {
-	KMS               string `yaml:"kms"`
-	PKBackend         string `yaml:"pk_backend"`
-	AutoGenerateKeys  bool   `yaml:"auto_generate_keys"`
+	// KMS specifies the key management system to use.
+	// Env: LH_SIGNING_KMS
+	KMS string `yaml:"kms" envconfig:"KMS"`
+	// PKBackend specifies the public key storage backend.
+	// Env: LH_SIGNING_PK_BACKEND
+	PKBackend string `yaml:"pk_backend" envconfig:"PK_BACKEND"`
+	// AutoGenerateKeys enables automatic key generation if keys are missing.
+	// Env: LH_SIGNING_AUTO_GENERATE_KEYS
+	AutoGenerateKeys bool `yaml:"auto_generate_keys" envconfig:"AUTO_GENERATE_KEYS"`
+	// FileSystemBackend holds filesystem-based key storage configuration.
+	// Env prefix: LH_SIGNING_FILESYSTEM_
 	FileSystemBackend struct {
-		KeyFile string `yaml:"key_file"`
-		KeyDir  string `yaml:"key_dir"`
-	} `yaml:"filesystem"`
+		// KeyFile is the path to a single key file.
+		// Env: LH_SIGNING_FILESYSTEM_KEY_FILE
+		KeyFile string `yaml:"key_file" envconfig:"KEY_FILE"`
+		// KeyDir is the directory for key files.
+		// Env: LH_SIGNING_FILESYSTEM_KEY_DIR
+		KeyDir string `yaml:"key_dir" envconfig:"KEY_DIR"`
+	} `yaml:"filesystem" envconfig:"FILESYSTEM"`
+	// PKCS11Backend holds PKCS#11 (HSM) configuration.
+	// Env prefix: LH_SIGNING_PKCS11_
 	PKCS11Backend struct {
-		StorageDir string `yaml:"storage_dir"`
+		// StorageDir is the storage directory for PKCS#11.
+		// Env: LH_SIGNING_PKCS11_STORAGE_DIR
+		StorageDir string `yaml:"storage_dir" envconfig:"STORAGE_DIR"`
 
 		// ModulePath is the path to the PKCS#11 module (crypto11.Config.Path)
-		ModulePath string `yaml:"module_path"`
+		// Env: LH_SIGNING_PKCS11_MODULE_PATH
+		ModulePath string `yaml:"module_path" envconfig:"MODULE_PATH"`
 		// TokenLabel selects the token by label (crypto11.Config.TokenLabel)
-		TokenLabel string `yaml:"token_label"`
+		// Env: LH_SIGNING_PKCS11_TOKEN_LABEL
+		TokenLabel string `yaml:"token_label" envconfig:"TOKEN_LABEL"`
 		// TokenSerial selects the token by serial (crypto11.Config.TokenSerial)
-		TokenSerial string `yaml:"token_serial"`
+		// Env: LH_SIGNING_PKCS11_TOKEN_SERIAL
+		TokenSerial string `yaml:"token_serial" envconfig:"TOKEN_SERIAL"`
 		// SlotNumber selects the token by slot number (crypto11.Config.SlotNumber)
-		SlotNumber *int `yaml:"token_slot"`
+		// Env: LH_SIGNING_PKCS11_TOKEN_SLOT
+		SlotNumber *int `yaml:"token_slot" envconfig:"TOKEN_SLOT"`
 		// Pin is the user PIN for the token (crypto11.Config.Pin)
-		Pin string `yaml:"pin"`
+		// Env: LH_SIGNING_PKCS11_PIN
+		Pin string `yaml:"pin" envconfig:"PIN"`
 
-		// Maximum number of concurrent sessions to open. If zero, DefaultMaxSessions is used.
-		// Otherwise, the value specified must be at least 2.
-		MaxSessions int `yaml:"max_sessions"`
+		// MaxSessions is the maximum number of concurrent sessions to open.
+		// If zero, DefaultMaxSessions is used. Otherwise, must be at least 2.
+		// Env: LH_SIGNING_PKCS11_MAX_SESSIONS
+		MaxSessions int `yaml:"max_sessions" envconfig:"MAX_SESSIONS"`
 
-		// User type identifies the user type logging in. If zero, DefaultUserType is used.
-		UserType int `yaml:"user_type"`
+		// UserType identifies the user type logging in. If zero, DefaultUserType is used.
+		// Env: LH_SIGNING_PKCS11_USER_TYPE
+		UserType int `yaml:"user_type" envconfig:"USER_TYPE"`
 
 		// LoginNotSupported should be set to true for tokens that do not support logging in.
-		LoginNotSupported bool `yaml:"no_login"`
+		// Env: LH_SIGNING_PKCS11_NO_LOGIN
+		LoginNotSupported bool `yaml:"no_login" envconfig:"NO_LOGIN"`
 
-		// Optional prefix for object labels inside HSM
-		LabelPrefix string `yaml:"label_prefix"`
+		// LabelPrefix is an optional prefix for object labels inside HSM.
+		// Env: LH_SIGNING_PKCS11_LABEL_PREFIX
+		LabelPrefix string `yaml:"label_prefix" envconfig:"LABEL_PREFIX"`
 
 		// ExtraLabels are HSM object labels to load into this KMS even if
 		// they are not present yet in the PublicKeyStorage.
-		ExtraLabels []string `yaml:"load_labels"`
-	} `yaml:"pkcs11"`
+		// Env: LH_SIGNING_PKCS11_LOAD_LABELS (comma-separated)
+		ExtraLabels []string `yaml:"load_labels" envconfig:"LOAD_LABELS"`
+	} `yaml:"pkcs11" envconfig:"PKCS11"`
 }
 
 const (

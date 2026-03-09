@@ -11,6 +11,7 @@ LightHouse uses SQL databases for data storage. SQLite, MySQL, and PostgreSQL ar
 <span class="badge badge-purple" title="Value Type">enum</span>
 <span class="badge badge-blue" title="Default Value">sqlite</span>
 <span class="badge badge-red" title="If this option is required or optional">required</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_DRIVER`</span>
 
 The `driver` option specifies which database driver to use.
 
@@ -47,6 +48,7 @@ Supported values:
 ## `data_dir`
 <span class="badge badge-purple" title="Value Type">directory path</span>
 <span class="badge badge-red" title="If this option is required or optional">required for SQLite</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_DATA_DIR`</span>
 
 The `data_dir` option sets the directory where the SQLite database file (`lighthouse.db`) will be stored.
 
@@ -63,6 +65,7 @@ This option is only required when using the `sqlite` driver.
 ## `dsn`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-red" title="If this option is required or optional">required for MySQL and PostgreSQL</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_DSN`</span>
 
 The `dsn` option specifies the Data Source Name (connection string) for the database.
 
@@ -100,13 +103,16 @@ host=hostname user=username password=password dbname=database port=5432 sslmode=
 
 Instead of providing a full `dsn` string, you can specify individual connection components:
 
-| Option | Description |
-|--------|-------------|
-| `user` | Database username |
-| `password` | Database password |
-| `host` | Database host (default: `localhost`) |
-| `port` | Database port |
-| `db` | Database name (default: `lighthouse`) |
+| Option | Description | Environment Variable |
+|--------|-------------|---------------------|
+| `user` | Database username | `LH_STORAGE_USER` |
+| `password` | Database password | `LH_STORAGE_PASSWORD` |
+| `host` | Database host (default: `localhost`) | `LH_STORAGE_HOST` |
+| `port` | Database port | `LH_STORAGE_PORT` |
+| `db` | Database name (default: `lighthouse`) | `LH_STORAGE_DB` |
+
+!!! tip "Sensitive Data"
+    Use `LH_STORAGE_PASSWORD` environment variable to avoid storing database passwords in config files.
 
 ??? file "config.yaml"
 
@@ -124,6 +130,7 @@ Instead of providing a full `dsn` string, you can specify individual connection 
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">false</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_DEBUG`</span>
 
 The `debug` option enables debug logging for database operations. This is useful for troubleshooting database issues.
 

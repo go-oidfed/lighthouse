@@ -34,10 +34,18 @@ import (
 
 const MaximumEntityConfigurationCachePeriod = 8 * time.Hour
 
-// EndpointConf is a type for configuring an endpoint with an internal and external path
+// EndpointConf is a type for configuring an endpoint with an internal and external path.
+//
+// Environment variables use the parent endpoint's prefix, e.g.:
+//   - LH_ENDPOINTS_FETCH_PATH: Internal path for the fetch endpoint
+//   - LH_ENDPOINTS_FETCH_URL: External URL for the fetch endpoint
 type EndpointConf struct {
-	Path string `yaml:"path"`
-	URL  string `yaml:"url"`
+	// Path is the internal path for the endpoint.
+	// Env: LH_ENDPOINTS_<ENDPOINT>_PATH
+	Path string `yaml:"path" envconfig:"PATH"`
+	// URL is the external URL for the endpoint.
+	// Env: LH_ENDPOINTS_<ENDPOINT>_URL
+	URL string `yaml:"url" envconfig:"URL"`
 }
 
 // IsSet returns a bool indicating if this endpoint was configured or not

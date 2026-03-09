@@ -29,6 +29,7 @@ Configuration for the Admin API.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_ENABLED`</span>
 
 Enables or disables the Admin API. When disabled, no admin endpoints are available.
 
@@ -44,6 +45,7 @@ Enables or disables the Admin API. When disabled, no admin endpoints are availab
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_USERS_ENABLED`</span>
 
 Enables or disables user management via the Admin API. When enabled, you can create and manage 
 admin users through the API endpoints.
@@ -61,6 +63,7 @@ admin users through the API endpoints.
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`0`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_PORT`</span>
 
 The port for the Admin API server. 
 
@@ -119,30 +122,35 @@ Configuration for Argon2id password hashing used for admin user passwords.
 #### `time`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`1`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_PASSWORD_HASHING_TIME`</span>
 
 Number of iterations (time cost) for Argon2id. Higher values increase computation time.
 
 #### `memory_kib`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`65536`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_PASSWORD_HASHING_MEMORY_KIB`</span>
 
 Memory usage in KiB for Argon2id. Default is 64 MiB.
 
 #### `parallelism`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`4`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_PASSWORD_HASHING_PARALLELISM`</span>
 
 Number of parallel threads for Argon2id.
 
 #### `key_len`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`64`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_PASSWORD_HASHING_KEY_LEN`</span>
 
 Length of the derived key in bytes.
 
 #### `salt_len`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`32`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_PASSWORD_HASHING_SALT_LEN`</span>
 
 Length of the random salt in bytes.
 

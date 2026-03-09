@@ -12,6 +12,7 @@ information, and query parameters.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`false`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_ENABLED`</span>
 
 The `enabled` option controls whether statistics collection is active.
 
@@ -45,6 +46,7 @@ before flushing to the database.
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`10000`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_BUFFER_SIZE`</span>
 
 The maximum number of request entries to hold in the ring buffer. If the 
 buffer fills up before flushing, older entries are overwritten.
@@ -56,6 +58,7 @@ data loss during traffic spikes.
 <span class="badge badge-purple" title="Value Type">duration</span>
 <span class="badge badge-blue" title="Default Value">`5s`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_BUFFER_FLUSH_INTERVAL`</span>
 
 How often the buffer is flushed to the database. Shorter intervals reduce 
 the risk of data loss but increase database write frequency.
@@ -64,6 +67,7 @@ the risk of data loss but increase database write frequency.
 <span class="badge badge-purple" title="Value Type">float (0.0-1.0)</span>
 <span class="badge badge-blue" title="Default Value">`0.8`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_BUFFER_FLUSH_THRESHOLD`</span>
 
 Triggers an immediate flush when the buffer reaches this percentage of 
 capacity. This prevents data loss during sudden traffic spikes.
@@ -92,6 +96,7 @@ The `capture` option controls what data is collected from each request.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_CAPTURE_CLIENT_IP`</span>
 
 Records the client's IP address. When behind a reverse proxy, ensure 
 [`server.forwarded_ip_header`](server.md) is configured correctly.
@@ -100,6 +105,7 @@ Records the client's IP address. When behind a reverse proxy, ensure
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_CAPTURE_USER_AGENT`</span>
 
 Records the `User-Agent` header from requests.
 
@@ -107,6 +113,7 @@ Records the `User-Agent` header from requests.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_CAPTURE_QUERY_PARAMS`</span>
 
 Records URL query parameters as JSON. This is useful for analyzing which 
 entities are being fetched or resolved most frequently.
@@ -121,12 +128,14 @@ GeoIP lookup enables country detection from client IP addresses.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`false`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_CAPTURE_GEO_IP_ENABLED`</span>
 
 Enables GeoIP country lookup.
 
 #### `database_path`
 <span class="badge badge-purple" title="Value Type">file path</span>
 <span class="badge badge-red" title="Required when geo_ip.enabled is true">required if enabled</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_CAPTURE_GEO_IP_DATABASE_PATH`</span>
 
 Path to a MaxMind GeoLite2-Country or GeoIP2-Country database file (`.mmdb`).
 
@@ -155,6 +164,7 @@ The `retention` option defines how long statistics data is kept.
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`90`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_RETENTION_DETAILED_DAYS`</span>
 
 Number of days to keep individual request logs. After this period, detailed 
 logs are deleted but daily aggregates are preserved.
@@ -163,6 +173,7 @@ logs are deleted but daily aggregates are preserved.
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">`365`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_RETENTION_AGGREGATED_DAYS`</span>
 
 Number of days to keep daily aggregated statistics. This enables long-term 
 trend analysis with minimal storage requirements.
@@ -171,9 +182,12 @@ trend analysis with minimal storage requirements.
 <span class="badge badge-purple" title="Value Type">array of strings</span>
 <span class="badge badge-blue" title="Default Value">empty (all federation endpoints)</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_ENDPOINTS`</span>
 
 List of endpoint paths to track. If empty or not specified, all federation 
 endpoints are tracked (excluding the admin API).
+
+For environment variables, use comma-separated values: `LH_STATS_ENDPOINTS="/.well-known/openid-federation,/fetch,/resolve"`
 
 ??? file "config.yaml"
 
