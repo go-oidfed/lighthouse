@@ -429,3 +429,56 @@ func TestPutSubordinateByID(t *testing.T) {
 }
 
 
+
+// --- DELETE /subordinates/:subordinateID TESTS ---
+
+func TestDeleteSubordinateByID(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		// Create a mock record
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://delete.example.org",
+				Status:   model.StatusActive,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://delete.example.org")
+
+		// Create a mock event for this subordinate
+		backends.SubordinateEvents.Add(model.SubordinateEvent{
+			SubordinateID: saved.ID,
+			Type:          model.EventTypeCreated,
+		})
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		// Verify it was deleted from DB
+		deleted, _ := backends.Subordinates.Get("https://delete.example.org")
+		if deleted != nil {
+			t.Errorf("Expected subordinate to be deleted, but it still exists")
+		}
+
+		// Verify events were deleted
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err == nil && len(events) > 0 {
+			t.Errorf("Expected subordinate events to be deleted, but found %d events", len(events))
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _ := setupSubordinateBaseApp(t)
+
+		req := httptest.NewRequest("DELETE", "/subordinates/9999", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+}
