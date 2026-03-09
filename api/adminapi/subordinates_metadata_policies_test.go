@@ -335,3 +335,144 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 		}
 	})
 }
+
+// --- GET /subordinates/:subordinateID/metadata-policies/:entityType TESTS ---
+
+func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		policy := &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"admin@example.org"},
+				},
+			},
+		}
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://entity-type-get.example.org",
+			},
+			MetadataPolicy: policy,
+		})
+		saved, _ := backends.Subordinates.Get("https://entity-type-get.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result oidfed.MetadataPolicy
+		json.Unmarshal(body, &result)
+
+		if contacts, ok := result["contacts"]; !ok || contacts["add"] == nil {
+			t.Errorf("Failed to retrieve entity type policy: %+v", result)
+		}
+	})
+
+	t.Run("NotFound/Subordinate", func(t *testing.T) {
+		app, _ := setupSubordinateMetadataPoliciesApp(t)
+		req := httptest.NewRequest("GET", "/subordinates/9999/metadata-policies/openid_relying_party", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound/EntityType", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-type.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-type.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_provider", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when entity type is missing, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// --- PUT /subordinates/:subordinateID/metadata-policies/:entityType TESTS ---
+
+func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://put-type.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"old_claim": oidfed.MetadataPolicyEntry{"value": "old"},
+				},
+				OpenIDProvider: oidfed.MetadataPolicy{
+					"untouched": oidfed.MetadataPolicyEntry{"value": "safe"},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://put-type.example.org")
+
+		body := `{
+			"new_claim": {
+				"value": "new"
+			}
+		}`
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		// Verify DB update
+		updated, _ := backends.Subordinates.Get("https://put-type.example.org")
+		rpPol := (*updated.MetadataPolicy).RelyingParty
+		opPol := (*updated.MetadataPolicy).OpenIDProvider
+
+		// Verify OP was untouched
+		if opPol["untouched"] == nil {
+			t.Errorf("Expected OpenIDProvider policy to remain untouched")
+		}
+
+		// Verify RP was entirely replaced
+		if rpPol["old_claim"] != nil {
+			t.Errorf("Expected old RP claim to be replaced and deleted")
+		}
+		if newClaim, ok := rpPol["new_claim"]; !ok || newClaim["value"] != "new" {
+			t.Errorf("Expected new RP claim to be set")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://bad-body-put-type.example.org",
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://bad-body-put-type.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), strings.NewReader("bad json"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
