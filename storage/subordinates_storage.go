@@ -303,13 +303,13 @@ func (s *SubordinateStorage) buildEntityTypeJoin(status *model.Status, entityTyp
 	}
 	subTable := s.db.NamingStrategy.TableName("subordinates")
 	joinTable := s.db.NamingStrategy.TableName("subordinate_entity_types")
-	db := s.db.Table(subTable + " as s").Joins("JOIN " + joinTable + " as set ON set.subordinate_id = s.id")
+	db := s.db.Table(subTable + " as s").Joins("JOIN " + joinTable + " as setypes ON setypes.subordinate_id = s.id")
 	if status != nil {
 		db = db.Where("s.status = ?", *status)
 	}
-	db = db.Where("set.entity_type IN ?", entityTypes)
+	db = db.Where("setypes.entity_type IN ?", entityTypes)
 	if requireAll {
-		db = db.Select("s.id").Group("s.id").Having("COUNT(DISTINCT set.entity_type) = ?", len(entityTypes))
+		db = db.Select("s.id").Group("s.id").Having("COUNT(DISTINCT setypes.entity_type) = ?", len(entityTypes))
 	} else {
 		db = db.Select("DISTINCT s.id")
 	}
