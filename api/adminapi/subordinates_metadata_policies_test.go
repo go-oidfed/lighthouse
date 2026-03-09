@@ -201,3 +201,137 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 		}
 	})
 }
+// --- POST /subordinates/:subordinateID/metadata-policies TESTS ---
+
+func TestPostSubordinateMetadataPolicies(t *testing.T) {
+	t.Run("Success/CopyFromGeneral", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		// Seed a global policy in KV
+		globalPolicy := &oidfed.MetadataPolicies{
+			OpenIDProvider: oidfed.MetadataPolicy{
+				"issuer": oidfed.MetadataPolicyEntry{
+					"value": "https://global.op.example.org",
+				},
+			},
+		}
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, globalPolicy)
+
+		// Create a mock record with no policy
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://post-policy.example.org",
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://post-policy.example.org")
+
+		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusCreated {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		// Verify DB update copied the global policy
+		updated, _ := backends.Subordinates.Get("https://post-policy.example.org")
+		if updated.MetadataPolicy == nil {
+			t.Fatalf("Expected MetadataPolicy to be saved in DB, got nil")
+		}
+		
+		opPol := (*updated.MetadataPolicy).OpenIDProvider
+		if opPol == nil {
+			t.Errorf("Expected OpenIDProvider policy to exist")
+		}
+		
+		issuer, ok := opPol["issuer"]
+		if !ok || issuer["value"] != "https://global.op.example.org" {
+			t.Errorf("Failed to retrieve correctly copied policy: %+v", updated.MetadataPolicy)
+		}
+
+		// Verify Event logging
+		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		found := false
+		for _, e := range events {
+			if e.Type == model.EventTypePolicyUpdated {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected PolicyUpdated event to be logged")
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _ := setupSubordinateMetadataPoliciesApp(t)
+
+		req := httptest.NewRequest("POST", "/subordinates/9999/metadata-policies", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// --- DELETE /subordinates/:subordinateID/metadata-policies TESTS ---
+
+func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		// Create a mock record with an existing policy
+		initialPolicy := &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"old@example.org"},
+				},
+			},
+		}
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://delete-policy.example.org",
+			},
+			MetadataPolicy: initialPolicy,
+		})
+		saved, _ := backends.Subordinates.Get("https://delete-policy.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		// Verify DB update (policy should be nil)
+		updated, _ := backends.Subordinates.Get("https://delete-policy.example.org")
+		if updated.MetadataPolicy != nil {
+			t.Fatalf("Expected MetadataPolicy to be nil after deletion")
+		}
+
+		// Verify Event logging
+		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		found := false
+		for _, e := range events {
+			if e.Type == model.EventTypePolicyDeleted {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected PolicyDeleted event to be logged")
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _ := setupSubordinateMetadataPoliciesApp(t)
+
+		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata-policies", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+}
