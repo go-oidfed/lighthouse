@@ -855,3 +855,190 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 		}
 	})
 }
+
+// --- GET /subordinates/:subordinateID/metadata-policies/:entityType/:claim/:operator TESTS ---
+
+func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://operator-get.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"contacts": oidfed.MetadataPolicyEntry{
+						"add": []any{"admin@example.org"},
+					},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://operator-get.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result []any
+		json.Unmarshal(body, &result)
+
+		if len(result) == 0 || result[0].(string) != "admin@example.org" {
+			t.Errorf("Failed to retrieve operator policy correctly: %+v", result)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-operator.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"contacts": oidfed.MetadataPolicyEntry{},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-operator.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when operator is missing, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// --- PUT & POST /subordinates/:subordinateID/metadata-policies/:entityType/:claim/:operator TESTS ---
+
+func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://put-operator.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"contacts": oidfed.MetadataPolicyEntry{
+						"add": []any{"old@example.org"},
+						"value": "untouched",
+					},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://put-operator.example.org")
+
+		body := `["new@example.org"]`
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		// Verify DB update
+		updated, _ := backends.Subordinates.Get("https://put-operator.example.org")
+		contacts := (*updated.MetadataPolicy).RelyingParty["contacts"]
+
+		if contacts["value"] != "untouched" {
+			t.Errorf("Expected sibling operators to remain safely untouched")
+		}
+		
+		addArr := contacts["add"].([]any)
+		if len(addArr) == 0 || addArr[0].(string) != "new@example.org" {
+			t.Errorf("Expected operator data to be fully replaced")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://bad-body-put-op.example.org",
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://bad-body-put-op.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), strings.NewReader("bad json"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// --- DELETE /subordinates/:subordinateID/metadata-policies/:entityType/:claim/:operator TESTS ---
+
+func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://delete-operator.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"contacts": oidfed.MetadataPolicyEntry{
+						"delete_me": "gone",
+						"keep_me":   "staying",
+					},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://delete-operator.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/delete_me", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		// Verify DB update
+		updated, _ := backends.Subordinates.Get("https://delete-operator.example.org")
+		contacts := (*updated.MetadataPolicy).RelyingParty["contacts"]
+		
+		if _, ok := contacts["delete_me"]; ok {
+			t.Errorf("Expected operator delete_me to be deleted")
+		}
+		if _, ok := contacts["keep_me"]; !ok {
+			t.Errorf("Expected operator keep_me to be safely retained")
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-delete-op.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"contacts": oidfed.MetadataPolicyEntry{},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-delete-op.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/not_here", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when operator is missing, got %d", resp.StatusCode)
+		}
+	})
+}
