@@ -61,14 +61,15 @@ func getSubordinateByDBID(subordinates model.SubordinateStorageBackend, dbID str
 }
 
 // handleSubordinateLookup retrieves a subordinate and handles error responses.
-// Returns nil if an error response was written.
+// Returns an error if the subordinate could not be found or a DB error occurred.
 func handleSubordinateLookup(c *fiber.Ctx, subordinates model.SubordinateStorageBackend) (*model.ExtendedSubordinateInfo, error) {
 	id := c.Params("subordinateID")
 	info, err := getSubordinateByDBID(subordinates, id)
 	if err != nil {
 		var nf model.NotFoundError
 		if errors.As(err, &nf) {
-			return nil, writeNotFound(c, err.Error())
+			_ = writeNotFound(c, err.Error())
+			return nil, err
 		}
 		return nil, writeServerError(c, err)
 	}
