@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -290,3 +291,50 @@ func TestPostSubordinates(t *testing.T) {
 		}
 	})
 }
+
+// --- GET /subordinates/:subordinateID TESTS ---
+
+func TestGetSubordinateByID(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		// Create a mock record
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://specific.example.org",
+				Status:   model.StatusActive,
+			},
+		})
+		
+		// Grab the actual inserted ID to test the endpoint
+		saved, _ := backends.Subordinates.Get("https://specific.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var sub model.ExtendedSubordinateInfo
+		json.Unmarshal(body, &sub)
+
+		if sub.EntityID != "https://specific.example.org" {
+			t.Errorf("Expected entity ID 'https://specific.example.org', got %s", sub.EntityID)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _ := setupSubordinateBaseApp(t)
+
+		req := httptest.NewRequest("GET", "/subordinates/9999", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		// Could be 404 or 500 depending on GORM error parsing, handlers return NotFound or ServerError
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500 for missing ID, got %d", resp.StatusCode)
+		}
+	})
+}
+
