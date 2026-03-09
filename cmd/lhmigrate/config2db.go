@@ -48,6 +48,7 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  constraints        - Subordinate statement constraints (federation_data.constraints)\n")
 		fmt.Fprintf(os.Stderr, "  metadata_crit      - Metadata policy crit operators (federation_data.metadata_policy_crit)\n")
 		fmt.Fprintf(os.Stderr, "  config_lifetime    - Entity configuration lifetime (federation_data.configuration_lifetime)\n")
+		fmt.Fprintf(os.Stderr, "  statement_lifetime - Subordinate statement lifetime (endpoints.fetch.statement_lifetime)\n")
 		fmt.Fprintf(os.Stderr, "  authority_hints    - Authority hints (federation_data.authority_hints)\n")
 		fmt.Fprintf(os.Stderr, "  metadata           - Federation entity metadata (federation_data.federation_entity_metadata)\n")
 		fmt.Fprintf(os.Stderr, "  trust_mark_specs   - Trust mark specifications (endpoints.trust_mark.trust_mark_specs)\n")
@@ -276,6 +277,9 @@ func (m *configMigrator) migrate() []migrationResult {
 	}
 	if m.shouldMigrate(sectionConfigLifetime) {
 		results = append(results, m.migrateConfigLifetime())
+	}
+	if m.shouldMigrate(sectionStatementLifetime) {
+		results = append(results, m.migrateStatementLifetime())
 	}
 	if m.shouldMigrate(sectionAuthorityHints) {
 		results = append(results, m.migrateAuthorityHints()...)
@@ -566,6 +570,50 @@ func (m *configMigrator) migrateConfigLifetime() migrationResult {
 		result.action = "created"
 	}
 	result.details = m.config.Federation.ConfigurationLifetime.Duration().String()
+	return result
+}
+
+func (m *configMigrator) migrateStatementLifetime() migrationResult {
+	result := migrationResult{section: sectionStatementLifetime}
+
+	if m.config.Endpoints.Fetch.StatementLifetime.Duration() == 0 {
+		result.action = "skipped"
+		result.details = "not set in config"
+		return result
+	}
+
+	// Check if exists
+	existing, err := storage.GetSubordinateStatementLifetime(m.backends.KV)
+	if err != nil {
+		result.err = err
+		return result
+	}
+
+	if existing != storage.DefaultSubordinateStatementLifetime && !m.force {
+		result.action = "skipped"
+		result.details = fmt.Sprintf("already set to %s (use --force to overwrite)", existing)
+		return result
+	}
+
+	if m.dryRun {
+		result.action = "dry-run"
+		result.details = fmt.Sprintf("would set to %s", m.config.Endpoints.Fetch.StatementLifetime.Duration())
+		return result
+	}
+
+	// Set the lifetime in the database
+	seconds := int(m.config.Endpoints.Fetch.StatementLifetime.Duration().Seconds())
+	if err := m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, seconds); err != nil {
+		result.err = err
+		return result
+	}
+
+	if existing != storage.DefaultSubordinateStatementLifetime {
+		result.action = "overwritten"
+	} else {
+		result.action = "created"
+	}
+	result.details = m.config.Endpoints.Fetch.StatementLifetime.Duration().String()
 	return result
 }
 

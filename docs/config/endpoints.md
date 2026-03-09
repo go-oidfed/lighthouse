@@ -44,11 +44,21 @@ in the Entity Configuration. This option is usually not set. There are two cases
 
 ### `statement_lifetime`
 <span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
-<span class="badge badge-blue" title="Default Value">600000 seconds</span>
-<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-blue" title="Default Value">600000 seconds (~1 week)</span>
+<span class="badge badge-yellow" title="Deprecation status">deprecated</span>
 
-The `statement_lifetime` option sets the lifetime of the issued Entity Statements.
-The default is a bit less than one week.
+The `statement_lifetime` option sets the lifetime of the issued Entity Statements (Subordinate Statements).
+
+!!! warning "Deprecated - Database-managed"
+    
+    This config file option is **deprecated** and ignored at runtime. The subordinate 
+    statement lifetime is now managed in the database.
+    
+    - Use `lhmigrate config2db --only=statement_lifetime` to migrate this value from 
+      your config file to the database.
+    - Use the Admin API at `GET/PUT /admin/api/v1/subordinates/lifetime` to view or 
+      change the value.
+    - If not set in the database, the default of 600000 seconds (~1 week) is used.
 
 ## `list`
 Under the `list` option the Federation Subordinate Listing Endpoint is configured.
@@ -412,11 +422,6 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 Under the `trust_mark_status` option the Federation Trust Mark Status Endpoint is configured.
 
 This endpoint is optional and only applicable if LightHouse serves as a Trust Mark Issuer.
-
-!!! warning ":fontawesome-solid-person-digging: NYI"
-
-    The current implementation of the Trust Mark Status Endpoint is not yet updated to draft 43 - and therefore 
-    works complelty differently.
 
 ??? file "config.yaml"
 

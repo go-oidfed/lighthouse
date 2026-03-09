@@ -21,34 +21,38 @@ The following is an example `config.yaml` file:
 ??? file "config.yaml"
 
     ```yaml
-
-
-
     server:
         port: 7672
+
+    entity_id: "https://ta.example.lh"
+
     signing:
-        key_dir: "/keys"
+        kms: filesystem
+        pk_backend: db
+        auto_generate_keys: true
+        filesystem:
+            key_dir: "/keys"
+
     federation_data:
-        entity_id: "https://ta.example.lh"
         authority_hints:
             - "https://trust-anchor.spid-cie.fedservice.lh/"
-        federation_entity_metadata:
-            display_name: "Example Federation TA"
-            organization_name: "Example Organization"
         metadata_policy_file: "/metadata-policy.json"
-        trust_mark_issuers:
-            "https://go-ia.federservice.lh/tm/federation-member":
-                - "https://go-ia.fedservice.lh"
+        trust_anchors:
+            - entity_id: "https://ta.example.org"
         trust_marks:
-            - id: "https://go-ia.federservice.lh/tm/federation-member"
-              trust_mark: "eyJhbGciOiJFUzUxMiIsImtpZCI6IlpsSFBmQXJTRnFGdjNHRlh3ZUptbmFkZDI4YTM4X3plcEJybEZkWHdIaTQiLCJ0eXAiOiJ0cnVzdC1tYXJrK2p3dCJ9.eyJleHAiOj..."
+            - trust_mark_type: "https://go-ia.federservice.lh/tm/federation-member"
+              trust_mark_issuer: "https://go-ia.fedservice.lh"
               refresh: true
-            - id: "https://trust-anchor.federservice.lh/tm/federation-member"
-              trust_mark: "eyJhbGciOiJFUzUxMiIsImtpZCI6InpFLTlhVlhJanJZOUcxVU0tYURQVkxVR1RkWmFuOTk0NlJJUWhraWFjUVkiLCJ0eXAiOiJ0cnVzdC1tYXJrK2p3dCJ9.eyJleHAiO..."
-              refresh: true
+
     storage:
-        backend: json
+        driver: sqlite
         data_dir: "/data"
+
+    api:
+        admin:
+            enabled: true
+            users_enabled: true
+
     endpoints:
         fetch:
             path: "/fetch"
@@ -87,6 +91,32 @@ The following is an example `config.yaml` file:
                               - entity_id: https://foo.bar.com
     ```
 
+## `entity_id`
+<span class="badge badge-purple" title="Value Type">URI</span>
+<span class="badge badge-red" title="If this option is required or optional">required</span>
+
+The `entity_id` option sets the Entity Identifier for this federation entity. This is a URI that 
+uniquely identifies your entity within the federation and is used as the `iss` and `sub` claims 
+in the Entity Configuration JWT.
+
+The entity ID is typically the base URL where your federation endpoints are served.
+
+??? file "config.yaml"
+
+    ```yaml
+    entity_id: "https://ta.example.com"
+    ```
+
+!!! warning "Required"
+    
+    This option is **required**. LightHouse will fail to start if `entity_id` is not specified.
+
+!!! note "Moved from federation_data"
+    
+    This option was previously located at `federation_data.entity_id`. It has been moved to 
+    a top-level configuration option. Use [`lhmigrate config`](../migration.md#config-file-transformation-config) 
+    to automatically update your config file.
+
 ## Configuration Sections
 
 <div class="grid cards" markdown>
@@ -99,6 +129,7 @@ The following is an example `config.yaml` file:
 - [:material-signature-freehand: Signing](signing.md)
 - [:material-routes: Endpoints](endpoints.md)
 - [:simple-openid: Federation Data](federation_data.md)
+- [:material-api: Admin API](api.md)
 - [:material-chart-line: Statistics](stats.md)
 
 </div>

@@ -280,6 +280,7 @@ The following fields are now managed in the database via the Admin API or `lhmig
 | `federation_data.constraints` | `constraints` | Subordinate statement constraints |
 | `federation_data.metadata_policy_crit` | `metadata_crit` | Critical metadata policy operators |
 | `federation_data.configuration_lifetime` | `config_lifetime` | Entity configuration JWT lifetime |
+| `endpoints.fetch.statement_lifetime` | `statement_lifetime` | Subordinate statement JWT lifetime |
 | `federation_data.trust_mark_issuers` | `trust_mark_issuers` | Allowed trust mark issuers per type |
 | `federation_data.trust_mark_owners` | `trust_mark_owners` | Trust mark owners per type |
 | `endpoints.trust_mark.trust_mark_specs` | `trust_mark_specs` | Trust mark issuance specifications |
@@ -298,14 +299,17 @@ The following fields remain in the configuration file:
 | `signing.auto_generate_keys` | Auto-generate missing keys |
 | `signing.filesystem.*` | Filesystem KMS settings |
 | `signing.pkcs11.*` | PKCS#11 HSM settings |
-| `federation_data.trust_anchors` | Trust anchors for resolution |
-| `federation_data.metadata_policy_file` | Path to metadata policy JSON file |
-| `federation_data.trust_marks` | Trust marks to include in entity configuration |
-| `endpoints.*` | Endpoint paths and settings |
+| `endpoints.*` | Endpoint paths and settings (except `statement_lifetime`) |
 | `api.*` | Admin API settings |
 | `stats.*` | Statistics collection settings |
 | `logging.*` | Logging configuration |
 | `cache.*` | Caching configuration |
+
+!!! note "federation_data section deprecated"
+    
+    The entire `federation_data` section is deprecated. All its options are either 
+    moved to top-level config (`entity_id`) or managed in the database. See 
+    [Federation Data](config/federation_data.md) for migration details.
 
 ### CLI Usage
 
@@ -367,6 +371,7 @@ The `config2db` subcommand migrates configuration file values directly to the da
 - `constraints` - Subordinate statement constraints
 - `metadata_crit` - Metadata policy crit operators
 - `config_lifetime` - Entity configuration lifetime
+- `statement_lifetime` - Subordinate statement lifetime
 - `authority_hints` - Authority hints
 - `metadata` - Federation entity metadata
 - `trust_mark_specs` - Trust mark specifications

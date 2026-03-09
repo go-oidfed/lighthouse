@@ -105,7 +105,13 @@ func (m *migrationFederationMetadataConf) isEmpty() bool {
 
 // migrationEndpointsConf holds endpoint config values that should be migrated to DB
 type migrationEndpointsConf struct {
+	Fetch     migrationFetchEndpointConf     `yaml:"fetch"`
 	TrustMark migrationTrustMarkEndpointConf `yaml:"trust_mark"`
+}
+
+// migrationFetchEndpointConf holds fetch endpoint config
+type migrationFetchEndpointConf struct {
+	StatementLifetime duration.DurationOption `yaml:"statement_lifetime"`
 }
 
 // migrationTrustMarkEndpointConf holds trust mark endpoint config
@@ -136,19 +142,20 @@ type migrationCheckerConfig struct {
 type migrationSection string
 
 const (
-	sectionSigning          migrationSection = "signing"
-	sectionFederation       migrationSection = "federation"
-	sectionTrustMarkSpecs   migrationSection = "trust_mark_specs"
-	sectionAuthorityHints   migrationSection = "authority_hints"
-	sectionMetadata         migrationSection = "metadata"
-	sectionConstraints      migrationSection = "constraints"
-	sectionMetadataCrit     migrationSection = "metadata_crit"
-	sectionConfigLifetime   migrationSection = "config_lifetime"
-	sectionAlg              migrationSection = "alg"
-	sectionRSAKeyLen        migrationSection = "rsa_key_len"
-	sectionKeyRotation      migrationSection = "key_rotation"
-	sectionTrustMarkIssuers migrationSection = "trust_mark_issuers"
-	sectionTrustMarkOwners  migrationSection = "trust_mark_owners"
+	sectionSigning           migrationSection = "signing"
+	sectionFederation        migrationSection = "federation"
+	sectionTrustMarkSpecs    migrationSection = "trust_mark_specs"
+	sectionAuthorityHints    migrationSection = "authority_hints"
+	sectionMetadata          migrationSection = "metadata"
+	sectionConstraints       migrationSection = "constraints"
+	sectionMetadataCrit      migrationSection = "metadata_crit"
+	sectionConfigLifetime    migrationSection = "config_lifetime"
+	sectionStatementLifetime migrationSection = "statement_lifetime"
+	sectionAlg               migrationSection = "alg"
+	sectionRSAKeyLen         migrationSection = "rsa_key_len"
+	sectionKeyRotation       migrationSection = "key_rotation"
+	sectionTrustMarkIssuers  migrationSection = "trust_mark_issuers"
+	sectionTrustMarkOwners   migrationSection = "trust_mark_owners"
 )
 
 // allSections returns all available migration sections
@@ -160,6 +167,7 @@ func allSections() []migrationSection {
 		sectionConstraints,
 		sectionMetadataCrit,
 		sectionConfigLifetime,
+		sectionStatementLifetime,
 		sectionAuthorityHints,
 		sectionMetadata,
 		sectionTrustMarkSpecs,

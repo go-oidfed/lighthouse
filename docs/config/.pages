@@ -7,4 +7,5 @@ arrange:
   - signing.md
   - endpoints.md
   - federation_data.md
+  - api.md
   - stats.md
