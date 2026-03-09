@@ -601,3 +601,131 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 		}
 	})
 }
+
+// --- GET /subordinates/:subordinateID/history TESTS ---
+
+func TestGetSubordinateHistory(t *testing.T) {
+	t.Run("Success/Default", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://history.example.org",
+				Status:   model.StatusPending,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://history.example.org")
+
+		// Create mock events
+		backends.SubordinateEvents.Add(model.SubordinateEvent{
+			SubordinateID: saved.ID,
+			Type:          model.EventTypeCreated,
+		})
+		status := "active"
+		backends.SubordinateEvents.Add(model.SubordinateEvent{
+			SubordinateID: saved.ID,
+			Type:          model.EventTypeStatusUpdated,
+			Status:        &status,
+		})
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result struct {
+			Events     []eventResponse `json:"events"`
+			Pagination struct {
+				Total  int64 `json:"total"`
+				Limit  int   `json:"limit"`
+				Offset int   `json:"offset"`
+			} `json:"pagination"`
+		}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+
+		if result.Pagination.Total != 2 {
+			t.Errorf("Expected total 2, got %d", result.Pagination.Total)
+		}
+		if len(result.Events) != 2 {
+			t.Errorf("Expected 2 events returned, got %d", len(result.Events))
+		}
+		if result.Pagination.Limit == 0 {
+			t.Errorf("Expected a default limit, got 0")
+		}
+	})
+
+	t.Run("Success/WithOpts", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://history-opts.example.org",
+				Status:   model.StatusPending,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://history-opts.example.org")
+
+		backends.SubordinateEvents.Add(model.SubordinateEvent{
+			SubordinateID: saved.ID,
+			Type:          model.EventTypeCreated,
+		})
+		backends.SubordinateEvents.Add(model.SubordinateEvent{
+			SubordinateID: saved.ID,
+			Type:          model.EventTypeUpdated,
+		})
+
+		// Query for limit=1, offset=1 (should return only the older/newer event depending on DB order)
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history?limit=1&offset=1&type=updated", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+		
+		body, _ := io.ReadAll(resp.Body)
+		var result map[string]any
+		json.Unmarshal(body, &result)
+		
+		pag := result["pagination"].(map[string]any)
+		if int(pag["limit"].(float64)) != 1 {
+			t.Errorf("Expected limit 1, got %v", pag["limit"])
+		}
+		if int(pag["offset"].(float64)) != 1 {
+			t.Errorf("Expected offset 1, got %v", pag["offset"])
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _ := setupSubordinateBaseApp(t)
+
+		req := httptest.NewRequest("GET", "/subordinates/9999/history", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("InvalidQuery", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://bad-query.example.org",
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://bad-query.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history?limit=abc", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for bad query string, got %d", resp.StatusCode)
+		}
+	})
+}
