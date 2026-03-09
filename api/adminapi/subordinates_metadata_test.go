@@ -317,3 +317,305 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 		}
 	})
 }
+
+// --- POST & DELETE /subordinates/:subordinateID/metadata/:entityType TESTS ---
+
+func TestPostSubordinateMetadataEntityType(t *testing.T) {
+	t.Run("Success/Merge", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://meta-type-post.example.org",
+			},
+			Metadata: &oidfed.Metadata{
+				Extra: map[string]any{
+					"target_type": map[string]any{"existing_claim": "kept"},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://meta-type-post.example.org")
+
+		body := `{"new_claim": "merged"}`
+
+		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata/target_type", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		updated, _ := backends.Subordinates.Get("https://meta-type-post.example.org")
+		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
+
+		if target["existing_claim"] != "kept" {
+			t.Errorf("Expected existing claim to be kept during merge")
+		}
+		if target["new_claim"] != "merged" {
+			t.Errorf("Expected new claim to be merged in")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://bad-body-meta-post.example.org",
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://bad-body-meta-post.example.org")
+
+		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata/target_type", saved.ID), strings.NewReader("bad json"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://meta-type-delete.example.org",
+			},
+			Metadata: &oidfed.Metadata{
+				Extra: map[string]any{
+					"delete_me": map[string]any{"claim": "bye"},
+					"keep_me":   map[string]any{"claim": "stay"},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://meta-type-delete.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/delete_me", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		updated, _ := backends.Subordinates.Get("https://meta-type-delete.example.org")
+		extra := (*updated.Metadata).Extra
+		
+		if extra["delete_me"] != nil {
+			t.Errorf("Expected delete_me entity type to be entirely removed")
+		}
+		if extra["keep_me"] == nil {
+			t.Errorf("Expected keep_me entity type to be safely retained")
+		}
+	})
+
+	t.Run("NotFound/Subordinate", func(t *testing.T) {
+		app, _ := setupSubordinateMetadataApp(t)
+		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata/delete_me", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound/EntityType", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-meta-delete-type.example.org",
+			},
+			Metadata: &oidfed.Metadata{},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-meta-delete-type.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/missing_type", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when trying to delete a missing entity type, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// --- /subordinates/:subordinateID/metadata/:entityType/:claim TESTS ---
+
+func TestGetSubordinateMetadataClaim(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://meta-claim-get.example.org",
+			},
+			Metadata: &oidfed.Metadata{
+				Extra: map[string]any{
+					"target_type": map[string]any{
+						"target_claim": "found_it",
+						"other_claim":  "ignore_me",
+					},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://meta-claim-get.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/target_type/target_claim", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result string
+		json.Unmarshal(body, &result)
+
+		if result != "found_it" {
+			t.Errorf("Failed to retrieve claim metadata: got %s", result)
+		}
+	})
+
+	t.Run("NotFound/Claim", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-meta-claim.example.org",
+			},
+			Metadata: &oidfed.Metadata{
+				Extra: map[string]any{
+					"target_type": map[string]any{},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-meta-claim.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/target_type/missing", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when claim is missing, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestPutSubordinateMetadataClaim(t *testing.T) {
+	t.Run("Success/Replace", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://meta-claim-put.example.org",
+			},
+			Metadata: &oidfed.Metadata{
+				Extra: map[string]any{
+					"target_type": map[string]any{
+						"target_claim": "old_value",
+						"safe_claim":   "untouched",
+					},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://meta-claim-put.example.org")
+
+		body := `"new_value"` // Notice we send just a JSON string here since it is a single claim value
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata/target_type/target_claim", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		updated, _ := backends.Subordinates.Get("https://meta-claim-put.example.org")
+		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
+
+		if target["safe_claim"] != "untouched" {
+			t.Errorf("Expected sibling claim to remain untouched")
+		}
+		if target["target_claim"] != "new_value" {
+			t.Errorf("Expected target claim to be fully replaced")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://bad-body-meta-claim-put.example.org",
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://bad-body-meta-claim-put.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata/target_type/target_claim", saved.ID), strings.NewReader("bad json"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestDeleteSubordinateMetadataClaim(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://meta-claim-delete.example.org",
+			},
+			Metadata: &oidfed.Metadata{
+				Extra: map[string]any{
+					"target_type": map[string]any{
+						"delete_me": "gone",
+						"keep_me":   "staying",
+					},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://meta-claim-delete.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/target_type/delete_me", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		updated, _ := backends.Subordinates.Get("https://meta-claim-delete.example.org")
+		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
+		
+		if _, ok := target["delete_me"]; ok {
+			t.Errorf("Expected claim delete_me to be deleted")
+		}
+		if _, ok := target["keep_me"]; !ok {
+			t.Errorf("Expected claim keep_me to be safely retained")
+		}
+	})
+
+	t.Run("NotFound/Claim", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-meta-claim-delete.example.org",
+			},
+			Metadata: &oidfed.Metadata{
+				Extra: map[string]any{
+					"target_type": map[string]any{},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-meta-claim-delete.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/target_type/not_here", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when claim is missing, got %d", resp.StatusCode)
+		}
+	})
+}
