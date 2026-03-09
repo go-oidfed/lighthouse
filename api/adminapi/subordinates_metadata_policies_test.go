@@ -1042,3 +1042,470 @@ func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
 		}
 	})
 }
+
+// ============================================================================
+// GENERAL METADATA POLICIES TESTS
+// ============================================================================
+
+// setupGeneralMetadataPoliciesApp creates a Fiber app and registers general metadata policies endpoints.
+func setupGeneralMetadataPoliciesApp(t *testing.T) (*fiber.App, model.Backends) {
+	t.Helper()
+	store := newSubordinateTestStorage(t)
+
+	backends := model.Backends{
+		KV: store.KeyValue(),
+	}
+
+	app := fiber.New()
+	registerGeneralMetadataPolicies(app, backends.KV)
+	return app, backends
+}
+
+// --- GET & PUT /subordinates/metadata-policies TESTS ---
+
+func TestGetGeneralMetadataPolicies(t *testing.T) {
+	t.Run("Success/WithPolicies", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		policy := &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"global-admin@example.org"},
+				},
+			},
+		}
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, policy)
+
+		req := httptest.NewRequest("GET", "/subordinates/metadata-policies", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result oidfed.MetadataPolicies
+		json.Unmarshal(body, &result)
+
+		if result.RelyingParty == nil {
+			t.Fatalf("Expected RelyingParty policy to be set")
+		}
+		contacts, ok := result.RelyingParty["contacts"]
+		if !ok || contacts["add"] == nil || contacts["add"].([]any)[0].(string) != "global-admin@example.org" {
+			t.Errorf("Failed to retrieve correctly unmarshaled policy: %+v", result)
+		}
+	})
+
+	t.Run("NoPolicies", func(t *testing.T) {
+		app, _ := setupGeneralMetadataPoliciesApp(t)
+
+		req := httptest.NewRequest("GET", "/subordinates/metadata-policies", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when policies are missing, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestPutGeneralMetadataPolicies(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		body := `{
+			"openid_relying_party": {
+				"contacts": {
+					"add": ["new-global-admin@example.org"]
+				}
+			}
+		}`
+
+		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		// Verify DB update
+		var updated oidfed.MetadataPolicies
+		found, _ := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if !found {
+			t.Fatalf("Expected MetadataPolicy to be saved in KV")
+		}
+		
+		rpPol := updated.RelyingParty
+		contacts, ok := rpPol["contacts"]
+		if !ok {
+			t.Fatalf("Expected 'contacts' claim in policy")
+		}
+		addList := contacts["add"].([]any)
+		if len(addList) == 0 || addList[0].(string) != "new-global-admin@example.org" {
+			t.Errorf("Expected 'new-global-admin@example.org' in Add policy, got: %+v", addList)
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, _ := setupGeneralMetadataPoliciesApp(t)
+
+		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies", strings.NewReader("bad json"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// --- /subordinates/metadata-policies/:entityType TESTS ---
+
+func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		policy := &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"admin@example.org"},
+				},
+			},
+		}
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, policy)
+
+		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result oidfed.MetadataPolicy
+		json.Unmarshal(body, &result)
+
+		if contacts, ok := result["contacts"]; !ok || contacts["add"] == nil {
+			t.Errorf("Failed to retrieve entity type policy: %+v", result)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"old_claim": oidfed.MetadataPolicyEntry{"value": "old"},
+			},
+			OpenIDProvider: oidfed.MetadataPolicy{
+				"untouched": oidfed.MetadataPolicyEntry{"value": "safe"},
+			},
+		})
+
+		body := `{"new_claim": {"value": "new"}}`
+		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies/openid_relying_party", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		rpPol := updated.RelyingParty
+		opPol := updated.OpenIDProvider
+
+		if opPol["untouched"] == nil {
+			t.Errorf("Expected OpenIDProvider policy to remain untouched")
+		}
+		if rpPol["old_claim"] != nil {
+			t.Errorf("Expected old RP claim to be replaced")
+		}
+		if newClaim, ok := rpPol["new_claim"]; !ok || newClaim["value"] != "new" {
+			t.Errorf("Expected new RP claim to be set")
+		}
+	})
+
+	t.Run("POST Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"existing_claim": oidfed.MetadataPolicyEntry{"value": "kept"},
+			},
+		})
+
+		body := `{"new_claim": {"add": ["merged"]}}`
+		req := httptest.NewRequest("POST", "/subordinates/metadata-policies/openid_relying_party", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		rpPol := updated.RelyingParty
+
+		if existing, ok := rpPol["existing_claim"]; !ok || existing["value"] != "kept" {
+			t.Errorf("Expected existing claim to be kept")
+		}
+		if newClaim, ok := rpPol["new_claim"]; !ok || newClaim["add"] == nil {
+			t.Errorf("Expected new claim to be merged in")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{"value": "delete-me"},
+			},
+			OpenIDProvider: oidfed.MetadataPolicy{
+				"issuer": oidfed.MetadataPolicyEntry{"value": "keep-me"},
+			},
+		})
+
+		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if updated.RelyingParty != nil {
+			t.Errorf("Expected RelyingParty to be deleted")
+		}
+		if updated.OpenIDProvider == nil {
+			t.Errorf("Expected OpenIDProvider to be kept")
+		}
+	})
+}
+
+// --- /subordinates/metadata-policies/:entityType/:claim TESTS ---
+
+func TestGeneralMetadataPolicyByClaim(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"admin@example.org"},
+				},
+			},
+		})
+
+		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party/contacts", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result oidfed.MetadataPolicyEntry
+		json.Unmarshal(body, &result)
+
+		if addVal, ok := result["add"]; !ok || addVal.([]any)[0].(string) != "admin@example.org" {
+			t.Errorf("Failed to retrieve claim policy: %+v", result)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"old@example.org"},
+				},
+				"safe_claim": oidfed.MetadataPolicyEntry{"value": "untouched"},
+			},
+		})
+
+		body := `{"value": "new_direct_value"}`
+		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies/openid_relying_party/contacts", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		rpPol := updated.RelyingParty
+		contacts := rpPol["contacts"]
+
+		if contacts["add"] != nil {
+			t.Errorf("Expected old operator add to be wiped")
+		}
+		if contacts["value"] != "new_direct_value" {
+			t.Errorf("Expected new operator value to be set")
+		}
+	})
+
+	t.Run("POST Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"old@example.org"},
+				},
+			},
+		})
+
+		body := `{"value": "merged_value"}`
+		req := httptest.NewRequest("POST", "/subordinates/metadata-policies/openid_relying_party/contacts", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		contacts := updated.RelyingParty["contacts"]
+
+		if contacts["add"] == nil {
+			t.Errorf("Expected old operator to be kept")
+		}
+		if contacts["value"] != "merged_value" {
+			t.Errorf("Expected new operator to be merged in")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"delete_me": oidfed.MetadataPolicyEntry{"value": "bye"},
+				"keep_me":   oidfed.MetadataPolicyEntry{"value": "staying"},
+			},
+		})
+
+		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party/delete_me", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		rpPol := updated.RelyingParty
+		
+		if _, ok := rpPol["delete_me"]; ok {
+			t.Errorf("Expected claim 'delete_me' to be deleted")
+		}
+		if _, ok := rpPol["keep_me"]; !ok {
+			t.Errorf("Expected claim 'keep_me' to be retained")
+		}
+	})
+}
+
+// --- /subordinates/metadata-policies/:entityType/:claim/:operator TESTS ---
+
+func TestGeneralMetadataPolicyByOperator(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"admin@example.org"},
+				},
+			},
+		})
+
+		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party/contacts/add", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result []any
+		json.Unmarshal(body, &result)
+
+		if len(result) == 0 || result[0].(string) != "admin@example.org" {
+			t.Errorf("Failed to retrieve operator policy: %+v", result)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"add": []any{"old@example.org"},
+					"value": "untouched",
+				},
+			},
+		})
+
+		body := `["new@example.org"]`
+		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies/openid_relying_party/contacts/add", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		contacts := updated.RelyingParty["contacts"]
+
+		if contacts["value"] != "untouched" {
+			t.Errorf("Expected sibling operators to remain untouched")
+		}
+		addArr := contacts["add"].([]any)
+		if len(addArr) == 0 || addArr[0].(string) != "new@example.org" {
+			t.Errorf("Expected operator data to be fully replaced")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupGeneralMetadataPoliciesApp(t)
+
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+			RelyingParty: oidfed.MetadataPolicy{
+				"contacts": oidfed.MetadataPolicyEntry{
+					"delete_me": "gone",
+					"keep_me":   "staying",
+				},
+			},
+		})
+
+		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party/contacts/delete_me", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.MetadataPolicies
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		contacts := updated.RelyingParty["contacts"]
+		
+		if _, ok := contacts["delete_me"]; ok {
+			t.Errorf("Expected operator delete_me to be deleted")
+		}
+		if _, ok := contacts["keep_me"]; !ok {
+			t.Errorf("Expected operator keep_me to be safely retained")
+		}
+	})
+}
