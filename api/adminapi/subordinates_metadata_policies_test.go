@@ -739,3 +739,119 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 		}
 	})
 }
+
+// --- POST /subordinates/:subordinateID/metadata-policies/:entityType/:claim TESTS ---
+
+func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
+	t.Run("Success/Merge", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://post-claim.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"contacts": oidfed.MetadataPolicyEntry{
+						"add": []any{"old@example.org"},
+					},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://post-claim.example.org")
+
+		body := `{
+			"value": "merged_value"
+		}`
+
+		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		// Verify DB update
+		updated, _ := backends.Subordinates.Get("https://post-claim.example.org")
+		contacts := (*updated.MetadataPolicy).RelyingParty["contacts"]
+
+		// POST merges, so both operators should exist in this specific claim
+		if contacts["add"] == nil || contacts["add"].([]any)[0].(string) != "old@example.org" {
+			t.Errorf("Expected old \"add\" operator to be kept")
+		}
+		if contacts["value"] != "merged_value" {
+			t.Errorf("Expected new \"value\" operator to be merged in")
+		}
+	})
+
+	t.Run("InvalidBody", func(t *testing.T) {
+		app, _ := setupSubordinateMetadataPoliciesApp(t)
+		req := httptest.NewRequest("POST", "/subordinates/1/metadata-policies/openid_relying_party/contacts", strings.NewReader("bad json"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+// --- DELETE /subordinates/:subordinateID/metadata-policies/:entityType/:claim TESTS ---
+
+func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://delete-claim.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{
+					"delete_me": oidfed.MetadataPolicyEntry{"value": "bye"},
+					"keep_me":   oidfed.MetadataPolicyEntry{"value": "staying"},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://delete-claim.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/delete_me", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		// Verify DB update
+		updated, _ := backends.Subordinates.Get("https://delete-claim.example.org")
+		rpPol := (*updated.MetadataPolicy).RelyingParty
+		
+		if _, ok := rpPol["delete_me"]; ok {
+			t.Errorf("Expected claim \"delete_me\" to be deleted")
+		}
+		if _, ok := rpPol["keep_me"]; !ok {
+			t.Errorf("Expected claim \"keep_me\" to be retained safely")
+		}
+	})
+
+	t.Run("NotFound/Claim", func(t *testing.T) {
+		app, backends := setupSubordinateMetadataPoliciesApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-delete-claim.example.org",
+			},
+			MetadataPolicy: &oidfed.MetadataPolicies{
+				RelyingParty: oidfed.MetadataPolicy{},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-delete-claim.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/not_here", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when claim is missing, got %d", resp.StatusCode)
+		}
+	})
+}
