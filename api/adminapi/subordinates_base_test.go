@@ -482,3 +482,122 @@ func TestDeleteSubordinateByID(t *testing.T) {
 		}
 	})
 }
+
+// --- PUT /subordinates/:subordinateID/status TESTS ---
+
+func TestUpdateSubordinateStatus(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://status.example.org",
+				Status:   model.StatusPending,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://status.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("blocked"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		// Verify DB status
+		updated, _ := backends.Subordinates.Get("https://status.example.org")
+		if updated.Status != model.StatusBlocked {
+			t.Errorf("Expected status blocked, got %s", updated.Status)
+		}
+
+		// Verify StatusUpdated event
+		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		foundEvent := false
+		for _, e := range events {
+			if e.Type == model.EventTypeStatusUpdated {
+				foundEvent = true
+				if e.Status == nil || *e.Status != "blocked" {
+					t.Errorf("Expected event status to be \"blocked\", got %v", e.Status)
+				}
+				break
+			}
+		}
+		if !foundEvent {
+			t.Errorf("Expected \"StatusUpdated\" event")
+		}
+	})
+
+	t.Run("MissingStatus", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://missing-status.example.org",
+				Status:   model.StatusPending,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://missing-status.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("  "))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("InvalidStatus", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://invalid-status.example.org",
+				Status:   model.StatusPending,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://invalid-status.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("unknown-status"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("ActiveWithoutKeys", func(t *testing.T) {
+		app, backends := setupSubordinateBaseApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://no-keys.example.org",
+				Status:   model.StatusPending,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://no-keys.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("active"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		app, _ := setupSubordinateBaseApp(t)
+
+		req := httptest.NewRequest("PUT", "/subordinates/9999/status", strings.NewReader("pending"))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+}
