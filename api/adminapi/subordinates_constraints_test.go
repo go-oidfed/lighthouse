@@ -187,3 +187,383 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		}
 	})
 }
+// --- GET, PUT, DELETE /subordinates/:subordinateID/constraints/max-path-length TESTS ---
+
+func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		length := 5
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://maxpath-get.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				MaxPathLength: &length,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://maxpath-get.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result int
+		json.Unmarshal(body, &result)
+
+		if result != 5 {
+			t.Errorf("Failed to retrieve max path length: %d", result)
+		}
+	})
+
+	t.Run("GET NotFound", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://maxpath-missing.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{},
+		})
+		saved, _ := backends.Subordinates.Get("https://maxpath-missing.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("Expected status 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://maxpath-put.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				AllowedEntityTypes: []string{"keep_me"},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://maxpath-put.example.org")
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), strings.NewReader(`3`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		updated, _ := backends.Subordinates.Get("https://maxpath-put.example.org")
+		if updated.Constraints == nil || updated.Constraints.MaxPathLength == nil || *updated.Constraints.MaxPathLength != 3 {
+			t.Errorf("Expected max_path_length to be set to 3")
+		}
+		if updated.Constraints.AllowedEntityTypes == nil || updated.Constraints.AllowedEntityTypes[0] != "keep_me" {
+			t.Errorf("Expected sibling constraints to be untouched")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		length := 5
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://maxpath-delete.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				MaxPathLength:      &length,
+				AllowedEntityTypes: []string{"keep_me"},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://maxpath-delete.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		updated, _ := backends.Subordinates.Get("https://maxpath-delete.example.org")
+		if updated.Constraints.MaxPathLength != nil {
+			t.Errorf("Expected max_path_length to be nil after deletion")
+		}
+		if updated.Constraints.AllowedEntityTypes == nil {
+			t.Errorf("Expected AllowedEntityTypes to be retained")
+		}
+	})
+}
+
+// --- GET, PUT, DELETE /subordinates/:subordinateID/constraints/naming-constraints TESTS ---
+
+func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://naming-get.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				NamingConstraints: &oidfed.NamingConstraints{
+					Permitted: []string{"example.com"},
+				},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://naming-get.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result oidfed.NamingConstraints
+		json.Unmarshal(body, &result)
+
+		if len(result.Permitted) == 0 || result.Permitted[0] != "example.com" {
+			t.Errorf("Failed to retrieve naming constraints: %+v", result)
+		}
+	})
+
+	t.Run("GET NotFound", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://naming-missing.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{},
+		})
+		saved, _ := backends.Subordinates.Get("https://naming-missing.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("Expected status 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://naming-put.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				AllowedEntityTypes: []string{"keep_me"},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://naming-put.example.org")
+
+		body := `{"permitted": ["new.example.com"], "excluded": ["bad.example.com"]}`
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		updated, _ := backends.Subordinates.Get("https://naming-put.example.org")
+		if updated.Constraints == nil || updated.Constraints.NamingConstraints == nil || len(updated.Constraints.NamingConstraints.Permitted) == 0 {
+			t.Errorf("Expected naming constraints to be set")
+		}
+		if updated.Constraints.AllowedEntityTypes == nil {
+			t.Errorf("Expected sibling constraints to be untouched")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://naming-delete.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				NamingConstraints: &oidfed.NamingConstraints{
+					Permitted: []string{"example.com"},
+				},
+				AllowedEntityTypes: []string{"keep_me"},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://naming-delete.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		updated, _ := backends.Subordinates.Get("https://naming-delete.example.org")
+		if updated.Constraints.NamingConstraints != nil {
+			t.Errorf("Expected naming constraints to be nil after deletion")
+		}
+		if updated.Constraints.AllowedEntityTypes == nil {
+			t.Errorf("Expected AllowedEntityTypes to be retained")
+		}
+	})
+}
+
+// --- GET, PUT, POST, DELETE /subordinates/:subordinateID/constraints/allowed-entity-types TESTS ---
+
+func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://allowed-get.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				AllowedEntityTypes: []string{"openid_relying_party"},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://allowed-get.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result []string
+		json.Unmarshal(body, &result)
+
+		if len(result) == 0 || result[0] != "openid_relying_party" {
+			t.Errorf("Failed to retrieve allowed entity types: %+v", result)
+		}
+	})
+
+	t.Run("GET NotFound", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://allowed-missing.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{},
+		})
+		saved, _ := backends.Subordinates.Get("https://allowed-missing.example.org")
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("Expected status 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		length := 5
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://allowed-put.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				AllowedEntityTypes: []string{"old_type"},
+				MaxPathLength: &length,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://allowed-put.example.org")
+
+		body := `["new_type"]`
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		updated, _ := backends.Subordinates.Get("https://allowed-put.example.org")
+		if updated.Constraints == nil || len(updated.Constraints.AllowedEntityTypes) == 0 || updated.Constraints.AllowedEntityTypes[0] != "new_type" {
+			t.Errorf("Expected allowed entity types to be replaced")
+		}
+		if updated.Constraints.MaxPathLength == nil {
+			t.Errorf("Expected sibling constraints to be untouched")
+		}
+	})
+
+	t.Run("POST Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://allowed-post.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				AllowedEntityTypes: []string{"old_type"},
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://allowed-post.example.org")
+
+		body := `merged_type`
+		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), strings.NewReader(body))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusCreated {
+			b, _ := io.ReadAll(resp.Body)
+			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(b))
+		}
+
+		updated, _ := backends.Subordinates.Get("https://allowed-post.example.org")
+		
+		// POST should merge the new type with the old type
+		types := updated.Constraints.AllowedEntityTypes
+		if len(types) != 2 {
+			t.Errorf("Expected 2 allowed entity types after merge, got %d: %+v", len(types), types)
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupSubordinateConstraintsApp(t)
+
+		length := 5
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://allowed-delete.example.org",
+			},
+			Constraints: &oidfed.ConstraintSpecification{
+				AllowedEntityTypes: []string{"delete_me", "keep_me"},
+				MaxPathLength: &length,
+			},
+		})
+		saved, _ := backends.Subordinates.Get("https://allowed-delete.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types/delete_me", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		updated, _ := backends.Subordinates.Get("https://allowed-delete.example.org")
+		types := updated.Constraints.AllowedEntityTypes
+		
+		if len(types) != 1 || types[0] != "keep_me" {
+			t.Errorf("Expected delete_me to be removed, leaving keep_me. Got: %+v", types)
+		}
+		if updated.Constraints.MaxPathLength == nil {
+			t.Errorf("Expected MaxPathLength to be retained")
+		}
+	})
+}
