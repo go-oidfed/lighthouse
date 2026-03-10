@@ -716,3 +716,82 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		}
 	})
 }
+
+// --- GET, PUT, DELETE /subordinates/constraints/naming-constraints TESTS ---
+
+func TestGeneralConstraintsNamingConstraints(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			NamingConstraints: &oidfed.NamingConstraints{
+				Permitted: []string{"example.com"},
+			},
+		})
+
+		req := httptest.NewRequest("GET", "/subordinates/constraints/naming-constraints", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result oidfed.NamingConstraints
+		json.Unmarshal(body, &result)
+
+		if len(result.Permitted) == 0 || result.Permitted[0] != "example.com" {
+			t.Errorf("Failed to retrieve naming constraints: %+v", result)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			AllowedEntityTypes: []string{"keep_me"},
+		})
+
+		body := `{"permitted": ["new.example.com"], "excluded": ["bad.example.com"]}`
+		req := httptest.NewRequest("PUT", "/subordinates/constraints/naming-constraints", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if updated.NamingConstraints == nil || len(updated.NamingConstraints.Permitted) == 0 || updated.NamingConstraints.Permitted[0] != "new.example.com" {
+			t.Errorf("Expected naming constraints to be set")
+		}
+		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+			t.Errorf("Expected sibling constraints to be untouched")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			NamingConstraints: &oidfed.NamingConstraints{
+				Permitted: []string{"example.com"},
+			},
+			AllowedEntityTypes: []string{"keep_me"},
+		})
+
+		req := httptest.NewRequest("DELETE", "/subordinates/constraints/naming-constraints", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if updated.NamingConstraints != nil {
+			t.Errorf("Expected naming constraints to be nil")
+		}
+		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+			t.Errorf("Expected AllowedEntityTypes to be retained safely")
+		}
+	})
+}
