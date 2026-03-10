@@ -39,6 +39,7 @@ type migrationFederationConf struct {
 	Constraints           *oidfed.ConstraintSpecification `yaml:"constraints"`
 	CriticalExtensions    []string                        `yaml:"crit"`
 	MetadataPolicyCrit    []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
+	MetadataPolicy        *oidfed.MetadataPolicies        `yaml:"metadata_policy"`
 	ConfigurationLifetime duration.DurationOption         `yaml:"configuration_lifetime"`
 	Metadata              migrationFederationMetadataConf `yaml:"federation_entity_metadata"`
 
@@ -149,6 +150,7 @@ const (
 	sectionMetadata          migrationSection = "metadata"
 	sectionConstraints       migrationSection = "constraints"
 	sectionMetadataCrit      migrationSection = "metadata_crit"
+	sectionMetadataPolicies  migrationSection = "metadata_policies"
 	sectionConfigLifetime    migrationSection = "config_lifetime"
 	sectionStatementLifetime migrationSection = "statement_lifetime"
 	sectionAlg               migrationSection = "alg"
@@ -166,6 +168,7 @@ func allSections() []migrationSection {
 		sectionKeyRotation,
 		sectionConstraints,
 		sectionMetadataCrit,
+		sectionMetadataPolicies,
 		sectionConfigLifetime,
 		sectionStatementLifetime,
 		sectionAuthorityHints,

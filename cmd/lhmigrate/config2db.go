@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
@@ -47,6 +48,7 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  key_rotation       - Key rotation config (signing.key_rotation)\n")
 		fmt.Fprintf(os.Stderr, "  constraints        - Subordinate statement constraints (federation_data.constraints)\n")
 		fmt.Fprintf(os.Stderr, "  metadata_crit      - Metadata policy crit operators (federation_data.metadata_policy_crit)\n")
+		fmt.Fprintf(os.Stderr, "  metadata_policies  - Metadata policies (federation_data.metadata_policy)\n")
 		fmt.Fprintf(os.Stderr, "  config_lifetime    - Entity configuration lifetime (federation_data.configuration_lifetime)\n")
 		fmt.Fprintf(os.Stderr, "  statement_lifetime - Subordinate statement lifetime (endpoints.fetch.statement_lifetime)\n")
 		fmt.Fprintf(os.Stderr, "  authority_hints    - Authority hints (federation_data.authority_hints)\n")
@@ -274,6 +276,9 @@ func (m *configMigrator) migrate() []migrationResult {
 	}
 	if m.shouldMigrate(sectionMetadataCrit) {
 		results = append(results, m.migrateMetadataPolicyCrit())
+	}
+	if m.shouldMigrate(sectionMetadataPolicies) {
+		results = append(results, m.migrateMetadataPolicies())
 	}
 	if m.shouldMigrate(sectionConfigLifetime) {
 		results = append(results, m.migrateConfigLifetime())
@@ -528,6 +533,49 @@ func (m *configMigrator) migrateMetadataPolicyCrit() migrationResult {
 		result.action = "created"
 	}
 	result.details = fmt.Sprintf("%d operators", len(m.config.Federation.MetadataPolicyCrit))
+	return result
+}
+
+func (m *configMigrator) migrateMetadataPolicies() migrationResult {
+	result := migrationResult{section: sectionMetadataPolicies}
+
+	if m.config.Federation.MetadataPolicy == nil || isMetadataPoliciesEmpty(m.config.Federation.MetadataPolicy) {
+		result.action = "skipped"
+		result.details = "not set in config"
+		return result
+	}
+
+	// Check if exists
+	var existing map[string]any
+	found, err := m.backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &existing)
+	if err != nil {
+		result.err = err
+		return result
+	}
+
+	if found && len(existing) > 0 && !m.force {
+		result.action = "skipped"
+		result.details = "already set (use --force to overwrite)"
+		return result
+	}
+
+	if m.dryRun {
+		result.action = "dry-run"
+		result.details = "would set metadata policies"
+		return result
+	}
+
+	if err := m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, m.config.Federation.MetadataPolicy); err != nil {
+		result.err = err
+		return result
+	}
+
+	if found && len(existing) > 0 {
+		result.action = "overwritten"
+	} else {
+		result.action = "created"
+	}
+	result.details = "metadata policies set"
 	return result
 }
 
@@ -1021,6 +1069,20 @@ func (m *configMigrator) migrateTrustMarkOwners() []migrationResult {
 	}
 
 	return results
+}
+
+// isMetadataPoliciesEmpty checks if all metadata policies are empty
+func isMetadataPoliciesEmpty(mp *oidfed.MetadataPolicies) bool {
+	if mp == nil {
+		return true
+	}
+	return len(mp.OpenIDProvider) == 0 &&
+		len(mp.RelyingParty) == 0 &&
+		len(mp.OAuthAuthorizationServer) == 0 &&
+		len(mp.OAuthClient) == 0 &&
+		len(mp.OAuthProtectedResource) == 0 &&
+		len(mp.FederationEntity) == 0 &&
+		len(mp.Extra) == 0
 }
 
 func printMigrationSummary(results []migrationResult) {
