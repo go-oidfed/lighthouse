@@ -294,11 +294,11 @@ type subordinatePolicyHandlers struct {
 }
 
 func (h *subordinatePolicyHandlers) getAll(c *fiber.Ctx) error {
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.MetadataPolicy == nil {
+	if info.MetadataPolicy == nil {
 		return writeNotFound(c, "metadata policy not found")
 	}
 	return c.JSON(info.MetadataPolicy)
@@ -393,11 +393,11 @@ func (h *subordinatePolicyHandlers) deleteAll(c *fiber.Ctx) error {
 
 func (h *subordinatePolicyHandlers) getEntityType(c *fiber.Ctx) error {
 	et := c.Params("entityType")
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.MetadataPolicy == nil {
+	if info.MetadataPolicy == nil {
 		return writeNotFound(c, "metadata policy not found")
 	}
 	policy := getMetadataPolicy(info.MetadataPolicy, et)
@@ -511,11 +511,11 @@ func (h *subordinatePolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
 func (h *subordinatePolicyHandlers) getClaim(c *fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.MetadataPolicy == nil {
+	if info.MetadataPolicy == nil {
 		return writeNotFound(c, "metadata policy not found")
 	}
 	policy := getMetadataPolicy(info.MetadataPolicy, et)
@@ -644,11 +644,11 @@ func (h *subordinatePolicyHandlers) getOperator(c *fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	op := oidfed.PolicyOperatorName(c.Params("operator"))
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.MetadataPolicy == nil {
+	if info.MetadataPolicy == nil {
 		return writeNotFound(c, "metadata policy not found")
 	}
 	policy := getMetadataPolicy(info.MetadataPolicy, et)

@@ -38,9 +38,9 @@ func registerSubordinateMetadata(
 
 func handleGetSubordinateMetadata(subordinates model.SubordinateStorageBackend) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
+		info, ok := handleSubordinateLookup(c, subordinates)
+		if !ok {
+			return nil
 		}
 		if info.Metadata == nil {
 			return writeNotFound(c, "metadata not found")
@@ -93,9 +93,9 @@ func handlePutSubordinateMetadata(storages model.Backends) fiber.Handler {
 func handleGetSubordinateMetadataEntityType(subordinates model.SubordinateStorageBackend) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		et := c.Params("entityType")
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
+		info, ok := handleSubordinateLookup(c, subordinates)
+		if !ok {
+			return nil
 		}
 		m := getEntityMetadata(info.Metadata, et)
 		if m == nil {
@@ -245,16 +245,16 @@ func handleGetSubordinateMetadataClaim(subordinates model.SubordinateStorageBack
 	return func(c *fiber.Ctx) error {
 		et := c.Params("entityType")
 		claim := c.Params("claim")
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
+		info, ok := handleSubordinateLookup(c, subordinates)
+		if !ok {
+			return nil
 		}
 		m := getEntityMetadata(info.Metadata, et)
 		if m == nil {
 			return writeNotFound(c, "metadata not found")
 		}
-		v, ok := m[claim]
-		if !ok {
+		v, found := m[claim]
+		if !found {
 			return writeNotFound(c, "metadata not found")
 		}
 		return c.JSON(v)

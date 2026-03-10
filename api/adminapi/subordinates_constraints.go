@@ -39,11 +39,11 @@ type subordinateConstraintsHandlers struct {
 }
 
 func (h *subordinateConstraintsHandlers) getAll(c *fiber.Ctx) error {
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.Constraints == nil {
+	if info.Constraints == nil {
 		return c.JSON(oidfed.ConstraintSpecification{})
 	}
 	return c.JSON(info.Constraints)
@@ -137,12 +137,11 @@ func (h *subordinateConstraintsHandlers) deleteAll(c *fiber.Ctx) error {
 }
 
 func (h *subordinateConstraintsHandlers) getMaxPathLength(c *fiber.Ctx) error {
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.Constraints == nil || info.Constraints.
-		MaxPathLength == nil {
+	if info.Constraints == nil || info.Constraints.MaxPathLength == nil {
 		return writeNotFound(c, "max_path_length not set")
 	}
 	return c.JSON(*info.Constraints.MaxPathLength)
@@ -213,12 +212,11 @@ func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error
 }
 
 func (h *subordinateConstraintsHandlers) getNamingConstraints(c *fiber.Ctx) error {
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.Constraints == nil || info.Constraints.
-		NamingConstraints == nil {
+	if info.Constraints == nil || info.Constraints.NamingConstraints == nil {
 		return writeNotFound(c, "naming_constraints not set")
 	}
 	return c.JSON(info.Constraints.NamingConstraints)
@@ -283,12 +281,11 @@ func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) e
 }
 
 func (h *subordinateConstraintsHandlers) getAllowedEntityTypes(c *fiber.Ctx) error {
-	info, err := handleSubordinateLookup(c, h.storages.Subordinates)
-	if err != nil {
-		return err
+	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
+	if !ok {
+		return nil
 	}
-	if info == nil || info.Constraints == nil || info.Constraints.
-		AllowedEntityTypes == nil {
+	if info.Constraints == nil || info.Constraints.AllowedEntityTypes == nil {
 		return writeNotFound(c, "allowed_entity_types not set")
 	}
 	return c.JSON(info.Constraints.AllowedEntityTypes)

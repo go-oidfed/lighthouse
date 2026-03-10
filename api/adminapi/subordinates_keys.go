@@ -35,9 +35,9 @@ func registerSubordinateKeys(
 
 func handleGetSubordinateJWKS(subordinates model.SubordinateStorageBackend) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
+		info, ok := handleSubordinateLookup(c, subordinates)
+		if !ok {
+			return nil
 		}
 		// Return empty JWKS if none exists
 		if info.JWKS.Keys.Set == nil {

@@ -27,9 +27,9 @@ func handleGetSubordinateStatement(
 	fedEntity oidfed.FederationEntity,
 ) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		info, err := handleSubordinateLookup(c, subordinates)
-		if err != nil {
-			return err
+		info, ok := handleSubordinateLookup(c, subordinates)
+		if !ok {
+			return nil
 		}
 		// Build the statement payload
 		payload := buildSubordinateStatementPayload(info, kv, fedEntity.EntityID())
