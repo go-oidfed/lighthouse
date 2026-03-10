@@ -641,3 +641,78 @@ func TestGeneralConstraintsAll(t *testing.T) {
 		}
 	})
 }
+
+// --- GET, PUT, DELETE /subordinates/constraints/max-path-length TESTS ---
+
+func TestGeneralConstraintsMaxPathLength(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		length := 5
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			MaxPathLength: &length,
+		})
+
+		req := httptest.NewRequest("GET", "/subordinates/constraints/max-path-length", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result int
+		json.Unmarshal(body, &result)
+		if result != 5 {
+			t.Errorf("Failed to retrieve max path length: %d", result)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			AllowedEntityTypes: []string{"keep_me"},
+		})
+
+		req := httptest.NewRequest("PUT", "/subordinates/constraints/max-path-length", strings.NewReader(`3`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if updated.MaxPathLength == nil || *updated.MaxPathLength != 3 {
+			t.Errorf("Expected max_path_length to be 3")
+		}
+		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+			t.Errorf("Expected sibling constraints to be untouched")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		length := 5
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			MaxPathLength: &length,
+			AllowedEntityTypes: []string{"keep_me"},
+		})
+
+		req := httptest.NewRequest("DELETE", "/subordinates/constraints/max-path-length", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if updated.MaxPathLength != nil {
+			t.Errorf("Expected max_path_length to be nil")
+		}
+		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+			t.Errorf("Expected AllowedEntityTypes to be safely retained")
+		}
+	})
+}
