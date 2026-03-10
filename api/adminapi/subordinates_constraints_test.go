@@ -567,3 +567,77 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 		}
 	})
 }
+
+// ============================================================================
+// GENERAL CONSTRAINTS TESTS
+// ============================================================================
+
+func setupGeneralConstraintsApp(t *testing.T) (*fiber.App, model.Backends) {
+	t.Helper()
+	store := newSubordinateTestStorage(t)
+
+	backends := model.Backends{
+		KV: store.KeyValue(),
+	}
+
+	app := fiber.New()
+	registerGeneralConstraints(app, backends.KV)
+	return app, backends
+}
+
+// --- GET, PUT /subordinates/constraints TESTS ---
+
+func TestGeneralConstraintsAll(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+
+		length := 5
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			MaxPathLength: &length,
+		})
+
+		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result oidfed.ConstraintSpecification
+		json.Unmarshal(body, &result)
+
+		if result.MaxPathLength == nil || *result.MaxPathLength != 5 {
+			t.Errorf("Failed to retrieve constraints: %+v", result)
+		}
+	})
+
+	t.Run("GET NoConstraints", func(t *testing.T) {
+		app, _ := setupGeneralConstraintsApp(t)
+		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 when policies are missing, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+
+		body := `{"max_path_length": 3}`
+		req := httptest.NewRequest("PUT", "/subordinates/constraints", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if updated.MaxPathLength == nil || *updated.MaxPathLength != 3 {
+			t.Errorf("Expected max_path_length to be 3")
+		}
+	})
+}
