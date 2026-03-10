@@ -270,9 +270,9 @@ func (h *historyHandlers) getHistory(c *fiber.Ctx) error {
 		return writeNotFound(c, "subordinate not found")
 	}
 
-	opts, err := h.parseQueryOpts(c)
-	if err != nil {
-		return err
+	opts, ok := h.parseQueryOpts(c)
+	if !ok {
+		return nil
 	}
 
 	eventsList, total, err := h.events.GetBySubordinateID(info.ID, opts)
@@ -303,13 +303,16 @@ func (h *historyHandlers) getHistory(c *fiber.Ctx) error {
 	})
 }
 
-func (*historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, error) {
+// parseQueryOpts parses query parameters for event history requests.
+// Returns (opts, true) on success, or (zero, false) if an error response was written.
+func (*historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, bool) {
 	var opts model.EventQueryOpts
 
 	if limitStr := c.Query("limit"); limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
 		if err != nil {
-			return opts, writeBadRequest(c, "invalid limit parameter")
+			_ = writeBadRequest(c, "invalid limit parameter")
+			return opts, false
 		}
 		opts.Limit = limit
 	}
@@ -317,7 +320,8 @@ func (*historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, erro
 	if offsetStr := c.Query("offset"); offsetStr != "" {
 		offset, err := strconv.Atoi(offsetStr)
 		if err != nil {
-			return opts, writeBadRequest(c, "invalid offset parameter")
+			_ = writeBadRequest(c, "invalid offset parameter")
+			return opts, false
 		}
 		opts.Offset = offset
 	}
@@ -329,7 +333,8 @@ func (*historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, erro
 	if fromStr := c.Query("from"); fromStr != "" {
 		from, err := strconv.ParseInt(fromStr, 10, 64)
 		if err != nil {
-			return opts, writeBadRequest(c, "invalid from parameter")
+			_ = writeBadRequest(c, "invalid from parameter")
+			return opts, false
 		}
 		opts.FromTime = &from
 	}
@@ -337,12 +342,13 @@ func (*historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, erro
 	if toStr := c.Query("to"); toStr != "" {
 		to, err := strconv.ParseInt(toStr, 10, 64)
 		if err != nil {
-			return opts, writeBadRequest(c, "invalid to parameter")
+			_ = writeBadRequest(c, "invalid to parameter")
+			return opts, false
 		}
 		opts.ToTime = &to
 	}
 
-	return opts, nil
+	return opts, true
 }
 
 func (*historyHandlers) normalizeLimit(limit int) int {
