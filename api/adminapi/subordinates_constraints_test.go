@@ -795,3 +795,91 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 		}
 	})
 }
+
+// --- GET, PUT, POST, DELETE /subordinates/constraints/allowed-entity-types TESTS ---
+
+func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
+	t.Run("GET Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			AllowedEntityTypes: []string{"openid_relying_party"},
+		})
+
+		req := httptest.NewRequest("GET", "/subordinates/constraints/allowed-entity-types", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result []string
+		json.Unmarshal(body, &result)
+
+		if len(result) == 0 || result[0] != "openid_relying_party" {
+			t.Errorf("Failed to retrieve allowed entity types: %+v", result)
+		}
+	})
+
+	t.Run("PUT Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			AllowedEntityTypes: []string{"old_type"},
+		})
+
+		req := httptest.NewRequest("PUT", "/subordinates/constraints/allowed-entity-types", strings.NewReader(`["new_type"]`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if len(updated.AllowedEntityTypes) == 0 || updated.AllowedEntityTypes[0] != "new_type" {
+			t.Errorf("Expected allowed entity types to be replaced")
+		}
+	})
+
+	t.Run("POST Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			AllowedEntityTypes: []string{"old_type"},
+		})
+
+		req := httptest.NewRequest("POST", "/subordinates/constraints/allowed-entity-types", strings.NewReader(`merged_type`))
+		req.Header.Set("Content-Type", "text/plain")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("Expected status 201, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if len(updated.AllowedEntityTypes) != 2 {
+			t.Errorf("Expected 2 allowed entity types after merge")
+		}
+	})
+
+	t.Run("DELETE Success", func(t *testing.T) {
+		app, backends := setupGeneralConstraintsApp(t)
+		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+			AllowedEntityTypes: []string{"delete_me", "keep_me"},
+		})
+
+		req := httptest.NewRequest("DELETE", "/subordinates/constraints/allowed-entity-types/delete_me", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var updated oidfed.ConstraintSpecification
+		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if len(updated.AllowedEntityTypes) != 1 || updated.AllowedEntityTypes[0] != "keep_me" {
+			t.Errorf("Expected delete_me to be removed")
+		}
+	})
+}
