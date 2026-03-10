@@ -234,3 +234,83 @@ func TestSubordinateJWKS(t *testing.T) {
 		}
 	})
 }
+// --- DELETE /subordinates/:subordinateID/jwks/:kid TESTS ---
+
+func TestSubordinateJWKDelete(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		app, backends := setupSubordinateKeysApp(t)
+
+		set := jwk.NewSet()
+		set.AddKey(createTestKey("keep-me"))
+		set.AddKey(createTestKey("delete-me"))
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://jwk-delete.example.org",
+			},
+			JWKS: model.JWKS{Keys: jwx.JWKS{Set: set}},
+		})
+		saved, _ := backends.Subordinates.Get("https://jwk-delete.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/jwks/delete-me", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+
+		updated, _ := backends.Subordinates.Get("https://jwk-delete.example.org")
+		if updated.JWKS.Keys.Set == nil || updated.JWKS.Keys.Len() != 1 {
+			t.Fatalf("Expected exactly 1 key remaining, got %d", updated.JWKS.Keys.Len())
+		}
+		key, ok := updated.JWKS.Keys.Key(0)
+		kid, _ := key.KeyID()
+		if !ok || kid != "keep-me" {
+			t.Errorf("Expected remaining key to be keep-me, got %v", kid)
+		}
+
+		// Verify Event
+		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		found := false
+		for _, e := range events {
+			if e.Type == model.EventTypeJWKRemoved {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected JWKRemoved event to be logged")
+		}
+	})
+
+	t.Run("NotFound/Subordinate", func(t *testing.T) {
+		app, _ := setupSubordinateKeysApp(t)
+		req := httptest.NewRequest("DELETE", "/subordinates/9999/jwks/delete-me", http.NoBody)
+		resp, _ := app.Test(req, -1)
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("NotFound/Key", func(t *testing.T) {
+		app, backends := setupSubordinateKeysApp(t)
+
+		set := jwk.NewSet()
+		set.AddKey(createTestKey("keep-me"))
+
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://jwk-delete-missing.example.org",
+			},
+			JWKS: model.JWKS{Keys: jwx.JWKS{Set: set}},
+		})
+		saved, _ := backends.Subordinates.Get("https://jwk-delete-missing.example.org")
+
+		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/jwks/missing-kid", saved.ID), http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Errorf("Expected status 204 (idempotent) when key is missing, got %d", resp.StatusCode)
+		}
+	})
+}
