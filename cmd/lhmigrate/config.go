@@ -18,6 +18,10 @@ type configTransformer struct {
 	verbose       bool
 	runConfig2db  bool
 	config2dbArgs []string
+	// Storage configuration for output config
+	dbType string // sqlite, mysql, postgres
+	dbDSN  string // DSN for mysql/postgres
+	dbDir  string // data_dir for sqlite
 }
 
 // runConfigMigration is the main entry point for the config migration command
@@ -67,11 +71,15 @@ func runConfigMigration(args []string) int {
 		fmt.Fprintf(os.Stderr, "This command reads an existing config file, removes deprecated fields,\n")
 		fmt.Fprintf(os.Stderr, "renames legacy options, and outputs a new config file compatible with\n")
 		fmt.Fprintf(os.Stderr, "LightHouse 0.20.0+. Deprecated fields are preserved as comments.\n\n")
+		fmt.Fprintf(os.Stderr, "The --db-type, --db-dsn, and --db-dir options configure the storage section\n")
+		fmt.Fprintf(os.Stderr, "in the output config file. They are also passed to config2db if --run-config2db is set.\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fs.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nTransformations applied:\n")
 		fmt.Fprintf(os.Stderr, "  - federation_data.entity_id -> entity_id (moved to top level)\n")
-		fmt.Fprintf(os.Stderr, "  - storage.backend (json|badger) -> storage.driver (sqlite)\n")
+		fmt.Fprintf(os.Stderr, "  - storage.backend (json|badger) -> storage.driver (from --db-type, default: sqlite)\n")
+		fmt.Fprintf(os.Stderr, "  - storage.dsn set from --db-dsn (for mysql/postgres)\n")
+		fmt.Fprintf(os.Stderr, "  - storage.data_dir set from --db-dir (for sqlite)\n")
 		fmt.Fprintf(os.Stderr, "  - signing.automatic_key_rollover -> signing.key_rotation (renamed)\n")
 		fmt.Fprintf(os.Stderr, "  - signing.alg, rsa_key_len, key_rotation -> commented (now in database)\n")
 		fmt.Fprintf(os.Stderr, "  - federation_data.authority_hints -> commented (now in database)\n")
@@ -83,10 +91,16 @@ func runConfigMigration(args []string) int {
 		fmt.Fprintf(os.Stderr, "  - federation_data.trust_mark_issuers -> commented (now in database)\n")
 		fmt.Fprintf(os.Stderr, "  - federation_data.trust_mark_owners -> commented (now in database)\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  # Transform config and output to stdout\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config --source=old-config.yaml\n\n")
+		fmt.Fprintf(os.Stderr, "  # Transform config for SQLite (default)\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config --source=old-config.yaml --db-dir=/var/lib/lighthouse\n\n")
+		fmt.Fprintf(os.Stderr, "  # Transform config for PostgreSQL\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config --source=old-config.yaml --db-type=postgres \\\n")
+		fmt.Fprintf(os.Stderr, "    --db-dsn='host=localhost user=lh password=secret dbname=lighthouse'\n\n")
+		fmt.Fprintf(os.Stderr, "  # Transform config for MySQL\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config --source=old-config.yaml --db-type=mysql \\\n")
+		fmt.Fprintf(os.Stderr, "    --db-dsn='user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&parseTime=True'\n\n")
 		fmt.Fprintf(os.Stderr, "  # Transform and write to new file\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config -s old-config.yaml -d new-config.yaml\n\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config -s old-config.yaml -d new-config.yaml --db-dir=/data\n\n")
 		fmt.Fprintf(os.Stderr, "  # Transform and also migrate values to database\n")
 		fmt.Fprintf(os.Stderr, "  lhmigrate config -s old-config.yaml -d new-config.yaml --run-config2db --db-dir=/data\n\n")
 		fmt.Fprintf(os.Stderr, "  # Dry run to preview changes\n")
@@ -140,6 +154,9 @@ func runConfigMigration(args []string) int {
 		verbose:       verbose,
 		runConfig2db:  runConfig2db,
 		config2dbArgs: config2dbArgs,
+		dbType:        dbType,
+		dbDSN:         dbDSN,
+		dbDir:         dbDir,
 	}
 
 	// Load and transform
@@ -373,27 +390,131 @@ func (t *configTransformer) transformStorageNode(node *yaml.Node) {
 		return
 	}
 
-	for i := 0; i < len(node.Content); i += 2 {
-		if i+1 >= len(node.Content) {
-			break
-		}
-		keyNode := node.Content[i]
-		valueNode := node.Content[i+1]
+	// Determine target driver (from flags or default to sqlite)
+	targetDriver := t.dbType
+	if targetDriver == "" {
+		targetDriver = "sqlite"
+	}
 
-		if keyNode.Value == "backend" {
-			// Transform legacy backend to driver
-			oldValue := valueNode.Value
-			if oldValue == "json" || oldValue == "badger" {
-				keyNode.Value = "driver"
-				valueNode.Value = "sqlite"
-				// Add comment about migration
-				keyNode.LineComment = fmt.Sprintf(" # Changed from 'backend: %s' - legacy backends no longer supported", oldValue)
+	// Helper to find field index
+	findField := func(name string) int {
+		for i := 0; i < len(node.Content); i += 2 {
+			if i+1 >= len(node.Content) {
+				break
+			}
+			if node.Content[i].Value == name {
+				return i
+			}
+		}
+		return -1
+	}
+
+	// Helper to remove field
+	removeField := func(name string) bool {
+		idx := findField(name)
+		if idx >= 0 {
+			node.Content = append(node.Content[:idx], node.Content[idx+2:]...)
+			return true
+		}
+		return false
+	}
+
+	// Helper to set or add field
+	setField := func(name, value string, afterField string) {
+		idx := findField(name)
+		if idx >= 0 {
+			// Update existing
+			node.Content[idx+1].Value = value
+		} else {
+			// Add new field
+			keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: name}
+			valueNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
+
+			insertPos := 0
+			if afterField != "" {
+				afterIdx := findField(afterField)
+				if afterIdx >= 0 {
+					insertPos = afterIdx + 2
+				}
+			}
+
+			newContent := make([]*yaml.Node, 0, len(node.Content)+2)
+			newContent = append(newContent, node.Content[:insertPos]...)
+			newContent = append(newContent, keyNode, valueNode)
+			newContent = append(newContent, node.Content[insertPos:]...)
+			node.Content = newContent
+		}
+	}
+
+	// Transform legacy backend to driver
+	backendIndex := findField("backend")
+	if backendIndex >= 0 {
+		keyNode := node.Content[backendIndex]
+		valueNode := node.Content[backendIndex+1]
+		oldValue := valueNode.Value
+		if oldValue == "json" || oldValue == "badger" {
+			keyNode.Value = "driver"
+			valueNode.Value = targetDriver
+			keyNode.LineComment = fmt.Sprintf(" # Changed from 'backend: %s' - legacy backends no longer supported", oldValue)
+			if t.verbose {
+				log.WithFields(log.Fields{
+					"old": "backend: " + oldValue,
+					"new": "driver: " + targetDriver,
+				}).Info("Transformed storage backend")
+			}
+		}
+	} else {
+		// Update or add driver
+		driverIndex := findField("driver")
+		if driverIndex >= 0 {
+			valueNode := node.Content[driverIndex+1]
+			if valueNode.Value != targetDriver {
+				oldValue := valueNode.Value
+				valueNode.Value = targetDriver
 				if t.verbose {
 					log.WithFields(log.Fields{
-						"old": "backend: " + oldValue,
-						"new": "driver: sqlite",
-					}).Info("Transformed storage backend")
+						"old": oldValue,
+						"new": targetDriver,
+					}).Info("Updated storage driver")
 				}
+			}
+		} else {
+			// Add driver at the beginning
+			keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "driver"}
+			valueNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: targetDriver}
+			node.Content = append([]*yaml.Node{keyNode, valueNode}, node.Content...)
+			if t.verbose {
+				log.WithField("driver", targetDriver).Info("Added storage driver")
+			}
+		}
+	}
+
+	// Handle DSN for mysql/postgres
+	if targetDriver == "mysql" || targetDriver == "postgres" {
+		if t.dbDSN != "" {
+			setField("dsn", t.dbDSN, "driver")
+			if t.verbose {
+				log.WithField("dsn", t.dbDSN).Info("Set storage DSN")
+			}
+		}
+		// Remove data_dir if present (not needed for mysql/postgres)
+		if removeField("data_dir") {
+			if t.verbose {
+				log.Info("Removed data_dir (not needed for mysql/postgres)")
+			}
+		}
+	} else {
+		// SQLite - handle data_dir
+		if t.dbDir != "" {
+			setField("data_dir", t.dbDir, "driver")
+			if t.verbose {
+				log.WithField("data_dir", t.dbDir).Info("Set storage data_dir")
+			}
+		}
+		// Remove dsn if present (not needed for sqlite)
+		if removeField("dsn") {
+			if t.verbose {
+				log.Info("Removed dsn (not needed for sqlite)")
 			}
 		}
 	}
