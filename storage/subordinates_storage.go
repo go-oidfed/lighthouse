@@ -35,15 +35,15 @@ func (s *SubordinateStorage) Add(info model.ExtendedSubordinateInfo) error {
 				return err
 			}
 
-			// Insert entity type rows separately with their own ON CONFLICT clause
+			// Insert entity type rows separately
 			if len(entityTypes) > 0 {
 				for i := range entityTypes {
 					entityTypes[i].SubordinateID = info.ID
 				}
-				// Use constraint name for PostgreSQL compatibility
+				// Use column-based conflict detection with DO NOTHING
 				if err := tx.Clauses(clause.OnConflict{
-					OnConstraint: "uidx_sub_ent",
-					DoNothing:    true,
+					Columns:   []clause.Column{{Name: "subordinate_id"}, {Name: "entity_type"}},
+					DoNothing: true,
 				}).Create(&entityTypes).Error; err != nil {
 					return errors.Wrap(err, "failed to insert subordinate entity types")
 				}
@@ -190,14 +190,15 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 				return err
 			}
 
-			// Insert entity type rows separately with their own ON CONFLICT clause
+			// Insert entity type rows separately
 			if len(entityTypes) > 0 {
 				for i := range entityTypes {
 					entityTypes[i].SubordinateID = info.ID
 				}
+				// Use column-based conflict detection with DO NOTHING
 				if err := tx.Clauses(clause.OnConflict{
-					OnConstraint: "uidx_sub_ent",
-					DoNothing:    true,
+					Columns:   []clause.Column{{Name: "subordinate_id"}, {Name: "entity_type"}},
+					DoNothing: true,
 				}).Create(&entityTypes).Error; err != nil {
 					return errors.Wrap(err, "failed to insert subordinate entity types")
 				}
