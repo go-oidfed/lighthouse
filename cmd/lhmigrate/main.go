@@ -30,52 +30,68 @@ func usage() {
 func publicCmd(args []string) int {
 	fs := flag.NewFlagSet("public", flag.ExitOnError)
 	var (
-		src    = fs.String("src", "", "Path to legacy public key storage directory")
-		dst    = fs.String("dst", "", "Destination for migrated public key storage (dir for fs, or DB file for sqlite)")
-		typeID = fs.String(
-			"type", "federation", "Key type identifier (e.g., "+
-				"'federation')",
-		)
-		destDB  = fs.String("dest-db", "", "Destination database type: sqlite|mysql|postgres (optional; defaults to filesystem if empty)")
-		destDSN = fs.String("dest-dsn", "", "Destination DSN for mysql/postgres (ignored for sqlite)")
-		dbDebug = fs.Bool("db-debug", false, "Enable GORM debug logging for DB migration")
-		v       = fs.Bool("v", false, "Verbose logging")
+		src     string
+		dst     string
+		typeID  string
+		destDB  string
+		destDSN string
+		dbDebug bool
+		verbose bool
 	)
+	// --source / -s
+	fs.StringVar(&src, "source", "", "Path to legacy public key storage directory")
+	fs.StringVar(&src, "s", "", "Path to legacy public key storage directory (shorthand)")
+	// --dest / -d
+	fs.StringVar(&dst, "dest", "", "Destination for migrated public key storage (dir for fs, or DB file for sqlite)")
+	fs.StringVar(&dst, "d", "", "Destination for migrated public key storage (shorthand)")
+	// --type / -t
+	fs.StringVar(&typeID, "type", "federation", "Key type identifier (e.g., 'federation')")
+	fs.StringVar(&typeID, "t", "federation", "Key type identifier (shorthand)")
+	// --db-type
+	fs.StringVar(&destDB, "db-type", "", "Destination database type: sqlite|mysql|postgres (optional; defaults to filesystem if empty)")
+	// --db-dsn
+	fs.StringVar(&destDSN, "db-dsn", "", "Destination DSN for mysql/postgres (ignored for sqlite)")
+	// --db-debug
+	fs.BoolVar(&dbDebug, "db-debug", false, "Enable GORM debug logging for DB migration")
+	// --verbose / -v
+	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
+
 	fs.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys public -src <legacy_dir> -dst <dest> -type <typeID> [--dest-db=<sqlite|mysql|postgres>] [--dest-dsn=<dsn>] [--db-debug]\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys public --source <legacy_dir> --dest <dest> --type <typeID> [--db-type=<sqlite|mysql|postgres>] [--db-dsn=<dsn>] [--db-debug]\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *v {
+	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
-	if *src == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "-src is required")
+	if src == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "--source is required")
 		fs.Usage()
 		return 2
 	}
-	if *dst == "" {
-		*dst = *src
+	if dst == "" {
+		dst = src
 	}
-	if *typeID == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "-type is required")
+	if typeID == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "--type is required")
 		fs.Usage()
 		return 2
 	}
 	log.WithFields(
 		log.Fields{
-			"src":  *src,
-			"dst":  *dst,
-			"type": *typeID,
+			"source": src,
+			"dest":   dst,
+			"type":   typeID,
 		},
 	).Info("migrating public key storage")
 
 	// Build source legacy storage wrapper
 	legacy := &public.LegacyPublicKeyStorage{
-		Dir:    *src,
-		TypeID: *typeID,
+		Dir:    src,
+		TypeID: typeID,
 	}
 	if err := legacy.Load(); err != nil {
 		log.WithError(err).Error("failed to load legacy public key storage")
@@ -83,16 +99,16 @@ func publicCmd(args []string) int {
 	}
 
 	// Destination selection: filesystem (default) or DB
-	if strings.TrimSpace(*destDB) == "" {
+	if strings.TrimSpace(destDB) == "" {
 		// Filesystem destination
-		if _, err := public.NewFilesystemPublicKeyStorageFromStorage(*dst, *typeID, legacy); err != nil {
+		if _, err := public.NewFilesystemPublicKeyStorageFromStorage(dst, typeID, legacy); err != nil {
 			log.WithError(err).Error("public key migration failed")
 			return 1
 		}
 	} else {
 		// Database destination
 		var driver storage.DriverType
-		switch strings.ToLower(strings.TrimSpace(*destDB)) {
+		switch strings.ToLower(strings.TrimSpace(destDB)) {
 		case string(storage.DriverSQLite):
 			driver = storage.DriverSQLite
 		case string(storage.DriverMySQL):
@@ -100,16 +116,16 @@ func publicCmd(args []string) int {
 		case string(storage.DriverPostgres):
 			driver = storage.DriverPostgres
 		default:
-			_, _ = fmt.Fprintf(os.Stderr, "invalid --dest-db: %s\n", *destDB)
+			_, _ = fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", destDB)
 			return 2
 		}
-		cfg := storage.Config{Driver: driver, DSN: *destDSN, DataDir: *dst, Debug: *dbDebug}
+		cfg := storage.Config{Driver: driver, DSN: destDSN, DataDir: dst, Debug: dbDebug}
 		db, err := storage.Connect(cfg)
 		if err != nil {
 			log.WithError(err).Error("failed to connect to destination database")
 			return 1
 		}
-		if _, err = storage.NewDBPublicKeyStorageFromStorage(db, *typeID, legacy); err != nil {
+		if _, err = storage.NewDBPublicKeyStorageFromStorage(db, typeID, legacy); err != nil {
 			log.WithError(err).Error("public key migration to DB failed")
 			return 1
 		}
@@ -141,70 +157,93 @@ func parseAlgs(list string) ([]jwa.SignatureAlgorithm, error) {
 func kmsCmd(args []string) int {
 	fs := flag.NewFlagSet("kms", flag.ExitOnError)
 	var (
-		src      = fs.String("src", "", "Path to legacy key files directory (containing <type>_<alg>.pem)")
-		dst      = fs.String("dst", "", "Destination directory for filesystem KMS and public storage")
-		typeID   = fs.String("type", "federation", "Key type identifier (e.g., 'federation')")
-		algsStr  = fs.String("algs", "", "Comma-separated list of algorithms to migrate (e.g., ES256,RS256)")
-		defAlg   = fs.String("default", "", "Default algorithm (optional)")
-		generate = fs.Bool("generate-missing", false, "Generate missing keys in destination if not present")
-		rsaLen   = fs.Int("rsa-len", 4096, "RSA key length when generating (if enabled)")
-		v        = fs.Bool("v", false, "Verbose logging")
+		src      string
+		dst      string
+		typeID   string
+		algsStr  string
+		defAlg   string
+		generate bool
+		rsaLen   int
+		verbose  bool
 	)
+	// --source / -s
+	fs.StringVar(&src, "source", "", "Path to legacy key files directory (containing <type>_<alg>.pem)")
+	fs.StringVar(&src, "s", "", "Path to legacy key files directory (shorthand)")
+	// --dest / -d
+	fs.StringVar(&dst, "dest", "", "Destination directory for filesystem KMS and public storage")
+	fs.StringVar(&dst, "d", "", "Destination directory (shorthand)")
+	// --type / -t
+	fs.StringVar(&typeID, "type", "federation", "Key type identifier (e.g., 'federation')")
+	fs.StringVar(&typeID, "t", "federation", "Key type identifier (shorthand)")
+	// --algs / -a
+	fs.StringVar(&algsStr, "algs", "", "Comma-separated list of algorithms to migrate (e.g., ES256,RS256)")
+	fs.StringVar(&algsStr, "a", "", "Comma-separated list of algorithms (shorthand)")
+	// --default
+	fs.StringVar(&defAlg, "default", "", "Default algorithm (optional)")
+	// --generate-missing / -g
+	fs.BoolVar(&generate, "generate-missing", false, "Generate missing keys in destination if not present")
+	fs.BoolVar(&generate, "g", false, "Generate missing keys (shorthand)")
+	// --rsa-len
+	fs.IntVar(&rsaLen, "rsa-len", 4096, "RSA key length when generating (if enabled)")
+	// --verbose / -v
+	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
+
 	fs.Usage = func() {
 		_, _ = fmt.Fprintf(
-			os.Stderr, "Usage: lhmigrate keys kms -src <legacy_dir> -dst <dest_dir> -type <typeID> -algs <list> [options]\n",
+			os.Stderr, "Usage: lhmigrate keys kms --source <legacy_dir> --dest <dest_dir> --type <typeID> --algs <list> [options]\n",
 		)
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *v {
+	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
-	if *src == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "-src is required")
+	if src == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "--source is required")
 		fs.Usage()
 		return 2
 	}
-	if *dst == "" {
-		*dst = *src
+	if dst == "" {
+		dst = src
 	}
-	if *typeID == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "-type is required")
+	if typeID == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "--type is required")
 		fs.Usage()
 		return 2
 	}
-	algs, err := parseAlgs(*algsStr)
+	algs, err := parseAlgs(algsStr)
 	if err != nil || len(algs) == 0 {
-		_, _ = fmt.Fprintln(os.Stderr, "-algs is required and must be a comma-separated list (e.g., ES256,RS256)")
+		_, _ = fmt.Fprintln(os.Stderr, "--algs is required and must be a comma-separated list (e.g., ES256,RS256)")
 		fs.Usage()
 		return 2
 	}
 	var defaultAlg jwa.SignatureAlgorithm
-	if a := strings.TrimSpace(*defAlg); a != "" {
+	if a := strings.TrimSpace(defAlg); a != "" {
 		alg, found := jwa.LookupSignatureAlgorithm(a)
 		if !found {
-			_, _ = fmt.Fprintf(os.Stderr, "invalid -default algorithm: %s\n", a)
+			_, _ = fmt.Fprintf(os.Stderr, "invalid --default algorithm: %s\n", a)
 			return 2
 		}
 		defaultAlg = alg
 	}
 	log.WithFields(
 		log.Fields{
-			"src":      *src,
-			"dst":      *dst,
-			"type":     *typeID,
-			"algs":     *algsStr,
+			"source":   src,
+			"dest":     dst,
+			"type":     typeID,
+			"algs":     algsStr,
 			"default":  defaultAlg.String(),
-			"generate": *generate,
+			"generate": generate,
 		},
 	).Info("migrating KMS")
 
 	// Prepare legacy KMS source
 	legacyKMS := &kms.LegacyFilesystemKMS{
-		Dir:    *src,
-		TypeID: *typeID,
+		Dir:    src,
+		TypeID: typeID,
 		Algs:   algs,
 	}
 	if err = legacyKMS.Load(); err != nil {
@@ -214,9 +253,9 @@ func kmsCmd(args []string) int {
 
 	// Prepare destination public key storage (migrated from legacy public store at src)
 	dstPKS, err := public.NewFilesystemPublicKeyStorageFromStorage(
-		*dst, *typeID, &public.LegacyPublicKeyStorage{
-			Dir:    *src,
-			TypeID: *typeID,
+		dst, typeID, &public.LegacyPublicKeyStorage{
+			Dir:    src,
+			TypeID: typeID,
 		},
 	)
 	if err != nil {
@@ -227,14 +266,14 @@ func kmsCmd(args []string) int {
 	// Configure destination filesystem KMS
 	cfg := kms.FilesystemKMSConfig{
 		KMSConfig: kms.KMSConfig{
-			GenerateKeys: *generate,
+			GenerateKeys: generate,
 			Algs:         algs,
 			DefaultAlg:   defaultAlg,
-			RSAKeyLen:    *rsaLen,
+			RSAKeyLen:    rsaLen,
 			// KeyRotation not needed for migration
 		},
-		Dir:    *dst,
-		TypeID: *typeID,
+		Dir:    dst,
+		TypeID: typeID,
 	}
 
 	if _, err = kms.NewFilesystemKMSFromBasic(legacyKMS, cfg, dstPKS); err != nil {

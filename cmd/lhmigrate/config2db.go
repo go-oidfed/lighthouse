@@ -23,19 +23,44 @@ import (
 func config2dbCmd(args []string) int {
 	fs := flag.NewFlagSet("config2db", flag.ExitOnError)
 	var (
-		configFile = fs.String("config", "", "Path to config file to migrate (required)")
-		dbDriver   = fs.String("db-driver", "sqlite", "Database driver: sqlite|mysql|postgres")
-		dbDSN      = fs.String("db-dsn", "", "Database DSN (for mysql/postgres)")
-		dbDir      = fs.String("db-dir", "", "Data directory (for sqlite)")
-		dbDebug    = fs.Bool("db-debug", false, "Enable GORM debug logging")
-		force      = fs.Bool("force", false, "Overwrite existing values in DB")
-		dryRun     = fs.Bool("dry-run", false, "Show what would be written without actually writing")
-		only       = fs.String("only", "", "Comma-separated list of sections to migrate (default: all)")
-		skip       = fs.String("skip", "", "Comma-separated list of sections to skip")
-		validate   = fs.Bool("validate", true, "Validate config values before migration")
-		v          = fs.Bool("v", false, "Verbose logging")
+		configFile string
+		dbType     string
+		dbDSN      string
+		dbDir      string
+		dbDebug    bool
+		force      bool
+		dryRun     bool
+		only       string
+		skip       string
+		validate   bool
+		verbose    bool
 	)
-	fs.StringVar(configFile, "c", "", "Path to config file to migrate (shorthand)")
+	// --config / -c
+	fs.StringVar(&configFile, "config", "", "Path to config file to migrate (required)")
+	fs.StringVar(&configFile, "c", "", "Path to config file to migrate (shorthand)")
+	// --db-type
+	fs.StringVar(&dbType, "db-type", "sqlite", "Database type: sqlite|mysql|postgres")
+	// --db-dsn
+	fs.StringVar(&dbDSN, "db-dsn", "", "Database DSN (for mysql/postgres)")
+	// --db-dir
+	fs.StringVar(&dbDir, "db-dir", "", "Data directory (for sqlite)")
+	// --db-debug
+	fs.BoolVar(&dbDebug, "db-debug", false, "Enable GORM debug logging")
+	// --force / -f
+	fs.BoolVar(&force, "force", false, "Overwrite existing values in DB")
+	fs.BoolVar(&force, "f", false, "Overwrite existing values (shorthand)")
+	// --dry-run / -n
+	fs.BoolVar(&dryRun, "dry-run", false, "Show what would be written without actually writing")
+	fs.BoolVar(&dryRun, "n", false, "Dry run mode (shorthand)")
+	// --only
+	fs.StringVar(&only, "only", "", "Comma-separated list of sections to migrate (default: all)")
+	// --skip
+	fs.StringVar(&skip, "skip", "", "Comma-separated list of sections to skip")
+	// --validate
+	fs.BoolVar(&validate, "validate", true, "Validate config values before migration")
+	// --verbose / -v
+	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: lhmigrate config2db --config=<config.yaml> [options]\n\n")
@@ -60,34 +85,34 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  # Migrate all config values to SQLite\n")
 		fmt.Fprintf(os.Stderr, "  lhmigrate config2db --config=config.yaml --db-dir=/data/lighthouse\n\n")
 		fmt.Fprintf(os.Stderr, "  # Migrate only signing options with force\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config2db -c config.yaml --db-dir=/data --only=alg,rsa_key_len,key_rotation --force\n\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config2db -c config.yaml --db-dir=/data --only=alg,rsa_key_len,key_rotation -f\n\n")
 		fmt.Fprintf(os.Stderr, "  # Dry run to see what would be migrated\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config2db -c config.yaml --db-dir=/data --dry-run -v\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config2db -c config.yaml --db-dir=/data -n -v\n")
 	}
 
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
-	if *v {
+	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
 
 	// Validate required flags
-	if *configFile == "" {
+	if configFile == "" {
 		fmt.Fprintln(os.Stderr, "--config is required")
 		fs.Usage()
 		return 2
 	}
 
 	// Parse sections
-	sections, err := parseSections(*only)
+	sections, err := parseSections(only)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "invalid --only: %s\n", err)
 		return 2
 	}
 
-	skipSections, err := parseSkipSections(*skip)
+	skipSections, err := parseSkipSections(skip)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "invalid --skip: %s\n", err)
 		return 2
@@ -110,14 +135,14 @@ func config2dbCmd(args []string) int {
 	}
 
 	// Load config file
-	config, err := loadMigrationConfig(*configFile)
+	config, err := loadMigrationConfig(configFile)
 	if err != nil {
 		log.WithError(err).Error("failed to load config file")
 		return 1
 	}
 
 	// Validate config if requested
-	if *validate {
+	if validate {
 		if err := validateMigrationConfig(config, sections); err != nil {
 			log.WithError(err).Error("config validation failed")
 			return 1
@@ -126,7 +151,7 @@ func config2dbCmd(args []string) int {
 
 	// Connect to database
 	var driver storage.DriverType
-	switch strings.ToLower(*dbDriver) {
+	switch strings.ToLower(dbType) {
 	case string(storage.DriverSQLite):
 		driver = storage.DriverSQLite
 	case string(storage.DriverMySQL):
@@ -134,29 +159,29 @@ func config2dbCmd(args []string) int {
 	case string(storage.DriverPostgres):
 		driver = storage.DriverPostgres
 	default:
-		fmt.Fprintf(os.Stderr, "invalid --db-driver: %s\n", *dbDriver)
+		fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", dbType)
 		return 2
 	}
 
-	if driver == storage.DriverSQLite && *dbDir == "" {
+	if driver == storage.DriverSQLite && dbDir == "" {
 		fmt.Fprintln(os.Stderr, "--db-dir is required for sqlite")
 		return 2
 	}
 
-	if (driver == storage.DriverMySQL || driver == storage.DriverPostgres) && *dbDSN == "" {
+	if (driver == storage.DriverMySQL || driver == storage.DriverPostgres) && dbDSN == "" {
 		fmt.Fprintln(os.Stderr, "--db-dsn is required for mysql/postgres")
 		return 2
 	}
 
-	if *dryRun {
+	if dryRun {
 		log.Info("DRY RUN - no changes will be made")
 	}
 
 	cfg := storage.Config{
 		Driver:  driver,
-		DSN:     *dbDSN,
-		DataDir: *dbDir,
-		Debug:   *dbDebug,
+		DSN:     dbDSN,
+		DataDir: dbDir,
+		Debug:   dbDebug,
 	}
 
 	backs, err := storage.LoadStorageBackends(cfg)
@@ -170,8 +195,8 @@ func config2dbCmd(args []string) int {
 	migrator := &configMigrator{
 		config:   config,
 		backends: backs,
-		force:    *force,
-		dryRun:   *dryRun,
+		force:    force,
+		dryRun:   dryRun,
 		sections: sections,
 	}
 

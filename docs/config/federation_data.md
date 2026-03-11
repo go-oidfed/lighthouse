@@ -25,7 +25,7 @@ moved to top-level config or are now managed in the database.
 
 ```bash
 # Transform config file (moves entity_id to top level)
-lhmigrate config --in config.yaml --out config-new.yaml
+lhmigrate config --source config.yaml --dest config-new.yaml
 
 # Migrate federation_data values to database
 lhmigrate config2db --config=config-new.yaml --db-dir=/data

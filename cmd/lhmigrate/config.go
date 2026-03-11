@@ -24,20 +24,45 @@ type configTransformer struct {
 func runConfigMigration(args []string) int {
 	fs := flag.NewFlagSet("config", flag.ExitOnError)
 	var (
-		in           = fs.String("in", "", "Path to existing configuration file (required)")
-		out          = fs.String("out", "", "Path to write updated configuration (default: stdout)")
-		runConfig2db = fs.Bool("run-config2db", false, "Also run config2db migration after transformation")
-		dbDriver     = fs.String("db-driver", "sqlite", "Database driver for config2db: sqlite|mysql|postgres")
-		dbDSN        = fs.String("db-dsn", "", "Database DSN for config2db (for mysql/postgres)")
-		dbDir        = fs.String("db-dir", "", "Data directory for config2db (for sqlite)")
-		dbDebug      = fs.Bool("db-debug", false, "Enable GORM debug logging for config2db")
-		force        = fs.Bool("force", false, "Force overwrite in config2db")
-		dryRun       = fs.Bool("dry-run", false, "Preview only, don't make changes")
-		v            = fs.Bool("v", false, "Verbose logging")
+		source       string
+		dest         string
+		runConfig2db bool
+		dbType       string
+		dbDSN        string
+		dbDir        string
+		dbDebug      bool
+		force        bool
+		dryRun       bool
+		verbose      bool
 	)
+	// --source / -s
+	fs.StringVar(&source, "source", "", "Path to existing configuration file (required)")
+	fs.StringVar(&source, "s", "", "Path to existing configuration file (shorthand)")
+	// --dest / -d
+	fs.StringVar(&dest, "dest", "", "Path to write updated configuration (default: stdout)")
+	fs.StringVar(&dest, "d", "", "Path to write updated configuration (shorthand)")
+	// --run-config2db
+	fs.BoolVar(&runConfig2db, "run-config2db", false, "Also run config2db migration after transformation")
+	// --db-type
+	fs.StringVar(&dbType, "db-type", "sqlite", "Database type for config2db: sqlite|mysql|postgres")
+	// --db-dsn
+	fs.StringVar(&dbDSN, "db-dsn", "", "Database DSN for config2db (for mysql/postgres)")
+	// --db-dir
+	fs.StringVar(&dbDir, "db-dir", "", "Data directory for config2db (for sqlite)")
+	// --db-debug
+	fs.BoolVar(&dbDebug, "db-debug", false, "Enable GORM debug logging for config2db")
+	// --force / -f
+	fs.BoolVar(&force, "force", false, "Force overwrite in config2db")
+	fs.BoolVar(&force, "f", false, "Force overwrite (shorthand)")
+	// --dry-run / -n
+	fs.BoolVar(&dryRun, "dry-run", false, "Preview only, don't make changes")
+	fs.BoolVar(&dryRun, "n", false, "Preview only (shorthand)")
+	// --verbose / -v
+	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
 
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: lhmigrate config --in=<config.yaml> [--out=<updated.yaml>] [options]\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: lhmigrate config --source=<config.yaml> [--dest=<updated.yaml>] [options]\n\n")
 		fmt.Fprintf(os.Stderr, "Transform legacy configuration file to new format.\n\n")
 		fmt.Fprintf(os.Stderr, "This command reads an existing config file, removes deprecated fields,\n")
 		fmt.Fprintf(os.Stderr, "renames legacy options, and outputs a new config file compatible with\n")
@@ -59,89 +84,89 @@ func runConfigMigration(args []string) int {
 		fmt.Fprintf(os.Stderr, "  - federation_data.trust_mark_owners -> commented (now in database)\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  # Transform config and output to stdout\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config --in=old-config.yaml\n\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config --source=old-config.yaml\n\n")
 		fmt.Fprintf(os.Stderr, "  # Transform and write to new file\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config --in=old-config.yaml --out=new-config.yaml\n\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config -s old-config.yaml -d new-config.yaml\n\n")
 		fmt.Fprintf(os.Stderr, "  # Transform and also migrate values to database\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config --in=old-config.yaml --out=new-config.yaml --run-config2db --db-dir=/data\n\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config -s old-config.yaml -d new-config.yaml --run-config2db --db-dir=/data\n\n")
 		fmt.Fprintf(os.Stderr, "  # Dry run to preview changes\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate config --in=old-config.yaml --dry-run -v\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config -s old-config.yaml -n -v\n")
 	}
 
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
-	if *v {
+	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if *in == "" {
-		fmt.Fprintln(os.Stderr, "--in is required")
+	if source == "" {
+		fmt.Fprintln(os.Stderr, "--source is required")
 		fs.Usage()
 		return 2
 	}
 
 	// Build config2db args if needed
 	var config2dbArgs []string
-	if *runConfig2db {
-		config2dbArgs = []string{"--config=" + *in}
-		if *dbDriver != "" {
-			config2dbArgs = append(config2dbArgs, "--db-driver="+*dbDriver)
+	if runConfig2db {
+		config2dbArgs = []string{"--config=" + source}
+		if dbType != "" {
+			config2dbArgs = append(config2dbArgs, "--db-type="+dbType)
 		}
-		if *dbDSN != "" {
-			config2dbArgs = append(config2dbArgs, "--db-dsn="+*dbDSN)
+		if dbDSN != "" {
+			config2dbArgs = append(config2dbArgs, "--db-dsn="+dbDSN)
 		}
-		if *dbDir != "" {
-			config2dbArgs = append(config2dbArgs, "--db-dir="+*dbDir)
+		if dbDir != "" {
+			config2dbArgs = append(config2dbArgs, "--db-dir="+dbDir)
 		}
-		if *dbDebug {
+		if dbDebug {
 			config2dbArgs = append(config2dbArgs, "--db-debug")
 		}
-		if *force {
+		if force {
 			config2dbArgs = append(config2dbArgs, "--force")
 		}
-		if *dryRun {
+		if dryRun {
 			config2dbArgs = append(config2dbArgs, "--dry-run")
 		}
-		if *v {
+		if verbose {
 			config2dbArgs = append(config2dbArgs, "-v")
 		}
 	}
 
 	transformer := &configTransformer{
-		inputPath:     *in,
-		outputPath:    *out,
-		verbose:       *v,
-		runConfig2db:  *runConfig2db,
+		inputPath:     source,
+		outputPath:    dest,
+		verbose:       verbose,
+		runConfig2db:  runConfig2db,
 		config2dbArgs: config2dbArgs,
 	}
 
 	// Load and transform
-	result, err := transformer.transform(*dryRun)
+	result, err := transformer.transform(dryRun)
 	if err != nil {
 		log.WithError(err).Error("Config transformation failed")
 		return 1
 	}
 
 	// Output result
-	if *dryRun {
+	if dryRun {
 		fmt.Println("=== Dry Run: Transformed Config ===")
 		fmt.Println()
 	}
 
-	if *out != "" && !*dryRun {
-		if err := os.WriteFile(*out, []byte(result), 0644); err != nil {
+	if dest != "" && !dryRun {
+		if err := os.WriteFile(dest, []byte(result), 0644); err != nil {
 			log.WithError(err).Error("Failed to write output file")
 			return 1
 		}
-		log.WithField("path", *out).Info("Config file written")
+		log.WithField("path", dest).Info("Config file written")
 	} else {
 		fmt.Println(result)
 	}
 
 	// Run config2db if requested
-	if *runConfig2db {
+	if runConfig2db {
 		fmt.Println()
 		fmt.Println("=== Running config2db migration ===")
 		fmt.Println()
@@ -151,7 +176,7 @@ func runConfigMigration(args []string) int {
 		}
 	}
 
-	if !*dryRun {
+	if !dryRun {
 		log.Info("Config transformation completed successfully")
 	}
 	return 0

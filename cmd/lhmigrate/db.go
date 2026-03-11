@@ -456,21 +456,48 @@ func isNotFoundError(err error) bool {
 func runDBMigration(args []string) int {
 	fs := flag.NewFlagSet("db", flag.ExitOnError)
 	var (
-		srcType  = fs.String("source-type", "", "Source storage type: json|badger")
-		srcDir   = fs.String("source-dir", "", "Source data directory")
-		destType = fs.String("dest-type", "sqlite", "Destination database type: sqlite|mysql|postgres")
-		destDir  = fs.String("dest-dir", "", "Destination data directory (for sqlite)")
-		destDSN  = fs.String("dest-dsn", "", "Destination DSN (for mysql/postgres)")
-		dbDebug  = fs.Bool("db-debug", false, "Enable GORM debug logging")
-		force    = fs.Bool("force", false, "Overwrite existing records")
-		dryRun   = fs.Bool("dry-run", false, "Preview only, don't make changes")
-		only     = fs.String("only", "", "Comma-separated list of sections to migrate (default: all)")
-		skip     = fs.String("skip", "", "Comma-separated list of sections to skip")
-		v        = fs.Bool("v", false, "Verbose logging")
+		srcType string
+		srcDir  string
+		dbType  string
+		destDir string
+		dbDSN   string
+		dbDebug bool
+		force   bool
+		dryRun  bool
+		only    string
+		skip    string
+		verbose bool
 	)
+	// --source-type
+	fs.StringVar(&srcType, "source-type", "", "Source storage type: json|badger")
+	// --source / -s
+	fs.StringVar(&srcDir, "source", "", "Source data directory")
+	fs.StringVar(&srcDir, "s", "", "Source data directory (shorthand)")
+	// --db-type
+	fs.StringVar(&dbType, "db-type", "sqlite", "Destination database type: sqlite|mysql|postgres")
+	// --dest / -d
+	fs.StringVar(&destDir, "dest", "", "Destination data directory (for sqlite)")
+	fs.StringVar(&destDir, "d", "", "Destination data directory (shorthand)")
+	// --db-dsn
+	fs.StringVar(&dbDSN, "db-dsn", "", "Destination DSN (for mysql/postgres)")
+	// --db-debug
+	fs.BoolVar(&dbDebug, "db-debug", false, "Enable GORM debug logging")
+	// --force / -f
+	fs.BoolVar(&force, "force", false, "Overwrite existing records")
+	fs.BoolVar(&force, "f", false, "Overwrite existing records (shorthand)")
+	// --dry-run / -n
+	fs.BoolVar(&dryRun, "dry-run", false, "Preview only, don't make changes")
+	fs.BoolVar(&dryRun, "n", false, "Preview only (shorthand)")
+	// --only
+	fs.StringVar(&only, "only", "", "Comma-separated list of sections to migrate (default: all)")
+	// --skip
+	fs.StringVar(&skip, "skip", "", "Comma-separated list of sections to skip")
+	// --verbose / -v
+	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
 
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: lhmigrate db --source-type=<json|badger> --source-dir=<dir> --dest-type=<sqlite|mysql|postgres> [options]\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: lhmigrate db --source-type=<json|badger> --source=<dir> --db-type=<sqlite|mysql|postgres> [options]\n\n")
 		fmt.Fprintf(os.Stderr, "Migrate legacy storage data to GORM-based database.\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fs.PrintDefaults()
@@ -479,41 +506,41 @@ func runDBMigration(args []string) int {
 		fmt.Fprintf(os.Stderr, "  trust_marked_entities - Trust mark subject eligibility status\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  # Migrate JSON file storage to SQLite\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate db --source-type=json --source-dir=/old/data --dest-type=sqlite --dest-dir=/new/data\n\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate db --source-type=json --source=/old/data --db-type=sqlite --dest=/new/data\n\n")
 		fmt.Fprintf(os.Stderr, "  # Migrate BadgerDB to PostgreSQL\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate db --source-type=badger --source-dir=/old/badger --dest-type=postgres \\\n")
-		fmt.Fprintf(os.Stderr, "    --dest-dsn='host=localhost user=lh password=secret dbname=lighthouse'\n\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate db --source-type=badger -s /old/badger --db-type=postgres \\\n")
+		fmt.Fprintf(os.Stderr, "    --db-dsn='host=localhost user=lh password=secret dbname=lighthouse'\n\n")
 		fmt.Fprintf(os.Stderr, "  # Dry run to preview migration\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate db --source-type=json --source-dir=/old/data --dest-dir=/new/data --dry-run -v\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate db --source-type=json -s /old/data -d /new/data -n -v\n")
 	}
 
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
-	if *v {
+	if verbose {
 		log.SetLevel(log.DebugLevel)
 	}
 
 	// Validate required flags
-	if *srcType == "" {
+	if srcType == "" {
 		fmt.Fprintln(os.Stderr, "--source-type is required")
 		fs.Usage()
 		return 2
 	}
-	if *srcType != "json" && *srcType != "badger" {
-		fmt.Fprintf(os.Stderr, "invalid --source-type: %s (must be json or badger)\n", *srcType)
+	if srcType != "json" && srcType != "badger" {
+		fmt.Fprintf(os.Stderr, "invalid --source-type: %s (must be json or badger)\n", srcType)
 		return 2
 	}
-	if *srcDir == "" {
-		fmt.Fprintln(os.Stderr, "--source-dir is required")
+	if srcDir == "" {
+		fmt.Fprintln(os.Stderr, "--source is required")
 		fs.Usage()
 		return 2
 	}
 
 	// Parse destination database type
 	var driver storage.DriverType
-	switch strings.ToLower(*destType) {
+	switch strings.ToLower(dbType) {
 	case string(storage.DriverSQLite):
 		driver = storage.DriverSQLite
 	case string(storage.DriverMySQL):
@@ -521,29 +548,29 @@ func runDBMigration(args []string) int {
 	case string(storage.DriverPostgres):
 		driver = storage.DriverPostgres
 	default:
-		fmt.Fprintf(os.Stderr, "invalid --dest-type: %s\n", *destType)
+		fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", dbType)
 		return 2
 	}
 
-	if driver == storage.DriverSQLite && *destDir == "" {
-		fmt.Fprintln(os.Stderr, "--dest-dir is required for sqlite")
+	if driver == storage.DriverSQLite && destDir == "" {
+		fmt.Fprintln(os.Stderr, "--dest is required for sqlite")
 		return 2
 	}
-	if (driver == storage.DriverMySQL || driver == storage.DriverPostgres) && *destDSN == "" {
-		fmt.Fprintln(os.Stderr, "--dest-dsn is required for mysql/postgres")
+	if (driver == storage.DriverMySQL || driver == storage.DriverPostgres) && dbDSN == "" {
+		fmt.Fprintln(os.Stderr, "--db-dsn is required for mysql/postgres")
 		return 2
 	}
 
 	// Parse sections
-	sections, err := parseDBSections(*only)
+	sections, err := parseDBSections(only)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "invalid --only: %s\n", err)
 		return 2
 	}
 
 	// Parse skip sections
-	if *skip != "" {
-		skipSections, err := parseDBSections(*skip)
+	if skip != "" {
+		skipSections, err := parseDBSections(skip)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid --skip: %s\n", err)
 			return 2
@@ -566,16 +593,16 @@ func runDBMigration(args []string) int {
 		return 2
 	}
 
-	if *dryRun {
+	if dryRun {
 		log.Info("DRY RUN - no changes will be made")
 	}
 
 	// Connect to destination database
 	cfg := storage.Config{
 		Driver:  driver,
-		DSN:     *destDSN,
-		DataDir: *destDir,
-		Debug:   *dbDebug,
+		DSN:     dbDSN,
+		DataDir: destDir,
+		Debug:   dbDebug,
 	}
 
 	backends, err := storage.LoadStorageBackends(cfg)
@@ -587,12 +614,12 @@ func runDBMigration(args []string) int {
 
 	// Create migrator and run
 	migrator := &dbMigrator{
-		sourceType: *srcType,
-		sourceDir:  *srcDir,
+		sourceType: srcType,
+		sourceDir:  srcDir,
 		backends:   backends,
-		force:      *force,
-		dryRun:     *dryRun,
-		verbose:    *v,
+		force:      force,
+		dryRun:     dryRun,
+		verbose:    verbose,
 		sections:   sections,
 	}
 

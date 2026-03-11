@@ -208,7 +208,7 @@ The entity ID is typically the base URL where your federation endpoints are serv
 !!! note "Moved from federation_data"
     
     This option was previously located at `federation_data.entity_id`. It has been moved to 
-    a top-level configuration option. Use [`lhmigrate config`](../migration.md#config-file-transformation-config) 
+    a top-level configuration option. Use [`lhmigrate config`](../migration.md#config-migration) 
     to automatically update your config file.
 
 ## Configuration Sections
