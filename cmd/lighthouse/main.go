@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
+	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 
@@ -57,6 +58,19 @@ func main() {
 	)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// Warn about SQLite + Prefork combination
+	if c.Server.Prefork && c.Storage.Driver == "sqlite" {
+		log.Warn("Using SQLite with prefork enabled may cause write conflicts. " +
+			"Consider using MySQL or PostgreSQL for production deployments with prefork.")
+	}
+
+	// Warn about prefork without Redis cache
+	if c.Server.Prefork && c.Caching.RedisAddr == "" && !c.Caching.Disabled {
+		log.Warn("Prefork is enabled without Redis cache. In-memory caches will be process-local " +
+			"and may lead to inconsistencies. It is strongly recommended to configure Redis " +
+			"for caching when using prefork mode.")
 	}
 
 	signingConf := c.Signing
@@ -155,7 +169,11 @@ func main() {
 				Concurrency: endpoint.ProactiveResolver.ConcurrencyLimit,
 				QueueSize:   endpoint.ProactiveResolver.QueueSize,
 			}
-			proactiveResolver.Start()
+			// In prefork mode, only start background resolver in parent process
+			// to avoid duplicate resolution work across child processes
+			if !fiber.IsChild() {
+				proactiveResolver.Start()
+			}
 		}
 		lh.AddResolveEndpoint(endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver)
 	}
@@ -227,7 +245,11 @@ func main() {
 			if proactiveResolver != nil {
 				pec.Handler = proactiveResolver
 			}
-			pec.Start()
+			// In prefork mode, only start background collector in parent process
+			// to avoid duplicate collection work across child processes
+			if !fiber.IsChild() {
+				pec.Start()
+			}
 			collector = pec
 		}
 		lh.AddEntityCollectionEndpoint(

@@ -149,6 +149,10 @@ func NewLightHouse(
 		// otherwise Fiber's c.IP() may return empty for direct connections
 		FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	}
+	// Enable prefork mode if configured
+	if serverConf.Prefork {
+		FiberServerConfig.Prefork = true
+	}
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
 	server.Use(compress.New())
@@ -376,12 +380,15 @@ func (fed *LightHouse) Start() {
 	fed.banner()
 
 	// Start stats collector if enabled
-	if fed.statsCollector != nil {
+	// In prefork mode, only start in parent process to avoid duplicate stats
+	if fed.statsCollector != nil && !fiber.IsChild() {
 		fed.statsCollector.Start()
 	}
 
 	conf := fed.serverConf
-	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
+	// Admin API server should only run in parent process when prefork is enabled
+	// to avoid multiple processes binding to the same admin port
+	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server && !fiber.IsChild() {
 		log.WithField("port", conf.AdminAPIPort).Info("starting admin api server")
 		go func() {
 			log.WithError(fed.adminAPIServer.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort))).Fatal()
@@ -390,9 +397,11 @@ func (fed *LightHouse) Start() {
 	if !conf.TLS.Enabled {
 		log.WithField("port", conf.Port).Info("TLS is disabled starting http server")
 		log.WithError(fed.server.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.Port))).Fatal()
+		return
 	}
 	// TLS enabled
-	if conf.TLS.RedirectHTTP {
+	if conf.TLS.RedirectHTTP && !fiber.IsChild() {
+		// HTTP redirect server only needs to run in one process
 		httpServer := fiber.New(FiberServerConfig)
 		httpServer.All(
 			"*", func(ctx *fiber.Ctx) error {

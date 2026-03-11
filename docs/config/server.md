@@ -38,6 +38,66 @@ If `tls` is enabled port `443` will be used (and optionally port `80`).
         port: 4242
     ```
 
+## `prefork`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_PREFORK`</span>
+
+The `prefork` option enables multiple processes listening on the same port.
+When enabled, LightHouse spawns multiple child processes to distribute 
+incoming connections across CPU cores for improved performance.
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        prefork: true
+    ```
+
+!!! warning "Requirements and Recommendations"
+
+    **We recommend to not enable prefork mode.**
+
+    If you still want to use prefork mode, consider the following:
+
+    **Strongly recommended: Use Redis for caching**
+    
+    In prefork mode, each child process has its own in-memory caches 
+    (eligibility cache, issued trust mark cache, etc.). This means cache 
+    invalidations via the Admin API only affect the process that receives 
+    the request. To ensure cache consistency across all processes, it is 
+    **strongly recommended** to configure Redis for caching:
+
+    ```yaml
+    cache:
+        redis_addr: "localhost:6379"
+    ```
+
+    **Database recommendations**
+    
+    - **SQLite**: Not recommended with prefork. Multiple processes writing 
+      to SQLite may cause write conflicts.
+    - **MySQL/PostgreSQL**: Recommended for production deployments with 
+      prefork enabled.
+
+    **Background tasks**
+    
+    Background tasks like the proactive resolver and periodic entity 
+    collector run only in the parent process to avoid duplicate work.
+
+    **Admin API**
+    
+    The Admin API server runs only in the parent process when prefork is 
+    enabled.
+
+!!! note "Running in Docker"
+
+    When using prefork with Docker, ensure the application is started with 
+    a shell. Use `CMD ./lighthouse` or `CMD ["sh", "-c", "/lighthouse"]` 
+    instead of `CMD ["/lighthouse"]` as prefork mode sets environment 
+    variables.
+
 ## `tls`
 
 Under the `tls` config option settings related to `tls` can be configured.
