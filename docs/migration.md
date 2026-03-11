@@ -278,12 +278,21 @@ The following fields are now managed in the database via the Admin API or `lhmig
 | `federation_data.authority_hints` | `authority_hints` | List of authority hint entity IDs |
 | `federation_data.federation_entity_metadata` | `metadata` | Federation entity metadata (name, contacts, etc.) |
 | `federation_data.constraints` | `constraints` | Subordinate statement constraints |
-| `federation_data.metadata_policy_crit` | `metadata_crit` | Critical metadata policy operators |
+| `federation_data.metadata_policy_crit` | `metadata_policy_crit` | Critical metadata policy operators |
+| `federation_data.metadata_policy_file` | `metadata_policies` | Metadata policies (loaded from JSON file) |
 | `federation_data.configuration_lifetime` | `config_lifetime` | Entity configuration JWT lifetime |
 | `endpoints.fetch.statement_lifetime` | `statement_lifetime` | Subordinate statement JWT lifetime |
 | `federation_data.trust_mark_issuers` | `trust_mark_issuers` | Allowed trust mark issuers per type |
 | `federation_data.trust_mark_owners` | `trust_mark_owners` | Trust mark owners per type |
 | `endpoints.trust_mark.trust_mark_specs` | `trust_mark_specs` | Trust mark issuance specifications |
+
+### Fields NOT migrated
+
+The following configuration fields are **not** migrated by `config2db`:
+
+| Config Path | Reason |
+|-------------|--------|
+| `federation_data.crit` | The `crit` attribute was used to mark critical claims in subordinate entity statements. This functionality has been replaced: additional claims can now be added to entity statements via the Admin API (`POST /admin/api/v1/subordinates/{id}/additional-claims`), and each claim can be individually marked as critical. Since the old config only specified which claims were critical but not the claim values themselves, there is nothing to migrate. |
 
 ### Fields that remain in config
 
@@ -370,6 +379,7 @@ The `config2db` subcommand migrates configuration file values directly to the da
 - `key_rotation` - Key rotation configuration
 - `constraints` - Subordinate statement constraints
 - `metadata_crit` - Metadata policy crit operators
+- `metadata_policies` - Metadata policies
 - `config_lifetime` - Entity configuration lifetime
 - `statement_lifetime` - Subordinate statement lifetime
 - `authority_hints` - Authority hints

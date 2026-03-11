@@ -143,21 +143,21 @@ type migrationCheckerConfig struct {
 type migrationSection string
 
 const (
-	sectionSigning           migrationSection = "signing"
-	sectionFederation        migrationSection = "federation"
-	sectionTrustMarkSpecs    migrationSection = "trust_mark_specs"
-	sectionAuthorityHints    migrationSection = "authority_hints"
-	sectionMetadata          migrationSection = "metadata"
-	sectionConstraints       migrationSection = "constraints"
-	sectionMetadataCrit      migrationSection = "metadata_crit"
-	sectionMetadataPolicies  migrationSection = "metadata_policies"
-	sectionConfigLifetime    migrationSection = "config_lifetime"
-	sectionStatementLifetime migrationSection = "statement_lifetime"
-	sectionAlg               migrationSection = "alg"
-	sectionRSAKeyLen         migrationSection = "rsa_key_len"
-	sectionKeyRotation       migrationSection = "key_rotation"
-	sectionTrustMarkIssuers  migrationSection = "trust_mark_issuers"
-	sectionTrustMarkOwners   migrationSection = "trust_mark_owners"
+	sectionSigning            migrationSection = "signing"
+	sectionFederation         migrationSection = "federation"
+	sectionTrustMarkSpecs     migrationSection = "trust_mark_specs"
+	sectionAuthorityHints     migrationSection = "authority_hints"
+	sectionMetadata           migrationSection = "metadata"
+	sectionConstraints        migrationSection = "constraints"
+	sectionMetadataPolicyCrit migrationSection = "metadata_policy_crit"
+	sectionMetadataPolicies   migrationSection = "metadata_policies"
+	sectionConfigLifetime     migrationSection = "config_lifetime"
+	sectionStatementLifetime  migrationSection = "statement_lifetime"
+	sectionAlg                migrationSection = "alg"
+	sectionRSAKeyLen          migrationSection = "rsa_key_len"
+	sectionKeyRotation        migrationSection = "key_rotation"
+	sectionTrustMarkIssuers   migrationSection = "trust_mark_issuers"
+	sectionTrustMarkOwners    migrationSection = "trust_mark_owners"
 )
 
 // allSections returns all available migration sections
@@ -167,7 +167,7 @@ func allSections() []migrationSection {
 		sectionRSAKeyLen,
 		sectionKeyRotation,
 		sectionConstraints,
-		sectionMetadataCrit,
+		sectionMetadataPolicyCrit,
 		sectionMetadataPolicies,
 		sectionConfigLifetime,
 		sectionStatementLifetime,

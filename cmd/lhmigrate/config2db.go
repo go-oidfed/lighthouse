@@ -72,7 +72,7 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  rsa_key_len        - RSA key length (signing.rsa_key_len)\n")
 		fmt.Fprintf(os.Stderr, "  key_rotation       - Key rotation config (signing.key_rotation)\n")
 		fmt.Fprintf(os.Stderr, "  constraints        - Subordinate statement constraints (federation_data.constraints)\n")
-		fmt.Fprintf(os.Stderr, "  metadata_crit      - Metadata policy crit operators (federation_data.metadata_policy_crit)\n")
+		fmt.Fprintf(os.Stderr, "  metadata_policy_crit - Metadata policy crit operators (federation_data.metadata_policy_crit)\n")
 		fmt.Fprintf(os.Stderr, "  metadata_policies  - Metadata policies (federation_data.metadata_policy_file)\n")
 		fmt.Fprintf(os.Stderr, "  config_lifetime    - Entity configuration lifetime (federation_data.configuration_lifetime)\n")
 		fmt.Fprintf(os.Stderr, "  statement_lifetime - Subordinate statement lifetime (endpoints.fetch.statement_lifetime)\n")
@@ -299,7 +299,7 @@ func (m *configMigrator) migrate() []migrationResult {
 	if m.shouldMigrate(sectionConstraints) {
 		results = append(results, m.migrateConstraints())
 	}
-	if m.shouldMigrate(sectionMetadataCrit) {
+	if m.shouldMigrate(sectionMetadataPolicyCrit) {
 		results = append(results, m.migrateMetadataPolicyCrit())
 	}
 	if m.shouldMigrate(sectionMetadataPolicies) {
@@ -520,7 +520,7 @@ func (m *configMigrator) migrateConstraints() migrationResult {
 }
 
 func (m *configMigrator) migrateMetadataPolicyCrit() migrationResult {
-	result := migrationResult{section: sectionMetadataCrit}
+	result := migrationResult{section: sectionMetadataPolicyCrit}
 
 	if len(m.config.Federation.MetadataPolicyCrit) == 0 {
 		result.action = "skipped"

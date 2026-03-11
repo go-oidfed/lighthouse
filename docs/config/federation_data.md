@@ -150,11 +150,23 @@ Constraints object included in the Entity Configuration.
 <span class="badge badge-yellow">deprecated</span>
 <span class="badge badge-purple">list of strings</span>
 
-Critical claims in the Entity Configuration as per OpenID Federation Specification.
+Critical claims in subordinate entity statements as per OpenID Federation Specification.
 
-**Admin API:** Managed via additional claims endpoints
+!!! warning "Not Migrated"
+    
+    This configuration option is **deprecated** and **not migrated** by `lhmigrate config2db`.
+    
+    The `crit` attribute was used to mark critical claims in subordinate entity statements.
+    This functionality has been replaced: additional claims can now be added to entity 
+    statements via the Admin API, and each claim can be individually marked as critical.
+    
+    Use the Admin API to manage additional claims for subordinates:
+    
+    - `POST /admin/api/v1/subordinates/{id}/additional-claims` - Add a claim (with `crit` flag)
+    - `GET /admin/api/v1/subordinates/{id}/additional-claims` - List claims
+    - `DELETE /admin/api/v1/subordinates/{id}/additional-claims/{claim}` - Remove a claim
 
-??? file "Legacy config.yaml (for migration only)"
+??? file "Legacy config.yaml (no longer supported)"
 
     ```yaml
     federation_data:
@@ -170,7 +182,7 @@ Critical claims in the Entity Configuration as per OpenID Federation Specificati
 
 Critical metadata policy operators as per OpenID Federation Specification.
 
-**Migration section:** `metadata_crit`
+**Migration section:** `metadata_policy_crit`
 
 ??? file "Legacy config.yaml (for migration only)"
 
