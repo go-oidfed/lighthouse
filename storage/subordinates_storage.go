@@ -22,11 +22,8 @@ func (s *SubordinateStorage) Add(info model.ExtendedSubordinateInfo) error {
 		func(tx *gorm.DB) error {
 			// Then save the subordinate info
 			if err := tx.Clauses(clause.OnConflict{
-				Columns: []clause.Column{{Name: "entity_id"}},
-				DoUpdates: clause.AssignmentColumns([]string{
-					"updated_at", "description", "status", "jwks_id",
-					"metadata", "metadata_policy", "constraints",
-				}),
+				Columns:   []clause.Column{{Name: "entity_id"}},
+				UpdateAll: true,
 			}).Create(&info).Error; err != nil {
 				return err
 			}
@@ -170,11 +167,8 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 			}
 			info.ID = dbInfo.ID
 			return tx.Clauses(clause.OnConflict{
-				Columns: []clause.Column{{Name: "entity_id"}},
-				DoUpdates: clause.AssignmentColumns([]string{
-					"updated_at", "description", "status", "jwks_id",
-					"metadata", "metadata_policy", "constraints",
-				}),
+				Columns:   []clause.Column{{Name: "entity_id"}},
+				UpdateAll: true,
 			}).Create(&info).Error
 		},
 	)
