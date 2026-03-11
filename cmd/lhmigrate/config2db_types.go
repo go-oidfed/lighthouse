@@ -39,7 +39,7 @@ type migrationFederationConf struct {
 	Constraints           *oidfed.ConstraintSpecification `yaml:"constraints"`
 	CriticalExtensions    []string                        `yaml:"crit"`
 	MetadataPolicyCrit    []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
-	MetadataPolicy        *oidfed.MetadataPolicies        `yaml:"metadata_policy"`
+	MetadataPolicyFile    string                          `yaml:"metadata_policy_file"`
 	ConfigurationLifetime duration.DurationOption         `yaml:"configuration_lifetime"`
 	Metadata              migrationFederationMetadataConf `yaml:"federation_entity_metadata"`
 

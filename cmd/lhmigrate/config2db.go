@@ -73,7 +73,7 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  key_rotation       - Key rotation config (signing.key_rotation)\n")
 		fmt.Fprintf(os.Stderr, "  constraints        - Subordinate statement constraints (federation_data.constraints)\n")
 		fmt.Fprintf(os.Stderr, "  metadata_crit      - Metadata policy crit operators (federation_data.metadata_policy_crit)\n")
-		fmt.Fprintf(os.Stderr, "  metadata_policies  - Metadata policies (federation_data.metadata_policy)\n")
+		fmt.Fprintf(os.Stderr, "  metadata_policies  - Metadata policies (federation_data.metadata_policy_file)\n")
 		fmt.Fprintf(os.Stderr, "  config_lifetime    - Entity configuration lifetime (federation_data.configuration_lifetime)\n")
 		fmt.Fprintf(os.Stderr, "  statement_lifetime - Subordinate statement lifetime (endpoints.fetch.statement_lifetime)\n")
 		fmt.Fprintf(os.Stderr, "  authority_hints    - Authority hints (federation_data.authority_hints)\n")
@@ -564,9 +564,29 @@ func (m *configMigrator) migrateMetadataPolicyCrit() migrationResult {
 func (m *configMigrator) migrateMetadataPolicies() migrationResult {
 	result := migrationResult{section: sectionMetadataPolicies}
 
-	if m.config.Federation.MetadataPolicy == nil || isMetadataPoliciesEmpty(m.config.Federation.MetadataPolicy) {
+	// Load metadata policies from file (metadata_policy_file)
+	if m.config.Federation.MetadataPolicyFile == "" {
 		result.action = "skipped"
-		result.details = "not set in config"
+		result.details = "metadata_policy_file not set in config"
+		return result
+	}
+
+	// Read and parse the metadata policy file
+	policyContent, err := fileutils.ReadFile(m.config.Federation.MetadataPolicyFile)
+	if err != nil {
+		result.err = fmt.Errorf("failed to read metadata_policy_file %q: %w", m.config.Federation.MetadataPolicyFile, err)
+		return result
+	}
+
+	var metadataPolicy oidfed.MetadataPolicies
+	if err := json.Unmarshal(policyContent, &metadataPolicy); err != nil {
+		result.err = fmt.Errorf("failed to parse metadata_policy_file %q: %w", m.config.Federation.MetadataPolicyFile, err)
+		return result
+	}
+
+	if isMetadataPoliciesEmpty(&metadataPolicy) {
+		result.action = "skipped"
+		result.details = fmt.Sprintf("metadata_policy_file %q is empty", m.config.Federation.MetadataPolicyFile)
 		return result
 	}
 
@@ -586,11 +606,11 @@ func (m *configMigrator) migrateMetadataPolicies() migrationResult {
 
 	if m.dryRun {
 		result.action = "dry-run"
-		result.details = "would set metadata policies"
+		result.details = fmt.Sprintf("would set metadata policies from %q", m.config.Federation.MetadataPolicyFile)
 		return result
 	}
 
-	if err := m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, m.config.Federation.MetadataPolicy); err != nil {
+	if err := m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &metadataPolicy); err != nil {
 		result.err = err
 		return result
 	}
@@ -600,7 +620,7 @@ func (m *configMigrator) migrateMetadataPolicies() migrationResult {
 	} else {
 		result.action = "created"
 	}
-	result.details = "metadata policies set"
+	result.details = fmt.Sprintf("loaded from %q", m.config.Federation.MetadataPolicyFile)
 	return result
 }
 
