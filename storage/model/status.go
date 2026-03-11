@@ -49,19 +49,32 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + s.String() + "\""), nil
 }
 
-// UnmarshalJSON decodes the status from a JSON string.
+// UnmarshalJSON decodes the status from a JSON string or integer.
+// It supports both formats for backward compatibility with legacy storage.
 func (s *Status) UnmarshalJSON(b []byte) error {
-	// Expect a quoted string
-	if len(b) < 2 || b[0] != '"' || b[len(b)-1] != '"' {
-		return fmt.Errorf("status must be a JSON string")
+	// Try to parse as a quoted string first
+	if len(b) >= 2 && b[0] == '"' && b[len(b)-1] == '"' {
+		val := string(b[1 : len(b)-1])
+		ps, err := ParseStatus(val)
+		if err != nil {
+			return err
+		}
+		*s = ps
+		return nil
 	}
-	val := string(b[1 : len(b)-1])
-	ps, err := ParseStatus(val)
-	if err != nil {
-		return err
+
+	// Try to parse as an integer (legacy format)
+	var intVal int
+	if _, err := fmt.Sscanf(string(b), "%d", &intVal); err == nil {
+		status := Status(intVal)
+		if status.Valid() {
+			*s = status
+			return nil
+		}
+		return fmt.Errorf("invalid status integer: %d", intVal)
 	}
-	*s = ps
-	return nil
+
+	return fmt.Errorf("status must be a JSON string or integer, got: %s", string(b))
 }
 
 // ParseStatus converts a string to a Status, returning an error for invalid values.
