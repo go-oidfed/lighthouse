@@ -2,12 +2,19 @@ package storage
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 )
+
+// nowPlusBuffer returns the current time plus 1 second for query comparisons.
+// This provides a small buffer to account for timing differences.
+func nowPlusBuffer() time.Time {
+	return time.Now().Add(time.Second)
+}
 
 // DBPublicKeyStorage implements public.PublicKeyStorage backed by the database.
 type DBPublicKeyStorage struct {
@@ -44,7 +51,7 @@ func (D *DBPublicKeyStorage) GetAll() (out public.PublicKeyEntryList, err error)
 func (D *DBPublicKeyStorage) GetRevoked() (out public.PublicKeyEntryList, err error) {
 	err = errors.WithStack(
 		D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Where(
-			"revoked_at IS NOT NULL AND revoked_at <= DATETIME(CURRENT_TIMESTAMP, '+1 second')",
+			"revoked_at IS NOT NULL AND revoked_at <= ?", nowPlusBuffer(),
 		).Find(&out).Error,
 	)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -57,7 +64,7 @@ func (D *DBPublicKeyStorage) GetRevoked() (out public.PublicKeyEntryList, err er
 func (D *DBPublicKeyStorage) GetExpired() (out public.PublicKeyEntryList, err error) {
 	err = errors.WithStack(
 		D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Where(
-			"expires_at IS NOT NULL AND expires_at <= DATETIME(CURRENT_TIMESTAMP, '+1 second')",
+			"expires_at IS NOT NULL AND expires_at <= ?", nowPlusBuffer(),
 		).Find(&out).Error,
 	)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -68,9 +75,11 @@ func (D *DBPublicKeyStorage) GetExpired() (out public.PublicKeyEntryList, err er
 
 // GetHistorical returns revoked and expired keys.
 func (D *DBPublicKeyStorage) GetHistorical() (out public.PublicKeyEntryList, err error) {
+	threshold := nowPlusBuffer()
 	err = errors.WithStack(
 		D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Where(
-			"(expires_at IS NOT NULL AND expires_at <= DATETIME(CURRENT_TIMESTAMP, '+1 second')) OR (revoked_at IS NOT NULL AND revoked_at <= DATETIME(CURRENT_TIMESTAMP, '+1 second'))",
+			"(expires_at IS NOT NULL AND expires_at <= ?) OR (revoked_at IS NOT NULL AND revoked_at <= ?)",
+			threshold, threshold,
 		).Find(&out).Error,
 	)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -81,9 +90,12 @@ func (D *DBPublicKeyStorage) GetHistorical() (out public.PublicKeyEntryList, err
 
 // GetActive returns keys that are currently usable.
 func (D *DBPublicKeyStorage) GetActive() (out public.PublicKeyEntryList, err error) {
+	now := time.Now()
+	threshold := now.Add(time.Second)
 	err = errors.WithStack(
 		D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Where(
-			"(revoked_at IS NULL OR revoked_at > CURRENT_TIMESTAMP) AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) AND (not_before IS NULL OR not_before <= DATETIME(CURRENT_TIMESTAMP, '+1 second'))",
+			"(revoked_at IS NULL OR revoked_at > ?) AND (expires_at IS NULL OR expires_at > ?) AND (not_before IS NULL OR not_before <= ?)",
+			now, now, threshold,
 		).Find(&out).Error,
 	)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
