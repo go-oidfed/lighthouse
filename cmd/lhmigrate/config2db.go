@@ -82,6 +82,7 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  authority_hints    - Authority hints (federation_data.authority_hints)\n")
 		fmt.Fprintf(os.Stderr, "  metadata           - Federation entity metadata (federation_data.federation_entity_metadata)\n")
 		fmt.Fprintf(os.Stderr, "  trust_mark_specs   - Trust mark specifications (endpoints.trust_mark.trust_mark_specs)\n")
+		fmt.Fprintf(os.Stderr, "  trust_marks        - Entity configuration trust marks (federation_data.trust_marks)\n")
 		fmt.Fprintf(os.Stderr, "  trust_mark_issuers - Trust mark issuers (federation_data.trust_mark_issuers)\n")
 		fmt.Fprintf(os.Stderr, "  trust_mark_owners  - Trust mark owners (federation_data.trust_mark_owners)\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
@@ -342,6 +343,9 @@ func (m *configMigrator) migrate() []migrationResult {
 	}
 	if m.shouldMigrate(sectionTrustMarkSpecs) {
 		results = append(results, m.migrateTrustMarkSpecs()...)
+	}
+	if m.shouldMigrate(sectionTrustMarks) {
+		results = append(results, m.migrateTrustMarks()...)
 	}
 	if m.shouldMigrate(sectionTrustMarkIssuers) {
 		results = append(results, m.migrateTrustMarkIssuers()...)
@@ -1139,6 +1143,115 @@ func (m *configMigrator) migrateTrustMarkOwners() []migrationResult {
 	return results
 }
 
+func (m *configMigrator) migrateTrustMarks() []migrationResult {
+	var results []migrationResult
+
+	if len(m.config.Federation.TrustMarks) == 0 {
+		results = append(results, migrationResult{
+			section: sectionTrustMarks,
+			action:  "skipped",
+			details: "not set in config",
+		})
+		return results
+	}
+
+	// Get existing trust marks
+	existingTrustMarks, err := m.backends.PublishedTrustMarks.List()
+	if err != nil {
+		results = append(results, migrationResult{
+			section: sectionTrustMarks,
+			err:     fmt.Errorf("failed to list existing trust marks: %w", err),
+		})
+		return results
+	}
+
+	existingMap := make(map[string]bool)
+	for _, tm := range existingTrustMarks {
+		existingMap[tm.TrustMarkType] = true
+	}
+
+	for _, tm := range m.config.Federation.TrustMarks {
+		result := migrationResult{
+			section: sectionTrustMarks,
+			details: tm.TrustMarkType,
+		}
+
+		// Validate that we have a trust mark type
+		if tm.TrustMarkType == "" && tm.TrustMarkJWT == "" {
+			result.err = fmt.Errorf("trust mark must have trust_mark_type or trust_mark_jwt")
+			results = append(results, result)
+			continue
+		}
+
+		// If trust_mark_type is empty but JWT is provided, we'll let the storage layer extract it
+		trustMarkType := tm.TrustMarkType
+		if trustMarkType == "" {
+			trustMarkType = "(from JWT)"
+		}
+		result.details = trustMarkType
+
+		if existingMap[tm.TrustMarkType] && !m.force {
+			result.action = "skipped"
+			result.details = fmt.Sprintf("%s already exists", trustMarkType)
+			results = append(results, result)
+			continue
+		}
+
+		if m.dryRun {
+			result.action = "dry-run"
+			if existingMap[tm.TrustMarkType] {
+				result.details = fmt.Sprintf("would update %s", trustMarkType)
+			} else {
+				result.details = fmt.Sprintf("would add %s", trustMarkType)
+			}
+			results = append(results, result)
+			continue
+		}
+
+		// Convert config format to model.AddTrustMark
+		addTrustMark := model.AddTrustMark{
+			TrustMarkType:      tm.TrustMarkType,
+			TrustMarkIssuer:    tm.TrustMarkIssuer,
+			TrustMark:          tm.TrustMarkJWT,
+			Refresh:            tm.Refresh,
+			MinLifetime:        int(tm.MinLifetime.Duration().Seconds()),
+			RefreshGracePeriod: int(tm.RefreshGracePeriod.Duration().Seconds()),
+			RefreshRateLimit:   int(tm.RefreshRateLimit.Duration().Seconds()),
+		}
+
+		// Convert self-issuance spec if present
+		if tm.SelfIssuanceSpec != nil {
+			addTrustMark.SelfIssuanceSpec = &model.SelfIssuedTrustMarkSpec{
+				Lifetime:                 tm.SelfIssuanceSpec.Lifetime,
+				Ref:                      tm.SelfIssuanceSpec.Ref,
+				LogoURI:                  tm.SelfIssuanceSpec.LogoURI,
+				AdditionalClaims:         tm.SelfIssuanceSpec.AdditionalClaims,
+				IncludeExtraClaimsInInfo: tm.SelfIssuanceSpec.IncludeExtraClaimsInInfo,
+			}
+		}
+
+		if existingMap[tm.TrustMarkType] {
+			// Update existing
+			if _, err := m.backends.PublishedTrustMarks.Update(tm.TrustMarkType, addTrustMark); err != nil {
+				result.err = fmt.Errorf("failed to update trust mark: %w", err)
+			} else {
+				result.action = "overwritten"
+			}
+		} else {
+			// Create new
+			if _, err := m.backends.PublishedTrustMarks.Create(addTrustMark); err != nil {
+				result.err = fmt.Errorf("failed to create trust mark: %w", err)
+			} else {
+				result.action = "created"
+			}
+		}
+
+		results = append(results, result)
+	}
+
+	return results
+}
+
 // isMetadataPoliciesEmpty checks if all metadata policies are empty
 func isMetadataPoliciesEmpty(mp *oidfed.MetadataPolicies) bool {
 	if mp == nil {
@@ -1348,6 +1461,9 @@ func removeFederationDataFields(node *yaml.Node, sections map[migrationSection]b
 	}
 	if sections[sectionMetadata] {
 		fieldsToRemove["federation_entity_metadata"] = true
+	}
+	if sections[sectionTrustMarks] {
+		fieldsToRemove["trust_marks"] = true
 	}
 	if sections[sectionTrustMarkIssuers] {
 		fieldsToRemove["trust_mark_issuers"] = true

@@ -44,9 +44,31 @@ type migrationFederationConf struct {
 	Metadata              migrationFederationMetadataConf `yaml:"federation_entity_metadata"`
 
 	// Trust mark related configuration
-	TrustMarks       []any                                    `yaml:"trust_marks"`
+	TrustMarks       []migrationTrustMarkConfig               `yaml:"trust_marks"`
 	TrustMarkIssuers oidfed.AllowedTrustMarkIssuers           `yaml:"trust_mark_issuers"`
 	TrustMarkOwners  map[string]migrationTrustMarkOwnerConfig `yaml:"trust_mark_owners"`
+}
+
+// migrationTrustMarkConfig holds entity configuration trust mark config for migration
+// These are trust marks that should be published in the entity's own entity configuration
+type migrationTrustMarkConfig struct {
+	TrustMarkType      string                     `yaml:"trust_mark_type"`
+	TrustMarkIssuer    string                     `yaml:"trust_mark_issuer"`
+	TrustMarkJWT       string                     `yaml:"trust_mark_jwt"`
+	Refresh            bool                       `yaml:"refresh"`
+	MinLifetime        duration.DurationOption    `yaml:"min_lifetime"`
+	RefreshGracePeriod duration.DurationOption    `yaml:"refresh_grace_period"`
+	RefreshRateLimit   duration.DurationOption    `yaml:"refresh_rate_limit"`
+	SelfIssuanceSpec   *migrationSelfIssuanceSpec `yaml:"self_issuance_spec"`
+}
+
+// migrationSelfIssuanceSpec holds self-issuance specification for trust marks
+type migrationSelfIssuanceSpec struct {
+	Lifetime                 int            `yaml:"lifetime"`
+	Ref                      string         `yaml:"ref"`
+	LogoURI                  string         `yaml:"logo_uri"`
+	AdditionalClaims         map[string]any `yaml:"additional_claims"`
+	IncludeExtraClaimsInInfo bool           `yaml:"include_extra_claims_in_info"`
 }
 
 // migrationTrustMarkOwnerConfig holds trust mark owner config for migration
@@ -146,6 +168,7 @@ const (
 	sectionSigning            migrationSection = "signing"
 	sectionFederation         migrationSection = "federation"
 	sectionTrustMarkSpecs     migrationSection = "trust_mark_specs"
+	sectionTrustMarks         migrationSection = "trust_marks"
 	sectionAuthorityHints     migrationSection = "authority_hints"
 	sectionMetadata           migrationSection = "metadata"
 	sectionConstraints        migrationSection = "constraints"
@@ -174,6 +197,7 @@ func allSections() []migrationSection {
 		sectionAuthorityHints,
 		sectionMetadata,
 		sectionTrustMarkSpecs,
+		sectionTrustMarks,
 		sectionTrustMarkIssuers,
 		sectionTrustMarkOwners,
 	}
