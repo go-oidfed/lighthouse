@@ -164,13 +164,17 @@ func kmsCmd(args []string) int {
 		defAlg   string
 		generate bool
 		rsaLen   int
+		pksType  string
+		destDB   string
+		destDSN  string
+		dbDebug  bool
 		verbose  bool
 	)
 	// --source / -s
 	fs.StringVar(&src, "source", "", "Path to legacy key files directory (containing <type>_<alg>.pem)")
 	fs.StringVar(&src, "s", "", "Path to legacy key files directory (shorthand)")
 	// --dest / -d
-	fs.StringVar(&dst, "dest", "", "Destination directory for filesystem KMS and public storage")
+	fs.StringVar(&dst, "dest", "", "Destination directory for filesystem KMS (and public storage if --pks-type=fs)")
 	fs.StringVar(&dst, "d", "", "Destination directory (shorthand)")
 	// --type / -t
 	fs.StringVar(&typeID, "type", "federation", "Key type identifier (e.g., 'federation')")
@@ -185,14 +189,25 @@ func kmsCmd(args []string) int {
 	fs.BoolVar(&generate, "g", false, "Generate missing keys (shorthand)")
 	// --rsa-len
 	fs.IntVar(&rsaLen, "rsa-len", 4096, "RSA key length when generating (if enabled)")
+	// --pks-type (required)
+	fs.StringVar(&pksType, "pks-type", "", "Public key storage type: fs (filesystem) or db (database) [required]")
+	// --db-type
+	fs.StringVar(&destDB, "db-type", "", "Database type for public key storage: sqlite|mysql|postgres (required when --pks-type=db)")
+	// --db-dsn
+	fs.StringVar(&destDSN, "db-dsn", "", "Database DSN for mysql/postgres (ignored for sqlite)")
+	// --db-debug
+	fs.BoolVar(&dbDebug, "db-debug", false, "Enable GORM debug logging for DB operations")
 	// --verbose / -v
 	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
 	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintf(
-			os.Stderr, "Usage: lhmigrate keys kms --source <legacy_dir> --dest <dest_dir> --type <typeID> --algs <list> [options]\n",
+			os.Stderr, "Usage: lhmigrate keys kms --source <legacy_dir> --dest <dest_dir> --type <typeID> --algs <list> --pks-type <fs|db> [options]\n",
 		)
+		_, _ = fmt.Fprintf(os.Stderr, "\nPublic key storage options:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  For filesystem:  --pks-type=fs\n")
+		_, _ = fmt.Fprintf(os.Stderr, "  For database:    --pks-type=db --db-type=<sqlite|mysql|postgres> [--db-dsn=<dsn>]\n\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -220,6 +235,43 @@ func kmsCmd(args []string) int {
 		fs.Usage()
 		return 2
 	}
+	// Validate --pks-type
+	pksType = strings.ToLower(strings.TrimSpace(pksType))
+	if pksType == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "--pks-type is required (fs or db)")
+		fs.Usage()
+		return 2
+	}
+	if pksType != "fs" && pksType != "db" {
+		_, _ = fmt.Fprintf(os.Stderr, "invalid --pks-type: %s (must be 'fs' or 'db')\n", pksType)
+		fs.Usage()
+		return 2
+	}
+	// Validate DB options when --pks-type=db
+	var dbDriver storage.DriverType
+	if pksType == "db" {
+		destDB = strings.ToLower(strings.TrimSpace(destDB))
+		if destDB == "" {
+			_, _ = fmt.Fprintln(os.Stderr, "--db-type is required when --pks-type=db")
+			fs.Usage()
+			return 2
+		}
+		switch destDB {
+		case string(storage.DriverSQLite):
+			dbDriver = storage.DriverSQLite
+		case string(storage.DriverMySQL):
+			dbDriver = storage.DriverMySQL
+		case string(storage.DriverPostgres):
+			dbDriver = storage.DriverPostgres
+		default:
+			_, _ = fmt.Fprintf(os.Stderr, "invalid --db-type: %s (must be sqlite, mysql, or postgres)\n", destDB)
+			return 2
+		}
+		if (dbDriver == storage.DriverMySQL || dbDriver == storage.DriverPostgres) && destDSN == "" {
+			_, _ = fmt.Fprintf(os.Stderr, "--db-dsn is required for %s\n", dbDriver)
+			return 2
+		}
+	}
 	var defaultAlg jwa.SignatureAlgorithm
 	if a := strings.TrimSpace(defAlg); a != "" {
 		alg, found := jwa.LookupSignatureAlgorithm(a)
@@ -237,6 +289,7 @@ func kmsCmd(args []string) int {
 			"algs":     algsStr,
 			"default":  defaultAlg.String(),
 			"generate": generate,
+			"pks-type": pksType,
 		},
 	).Info("migrating KMS")
 
@@ -251,16 +304,33 @@ func kmsCmd(args []string) int {
 		return 1
 	}
 
-	// Prepare destination public key storage (migrated from legacy public store at src)
-	dstPKS, err := public.NewFilesystemPublicKeyStorageFromStorage(
-		dst, typeID, &public.LegacyPublicKeyStorage{
-			Dir:    src,
-			TypeID: typeID,
-		},
-	)
-	if err != nil {
-		log.WithError(err).Error("failed to migrate public key storage for KMS")
-		return 1
+	// Prepare legacy public key storage source
+	legacyPKS := &public.LegacyPublicKeyStorage{
+		Dir:    src,
+		TypeID: typeID,
+	}
+
+	// Prepare destination public key storage based on --pks-type
+	var dstPKS public.PublicKeyStorage
+	if pksType == "fs" {
+		dstPKS, err = public.NewFilesystemPublicKeyStorageFromStorage(dst, typeID, legacyPKS)
+		if err != nil {
+			log.WithError(err).Error("failed to migrate public key storage for KMS (filesystem)")
+			return 1
+		}
+	} else {
+		// pksType == "db"
+		dbCfg := storage.Config{Driver: dbDriver, DSN: destDSN, DataDir: dst, Debug: dbDebug}
+		db, dbErr := storage.Connect(dbCfg)
+		if dbErr != nil {
+			log.WithError(dbErr).Error("failed to connect to destination database for public key storage")
+			return 1
+		}
+		dstPKS, err = storage.NewDBPublicKeyStorageFromStorage(db, typeID, legacyPKS)
+		if err != nil {
+			log.WithError(err).Error("failed to migrate public key storage for KMS (database)")
+			return 1
+		}
 	}
 
 	// Configure destination filesystem KMS
