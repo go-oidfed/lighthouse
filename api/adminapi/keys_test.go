@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
+	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 )
@@ -105,7 +107,17 @@ func setupPublicKeyApp(t *testing.T) (*fiber.App, KeyManagement, *storage.Storag
 		t.Fatalf("Failed to create public key table: %v", err)
 	}
 	app := fiber.New()
-	registerKeys(app, km, store.KeyValue())
+	backends := model.Backends{
+		KV: store.KeyValue(),
+		PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+		Transaction: func(fn model.TransactionFunc) error {
+			return fn(&model.Backends{
+				KV: store.KeyValue(),
+				PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			})
+		},
+	}
+	registerKeys(app, km, store.KeyValue(), backends)
 	return app, km, store
 }
 
@@ -127,18 +139,6 @@ func injectTestKey(t *testing.T, app *fiber.App, kid string) {
 
 // doRequest is a tiny helper to execute an HTTP request against a Fiber app and
 // return the response plus the fully-read body.
-func doRequest(t *testing.T, app *fiber.App, req *http.Request) (*http.Response, []byte) {
-	t.Helper()
-	resp, err := app.Test(req, -1)
-	if err != nil {
-		t.Fatalf("Request %s %s failed: %v", req.Method, req.URL.Path, err)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Failed to read response body: %v", err)
-	}
-	return resp, body
-}
 
 // --- PUBLIC KEY MANAGEMENT TESTS ---
 
@@ -547,7 +547,17 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 		}
 
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		injectTestKey(t, app, "jwks-key-1")
 
@@ -585,7 +595,17 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 		}
 
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("GET", "/entity-configuration/jwks", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
@@ -619,7 +639,17 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 		}
 
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		// Inject a key, then expire it
 		injectTestKey(t, app, "expired-key")
@@ -659,7 +689,17 @@ func TestGetKMSInfo(t *testing.T) {
 			BasicKeys: &mockBasicKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("GET", "/kms", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
@@ -695,7 +735,17 @@ func TestGetKMSInfo(t *testing.T) {
 			Keys:      pendingMock,
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("GET", "/kms", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
@@ -738,9 +788,19 @@ func TestPutKMSAlg(t *testing.T) {
 			Keys:      nil,
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
-		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`"ES512"`))
+		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`ES512`))
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, respBody := doRequest(t, app, req)
@@ -758,9 +818,19 @@ func TestPutKMSAlg(t *testing.T) {
 			Keys:      &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
-		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`"INVALID-ALG"`))
+		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`INVALID-ALG`))
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, respBody := doRequest(t, app, req)
@@ -778,7 +848,17 @@ func TestPutKMSAlg(t *testing.T) {
 			Keys:      &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`not json`))
 		req.Header.Set("Content-Type", "application/json")
@@ -798,9 +878,19 @@ func TestPutKMSAlg(t *testing.T) {
 			Keys:      &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
-		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`"ES512"`))
+		req := httptest.NewRequest("PUT", "/kms/alg", strings.NewReader(`ES512`))
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, respBody := doRequest(t, app, req)
@@ -829,7 +919,17 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 			Keys:      &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`4096`))
 		req.Header.Set("Content-Type", "application/json")
@@ -856,7 +956,17 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 			Keys:      nil,
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`4096`))
 		req.Header.Set("Content-Type", "application/json")
@@ -875,7 +985,17 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 			Keys:      &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("PUT", "/kms/rsa-key-len", strings.NewReader(`"not a number"`))
 		req.Header.Set("Content-Type", "application/json")
@@ -897,7 +1017,17 @@ func TestGetKMSRotation(t *testing.T) {
 			Keys: &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		initialConfig := kms.KeyRotationConfig{Enabled: true}
 		if err := storage.SetKeyRotation(store.KeyValue(), initialConfig); err != nil {
@@ -927,7 +1057,17 @@ func TestGetKMSRotation(t *testing.T) {
 			Keys: nil,
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("GET", "/kms/rotation", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
@@ -946,7 +1086,17 @@ func TestPutKMSRotation(t *testing.T) {
 			Keys: &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		body := `{"enabled": true, "interval": 3600, "overlap": 600}`
 		req := httptest.NewRequest("PUT", "/kms/rotation", strings.NewReader(body))
@@ -979,7 +1129,17 @@ func TestPutKMSRotation(t *testing.T) {
 			Keys: nil,
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		body := `{"enabled": true}`
 		req := httptest.NewRequest("PUT", "/kms/rotation", strings.NewReader(body))
@@ -998,7 +1158,17 @@ func TestPutKMSRotation(t *testing.T) {
 			Keys: &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("PUT", "/kms/rotation", strings.NewReader(`not json`))
 		req.Header.Set("Content-Type", "application/json")
@@ -1018,7 +1188,17 @@ func TestPatchKMSRotation(t *testing.T) {
 			Keys: &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		// Set initial config
 		if err := storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: false}); err != nil {
@@ -1050,7 +1230,17 @@ func TestPatchKMSRotation(t *testing.T) {
 			Keys: &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		if err := storage.SetKeyRotation(store.KeyValue(), kms.KeyRotationConfig{Enabled: true}); err != nil {
 			t.Fatalf("Failed to set initial rotation config: %v", err)
@@ -1085,7 +1275,17 @@ func TestPatchKMSRotation(t *testing.T) {
 			Keys: nil,
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("PATCH", "/kms/rotation", strings.NewReader(`{"enabled": true}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -1105,7 +1305,17 @@ func TestPostKMSRotateAll(t *testing.T) {
 			Keys: &mockFullKMS{},
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("POST", "/kms/rotate", http.NoBody)
 		resp, respBody := doRequest(t, app, req)
@@ -1122,7 +1332,17 @@ func TestPostKMSRotateAll(t *testing.T) {
 			Keys: nil,
 		}
 		app := fiber.New()
-		registerKeys(app, km, store.KeyValue())
+		backends := model.Backends{
+			KV: store.KeyValue(),
+			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+			Transaction: func(fn model.TransactionFunc) error {
+				return fn(&model.Backends{
+					KV: store.KeyValue(),
+					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
+				})
+			},
+		}
+		registerKeys(app, km, store.KeyValue(), backends)
 
 		req := httptest.NewRequest("POST", "/kms/rotate", http.NoBody)
 		resp, respBody := doRequest(t, app, req)

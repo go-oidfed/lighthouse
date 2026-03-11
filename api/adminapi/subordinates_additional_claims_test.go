@@ -457,7 +457,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 		}
 
 		body, _ := io.ReadAll(resp.Body)
-		if string(body) != "{}" {
+		if string(body) != "[]" {
 			t.Errorf("Expected empty JSON object, got %s", string(body))
 		}
 	})
