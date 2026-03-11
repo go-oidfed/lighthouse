@@ -98,9 +98,13 @@ func allCmd(args []string) int {
 		configFile string
 		destConfig string
 
-		// Source/destination directories
-		sourceDir  string
-		destDir    string
+		// Keys source/destination
+		keysSource string
+		keysDest   string
+
+		// Data source/destination
+		dataSource string
+		dataDest   string
 		sourceType string
 
 		// Database options
@@ -129,11 +133,13 @@ func allCmd(args []string) int {
 	fs.StringVar(&configFile, "c", "", "Path to config file (shorthand)")
 	fs.StringVar(&destConfig, "dest-config", "", "Path to write transformed config (default: overwrite source)")
 
-	// Source/destination directories
-	fs.StringVar(&sourceDir, "source", "", "Source data directory (for keys and db steps)")
-	fs.StringVar(&sourceDir, "s", "", "Source data directory (shorthand)")
-	fs.StringVar(&destDir, "dest", "", "Destination directory (for keys and db steps)")
-	fs.StringVar(&destDir, "d", "", "Destination directory (shorthand)")
+	// Keys source/destination
+	fs.StringVar(&keysSource, "keys-source", "", "Source directory for legacy keys (PEM files, JWKS)")
+	fs.StringVar(&keysDest, "keys-dest", "", "Destination directory for migrated keys (filesystem KMS)")
+
+	// Data source/destination
+	fs.StringVar(&dataSource, "data-source", "", "Source directory for legacy data (subordinates, trust marks)")
+	fs.StringVar(&dataDest, "data-dest", "", "Destination directory for SQLite database (defaults to --db-dir)")
 	fs.StringVar(&sourceType, "source-type", "", "Legacy storage type: json|badger (for db step)")
 
 	// Database options
@@ -177,17 +183,24 @@ func allCmd(args []string) int {
 		fs.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  # Full migration from JSON storage to SQLite\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate all --config=config.yaml --source=/old/data --dest=/new/data \\\n")
-		fmt.Fprintf(os.Stderr, "    --source-type=json --db-type=sqlite --db-dir=/new/data \\\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate all --config=/etc/lighthouse/config.yaml \\\n")
+		fmt.Fprintf(os.Stderr, "    --keys-source=/var/lib/lighthouse/legacy-keys \\\n")
+		fmt.Fprintf(os.Stderr, "    --keys-dest=/var/lib/lighthouse/keys \\\n")
+		fmt.Fprintf(os.Stderr, "    --data-source=/var/lib/lighthouse/legacy \\\n")
+		fmt.Fprintf(os.Stderr, "    --source-type=json --db-type=sqlite --db-dir=/var/lib/lighthouse \\\n")
 		fmt.Fprintf(os.Stderr, "    --algs=ES256,RS256 --pks-type=db\n\n")
 		fmt.Fprintf(os.Stderr, "  # Migration to PostgreSQL, skipping key migrations\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate all --config=config.yaml --source=/old/data --source-type=badger \\\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate all --config=/etc/lighthouse/config.yaml \\\n")
+		fmt.Fprintf(os.Stderr, "    --data-source=/var/lib/lighthouse/badger --source-type=badger \\\n")
 		fmt.Fprintf(os.Stderr, "    --db-type=postgres --db-dsn='host=localhost user=lh dbname=lighthouse' \\\n")
 		fmt.Fprintf(os.Stderr, "    --skip=keys-public,keys-kms\n\n")
 		fmt.Fprintf(os.Stderr, "  # Dry run to preview all changes\n")
-		fmt.Fprintf(os.Stderr, "  lhmigrate all --config=config.yaml --source=/old/data --dest=/new/data \\\n")
-		fmt.Fprintf(os.Stderr, "    --source-type=json --db-type=sqlite --db-dir=/new/data \\\n")
-		fmt.Fprintf(os.Stderr, "    --algs=ES256 --pks-type=fs --dry-run -v\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate all --config=/etc/lighthouse/config.yaml \\\n")
+		fmt.Fprintf(os.Stderr, "    --keys-source=/var/lib/lighthouse/legacy-keys \\\n")
+		fmt.Fprintf(os.Stderr, "    --keys-dest=/var/lib/lighthouse/keys \\\n")
+		fmt.Fprintf(os.Stderr, "    --data-source=/var/lib/lighthouse/legacy \\\n")
+		fmt.Fprintf(os.Stderr, "    --source-type=json --db-type=sqlite --db-dir=/var/lib/lighthouse \\\n")
+		fmt.Fprintf(os.Stderr, "    --algs=ES256 --pks-type=db --dry-run -v\n")
 	}
 
 	if err := fs.Parse(args); err != nil {
@@ -209,8 +222,10 @@ func allCmd(args []string) int {
 	orch := &allOrchestrator{
 		configFile: configFile,
 		destConfig: destConfig,
-		sourceDir:  sourceDir,
-		destDir:    destDir,
+		keysSource: keysSource,
+		keysDest:   keysDest,
+		dataSource: dataSource,
+		dataDest:   dataDest,
 		sourceType: sourceType,
 		dbType:     dbType,
 		dbDSN:      dbDSN,
@@ -235,8 +250,10 @@ func allCmd(args []string) int {
 type allOrchestrator struct {
 	configFile string
 	destConfig string
-	sourceDir  string
-	destDir    string
+	keysSource string
+	keysDest   string
+	dataSource string
+	dataDest   string
 	sourceType string
 	dbType     string
 	dbDSN      string
@@ -352,17 +369,17 @@ func (o *allOrchestrator) runConfigStep() int {
 
 // runKeysPublicStep runs the public keys migration step
 func (o *allOrchestrator) runKeysPublicStep() int {
-	if o.sourceDir == "" {
-		log.Warn("No source directory specified, skipping public keys migration")
+	if o.keysSource == "" {
+		log.Warn("No keys source directory specified (--keys-source), skipping public keys migration")
 		return 0
 	}
 
-	args := []string{"--source=" + o.sourceDir}
+	args := []string{"--source=" + o.keysSource}
 
 	// Destination
-	dest := o.destDir
+	dest := o.keysDest
 	if dest == "" {
-		dest = o.sourceDir
+		dest = o.keysSource
 	}
 	args = append(args, "--dest="+dest)
 
@@ -392,8 +409,8 @@ func (o *allOrchestrator) runKeysPublicStep() int {
 
 // runKeysKMSStep runs the KMS migration step
 func (o *allOrchestrator) runKeysKMSStep() int {
-	if o.sourceDir == "" {
-		log.Warn("No source directory specified, skipping KMS migration")
+	if o.keysSource == "" {
+		log.Warn("No keys source directory specified (--keys-source), skipping KMS migration")
 		return 0
 	}
 	if o.algsStr == "" {
@@ -405,12 +422,12 @@ func (o *allOrchestrator) runKeysKMSStep() int {
 		return 0
 	}
 
-	args := []string{"--source=" + o.sourceDir}
+	args := []string{"--source=" + o.keysSource}
 
 	// Destination
-	dest := o.destDir
+	dest := o.keysDest
 	if dest == "" {
-		dest = o.sourceDir
+		dest = o.keysSource
 	}
 	args = append(args, "--dest="+dest)
 
@@ -497,8 +514,8 @@ func (o *allOrchestrator) runConfig2DBStep() int {
 
 // runDBStep runs the database migration step
 func (o *allOrchestrator) runDBStep() int {
-	if o.sourceDir == "" {
-		log.Warn("No source directory specified, skipping database migration")
+	if o.dataSource == "" {
+		log.Warn("No data source directory specified (--data-source), skipping database migration")
 		return 0
 	}
 	if o.sourceType == "" {
@@ -508,7 +525,7 @@ func (o *allOrchestrator) runDBStep() int {
 
 	args := []string{
 		"--source-type=" + o.sourceType,
-		"--source=" + o.sourceDir,
+		"--source=" + o.dataSource,
 	}
 
 	// Database options
@@ -518,9 +535,9 @@ func (o *allOrchestrator) runDBStep() int {
 
 	// Destination based on database type
 	if o.dbType == "sqlite" || o.dbType == "" {
-		dest := o.dbDir
+		dest := o.dataDest
 		if dest == "" {
-			dest = o.destDir
+			dest = o.dbDir
 		}
 		if dest != "" {
 			args = append(args, "--dest="+dest)
