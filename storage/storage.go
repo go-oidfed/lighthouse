@@ -1054,13 +1054,37 @@ func (s *TrustMarkSpecStorage) ListSubjects(specIdent string, status *model.Stat
 	return subjects, nil
 }
 
-// CreateSubject creates a new TrustMarkSubject for a TrustMarkSpec
+// CreateSubject creates a new TrustMarkSubject for a TrustMarkSpec.
+// If a soft-deleted subject with the same entity_id exists, it will be restored.
 func (s *TrustMarkSpecStorage) CreateSubject(specIdent string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 	spec, err := s.findByIdent(specIdent)
 	if err != nil {
 		return nil, err
 	}
 	subject.TrustMarkSpecID = spec.ID
+
+	// Check for soft-deleted record with same entity_id (unscoped to include deleted)
+	var existing model.TrustMarkSubject
+	if err := s.db.Unscoped().Where(
+		"trust_mark_spec_id = ? AND entity_id = ?", spec.ID, subject.EntityID,
+	).First(&existing).Error; err == nil {
+		// Record exists (possibly soft-deleted)
+		if existing.DeletedAt.Valid {
+			// Restore soft-deleted record by updating it
+			existing.DeletedAt = gorm.DeletedAt{} // Clear soft-delete
+			existing.Status = subject.Status
+			existing.AdditionalClaims = subject.AdditionalClaims
+			existing.Description = subject.Description
+			if err := s.db.Unscoped().Save(&existing).Error; err != nil {
+				return nil, errors.Wrap(err, "trust_mark_specs: restore subject failed")
+			}
+			return &existing, nil
+		}
+		// Record exists and is not deleted - conflict
+		return nil, model.AlreadyExistsError("subject already exists for this trust mark spec")
+	}
+
+	// No existing record, create new
 	if err = s.db.Create(subject).Error; err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, model.AlreadyExistsError("subject already exists for this trust mark spec")

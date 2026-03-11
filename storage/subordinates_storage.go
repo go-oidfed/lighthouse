@@ -35,9 +35,10 @@ func (s *SubordinateStorage) Add(info model.ExtendedSubordinateInfo) error {
 				for i := range info.SubordinateEntityTypes {
 					info.SubordinateEntityTypes[i].SubordinateID = info.ID
 				}
+				// Use constraint name for PostgreSQL compatibility
 				if err := tx.Clauses(clause.OnConflict{
-					Columns:   []clause.Column{{Name: "subordinate_id"}, {Name: "entity_type"}},
-					DoNothing: true,
+					OnConstraint: "uidx_sub_ent",
+					DoNothing:    true,
 				}).Create(&info.SubordinateEntityTypes).Error; err != nil {
 					return errors.Wrap(err, "failed to insert subordinate entity types")
 				}
