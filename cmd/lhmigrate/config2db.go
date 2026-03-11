@@ -23,17 +23,18 @@ import (
 func config2dbCmd(args []string) int {
 	fs := flag.NewFlagSet("config2db", flag.ExitOnError)
 	var (
-		configFile string
-		dbType     string
-		dbDSN      string
-		dbDir      string
-		dbDebug    bool
-		force      bool
-		dryRun     bool
-		only       string
-		skip       string
-		validate   bool
-		verbose    bool
+		configFile   string
+		dbType       string
+		dbDSN        string
+		dbDir        string
+		dbDebug      bool
+		force        bool
+		dryRun       bool
+		only         string
+		skip         string
+		validate     bool
+		updateConfig bool
+		verbose      bool
 	)
 	// --config / -c
 	fs.StringVar(&configFile, "config", "", "Path to config file to migrate (required)")
@@ -58,6 +59,8 @@ func config2dbCmd(args []string) int {
 	fs.StringVar(&skip, "skip", "", "Comma-separated list of sections to skip")
 	// --validate
 	fs.BoolVar(&validate, "validate", true, "Validate config values before migration")
+	// --update-config
+	fs.BoolVar(&updateConfig, "update-config", false, "Remove successfully migrated options from config file")
 	// --verbose / -v
 	fs.BoolVar(&verbose, "verbose", false, "Verbose logging")
 	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
@@ -86,6 +89,8 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  lhmigrate config2db --config=config.yaml --db-dir=/data/lighthouse\n\n")
 		fmt.Fprintf(os.Stderr, "  # Migrate only signing options with force\n")
 		fmt.Fprintf(os.Stderr, "  lhmigrate config2db -c config.yaml --db-dir=/data --only=alg,rsa_key_len,key_rotation -f\n\n")
+		fmt.Fprintf(os.Stderr, "  # Migrate and remove migrated options from config file\n")
+		fmt.Fprintf(os.Stderr, "  lhmigrate config2db -c config.yaml --db-dir=/data --update-config\n\n")
 		fmt.Fprintf(os.Stderr, "  # Dry run to see what would be migrated\n")
 		fmt.Fprintf(os.Stderr, "  lhmigrate config2db -c config.yaml --db-dir=/data -n -v\n")
 	}
@@ -217,6 +222,24 @@ func config2dbCmd(args []string) int {
 	if hasErrors {
 		return 1
 	}
+
+	// Update config file if requested
+	if updateConfig && !dryRun {
+		migratedSections := getSuccessfullyMigratedSections(results)
+		if len(migratedSections) > 0 {
+			if err := removeMigratedOptionsFromConfig(configFile, migratedSections); err != nil {
+				log.WithError(err).Error("failed to update config file")
+				return 1
+			}
+			log.WithField("sections", len(migratedSections)).Info("Removed migrated options from config file")
+		}
+	} else if updateConfig && dryRun {
+		migratedSections := getSuccessfullyMigratedSections(results)
+		if len(migratedSections) > 0 {
+			log.WithField("sections", len(migratedSections)).Info("Would remove migrated options from config file (dry-run)")
+		}
+	}
+
 	return 0
 }
 
@@ -1176,4 +1199,210 @@ func printMigrationSummary(results []migrationResult) {
 	if dryRuns > 0 {
 		fmt.Printf("       %d would be changed (dry-run)\n", dryRuns)
 	}
+}
+
+// getSuccessfullyMigratedSections returns a list of sections that were successfully migrated
+func getSuccessfullyMigratedSections(results []migrationResult) []migrationSection {
+	sectionSet := make(map[migrationSection]bool)
+	for _, r := range results {
+		if r.action == "created" || r.action == "overwritten" {
+			sectionSet[r.section] = true
+		}
+	}
+	sections := make([]migrationSection, 0, len(sectionSet))
+	for s := range sectionSet {
+		sections = append(sections, s)
+	}
+	return sections
+}
+
+// removeMigratedOptionsFromConfig removes successfully migrated options from the config file
+func removeMigratedOptionsFromConfig(configFile string, sections []migrationSection) error {
+	content, err := fileutils.ReadFile(configFile)
+	if err != nil {
+		return errors.Wrap(err, "failed to read config file")
+	}
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(content, &root); err != nil {
+		return errors.Wrap(err, "failed to parse config file")
+	}
+
+	// Build a map of sections for quick lookup
+	sectionMap := make(map[migrationSection]bool)
+	for _, s := range sections {
+		sectionMap[s] = true
+	}
+
+	// Remove migrated fields from the YAML tree
+	removeMigratedFields(&root, sectionMap)
+
+	// Marshal back to YAML
+	var buf strings.Builder
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(&root); err != nil {
+		return errors.Wrap(err, "failed to encode config")
+	}
+	if err := encoder.Close(); err != nil {
+		return errors.Wrap(err, "failed to close encoder")
+	}
+
+	// Write back to file
+	if err := os.WriteFile(configFile, []byte(buf.String()), 0644); err != nil {
+		return errors.Wrap(err, "failed to write config file")
+	}
+
+	return nil
+}
+
+// removeMigratedFields removes fields from YAML that correspond to migrated sections
+func removeMigratedFields(node *yaml.Node, sections map[migrationSection]bool) {
+	if node == nil {
+		return
+	}
+
+	switch node.Kind {
+	case yaml.DocumentNode:
+		for _, child := range node.Content {
+			removeMigratedFields(child, sections)
+		}
+	case yaml.MappingNode:
+		removeMigratedFieldsFromMapping(node, sections)
+	case yaml.SequenceNode:
+		for _, child := range node.Content {
+			removeMigratedFields(child, sections)
+		}
+	}
+}
+
+// removeMigratedFieldsFromMapping removes migrated fields from a mapping node
+func removeMigratedFieldsFromMapping(node *yaml.Node, sections map[migrationSection]bool) {
+	// Process key-value pairs
+	for i := 0; i < len(node.Content); i += 2 {
+		if i+1 >= len(node.Content) {
+			break
+		}
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+
+		key := keyNode.Value
+
+		// Check specific sections
+		switch key {
+		case "signing":
+			removeSigningFields(valueNode, sections)
+		case "federation_data":
+			removeFederationDataFields(valueNode, sections)
+		case "endpoints":
+			removeEndpointsFields(valueNode, sections)
+		}
+
+		// Recurse
+		removeMigratedFields(valueNode, sections)
+	}
+}
+
+// removeSigningFields removes migrated fields from the signing section
+func removeSigningFields(node *yaml.Node, sections map[migrationSection]bool) {
+	if node.Kind != yaml.MappingNode {
+		return
+	}
+
+	fieldsToRemove := make(map[string]bool)
+	if sections[sectionAlg] {
+		fieldsToRemove["alg"] = true
+	}
+	if sections[sectionRSAKeyLen] {
+		fieldsToRemove["rsa_key_len"] = true
+	}
+	if sections[sectionKeyRotation] {
+		fieldsToRemove["key_rotation"] = true
+		fieldsToRemove["automatic_key_rollover"] = true // legacy name
+	}
+
+	removeFieldsFromMapping(node, fieldsToRemove)
+}
+
+// removeFederationDataFields removes migrated fields from the federation_data section
+func removeFederationDataFields(node *yaml.Node, sections map[migrationSection]bool) {
+	if node.Kind != yaml.MappingNode {
+		return
+	}
+
+	fieldsToRemove := make(map[string]bool)
+	if sections[sectionConstraints] {
+		fieldsToRemove["constraints"] = true
+	}
+	if sections[sectionMetadataPolicyCrit] {
+		fieldsToRemove["metadata_policy_crit"] = true
+	}
+	if sections[sectionMetadataPolicies] {
+		fieldsToRemove["metadata_policy_file"] = true
+	}
+	if sections[sectionConfigLifetime] {
+		fieldsToRemove["configuration_lifetime"] = true
+	}
+	if sections[sectionAuthorityHints] {
+		fieldsToRemove["authority_hints"] = true
+	}
+	if sections[sectionMetadata] {
+		fieldsToRemove["federation_entity_metadata"] = true
+	}
+	if sections[sectionTrustMarkIssuers] {
+		fieldsToRemove["trust_mark_issuers"] = true
+	}
+	if sections[sectionTrustMarkOwners] {
+		fieldsToRemove["trust_mark_owners"] = true
+	}
+
+	removeFieldsFromMapping(node, fieldsToRemove)
+}
+
+// removeEndpointsFields removes migrated fields from the endpoints section
+func removeEndpointsFields(node *yaml.Node, sections map[migrationSection]bool) {
+	if node.Kind != yaml.MappingNode {
+		return
+	}
+
+	// Look for nested fields
+	for i := 0; i < len(node.Content); i += 2 {
+		if i+1 >= len(node.Content) {
+			break
+		}
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+
+		switch keyNode.Value {
+		case "fetch":
+			if sections[sectionStatementLifetime] && valueNode.Kind == yaml.MappingNode {
+				removeFieldsFromMapping(valueNode, map[string]bool{"statement_lifetime": true})
+			}
+		case "trust_mark":
+			if sections[sectionTrustMarkSpecs] && valueNode.Kind == yaml.MappingNode {
+				removeFieldsFromMapping(valueNode, map[string]bool{"trust_mark_specs": true})
+			}
+		}
+	}
+}
+
+// removeFieldsFromMapping removes specified fields from a mapping node
+func removeFieldsFromMapping(node *yaml.Node, fieldsToRemove map[string]bool) {
+	if node.Kind != yaml.MappingNode {
+		return
+	}
+
+	newContent := make([]*yaml.Node, 0, len(node.Content))
+	for i := 0; i < len(node.Content); i += 2 {
+		if i+1 >= len(node.Content) {
+			break
+		}
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+
+		if !fieldsToRemove[keyNode.Value] {
+			newContent = append(newContent, keyNode, valueNode)
+		}
+	}
+	node.Content = newContent
 }
