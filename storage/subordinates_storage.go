@@ -21,7 +21,10 @@ func (s *SubordinateStorage) Add(info model.ExtendedSubordinateInfo) error {
 	return s.db.Transaction(
 		func(tx *gorm.DB) error {
 			// Then save the subordinate info
-			if err := tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(&info).Error; err != nil {
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "entity_id"}},
+				UpdateAll: true,
+			}).Create(&info).Error; err != nil {
 				return err
 			}
 			// Insert entity type rows from pre-populated join slice (UnmarshalJSON)
@@ -29,7 +32,10 @@ func (s *SubordinateStorage) Add(info model.ExtendedSubordinateInfo) error {
 				for i := range info.SubordinateEntityTypes {
 					info.SubordinateEntityTypes[i].SubordinateID = info.ID
 				}
-				if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&info.SubordinateEntityTypes).Error; err != nil {
+				if err := tx.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "subordinate_id"}, {Name: "entity_type"}},
+					DoNothing: true,
+				}).Create(&info.SubordinateEntityTypes).Error; err != nil {
 					return errors.Wrap(err, "failed to insert subordinate entity types")
 				}
 			}
@@ -159,7 +165,10 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 				return result.Error
 			}
 			info.ID = dbInfo.ID
-			return tx.Clauses(clause.OnConflict{UpdateAll: true}).Create(&info).Error
+			return tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "entity_id"}},
+				UpdateAll: true,
+			}).Create(&info).Error
 		},
 	)
 }

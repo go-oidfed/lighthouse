@@ -241,7 +241,10 @@ func (s *TrustMarkedEntitiesStorage) writeStatus(trustMarkType, entityID string,
 				EntityID:        entityID,
 				Status:          status,
 			}
-			return tx.Clauses(clause.OnConflict{DoUpdates: clause.AssignmentColumns([]string{"status"})}).Create(&entity).Error
+			return tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "trust_mark_spec_id"}, {Name: "entity_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"status"}),
+			}).Create(&entity).Error
 		},
 	)
 }
