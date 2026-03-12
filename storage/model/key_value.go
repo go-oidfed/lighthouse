@@ -15,7 +15,6 @@ const (
 	KeyValueKeyMetadataPolicy     = "metadata_policy"
 	KeyValueKeyMetadata           = "metadata"
 	KeyValueKeyConstraints        = "constraints"
-	KeyValueKeyCriticalClaims     = "crit"
 	KeyValueKeyAlg                = "alg"
 	KeyValueKeyRSAKeyLen          = "rsa_key_len"
 	KeyValueKeyKeyRotation        = "key_rotation"

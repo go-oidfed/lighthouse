@@ -34,10 +34,8 @@ type migrationSigningConf struct {
 
 // migrationFederationConf holds federation config values that should be migrated to DB
 type migrationFederationConf struct {
-	EntityID                     string                          `yaml:"entity_id"`
 	AuthorityHints               []string                        `yaml:"authority_hints"`
 	Constraints                  *oidfed.ConstraintSpecification `yaml:"constraints"`
-	CriticalExtensions           []string                        `yaml:"crit"`
 	MetadataPolicyCrit           []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
 	MetadataPolicyFile           string                          `yaml:"metadata_policy_file"`
 	ConfigurationLifetime        duration.DurationOption         `yaml:"configuration_lifetime"`

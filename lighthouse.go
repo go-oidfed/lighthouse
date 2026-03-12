@@ -80,16 +80,6 @@ type LightHouse struct {
 	trustMarkConfigProvider *storage.TrustMarkConfigProvider
 }
 
-// SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
-// SubordinateStatements issued by this LightHouse
-type SubordinateStatementsConfig struct {
-	SubordinateStatementLifetime time.Duration
-	Constraints                  *oidfed.ConstraintSpecification
-	CriticalExtensions           []string
-	MetadataPolicyCrit           []oidfed.PolicyOperatorName
-	Extra                        map[string]any
-}
-
 // FiberServerConfig is the fiber.Config that is used to init the http fiber.App
 var FiberServerConfig = fiber.Config{
 	ReadTimeout:    3 * time.Second,
