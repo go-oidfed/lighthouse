@@ -3,4 +3,4 @@ arrange:
   - features
   - config
   - deployment
-  - migration.md
+  - migration

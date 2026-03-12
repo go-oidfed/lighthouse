@@ -1,3 +1,7 @@
+---
+icon: material/map-check
+---
+
 # Overview of Supported and Planned Features
 
 ## Endpoints

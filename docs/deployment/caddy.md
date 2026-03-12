@@ -1,5 +1,5 @@
 ---
-title: Caddy Docker Deployment
+title: Caddy & Docker
 description: Deployment of LightHouse with a Caddy reverse proxy.
 icon: simple/caddy
 #icon: simple/docker

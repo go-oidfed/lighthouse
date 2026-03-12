@@ -1,3 +1,7 @@
+---
+icon: material/file-cog
+---
+
 # Config
 LightHouse is configured through a configuration file named `config.yaml` and/or 
 environment variables.
