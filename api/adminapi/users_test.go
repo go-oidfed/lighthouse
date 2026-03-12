@@ -21,8 +21,8 @@ func setupUsersApp(t *testing.T, store model.UsersStore) *fiber.App {
 	return app
 }
 
-// doRequest is a helper to execute a request against the test app and return the response.
-func doRequest(t *testing.T, app *fiber.App, method, path string, body any) *http.Response {
+// doJSONRequest is a helper to execute a request against the test app and return the response.
+func doJSONRequest(t *testing.T, app *fiber.App, method, path string, body any) *http.Response {
 	t.Helper()
 	var reqBody io.Reader
 	if body != nil {
@@ -83,7 +83,7 @@ func TestListUsers(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/", nil)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/", nil)
 		assertStatus(t, resp, fiber.StatusOK)
 
 		list := decodeJSONArray(t, resp)
@@ -102,7 +102,7 @@ func TestListUsers(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/", http.NoBody)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/", http.NoBody)
 		assertStatus(t, resp, fiber.StatusOK)
 
 		list := decodeJSONArray(t, resp)
@@ -118,7 +118,7 @@ func TestListUsers(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/", nil)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/", nil)
 		assertStatus(t, resp, fiber.StatusInternalServerError)
 
 		body := decodeJSON(t, resp)
@@ -144,7 +144,7 @@ func TestCreateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
+		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
 			"username":     "alice",
 			"password":     "strongpass",
 			"display_name": "Alice",
@@ -163,7 +163,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("MissingUsername", func(t *testing.T) {
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
+		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
 			"password": "strongpass",
 		})
 		assertStatus(t, resp, fiber.StatusBadRequest)
@@ -177,7 +177,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("MissingPassword", func(t *testing.T) {
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
+		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
 			"username": "alice",
 		})
 		assertStatus(t, resp, fiber.StatusBadRequest)
@@ -191,7 +191,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("EmptyBody", func(t *testing.T) {
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{})
+		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{})
 		assertStatus(t, resp, fiber.StatusBadRequest)
 	})
 
@@ -212,7 +212,7 @@ func TestCreateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
+		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
 			"username": "alice",
 			"password": "strongpass",
 		})
@@ -231,7 +231,7 @@ func TestCreateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
+		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
 			"username": "alice",
 			"password": "strongpass",
 		})
@@ -260,7 +260,7 @@ func TestGetUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/alice", nil)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/alice", nil)
 		assertStatus(t, resp, fiber.StatusOK)
 
 		body := decodeJSON(t, resp)
@@ -279,7 +279,7 @@ func TestGetUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/unknown", nil)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/unknown", nil)
 		assertStatus(t, resp, fiber.StatusNotFound)
 
 		body := decodeJSON(t, resp)
@@ -295,7 +295,7 @@ func TestGetUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/alice", nil)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/alice", nil)
 		assertStatus(t, resp, fiber.StatusInternalServerError)
 
 		body := decodeJSON(t, resp)
@@ -325,7 +325,7 @@ func TestUpdateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]string{
+		resp := doJSONRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]string{
 			"display_name": "Alice Updated",
 		})
 		assertStatus(t, resp, fiber.StatusOK)
@@ -351,7 +351,7 @@ func TestUpdateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]string{
+		resp := doJSONRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]string{
 			"password": "newpass123",
 		})
 		assertStatus(t, resp, fiber.StatusOK)
@@ -374,7 +374,7 @@ func TestUpdateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]any{
+		resp := doJSONRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]any{
 			"disabled": true,
 		})
 		assertStatus(t, resp, fiber.StatusOK)
@@ -392,7 +392,7 @@ func TestUpdateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "PUT", "/api/v1/admin/users/unknown", map[string]string{
+		resp := doJSONRequest(t, app, "PUT", "/api/v1/admin/users/unknown", map[string]string{
 			"display_name": "Test",
 		})
 		assertStatus(t, resp, fiber.StatusNotFound)
@@ -420,7 +420,7 @@ func TestUpdateUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]string{
+		resp := doJSONRequest(t, app, "PUT", "/api/v1/admin/users/alice", map[string]string{
 			"display_name": "Test",
 		})
 		assertStatus(t, resp, fiber.StatusInternalServerError)
@@ -447,7 +447,7 @@ func TestDeleteUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "DELETE", "/api/v1/admin/users/alice", nil)
+		resp := doJSONRequest(t, app, "DELETE", "/api/v1/admin/users/alice", nil)
 		assertStatus(t, resp, fiber.StatusNoContent)
 
 		if !deleteCalled {
@@ -462,7 +462,7 @@ func TestDeleteUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "DELETE", "/api/v1/admin/users/unknown", nil)
+		resp := doJSONRequest(t, app, "DELETE", "/api/v1/admin/users/unknown", nil)
 		assertStatus(t, resp, fiber.StatusNotFound)
 
 		body := decodeJSON(t, resp)
@@ -478,7 +478,7 @@ func TestDeleteUser(t *testing.T) {
 			},
 		}
 		app := setupUsersApp(t, store)
-		resp := doRequest(t, app, "DELETE", "/api/v1/admin/users/alice", nil)
+		resp := doJSONRequest(t, app, "DELETE", "/api/v1/admin/users/alice", nil)
 		assertStatus(t, resp, fiber.StatusInternalServerError)
 
 		body := decodeJSON(t, resp)
@@ -511,7 +511,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 			},
 		}
 		app := newAppWithAuth(store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/", nil)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/", nil)
 		assertStatus(t, resp, fiber.StatusOK)
 	})
 
@@ -522,7 +522,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 			},
 		}
 		app := newAppWithAuth(store)
-		resp := doRequest(t, app, "GET", "/api/v1/admin/users/", nil)
+		resp := doJSONRequest(t, app, "GET", "/api/v1/admin/users/", nil)
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 
@@ -556,7 +556,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 			},
 		}
 		app := newAppWithAuth(store)
-		resp := doRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
+		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
 			"username": "newuser",
 			"password": "pass",
 		})
