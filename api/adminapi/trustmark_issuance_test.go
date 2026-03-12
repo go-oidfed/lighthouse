@@ -2,7 +2,6 @@ package adminapi
 
 import (
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,12 +16,12 @@ import (
 
 type mockTrustMarkSpecStore struct {
 	model.TrustMarkSpecStore
-	listFn                 func() ([]model.TrustMarkSpec, error)
-	createFn               func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error)
-	getFn                  func(id string) (*model.TrustMarkSpec, error)
-	updateFn               func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error)
-	patchFn                func(id string, updates map[string]any) (*model.TrustMarkSpec, error)
-	deleteFn               func(id string) error
+	listFn   func() ([]model.TrustMarkSpec, error)
+	createFn func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error)
+	getFn    func(id string) (*model.TrustMarkSpec, error)
+	updateFn func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error)
+	patchFn  func(id string, updates map[string]any) (*model.TrustMarkSpec, error)
+	deleteFn func(id string) error
 
 	listSubjectsFn        func(specID string, status *model.Status) ([]model.TrustMarkSubject, error)
 	createSubjectFn       func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error)
@@ -114,25 +113,12 @@ func setupTrustMarkIssuanceApp(store model.TrustMarkSpecStore) *fiber.App {
 	return app
 }
 
-func doTrustMarkReq(t *testing.T, app *fiber.App, req *http.Request) (*http.Response, []byte) {
-	t.Helper()
-	resp, err := app.Test(req, -1)
-	if err != nil {
-		t.Fatalf("Request %s %s failed: %v", req.Method, req.URL.Path, err)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Failed to read response body: %v", err)
-	}
-	return resp, body
-}
-
 // --- TESTS ---
 
 func TestTrustMarkSpecHandlers_List(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			listFn: func() ([]model.TrustMarkSpec, error) {
 				return []model.TrustMarkSpec{{TrustMarkType: "type1"}}, nil
@@ -141,7 +127,7 @@ func TestTrustMarkSpecHandlers_List(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec", http.NoBody)
-		resp, body := doTrustMarkReq(t, app, req)
+		resp, body := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -152,7 +138,7 @@ func TestTrustMarkSpecHandlers_List(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			listFn: func() ([]model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
@@ -161,7 +147,7 @@ func TestTrustMarkSpecHandlers_List(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -172,7 +158,7 @@ func TestTrustMarkSpecHandlers_List(t *testing.T) {
 func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			createFn: func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return spec, nil
@@ -183,7 +169,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 		body := `{"trust_mark_type": "type1"}`
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, respBody := doTrustMarkReq(t, app, req)
+		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusCreated {
 			t.Errorf("Expected 201, got %d", resp.StatusCode)
@@ -194,12 +180,12 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec", strings.NewReader(`invalid json`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -207,12 +193,12 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	})
 
 	t.Run("MissingType", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -220,7 +206,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			createFn: func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, model.AlreadyExistsError("exists")
@@ -230,7 +216,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec", strings.NewReader(`{"trust_mark_type": "type1"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusConflict {
 			t.Errorf("Expected 409, got %d", resp.StatusCode)
@@ -238,7 +224,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			createFn: func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
@@ -248,7 +234,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec", strings.NewReader(`{"trust_mark_type": "type1"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -259,7 +245,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getFn: func(id string) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{TrustMarkType: "type1"}, nil
@@ -268,7 +254,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1", http.NoBody)
-		resp, body := doTrustMarkReq(t, app, req)
+		resp, body := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -279,7 +265,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getFn: func(id string) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("not found")
@@ -288,7 +274,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -296,7 +282,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getFn: func(id string) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
@@ -305,7 +291,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -316,7 +302,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			updateFn: func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return spec, nil
@@ -327,7 +313,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 		body := `{"trust_mark_type": "type2"}`
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, respBody := doTrustMarkReq(t, app, req)
+		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -338,12 +324,12 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1", strings.NewReader(`invalid`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -351,12 +337,12 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("MissingType", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -364,7 +350,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			updateFn: func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("not found")
@@ -374,7 +360,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1", strings.NewReader(`{"trust_mark_type": "type2"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -382,7 +368,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			updateFn: func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
@@ -392,7 +378,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1", strings.NewReader(`{"trust_mark_type": "type2"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -403,7 +389,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			patchFn: func(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{TrustMarkType: "type3"}, nil
@@ -414,7 +400,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 		body := `{"trust_mark_type": "type3"}`
 		req := httptest.NewRequest("PATCH", "/trust-marks/issuance-spec/1", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, respBody := doTrustMarkReq(t, app, req)
+		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -425,12 +411,12 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PATCH", "/trust-marks/issuance-spec/1", strings.NewReader(`invalid`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -438,7 +424,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			patchFn: func(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("not found")
@@ -448,7 +434,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 
 		req := httptest.NewRequest("PATCH", "/trust-marks/issuance-spec/1", strings.NewReader(`{"trust_mark_type": "type3"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -456,7 +442,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			patchFn: func(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
@@ -466,7 +452,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 
 		req := httptest.NewRequest("PATCH", "/trust-marks/issuance-spec/1", strings.NewReader(`{"trust_mark_type": "type3"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -477,7 +463,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			deleteFn: func(id string) error {
 				return nil
@@ -486,7 +472,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNoContent {
 			t.Errorf("Expected 204, got %d", resp.StatusCode)
@@ -494,7 +480,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			deleteFn: func(id string) error {
 				return model.NotFoundError("not found")
@@ -503,7 +489,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -511,7 +497,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			deleteFn: func(id string) error {
 				return errors.New("db error")
@@ -520,7 +506,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -531,7 +517,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			listSubjectsFn: func(specID string, status *model.Status) ([]model.TrustMarkSubject, error) {
 				return []model.TrustMarkSubject{{EntityID: "sub1"}}, nil
@@ -540,7 +526,7 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects", http.NoBody)
-		resp, body := doTrustMarkReq(t, app, req)
+		resp, body := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -551,11 +537,11 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 	})
 
 	t.Run("InvalidStatusFilter", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects?status=invalid", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -563,7 +549,7 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			listSubjectsFn: func(specID string, status *model.Status) ([]model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
@@ -572,7 +558,7 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -583,7 +569,7 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			createSubjectFn: func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return subject, nil
@@ -594,7 +580,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 		body := `{"entity_id": "sub1"}`
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, respBody := doTrustMarkReq(t, app, req)
+		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusCreated {
 			t.Errorf("Expected 201, got %d", resp.StatusCode)
@@ -605,12 +591,12 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(`invalid`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -618,12 +604,12 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	})
 
 	t.Run("MissingEntityID", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -631,7 +617,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			createSubjectFn: func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
@@ -641,7 +627,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects", strings.NewReader(`{"entity_id": "sub1"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -652,7 +638,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{EntityID: "sub1"}, nil
@@ -661,7 +647,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
-		resp, body := doTrustMarkReq(t, app, req)
+		resp, body := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -672,7 +658,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
@@ -681,7 +667,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -689,7 +675,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
@@ -698,7 +684,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -709,7 +695,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return subject, nil
@@ -720,7 +706,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 		body := `{"entity_id": "sub2"}`
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, respBody := doTrustMarkReq(t, app, req)
+		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -731,12 +717,12 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`invalid`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -744,12 +730,12 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("MissingEntityID", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -757,7 +743,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
@@ -767,7 +753,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`{"entity_id": "sub2"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -775,7 +761,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
@@ -785,7 +771,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2", strings.NewReader(`{"entity_id": "sub2"}`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -796,7 +782,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			deleteSubjectFn: func(specID, subjectID string) error {
 				return nil
@@ -805,7 +791,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNoContent {
 			t.Errorf("Expected 204, got %d", resp.StatusCode)
@@ -813,7 +799,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			deleteSubjectFn: func(specID, subjectID string) error {
 				return model.NotFoundError("not found")
@@ -822,7 +808,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -830,7 +816,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			deleteSubjectFn: func(specID, subjectID string) error {
 				return errors.New("db error")
@@ -839,7 +825,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/1/subjects/2", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -850,7 +836,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{Status: status}, nil
@@ -860,7 +846,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("inactive"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, body := doTrustMarkReq(t, app, req)
+		resp, body := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -871,12 +857,12 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	})
 
 	t.Run("MissingStatus", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("   "))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -884,12 +870,12 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	})
 
 	t.Run("InvalidStatus", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("unknown"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -897,7 +883,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
@@ -907,7 +893,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("active"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -915,7 +901,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
@@ -925,7 +911,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/status", strings.NewReader("active"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusInternalServerError {
 			t.Errorf("Expected 500, got %d", resp.StatusCode)
@@ -936,7 +922,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Parallel()
 	t.Run("GetAdditionalClaims_SuccessWithClaims", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{AdditionalClaims: map[string]any{"claim1": "val1"}}, nil
@@ -945,7 +931,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
-		resp, body := doTrustMarkReq(t, app, req)
+		resp, body := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -956,7 +942,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("GetAdditionalClaims_SuccessEmptyClaims", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{AdditionalClaims: nil}, nil
@@ -965,7 +951,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
-		resp, body := doTrustMarkReq(t, app, req)
+		resp, body := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -976,7 +962,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("GetAdditionalClaims_NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
@@ -985,7 +971,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("GET", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -993,7 +979,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("PutAdditionalClaims_Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{}, nil
@@ -1007,7 +993,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 		body := `{"claim1": "val1"}`
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, respBody := doTrustMarkReq(t, app, req)
+		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -1018,12 +1004,12 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("PutAdditionalClaims_InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupTrustMarkIssuanceApp(&mockTrustMarkSpecStore{})
 
 		req := httptest.NewRequest("PUT", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", strings.NewReader(`invalid`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected 400, got %d", resp.StatusCode)
@@ -1031,7 +1017,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("CopyAdditionalClaims_Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getFn: func(id string) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{AdditionalClaims: map[string]any{"spec_claim": "spec_val"}}, nil
@@ -1046,7 +1032,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
-		resp, respBody := doTrustMarkReq(t, app, req)
+		resp, respBody := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected 200, got %d", resp.StatusCode)
@@ -1057,7 +1043,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("CopyAdditionalClaims_SpecNotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getFn: func(id string) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("spec not found")
@@ -1066,7 +1052,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
@@ -1074,7 +1060,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("CopyAdditionalClaims_SubjectNotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
 			getFn: func(id string) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{}, nil
@@ -1086,7 +1072,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 		app := setupTrustMarkIssuanceApp(mockStore)
 
 		req := httptest.NewRequest("POST", "/trust-marks/issuance-spec/1/subjects/2/additional-claims", http.NoBody)
-		resp, _ := doTrustMarkReq(t, app, req)
+		resp, _ := doRequest(t, app, req)
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404, got %d", resp.StatusCode)
