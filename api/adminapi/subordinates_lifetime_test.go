@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func setupSubordinateLifetimeApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestSubordinateLifetime(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success/Default", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateLifetimeApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
@@ -49,7 +50,7 @@ func TestSubordinateLifetime(t *testing.T) {
 	})
 
 	t.Run("PUT and GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateLifetimeApp(t)
 
 		// PUT new lifetime
@@ -87,7 +88,7 @@ func TestSubordinateLifetime(t *testing.T) {
 	})
 
 	t.Run("PUT InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateLifetimeApp(t)
 
 		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader("bad json"))
@@ -96,6 +97,69 @@ func TestSubordinateLifetime(t *testing.T) {
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PUT EmptyBody", func(t *testing.T) {
+		t.Parallel()
+		app, _ := setupSubordinateLifetimeApp(t)
+
+		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader(""))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PUT NegativeValue", func(t *testing.T) {
+		t.Parallel()
+		app, _ := setupSubordinateLifetimeApp(t)
+
+		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader("-100"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("GET StorageError", func(t *testing.T) {
+		t.Parallel()
+		kv := &mockKeyValueStore{
+			getAsFn: func(scope, key string, out any) (bool, error) {
+				return false, errors.New("db read error")
+			},
+		}
+		app := fiber.New()
+		registerGeneralSubordinateLifetime(app, kv)
+
+		req := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 500, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("PUT StorageError", func(t *testing.T) {
+		t.Parallel()
+		kv := &mockKeyValueStore{
+			setAnyFn: func(scope, key string, v any) error {
+				return errors.New("db write error")
+			},
+		}
+		app := fiber.New()
+		registerGeneralSubordinateLifetime(app, kv)
+
+		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader("3600"))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := app.Test(req, -1)
+
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("Expected status 500, got %d", resp.StatusCode)
 		}
 	})
 }
