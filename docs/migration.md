@@ -950,6 +950,7 @@ The following configuration fields are **not** migrated by `config2db`:
 | Config Path | Reason |
 |-------------|--------|
 | `federation_data.crit` | The `crit` attribute was used to mark critical claims in subordinate entity statements. This functionality has been replaced: additional claims can now be added to entity statements via the Admin API (`POST /admin/api/v1/subordinates/{id}/additional-claims`), and each claim can be individually marked as critical. Since the old config only specified which claims were critical but not the claim values themselves, there is nothing to migrate. |
+| `federation_data.trust_anchors` | This field was not used at runtime and is therefore not migrated. |
 
 ### Fields that remain in config
 
