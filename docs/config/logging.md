@@ -25,6 +25,7 @@ The following options are available:
 ### `dir`
 <span class="badge badge-purple" title="Value Type">directory path</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_ACCESS_DIR`</span>
 
 The `dir` option is used to configure the directory where the log file 
 should be stored.
@@ -34,6 +35,7 @@ If not set, LightHouse will not log to file.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`false`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_ACCESS_STDERR`</span>
 
 The `stderr` option indicates if LightHouse logs to `stderr`.
 
@@ -62,8 +64,12 @@ In additional the following options can be used:
 <span class="badge badge-purple" title="Value Type">enum</span>
 <span class="badge badge-blue" title="Default Value">info</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_LEVEL`</span>
 
 The `level` option sets the minimal log level that should be logged.
+
+!!! tip "Shortcut"
+    You can also use `LH_LOG_LEVEL` as a shortcut for `LH_LOGGING_INTERNAL_LEVEL`.
 
 Valid values are:
 
@@ -92,6 +98,7 @@ not be logged - for that particular request.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`false`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_SMART_ENABLED`</span>
 
 The `enabled` option is used to enable smart logging.
 
@@ -99,6 +106,7 @@ The `enabled` option is used to enable smart logging.
 <span class="badge badge-purple" title="Value Type">directory path</span>
 <span class="badge badge-blue" title="Default Value">same as the internal logging dir</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_SMART_DIR`</span>
 
 The `dir` option is used to specify the directory where smart error log 
 files should be stored.
@@ -128,6 +136,7 @@ The following options are available:
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_BANNER_LOGO`</span>
 
 The `logo` option controls printing of the Lighthouse logo banner on startup.
 
@@ -135,5 +144,6 @@ The `logo` option controls printing of the Lighthouse logo banner on startup.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_BANNER_VERSION`</span>
 
 The `version` option controls printing of the version banner on startup.

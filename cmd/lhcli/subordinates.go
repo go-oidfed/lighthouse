@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/pkg/errors"
@@ -12,7 +11,7 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 var subordinatesCmd = &cobra.Command{
@@ -48,6 +47,13 @@ var subordinatesManageRequestsCmd = &cobra.Command{
 	Long:  "Manage subordinate requests interactively",
 	RunE:  manageSubordinateRequests,
 }
+var subordinatesStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Update subordinate status",
+	Long:  `Update the status of a subordinate to one of: active, blocked, pending, inactive`,
+	Args:  cobra.ExactArgs(2),
+	RunE:  updateSubordinateStatus,
+}
 
 var entityTypes []string
 var onlyIDs bool
@@ -64,6 +70,7 @@ func init() {
 	)
 	subordinatesRemoveCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
 	subordinatesBlockCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
+	subordinatesStatusCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
 	subordinatesManageRequestsCmd.Flags().StringVarP(
 		&configFile, "config", "c", "config.yaml", "the config file to use",
 	)
@@ -77,11 +84,12 @@ func init() {
 	subordinatesCmd.AddCommand(subordinatesAddCmd)
 	subordinatesCmd.AddCommand(subordinatesRemoveCmd)
 	subordinatesCmd.AddCommand(subordinatesBlockCmd)
+	subordinatesCmd.AddCommand(subordinatesStatusCmd)
 	subordinatesCmd.AddCommand(subordinatesManageRequestsCmd)
 	rootCmd.AddCommand(subordinatesCmd)
 }
 
-func addSubordinate(cmd *cobra.Command, args []string) error {
+func addSubordinate(_ *cobra.Command, args []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -122,21 +130,25 @@ func addSubordinate(cmd *cobra.Command, args []string) error {
 	if len(entityTypes) == 0 {
 		entityTypes = entityConfig.Metadata.GuessEntityTypes()
 	}
-	info := storage.SubordinateInfo{
-		JWKS:        entityConfig.JWKS,
-		EntityTypes: entityTypes,
-		EntityID:    entityConfig.Subject,
+	subEntityTypes := make([]model.SubordinateEntityType, len(entityTypes))
+	for i, t := range entityTypes {
+		subEntityTypes[i] = model.SubordinateEntityType{EntityType: t}
 	}
-	if err := subordinateStorage.Write(
-		entityConfig.Subject, info,
-	); err != nil {
+	info := model.ExtendedSubordinateInfo{
+		JWKS: model.NewJWKS(entityConfig.JWKS),
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID:               entityConfig.Subject,
+			SubordinateEntityTypes: subEntityTypes,
+		},
+	}
+	if err := subordinateStorage.Add(info); err != nil {
 		return errors.Wrap(err, "failed to add subordinate to storage")
 	}
 	fmt.Println("subordinate added successfully")
 	return nil
 }
 
-func removeSubordinate(cmd *cobra.Command, args []string) error {
+func removeSubordinate(_ *cobra.Command, args []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -153,7 +165,7 @@ func removeSubordinate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func blockSubordinate(cmd *cobra.Command, args []string) error {
+func blockSubordinate(_ *cobra.Command, args []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -163,14 +175,14 @@ func blockSubordinate(cmd *cobra.Command, args []string) error {
 
 	entityID := args[0]
 
-	if err := subordinateStorage.Block(entityID); err != nil {
+	if err := subordinateStorage.UpdateStatus(entityID, model.StatusBlocked); err != nil {
 		return errors.Wrap(err, "failed to block subordinate in storage")
 	}
 	fmt.Println("subordinate blocked successfully")
 	return nil
 }
 
-func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
+func updateSubordinateStatus(_ *cobra.Command, args []string) error {
 	if err := loadConfig(); err != nil {
 		return err
 	}
@@ -178,51 +190,71 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 		return errors.Wrap(err, "failed to load subordinates from storage")
 	}
 
-	pendingQ := subordinateStorage.Pending()
-	var pendingIDs []string
-	var pendingInfos []storage.SubordinateInfo
-	var err error
-	if onlyIDs {
-		pendingIDs, err = pendingQ.EntityIDs()
-	} else {
-		pendingInfos, err = pendingQ.Subordinates()
-	}
+	entityID := args[0]
+	statusStr := args[1]
+
+	status, err := model.ParseStatus(statusStr)
 	if err != nil {
+		return errors.Wrap(err, "invalid status (valid values: active, blocked, pending, inactive)")
+	}
+
+	if err := subordinateStorage.UpdateStatus(entityID, status); err != nil {
+		return errors.Wrap(err, "failed to update subordinate status")
+	}
+	fmt.Printf("subordinate status updated to '%s' successfully\n", status)
+	return nil
+}
+
+func manageSubordinateRequests(_ *cobra.Command, _ []string) error {
+	if err := loadConfig(); err != nil {
 		return err
 	}
-	if len(pendingIDs) == 0 && len(pendingInfos) == 0 {
+	if err := subordinateStorage.Load(); err != nil {
+		return errors.Wrap(err, "failed to load subordinates from storage")
+	}
+
+	pending, err := subordinateStorage.GetByStatus(model.StatusPending)
+	if err != nil {
+		return errors.Wrap(err, "failed to get pending subordinates")
+	}
+	if len(pending) == 0 {
 		fmt.Println("No pending requests")
 		return nil
 	}
 	if printFlag {
-		str := strings.Join(pendingIDs, "\n")
-		if !onlyIDs {
-			for _, info := range pendingInfos {
-				s, err := stringSubordinateInfo(info)
+		var str string
+		for _, info := range pending {
+			printStr := info.EntityID
+			if !onlyIDs {
+				extended, err := subordinateStorage.Get(info.EntityID)
 				if err != nil {
 					return err
 				}
-				str += fmt.Sprintf("%s\n", s)
+				printStr, err = stringSubordinateInfo(*extended)
+				if err != nil {
+					return err
+				}
 			}
+			str += fmt.Sprintf("%s\n", printStr)
 		}
 		fmt.Printf("The following entities have pending requests:\n%s\n\n", str)
 		return nil
 	}
-	if onlyIDs {
-		for _, entityID := range pendingIDs {
-			if err = promptInSubordinateRequest(entityID, entityID); err != nil {
-				return err
-			}
-		}
-	} else {
-		for _, infos := range pendingInfos {
-			str, err := stringSubordinateInfo(infos)
+
+	for _, info := range pending {
+		printStr := info.EntityID
+		if !onlyIDs {
+			extended, err := subordinateStorage.Get(info.EntityID)
 			if err != nil {
 				return err
 			}
-			if err = promptInSubordinateRequest(infos.EntityID, str); err != nil {
+			printStr, err = stringSubordinateInfo(*extended)
+			if err != nil {
 				return err
 			}
+		}
+		if err = promptInSubordinateRequest(info.EntityID, printStr); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -231,12 +263,12 @@ func manageSubordinateRequests(cmd *cobra.Command, _ []string) error {
 func promptInSubordinateRequest(entityID, str string) error {
 	approved := promptApproval("Do you approve entity '%s'", str)
 	if approved {
-		return subordinateStorage.Approve(entityID)
+		return subordinateStorage.UpdateStatus(entityID, model.StatusActive)
 	}
-	return subordinateStorage.Block(entityID)
+	return subordinateStorage.UpdateStatus(entityID, model.StatusBlocked)
 }
 
-func stringSubordinateInfo(info storage.SubordinateInfo) (string, error) {
+func stringSubordinateInfo(info model.ExtendedSubordinateInfo) (string, error) {
 	data, err := json.Marshal(info)
 	if err != nil {
 		return "", err

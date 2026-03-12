@@ -7,19 +7,19 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddTrustMarkRequestEndpoint adds an endpoint where entities can request to
 // be entitled for a trust mark
 func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 	endpoint EndpointConf,
-	store storage.TrustMarkedEntitiesStorageBackend,
+	store model.TrustMarkedEntitiesStorageBackend,
 ) {
-	if fed.Metadata.FederationEntity.Extra == nil {
-		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
+	if fed.fedMetadata.Extra == nil {
+		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.Metadata.FederationEntity.Extra["federation_trust_mark_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.Extra["federation_trust_mark_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}
@@ -59,16 +59,16 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			switch status {
-			case storage.StatusActive:
+			case model.StatusActive:
 				ctx.Status(fiber.StatusNoContent)
 				return nil
-			case storage.StatusBlocked:
+			case model.StatusBlocked:
 				ctx.Status(fiber.StatusForbidden)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("subject cannot obtain this trust mark"))
-			case storage.StatusPending:
+			case model.StatusPending:
 				ctx.Status(fiber.StatusAccepted)
 				return nil
-			case storage.StatusInactive:
+			case model.StatusInactive:
 				fallthrough
 			default:
 				if err = store.Request(trustMarkType, sub); err != nil {

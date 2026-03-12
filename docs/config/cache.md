@@ -8,6 +8,7 @@ Currently, only Redis is supported (in additional to in-memory caching).
 ## `redis_addr`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_REDIS_ADDR`</span>
 
 The `redis_addr` option sets the address of a Redis server to be used as a cache backend.
 If set, Lighthouse initializes Redis caching at startup. If not set or empty, no external cache is used and in-memory defaults apply.
@@ -27,6 +28,7 @@ Typical formats:
 ## `username`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_USERNAME`</span>
 
 Sets the Redis ACL username used to authenticate to the server.
 Leave empty when Redis is configured without ACL users.
@@ -42,6 +44,7 @@ Leave empty when Redis is configured without ACL users.
 ## `password`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_PASSWORD`</span>
 
 Sets the password for Redis authentication. Used with or without `username`
 depending on your Redis setup.
@@ -57,6 +60,7 @@ depending on your Redis setup.
 ## `redis_db`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_REDIS_DB`</span>
 
 Selects the Redis logical database index to use. Defaults to `0` if not
 set. Common deployments use `0`; choose another index when sharing a
@@ -73,6 +77,7 @@ Redis instance with other applications.
 ## `disabled`
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_DISABLED`</span>
 
 Disables caching entirely when set to `true`. Lighthouse uses a no-op cache and does not persist or reuse responses.
 
@@ -90,6 +95,7 @@ Disables caching entirely when set to `true`. Lighthouse uses a no-op cache and 
 ## `max_lifetime`
 <span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_MAX_LIFETIME`</span>
 
 Sets the maximum lifetime for cached entries. When configured, this upper bound controls how long items may remain 
 in the cache before they are considered expired and refreshed. If unset or `0`, no upper limit is used.

@@ -4,10 +4,27 @@ icon: material/server-network
 
 Under the `server` config option the (http) server can be configured.
 
+## `ip_listen`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">0.0.0.0</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_IP_LISTEN`</span>
+
+The `ip_listen` config option is used to set the network address to which to bind to.
+If omitted `0.0.0.0` is used.
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        ip_listen: 127.0.0.1
+    ```
+
 ## `port`
 <span class="badge badge-purple" title="Value Type">integer</span>
 <span class="badge badge-blue" title="Default Value">7672</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_PORT`</span>
 
 The `port` config option is used to set the port at which LightHouse starts 
 the webserver and listens for incoming requests.
@@ -20,6 +37,66 @@ If `tls` is enabled port `443` will be used (and optionally port `80`).
     server:
         port: 4242
     ```
+
+## `prefork`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_PREFORK`</span>
+
+The `prefork` option enables multiple processes listening on the same port.
+When enabled, LightHouse spawns multiple child processes to distribute 
+incoming connections across CPU cores for improved performance.
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        prefork: true
+    ```
+
+!!! warning "Requirements and Recommendations"
+
+    **We recommend to not enable prefork mode.**
+
+    If you still want to use prefork mode, consider the following:
+
+    **Strongly recommended: Use Redis for caching**
+    
+    In prefork mode, each child process has its own in-memory caches 
+    (eligibility cache, issued trust mark cache, etc.). This means cache 
+    invalidations via the Admin API only affect the process that receives 
+    the request. To ensure cache consistency across all processes, it is 
+    **strongly recommended** to configure Redis for caching:
+
+    ```yaml
+    cache:
+        redis_addr: "localhost:6379"
+    ```
+
+    **Database recommendations**
+    
+    - **SQLite**: Not recommended with prefork. Multiple processes writing 
+      to SQLite may cause write conflicts.
+    - **MySQL/PostgreSQL**: Recommended for production deployments with 
+      prefork enabled.
+
+    **Background tasks**
+    
+    Background tasks like the proactive resolver and periodic entity 
+    collector run only in the parent process to avoid duplicate work.
+
+    **Admin API**
+    
+    The Admin API server runs only in the parent process when prefork is 
+    enabled.
+
+!!! note "Running in Docker"
+
+    When using prefork with Docker, ensure the application is started with 
+    a shell. Use `CMD ./lighthouse` or `CMD ["sh", "-c", "/lighthouse"]` 
+    instead of `CMD ["/lighthouse"]` as prefork mode sets environment 
+    variables.
 
 ## `tls`
 
@@ -44,6 +121,7 @@ If `tls` is enabled port `443` will be used.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_ENABLED`</span>
 
 If set to `false` `tls` will be disabled. Otherwise, it will automatically be 
 enabled, if `cert` and `key` are set.
@@ -52,6 +130,7 @@ enabled, if `cert` and `key` are set.
 <span class="badge badge-purple" title="Value Type">boolean</span>
 <span class="badge badge-blue" title="Default Value">`true`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_REDIRECT_HTTP`</span>
 
 The `redirect_http` option determines if port `80` should be redirected to 
 port `443` or not.
@@ -59,18 +138,21 @@ port `443` or not.
 ### `cert`
 <span class="badge badge-purple" title="Value Type">file path</span>
 <span class="badge badge-green" title="If this option is required or optional">required for TLS</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_CERT`</span>
 
 The `cert` option is set to the tls `cert` file.
 
 ### `key`
 <span class="badge badge-purple" title="Value Type">file path</span>
 <span class="badge badge-green" title="If this option is required or optional">required for TLS</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TLS_KEY`</span>
 
 The `key` option is set to the tls `key` file.
 
 ## `trusted_proxies`
 <span class="badge badge-purple" title="Value Type">list of strings</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_TRUSTED_PROXIES`</span>
 
 The `trusted_proxies` option is used to configure a list of trusted proxies
 by IP address or network range (CIDR notation).
@@ -95,11 +177,16 @@ headers, which might be spoofed.
             - "fc00::/7"
     ```
 
-## `forwarded_ip_header`
+```bash
+# Environment variable (comma-separated)
+export LH_SERVER_TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+```
 
+## `forwarded_ip_header`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-blue" title="Default Value">`X-Forwarded-For`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_FORWARDED_IP_HEADER`</span>
 
 The `forwarded_ip_header` option specifies which HTTP header to use for getting the client's real IP address when behind
 a proxy.

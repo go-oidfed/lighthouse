@@ -15,10 +15,10 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 	endpoint EndpointConf, collector oidfed.EntityCollector,
 	allowedTrustAnchors []string, paginationSupported bool,
 ) {
-	if fed.Metadata.FederationEntity.Extra == nil {
-		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
+	if fed.fedMetadata.Extra == nil {
+		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.Metadata.FederationEntity.Extra["federation_collection_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.Extra["federation_collection_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}
@@ -34,7 +34,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'from_entity_id' is not yet supported"))
 			}
 			if req.TrustAnchor == "" {
-				req.TrustAnchor = fed.FederationEntity.EntityID
+				req.TrustAnchor = fed.FederationEntity.EntityID()
 			}
 			if len(allowedTrustAnchors) > 0 {
 				if !slices2.Contains(allowedTrustAnchors, req.TrustAnchor) {
