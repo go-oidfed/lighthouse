@@ -62,15 +62,19 @@ func main() {
 
 	// Warn about SQLite + Prefork combination
 	if c.Server.Prefork && c.Storage.Driver == "sqlite" {
-		log.Warn("Using SQLite with prefork enabled may cause write conflicts. " +
-			"Consider using MySQL or PostgreSQL for production deployments with prefork.")
+		log.Warn(
+			"Using SQLite with prefork enabled may cause write conflicts. " +
+				"Consider using MySQL or PostgreSQL for production deployments with prefork.",
+		)
 	}
 
 	// Warn about prefork without Redis cache
 	if c.Server.Prefork && c.Caching.RedisAddr == "" && !c.Caching.Disabled {
-		log.Warn("Prefork is enabled without Redis cache. In-memory caches will be process-local " +
-			"and may lead to inconsistencies. It is strongly recommended to configure Redis " +
-			"for caching when using prefork mode.")
+		log.Warn(
+			"Prefork is enabled without Redis cache. In-memory caches will be process-local " +
+				"and may lead to inconsistencies. It is strongly recommended to configure Redis " +
+				"for caching when using prefork mode.",
+		)
 	}
 
 	signingConf := c.Signing
@@ -116,6 +120,8 @@ func main() {
 			Enabled:      c.API.Admin.Enabled,
 			UsersEnabled: c.API.Admin.UsersEnabled,
 			Port:         c.API.Admin.Port,
+			ActorHeader:  c.API.Admin.ActorHeader,
+			ActorSource:  c.API.Admin.ActorSource,
 		},
 		statsOpts,
 	)

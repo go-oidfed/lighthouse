@@ -77,7 +77,7 @@ func handlePutSubordinateAdditionalClaims(storages model.Backends) fiber.Handler
 				return err
 			}
 			result = claims
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimsUpdated)
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimsUpdated, WithActor(GetActor(c)))
 		})
 		if err != nil {
 			return handleTxError(c, err)
@@ -110,7 +110,7 @@ func handlePostSubordinateAdditionalClaim(storages model.Backends) fiber.Handler
 				return err
 			}
 			result = claim
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimsUpdated, WithMessage("claim: "+req.Claim))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimsUpdated, WithMessage("claim: "+req.Claim), WithActor(GetActor(c)))
 		})
 		if err != nil {
 			var ae model.AlreadyExistsError
@@ -164,7 +164,7 @@ func handleUpdateSubordinateAdditionalClaim(storages model.Backends) fiber.Handl
 				return err
 			}
 			result = claim
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimsUpdated, WithMessage("claim: "+req.Claim))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimsUpdated, WithMessage("claim: "+req.Claim), WithActor(GetActor(c)))
 		})
 		if err != nil {
 			var ae model.AlreadyExistsError
@@ -195,7 +195,7 @@ func handleDeleteSubordinateAdditionalClaim(storages model.Backends) fiber.Handl
 			if err := tx.Subordinates.DeleteAdditionalClaim(subID, claimID); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimDeleted, WithMessage("claim ID: "+claimID))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeClaimDeleted, WithMessage("claim ID: "+claimID), WithActor(GetActor(c)))
 		})
 		if err != nil {
 			return handleTxError(c, err)

@@ -27,6 +27,9 @@ type Options struct {
 	// TrustMarkConfigInvalidator is called when entity configuration trust marks are modified
 	// to invalidate any cached configurations. Can be nil if not using trust mark refresh.
 	TrustMarkConfigInvalidator TrustMarkConfigInvalidator
+	// Actor holds configuration for actor extraction from requests.
+	// The actor is recorded in subordinate event history.
+	Actor ActorConfig
 }
 
 // Register mounts all admin API routes under the provided group.
@@ -90,6 +93,13 @@ func Register(
 	)
 	// Optional authentication middleware for all admin routes
 	r.Use(authMiddleware(storages.Users))
+
+	// Actor extraction middleware (must come after auth middleware)
+	var actorCfg ActorConfig
+	if opts != nil {
+		actorCfg = opts.Actor
+	}
+	r.Use(actorMiddleware(actorCfg))
 
 	// Entity Configuration
 	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV, fedEntity)

@@ -26,6 +26,8 @@ type apiConf struct {
 //   - LH_API_ADMIN_USERS_ENABLED: Enable user management
 //   - LH_API_ADMIN_PORT: Admin API port (0 = use main server)
 //   - LH_API_ADMIN_PASSWORD_HASHING_*: Password hashing parameters
+//   - LH_API_ADMIN_ACTOR_HEADER: HTTP header name for actor extraction
+//   - LH_API_ADMIN_ACTOR_SOURCE: Preferred actor source ("basic_auth" or "header")
 type adminAPIConf struct {
 	// Enabled enables the admin API.
 	// Env: LH_API_ADMIN_ENABLED
@@ -39,6 +41,14 @@ type adminAPIConf struct {
 	// Argon2idParams holds password hashing parameters.
 	// Env prefix: LH_API_ADMIN_PASSWORD_HASHING_
 	Argon2idParams storage.Argon2idParams `yaml:"password_hashing" envconfig:"PASSWORD_HASHING"`
+	// ActorHeader is the HTTP header name to extract the actor from.
+	// Env: LH_API_ADMIN_ACTOR_HEADER
+	ActorHeader string `yaml:"actor_header" envconfig:"ACTOR_HEADER"`
+	// ActorSource is the preferred source for actor extraction.
+	// Valid values: "basic_auth" (default), "header".
+	// The system tries the preferred source first, then falls back to the other.
+	// Env: LH_API_ADMIN_ACTOR_SOURCE
+	ActorSource string `yaml:"actor_source" envconfig:"ACTOR_SOURCE"`
 }
 
 var defaultAPIConf = apiConf{
@@ -53,5 +63,7 @@ var defaultAPIConf = apiConf{
 			KeyLen:      64,
 			SaltLen:     32,
 		},
+		ActorHeader: "X-Actor",
+		ActorSource: "basic_auth",
 	},
 }

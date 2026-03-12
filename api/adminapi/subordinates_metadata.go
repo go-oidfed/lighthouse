@@ -72,7 +72,7 @@ func handlePutSubordinateMetadata(storages model.Backends) fiber.Handler {
 				return err
 			}
 			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated); err != nil {
+			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithActor(GetActor(c))); err != nil {
 				return err
 			}
 			result = &body
@@ -132,7 +132,7 @@ func handlePutSubordinateMetadataEntityType(storages model.Backends) fiber.Handl
 				return err
 			}
 			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et)); err != nil {
+			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c))); err != nil {
 				return err
 			}
 			result = body
@@ -184,7 +184,7 @@ func handlePostSubordinateMetadataEntityType(storages model.Backends) fiber.Hand
 				return err
 			}
 			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et)); err != nil {
+			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c))); err != nil {
 				return err
 			}
 			result = existing
@@ -227,7 +227,7 @@ func handleDeleteSubordinateMetadataEntityType(storages model.Backends) fiber.Ha
 				return err
 			}
 			// Record metadata deleted event within transaction
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage("entity type: "+et))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage("entity type: "+et), WithActor(GetActor(c)))
 		})
 
 		if err != nil {
@@ -300,7 +300,7 @@ func handlePutSubordinateMetadataClaim(storages model.Backends) fiber.Handler {
 				return err
 			}
 			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage(et+"."+claim)); err != nil {
+			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage(et+"."+claim), WithActor(GetActor(c))); err != nil {
 				return err
 			}
 			result = body
@@ -352,7 +352,7 @@ func handleDeleteSubordinateMetadataClaim(storages model.Backends) fiber.Handler
 				return err
 			}
 			// Record metadata deleted event within transaction
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage(et+"."+claim))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage(et+"."+claim), WithActor(GetActor(c)))
 		})
 
 		if err != nil {

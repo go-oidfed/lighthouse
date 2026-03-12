@@ -321,7 +321,7 @@ func (h *subordinatePolicyHandlers) putAll(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated)
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithActor(GetActor(c)))
 		},
 	)
 	if err != nil {
@@ -356,7 +356,7 @@ func (h *subordinatePolicyHandlers) postAll(c *fiber.Ctx) error {
 			}
 			result = info.MetadataPolicy
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("copied from general"),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("copied from general"), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -382,7 +382,7 @@ func (h *subordinatePolicyHandlers) deleteAll(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted)
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithActor(GetActor(c)))
 		},
 	)
 	if err != nil {
@@ -429,7 +429,7 @@ func (h *subordinatePolicyHandlers) putEntityType(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -470,7 +470,7 @@ func (h *subordinatePolicyHandlers) postEntityType(c *fiber.Ctx) error {
 			}
 			result = existing
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -498,7 +498,7 @@ func (h *subordinatePolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage("entity type: "+et),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage("entity type: "+et), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -551,7 +551,7 @@ func (h *subordinatePolicyHandlers) putClaim(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim), WithActor(GetActor(c)))
 		},
 	)
 	if err != nil {
@@ -596,7 +596,7 @@ func (h *subordinatePolicyHandlers) postClaim(c *fiber.Ctx) error {
 				return err
 			}
 			result = existing
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim), WithActor(GetActor(c)))
 		},
 	)
 	if err != nil {
@@ -631,7 +631,7 @@ func (h *subordinatePolicyHandlers) deleteClaim(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim), WithActor(GetActor(c)))
 		},
 	)
 	if err != nil {
@@ -707,7 +707,7 @@ func (h *subordinatePolicyHandlers) putOperator(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim+"."+string(op)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim+"."+string(op)), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -756,7 +756,7 @@ func (h *subordinatePolicyHandlers) deleteOperator(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim+"."+string(op)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim+"."+string(op)), WithActor(GetActor(c)),
 			)
 		},
 	)
