@@ -149,7 +149,7 @@ func main() {
 	log.Println("Initialized Entity")
 
 	if endpoint := c.Endpoints.FetchEndpoint; endpoint.IsSet() {
-		lh.AddFetchEndpoint(endpoint.EndpointConf, backs.Subordinates)
+		lh.AddFetchEndpoint(endpoint, backs.Subordinates)
 	}
 	if endpoint := c.Endpoints.ListEndpoint; endpoint.IsSet() {
 		lh.AddSubordinateListingEndpoint(endpoint, backs.Subordinates, backs.TrustMarks)
@@ -200,7 +200,7 @@ func main() {
 		defer stopIssuedCacheCleanup()
 
 		lh.AddTrustMarkEndpointWithConfig(
-			endpoint.EndpointConf, lighthouse.TrustMarkEndpointConfig{
+			endpoint, lighthouse.TrustMarkEndpointConfig{
 				Store:                backs.TrustMarks,
 				SpecStore:            backs.TrustMarkSpecs,
 				InstanceStore:        backs.TrustMarkInstances,
