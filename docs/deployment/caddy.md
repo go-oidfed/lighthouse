@@ -1,8 +1,8 @@
 ---
-title: Deployment
+title: Caddy Docker Deployment
 description: Deployment of LightHouse with a Caddy reverse proxy.
-#icon: simple/caddy
-icon: simple/docker
+icon: simple/caddy
+#icon: simple/docker
 ---
 
 The following example configuration can be used (tweak as needed) to deploy 
