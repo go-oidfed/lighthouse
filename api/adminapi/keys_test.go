@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -55,31 +55,17 @@ func (*mockFullKMS) GetPendingChanges() (*kms.PendingAlgChange, *kms.PendingDefa
 // testRSAKeyN is a valid RSA modulus reused across all key tests to avoid duplication.
 const testRSAKeyN = "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw"
 
-// newTestStorage creates a temporary SQLite database for testing.
-// The temporary directory is cleaned up automatically when the test finishes.
+// newTestStorage creates a unique in-memory SQLite database for testing.
 func newTestStorage(t *testing.T) *storage.Storage {
 	t.Helper()
-	tempDir, err := os.MkdirTemp("", "lighthouse-test-*")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", url.PathEscape(t.Name()))
 	store, err := storage.NewStorage(storage.Config{
-		Driver:  storage.DriverSQLite,
-		DataDir: tempDir,
+		Driver: storage.DriverSQLite,
+		DSN:    dsn,
 	})
 	if err != nil {
-		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
-			t.Fatalf("Failed to create storage: %v (also failed to remove temp dir %q: %v)", err, tempDir, removeErr)
-		}
 		t.Fatalf("Failed to create storage: %v", err)
 	}
-	// TODO: Storage doesn't expose a Close() method; ideally the DB connection
-	// should be closed before removing the temp dir to avoid file locks on Windows.
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Errorf("Failed to remove temp dir %q: %v", tempDir, err)
-		}
-	})
 	return store
 }
 
@@ -108,11 +94,11 @@ func setupPublicKeyApp(t *testing.T) (*fiber.App, KeyManagement, *storage.Storag
 	}
 	app := fiber.New()
 	backends := model.Backends{
-		KV: store.KeyValue(),
+		KV:         store.KeyValue(),
 		PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 		Transaction: func(fn model.TransactionFunc) error {
 			return fn(&model.Backends{
-				KV: store.KeyValue(),
+				KV:         store.KeyValue(),
 				PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			})
 		},
@@ -548,11 +534,11 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -596,11 +582,11 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -640,11 +626,11 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -690,11 +676,11 @@ func TestGetKMSInfo(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -736,11 +722,11 @@ func TestGetKMSInfo(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -789,11 +775,11 @@ func TestPutKMSAlg(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -819,11 +805,11 @@ func TestPutKMSAlg(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -849,11 +835,11 @@ func TestPutKMSAlg(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -879,11 +865,11 @@ func TestPutKMSAlg(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -920,11 +906,11 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -957,11 +943,11 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -986,11 +972,11 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1018,11 +1004,11 @@ func TestGetKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1058,11 +1044,11 @@ func TestGetKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1087,11 +1073,11 @@ func TestPutKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1130,11 +1116,11 @@ func TestPutKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1159,11 +1145,11 @@ func TestPutKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1189,11 +1175,11 @@ func TestPatchKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1231,11 +1217,11 @@ func TestPatchKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1276,11 +1262,11 @@ func TestPatchKMSRotation(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1306,11 +1292,11 @@ func TestPostKMSRotateAll(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
@@ -1333,11 +1319,11 @@ func TestPostKMSRotateAll(t *testing.T) {
 		}
 		app := fiber.New()
 		backends := model.Backends{
-			KV: store.KeyValue(),
+			KV:         store.KeyValue(),
 			PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 			Transaction: func(fn model.TransactionFunc) error {
 				return fn(&model.Backends{
-					KV: store.KeyValue(),
+					KV:         store.KeyValue(),
 					PKStorages: func(tid string) public.PublicKeyStorage { return store.DBPublicKeyStorage(tid) },
 				})
 			},
