@@ -43,6 +43,7 @@ func setupSubordinateAdditionalClaimsApp(t *testing.T) (*fiber.App, model.Backen
 func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -72,6 +73,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateAdditionalClaimsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/additional-claims", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -89,6 +91,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -133,6 +136,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 	})
 
 	t.Run("PUT InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -151,6 +155,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -193,6 +198,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 	})
 	
 	t.Run("POST InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -216,6 +222,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 func TestSubordinateAdditionalClaimByID(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -250,6 +257,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("GET NotFound/Claim", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -267,6 +275,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -322,6 +331,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("PUT InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -340,6 +350,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -388,6 +399,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("DELETE NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -427,6 +439,7 @@ func setupGeneralAdditionalClaimsApp(t *testing.T) (*fiber.App, model.Backends) 
 func TestGeneralAdditionalClaimsAll(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 
 		claimsList := []generalAdditionalClaim{
@@ -451,6 +464,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 	})
 
 	t.Run("GET NoClaims", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupGeneralAdditionalClaimsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/additional-claims", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -466,6 +480,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 
 		claimsList := []generalAdditionalClaim{
@@ -501,6 +516,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 
 		claimsList := []generalAdditionalClaim{
@@ -537,6 +553,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 func TestGeneralAdditionalClaimByID(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 
 		claimsList := []generalAdditionalClaim{
@@ -563,6 +580,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, []generalAdditionalClaim{})
 
@@ -575,6 +593,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 
 		claimsList := []generalAdditionalClaim{
@@ -607,6 +626,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 
 		claimsList := []generalAdditionalClaim{

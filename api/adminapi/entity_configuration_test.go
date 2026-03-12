@@ -154,6 +154,7 @@ func TestIsUniqueConstraintError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := isUniqueConstraintError(tt.err)
 			if got != tt.want {
 				t.Errorf("isUniqueConstraintError(%v) = %v, want %v", tt.err, got, tt.want)
@@ -165,6 +166,7 @@ func TestIsUniqueConstraintError(t *testing.T) {
 func TestGetEntityConfiguration(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		payload := &oidfed.EntityStatementPayload{
 			Issuer:  "https://example.com",
 			Subject: "https://example.com",
@@ -197,6 +199,7 @@ func TestGetEntityConfiguration(t *testing.T) {
 	})
 
 	t.Run("FedEntityError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			&mockFederationEntity{
 				entityConfigurationPayloadFn: func() (*oidfed.EntityStatementPayload, error) {
@@ -218,6 +221,7 @@ func TestGetEntityConfiguration(t *testing.T) {
 func TestGetAdditionalClaims(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		claims := []smodel.EntityConfigurationAdditionalClaim{
 			{ID: 1, Claim: "org_name", Value: "ACME", Crit: false},
 			{ID: 2, Claim: "policy_uri", Value: "https://example.com/policy", Crit: true},
@@ -250,6 +254,7 @@ func TestGetAdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -271,6 +276,7 @@ func TestGetAdditionalClaims(t *testing.T) {
 func TestPutAdditionalClaims(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -300,6 +306,7 @@ func TestPutAdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -315,6 +322,7 @@ func TestPutAdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("UniqueConstraintError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -335,6 +343,7 @@ func TestPutAdditionalClaims(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -358,6 +367,7 @@ func TestPutAdditionalClaims(t *testing.T) {
 func TestPostAdditionalClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -387,6 +397,7 @@ func TestPostAdditionalClaim(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -402,6 +413,7 @@ func TestPostAdditionalClaim(t *testing.T) {
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -422,6 +434,7 @@ func TestPostAdditionalClaim(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -445,6 +458,7 @@ func TestPostAdditionalClaim(t *testing.T) {
 func TestGetAdditionalClaimByID(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -472,6 +486,7 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("InvalidID", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -486,6 +501,7 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -507,6 +523,7 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 func TestPutAdditionalClaimByID(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -536,6 +553,7 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -551,6 +569,7 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -571,6 +590,7 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -591,6 +611,7 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -614,6 +635,7 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 func TestDeleteAdditionalClaimByID(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -632,6 +654,7 @@ func TestDeleteAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("InvalidID", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -646,6 +669,7 @@ func TestDeleteAdditionalClaimByID(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
@@ -667,6 +691,7 @@ func TestDeleteAdditionalClaimByID(t *testing.T) {
 func TestGetLifetime(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -693,6 +718,7 @@ func TestGetLifetime(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -714,6 +740,7 @@ func TestGetLifetime(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -732,6 +759,7 @@ func TestGetLifetime(t *testing.T) {
 	})
 
 	t.Run("ZeroValueReturnsDefault", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -758,6 +786,7 @@ func TestGetLifetime(t *testing.T) {
 func TestPutLifetime(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -786,6 +815,7 @@ func TestPutLifetime(t *testing.T) {
 	})
 
 	t.Run("EmptyBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -801,6 +831,7 @@ func TestPutLifetime(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -816,6 +847,7 @@ func TestPutLifetime(t *testing.T) {
 	})
 
 	t.Run("NegativeValue", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -831,6 +863,7 @@ func TestPutLifetime(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -850,6 +883,7 @@ func TestPutLifetime(t *testing.T) {
 	})
 
 	t.Run("ZeroValueSuccess", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -878,6 +912,7 @@ func TestPutLifetime(t *testing.T) {
 func TestGetMetadata(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -906,6 +941,7 @@ func TestGetMetadata(t *testing.T) {
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -927,6 +963,7 @@ func TestGetMetadata(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -945,6 +982,7 @@ func TestGetMetadata(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -966,6 +1004,7 @@ func TestGetMetadata(t *testing.T) {
 func TestPutMetadata(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -991,6 +1030,7 @@ func TestPutMetadata(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1006,6 +1046,7 @@ func TestPutMetadata(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1031,6 +1072,7 @@ func TestGetMetadataClaim(t *testing.T) {
 	metaJSON := `{"openid_provider":{"issuer":"https://example.com","some_claim":123}}`
 
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1052,6 +1094,7 @@ func TestGetMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1070,6 +1113,7 @@ func TestGetMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("EntityTypeNotFound", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1088,6 +1132,7 @@ func TestGetMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("ClaimNotFound", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1106,6 +1151,7 @@ func TestGetMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1124,6 +1170,7 @@ func TestGetMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1145,6 +1192,7 @@ func TestGetMetadataClaim(t *testing.T) {
 func TestPutMetadataClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success_ExistingMeta", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1171,6 +1219,7 @@ func TestPutMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("Success_NoExistingMeta", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1196,6 +1245,7 @@ func TestPutMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("EmptyBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1211,6 +1261,7 @@ func TestPutMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1230,6 +1281,7 @@ func TestPutMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1252,6 +1304,7 @@ func TestPutMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1274,6 +1327,7 @@ func TestPutMetadataClaim(t *testing.T) {
 func TestDeleteMetadataClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1302,6 +1356,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("LastClaimRemovesEntityType", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1327,6 +1382,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1345,6 +1401,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("EntityTypeNotInMeta", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1367,6 +1424,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1385,6 +1443,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1403,6 +1462,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1427,6 +1487,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 func TestGetMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1452,6 +1513,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1473,6 +1535,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("EntityTypeNotFound", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1494,6 +1557,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1512,6 +1576,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1533,6 +1598,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 func TestPutMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1565,6 +1631,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1580,6 +1647,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1599,6 +1667,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1621,6 +1690,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1643,6 +1713,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 func TestPostMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success_MergesInto", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1669,6 +1740,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("Success_CreatesNew", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1695,6 +1767,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1710,6 +1783,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1729,6 +1803,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1751,6 +1826,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1773,6 +1849,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 func TestDeleteMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1801,6 +1878,7 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("NoMetadataStored", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1819,6 +1897,7 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("CorruptStoredMetadata", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1837,6 +1916,7 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("StoreGetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
@@ -1855,6 +1935,7 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("StoreSetError", func(t *testing.T) {
+			t.Parallel()
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},

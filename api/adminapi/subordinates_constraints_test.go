@@ -43,6 +43,7 @@ func setupSubordinateConstraintsApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestSubordinateConstraintsAll(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -75,6 +76,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("GET NoConstraints", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -97,6 +99,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -140,6 +143,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -180,6 +184,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 	})
 	
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateConstraintsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -193,6 +198,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -223,6 +229,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -241,6 +248,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -272,6 +280,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -308,6 +317,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -339,6 +349,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -357,6 +368,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -389,6 +401,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -426,6 +439,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -455,6 +469,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -473,6 +488,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -507,6 +523,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -539,6 +556,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -594,6 +612,7 @@ func setupGeneralConstraintsApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestGeneralConstraintsAll(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 
 		length := 5
@@ -618,6 +637,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("GET NoConstraints", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupGeneralConstraintsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -628,6 +648,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 
 		body := `{"max_path_length": 3}`
@@ -652,6 +673,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		length := 5
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
@@ -674,6 +696,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"keep_me"},
@@ -698,6 +721,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		length := 5
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
@@ -728,6 +752,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			NamingConstraints: &oidfed.NamingConstraints{
@@ -752,6 +777,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"keep_me"},
@@ -777,6 +803,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			NamingConstraints: &oidfed.NamingConstraints{
@@ -808,6 +835,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"openid_relying_party"},
@@ -830,6 +858,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"old_type"},
@@ -851,6 +880,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"old_type"},
@@ -872,6 +902,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"delete_me", "keep_me"},

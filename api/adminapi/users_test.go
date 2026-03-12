@@ -78,6 +78,7 @@ func assertStatus(t *testing.T, resp *http.Response, expected int) {
 func TestListUsers(t *testing.T) {
 	t.Parallel()
 	t.Run("Success_Empty", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			ListFunc: func() ([]model.User, error) {
 				return []model.User{}, nil
@@ -94,6 +95,7 @@ func TestListUsers(t *testing.T) {
 	})
 
 	t.Run("Success_MultipleUsers", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			ListFunc: func() ([]model.User, error) {
 				return []model.User{
@@ -113,6 +115,7 @@ func TestListUsers(t *testing.T) {
 	})
 
 	t.Run("InternalError", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			ListFunc: func() ([]model.User, error) {
 				return nil, fiber.ErrInternalServerError
@@ -134,6 +137,7 @@ func TestListUsers(t *testing.T) {
 func TestCreateUser(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			CreateFunc: func(username, password, displayName string) (*model.User, error) {
 				return &model.User{
@@ -163,6 +167,7 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("MissingUsername", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
 		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
@@ -177,6 +182,7 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("MissingPassword", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
 		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{
@@ -191,6 +197,7 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("EmptyBody", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
 		resp := doJSONRequest(t, app, "POST", "/api/v1/admin/users/", map[string]string{})
@@ -198,6 +205,7 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("InvalidJSON", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
 
@@ -208,6 +216,7 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("ConflictAlreadyExists", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			CreateFunc: func(username, password, displayName string) (*model.User, error) {
 				return nil, model.AlreadyExistsError("user already exists")
@@ -227,6 +236,7 @@ func TestCreateUser(t *testing.T) {
 	})
 
 	t.Run("InternalError", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			CreateFunc: func(username, password, displayName string) (*model.User, error) {
 				return nil, fiber.ErrInternalServerError
@@ -251,6 +261,7 @@ func TestCreateUser(t *testing.T) {
 func TestGetUser(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			GetFunc: func(username string) (*model.User, error) {
 				return &model.User{
@@ -276,6 +287,7 @@ func TestGetUser(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			GetFunc: func(username string) (*model.User, error) {
 				return nil, model.NotFoundError("user not found")
@@ -292,6 +304,7 @@ func TestGetUser(t *testing.T) {
 	})
 
 	t.Run("InternalError", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			GetFunc: func(username string) (*model.User, error) {
 				return nil, fiber.ErrInternalServerError
@@ -313,6 +326,7 @@ func TestGetUser(t *testing.T) {
 func TestUpdateUser(t *testing.T) {
 	t.Parallel()
 	t.Run("Success_DisplayName", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
 				dn := "Alice Updated"
@@ -341,6 +355,7 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	t.Run("Success_Password", func(t *testing.T) {
+			t.Parallel()
 		updateCalled := false
 		store := &mockUsersStore{
 			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
@@ -365,6 +380,7 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	t.Run("Success_Disabled", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
 				if disabled == nil || !*disabled {
@@ -390,6 +406,7 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
 				return nil, model.NotFoundError("user not found")
@@ -408,6 +425,7 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	t.Run("InvalidJSON", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{}
 		app := setupUsersApp(t, store)
 
@@ -418,6 +436,7 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	t.Run("InternalError", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
 				return nil, fiber.ErrInternalServerError
@@ -441,6 +460,7 @@ func TestUpdateUser(t *testing.T) {
 func TestDeleteUser(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		deleteCalled := false
 		store := &mockUsersStore{
 			DeleteFunc: func(username string) error {
@@ -461,6 +481,7 @@ func TestDeleteUser(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			DeleteFunc: func(username string) error {
 				return model.NotFoundError("user not found")
@@ -477,6 +498,7 @@ func TestDeleteUser(t *testing.T) {
 	})
 
 	t.Run("InternalError", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			DeleteFunc: func(username string) error {
 				return fiber.ErrInternalServerError
@@ -508,6 +530,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 	}
 
 	t.Run("NoUsers_AccessWithoutAuth", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 0, nil
@@ -522,6 +545,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("WithUsers_RequiresAuth", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 1, nil
@@ -533,6 +557,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("WithUsers_AuthenticatedAccess", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 1, nil
@@ -556,6 +581,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("WithUsers_CreateRequiresAuth", func(t *testing.T) {
+			t.Parallel()
 		store := &mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 1, nil

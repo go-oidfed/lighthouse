@@ -29,6 +29,7 @@ func setupSubordinateLifetimeApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestSubordinateLifetime(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success/Default", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateLifetimeApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
@@ -48,6 +49,7 @@ func TestSubordinateLifetime(t *testing.T) {
 	})
 
 	t.Run("PUT and GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateLifetimeApp(t)
 
 		// PUT new lifetime
@@ -85,6 +87,7 @@ func TestSubordinateLifetime(t *testing.T) {
 	})
 
 	t.Run("PUT InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateLifetimeApp(t)
 
 		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader("bad json"))

@@ -131,6 +131,7 @@ func injectTestKey(t *testing.T, app *fiber.App, kid string) {
 func TestPostPublicKey(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, km, _ := setupPublicKeyApp(t)
 
 		body := newTestKeyBody("my-test-key-1")
@@ -166,6 +167,7 @@ func TestPostPublicKey(t *testing.T) {
 	})
 
 	t.Run("MissingKey", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 
 		// Send a body with no key field
@@ -180,6 +182,7 @@ func TestPostPublicKey(t *testing.T) {
 	})
 
 	t.Run("KidMismatch", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 
 		// The top-level "kid" doesn't match the key's embedded "kid"
@@ -203,6 +206,7 @@ func TestPostPublicKey(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 
 		req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(`not valid json`))
@@ -219,6 +223,7 @@ func TestPostPublicKey(t *testing.T) {
 func TestGetPublicKeys(t *testing.T) {
 	t.Parallel()
 	t.Run("ReturnsInjectedKeys", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-1")
 		injectTestKey(t, app, "key-2")
@@ -241,6 +246,7 @@ func TestGetPublicKeys(t *testing.T) {
 	})
 
 	t.Run("EmptyWhenNoKeys", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 
 		req := httptest.NewRequest("GET", "/entity-configuration/keys/", http.NoBody)
@@ -263,6 +269,7 @@ func TestGetPublicKeys(t *testing.T) {
 func TestDeletePublicKey(t *testing.T) {
 	t.Parallel()
 	t.Run("HardDelete", func(t *testing.T) {
+			t.Parallel()
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-to-delete")
 
@@ -289,6 +296,7 @@ func TestDeletePublicKey(t *testing.T) {
 	})
 
 	t.Run("RevokeInsteadOfDelete", func(t *testing.T) {
+			t.Parallel()
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-to-revoke")
 
@@ -313,6 +321,7 @@ func TestDeletePublicKey(t *testing.T) {
 	})
 
 	t.Run("NonExistentKey", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 
 		// Deleting a non-existent key should still return 204 (idempotent)
@@ -328,6 +337,7 @@ func TestDeletePublicKey(t *testing.T) {
 func TestUpdatePublicKeyExp(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-to-update")
 
@@ -366,6 +376,7 @@ func TestUpdatePublicKeyExp(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 
 		body := `{"exp": 2000000000}`
@@ -379,6 +390,7 @@ func TestUpdatePublicKeyExp(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-bad-update")
 
@@ -395,6 +407,7 @@ func TestUpdatePublicKeyExp(t *testing.T) {
 func TestRotatePublicKey(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "old-key")
 
@@ -447,6 +460,7 @@ func TestRotatePublicKey(t *testing.T) {
 	})
 
 	t.Run("OldKeyNotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 
 		newKeyBody := newTestKeyBody("new-key")
@@ -460,6 +474,7 @@ func TestRotatePublicKey(t *testing.T) {
 	})
 
 	t.Run("MissingKey", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "existing-key")
 
@@ -473,6 +488,7 @@ func TestRotatePublicKey(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, _, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "existing-key-2")
 
@@ -486,6 +502,7 @@ func TestRotatePublicKey(t *testing.T) {
 	})
 
 	t.Run("WithCustomOldKeyExp", func(t *testing.T) {
+			t.Parallel()
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "rotate-custom-old")
 
@@ -526,6 +543,7 @@ func TestRotatePublicKey(t *testing.T) {
 func TestGetEntityConfigurationJWKS(t *testing.T) {
 	t.Parallel()
 	t.Run("ReturnsValidKeys", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
@@ -574,6 +592,7 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 	})
 
 	t.Run("EmptyWhenNoKeys", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
@@ -618,6 +637,7 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 	})
 
 	t.Run("ExcludesExpiredKeys", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			APIManagedPKs: store.DBPublicKeyStorage("api-managed"),
@@ -676,6 +696,7 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 func TestGetKMSInfo(t *testing.T) {
 	t.Parallel()
 	t.Run("ReturnsKMSDetails", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -719,6 +740,7 @@ func TestGetKMSInfo(t *testing.T) {
 	})
 
 	t.Run("IncludesPendingAlg", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		// Use a custom mock that reports a pending change
 		pendingMock := &mockFullKMSWithPending{}
@@ -775,6 +797,7 @@ func (*mockFullKMSWithPending) GetPendingChanges() (*kms.PendingAlgChange, *kms.
 func TestPutKMSAlg(t *testing.T) {
 	t.Parallel()
 	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -805,6 +828,7 @@ func TestPutKMSAlg(t *testing.T) {
 	})
 
 	t.Run("InvalidAlgorithm", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -835,6 +859,7 @@ func TestPutKMSAlg(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -865,6 +890,7 @@ func TestPutKMSAlg(t *testing.T) {
 	})
 
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -907,6 +933,7 @@ func TestPutKMSAlg(t *testing.T) {
 func TestPutKMSRSAKeyLen(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -944,6 +971,7 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 	})
 
 	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -973,6 +1001,7 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:       "mock-kms",
@@ -1007,6 +1036,7 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 func TestGetKMSRotation(t *testing.T) {
 	t.Parallel()
 	t.Run("ReturnsConfig", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1047,6 +1077,7 @@ func TestGetKMSRotation(t *testing.T) {
 	})
 
 	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1077,6 +1108,7 @@ func TestGetKMSRotation(t *testing.T) {
 func TestPutKMSRotation(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1120,6 +1152,7 @@ func TestPutKMSRotation(t *testing.T) {
 	})
 
 	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1149,6 +1182,7 @@ func TestPutKMSRotation(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1180,6 +1214,7 @@ func TestPutKMSRotation(t *testing.T) {
 func TestPatchKMSRotation(t *testing.T) {
 	t.Parallel()
 	t.Run("PartialUpdate", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1222,6 +1257,7 @@ func TestPatchKMSRotation(t *testing.T) {
 	})
 
 	t.Run("PatchInterval", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1267,6 +1303,7 @@ func TestPatchKMSRotation(t *testing.T) {
 	})
 
 	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1298,6 +1335,7 @@ func TestPatchKMSRotation(t *testing.T) {
 func TestPostKMSRotateAll(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",
@@ -1325,6 +1363,7 @@ func TestPostKMSRotateAll(t *testing.T) {
 	})
 
 	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
+			t.Parallel()
 		store := newTestStorage(t)
 		km := KeyManagement{
 			KMS:  "mock-kms",

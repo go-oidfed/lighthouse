@@ -42,6 +42,7 @@ func setupSubordinateMetadataApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestGetSubordinateMetadata(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/WithMetadata", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		meta := &oidfed.Metadata{
@@ -75,6 +76,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 	})
 
 	t.Run("NoMetadata", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -93,6 +95,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata", http.NoBody)
@@ -107,6 +110,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 func TestPutSubordinateMetadata(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -157,6 +161,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -175,6 +180,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataApp(t)
 
 		req := httptest.NewRequest("PUT", "/subordinates/9999/metadata", strings.NewReader("{}"))
@@ -192,6 +198,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 func TestGetSubordinateMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		meta := &oidfed.Metadata{
@@ -227,6 +234,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/Subordinate", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata/custom", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -236,6 +244,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -260,6 +269,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 func TestPutSubordinateMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -304,6 +314,7 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -327,6 +338,7 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 func TestPostSubordinateMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/Merge", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -364,6 +376,7 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -385,6 +398,7 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -419,6 +433,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/Subordinate", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata/delete_me", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -428,6 +443,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -451,6 +467,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 func TestGetSubordinateMetadataClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -485,6 +502,7 @@ func TestGetSubordinateMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("NotFound/Claim", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -510,6 +528,7 @@ func TestGetSubordinateMetadataClaim(t *testing.T) {
 func TestPutSubordinateMetadataClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/Replace", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -550,6 +569,7 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -571,6 +591,7 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 func TestDeleteSubordinateMetadataClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -607,6 +628,7 @@ func TestDeleteSubordinateMetadataClaim(t *testing.T) {
 	})
 
 	t.Run("NotFound/Claim", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{

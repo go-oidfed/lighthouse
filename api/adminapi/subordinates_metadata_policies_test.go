@@ -43,6 +43,7 @@ func setupSubordinateMetadataPoliciesApp(t *testing.T) (*fiber.App, model.Backen
 func TestGetSubordinateMetadataPolicies(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/WithPolicies", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		policy := &oidfed.MetadataPolicies{
@@ -82,6 +83,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("NoPolicies", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -100,6 +102,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata-policies", http.NoBody)
@@ -116,6 +119,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 func TestPutSubordinateMetadataPolicies(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -173,6 +177,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -192,6 +197,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("PUT", "/subordinates/9999/metadata-policies", strings.NewReader("{}"))
@@ -208,6 +214,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 func TestPostSubordinateMetadataPolicies(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/CopyFromGeneral", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		// Seed a global policy in KV
@@ -267,6 +274,7 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("POST", "/subordinates/9999/metadata-policies", http.NoBody)
@@ -283,6 +291,7 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		// Create a mock record with an existing policy
@@ -329,6 +338,7 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata-policies", http.NoBody)
@@ -345,6 +355,7 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		policy := &oidfed.MetadataPolicies{
@@ -380,6 +391,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/Subordinate", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata-policies/openid_relying_party", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -389,6 +401,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -413,6 +426,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -465,6 +479,7 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -488,6 +503,7 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/Merge", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -533,6 +549,7 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -556,6 +573,7 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -592,6 +610,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/Subordinate", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata-policies/openid_relying_party", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -601,6 +620,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -625,6 +645,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -659,6 +680,7 @@ func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 	})
 
 	t.Run("NotFound/Claim", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -684,6 +706,7 @@ func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -732,6 +755,7 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -755,6 +779,7 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/Merge", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -798,6 +823,7 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("POST", "/subordinates/1/metadata-policies/openid_relying_party/contacts", strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
@@ -813,6 +839,7 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -848,6 +875,7 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 	})
 
 	t.Run("NotFound/Claim", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -873,6 +901,7 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -906,6 +935,7 @@ func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -933,6 +963,7 @@ func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -976,6 +1007,7 @@ func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -999,6 +1031,7 @@ func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -1036,6 +1069,7 @@ func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -1081,6 +1115,7 @@ func setupGeneralMetadataPoliciesApp(t *testing.T) (*fiber.App, model.Backends) 
 func TestGetGeneralMetadataPolicies(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/WithPolicies", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		policy := &oidfed.MetadataPolicies{
@@ -1113,6 +1148,7 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("NoPolicies", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupGeneralMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies", http.NoBody)
@@ -1135,6 +1171,7 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 func TestPutGeneralMetadataPolicies(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		body := `{
@@ -1173,6 +1210,7 @@ func TestPutGeneralMetadataPolicies(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
+			t.Parallel()
 		app, _ := setupGeneralMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies", strings.NewReader("bad json"))
@@ -1190,6 +1228,7 @@ func TestPutGeneralMetadataPolicies(t *testing.T) {
 func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		policy := &oidfed.MetadataPolicies{
@@ -1218,6 +1257,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1255,6 +1295,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1285,6 +1326,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1319,6 +1361,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1346,6 +1389,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1380,6 +1424,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1412,6 +1457,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1446,6 +1492,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1473,6 +1520,7 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
@@ -1507,6 +1555,7 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
+			t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
