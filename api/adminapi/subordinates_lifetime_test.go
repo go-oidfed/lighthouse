@@ -27,6 +27,7 @@ func setupSubordinateLifetimeApp(t *testing.T) (*fiber.App, model.Backends) {
 }
 
 func TestSubordinateLifetime(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success/Default", func(t *testing.T) {
 		app, _ := setupSubordinateLifetimeApp(t)
 

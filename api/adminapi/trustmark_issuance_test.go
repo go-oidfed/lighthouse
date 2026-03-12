@@ -130,6 +130,7 @@ func doTrustMarkReq(t *testing.T, app *fiber.App, req *http.Request) (*http.Resp
 // --- TESTS ---
 
 func TestTrustMarkSpecHandlers_List(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			listFn: func() ([]model.TrustMarkSpec, error) {
@@ -167,6 +168,7 @@ func TestTrustMarkSpecHandlers_List(t *testing.T) {
 }
 
 func TestTrustMarkSpecHandlers_Create(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			createFn: func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
@@ -248,6 +250,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 }
 
 func TestTrustMarkSpecHandlers_Get(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			getFn: func(id string) (*model.TrustMarkSpec, error) {
@@ -301,6 +304,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 }
 
 func TestTrustMarkSpecHandlers_Update(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			updateFn: func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
@@ -382,6 +386,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 }
 
 func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			patchFn: func(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
@@ -451,6 +456,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 }
 
 func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			deleteFn: func(id string) error {
@@ -501,6 +507,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 }
 
 func TestTrustMarkSubjectHandlers_List(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			listSubjectsFn: func(specID string, status *model.Status) ([]model.TrustMarkSubject, error) {
@@ -549,6 +556,7 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 }
 
 func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			createSubjectFn: func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
@@ -613,6 +621,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 }
 
 func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
@@ -666,6 +675,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 }
 
 func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
@@ -747,6 +757,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 }
 
 func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			deleteSubjectFn: func(specID, subjectID string) error {
@@ -797,6 +808,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 }
 
 func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
@@ -877,6 +889,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 }
 
 func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
+	t.Parallel()
 	t.Run("GetAdditionalClaims_SuccessWithClaims", func(t *testing.T) {
 		mockStore := &mockTrustMarkSpecStore{
 			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {

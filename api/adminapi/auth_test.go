@@ -99,6 +99,7 @@ func basicAuthHeader(username, password string) string {
 }
 
 func TestParseBasicAuth(t *testing.T) {
+	t.Parallel()
 	setupApp := func() *fiber.App {
 		app := fiber.New()
 		app.Get("/test", func(c *fiber.Ctx) error {
@@ -261,6 +262,7 @@ func TestParseBasicAuth(t *testing.T) {
 }
 
 func TestAuthMiddleware(t *testing.T) {
+	t.Parallel()
 	// setupAuthApp creates a Fiber app with the authMiddleware and a test endpoint.
 	setupAuthApp := func(store model.UsersStore) *fiber.App {
 		app := fiber.New()

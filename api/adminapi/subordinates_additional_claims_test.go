@@ -41,6 +41,7 @@ func setupSubordinateAdditionalClaimsApp(t *testing.T) (*fiber.App, model.Backen
 // --- GET, PUT, POST /subordinates/:subordinateID/additional-claims TESTS ---
 
 func TestSubordinateAdditionalClaimsAll(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
@@ -213,6 +214,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 // --- GET, PUT, DELETE /subordinates/:subordinateID/additional-claims/:additionalClaimsID TESTS ---
 
 func TestSubordinateAdditionalClaimByID(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupSubordinateAdditionalClaimsApp(t)
 
@@ -423,6 +425,7 @@ func setupGeneralAdditionalClaimsApp(t *testing.T) (*fiber.App, model.Backends) 
 // --- GET, PUT, POST /subordinates/additional-claims TESTS ---
 
 func TestGeneralAdditionalClaimsAll(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 
@@ -532,6 +535,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 // --- GET, PUT, DELETE /subordinates/additional-claims/:additionalClaimsID TESTS ---
 
 func TestGeneralAdditionalClaimByID(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralAdditionalClaimsApp(t)
 

@@ -40,6 +40,7 @@ func setupSubordinateMetadataApp(t *testing.T) (*fiber.App, model.Backends) {
 // --- GET & PUT /subordinates/:subordinateID/metadata TESTS ---
 
 func TestGetSubordinateMetadata(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/WithMetadata", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -104,6 +105,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 }
 
 func TestPutSubordinateMetadata(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -188,6 +190,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 // --- GET /subordinates/:subordinateID/metadata/:entityType TESTS ---
 
 func TestGetSubordinateMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -255,6 +258,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 // --- PUT /subordinates/:subordinateID/metadata/:entityType TESTS ---
 
 func TestPutSubordinateMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -321,6 +325,7 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 // --- POST & DELETE /subordinates/:subordinateID/metadata/:entityType TESTS ---
 
 func TestPostSubordinateMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/Merge", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -378,6 +383,7 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 }
 
 func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -443,6 +449,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 // --- /subordinates/:subordinateID/metadata/:entityType/:claim TESTS ---
 
 func TestGetSubordinateMetadataClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -501,6 +508,7 @@ func TestGetSubordinateMetadataClaim(t *testing.T) {
 }
 
 func TestPutSubordinateMetadataClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/Replace", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 
@@ -561,6 +569,7 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 }
 
 func TestDeleteSubordinateMetadataClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataApp(t)
 

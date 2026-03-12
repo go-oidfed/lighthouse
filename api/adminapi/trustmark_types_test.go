@@ -168,6 +168,7 @@ func doTrustMarkTypesReq(t *testing.T, app *fiber.App, req *http.Request) (*http
 // --- TESTS ---
 
 func TestTrustMarkTypesHandlers_List(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			listFn: func() ([]model.TrustMarkType, error) {
@@ -205,6 +206,7 @@ func TestTrustMarkTypesHandlers_List(t *testing.T) {
 }
 
 func TestTrustMarkTypesHandlers_Create(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{}
 		app := setupTrustMarkTypesApp(mockStore)
@@ -282,6 +284,7 @@ func TestTrustMarkTypesHandlers_Create(t *testing.T) {
 }
 
 func TestTrustMarkTypesHandlers_Get(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			getFn: func(id string) (*model.TrustMarkType, error) {
@@ -319,6 +322,7 @@ func TestTrustMarkTypesHandlers_Get(t *testing.T) {
 }
 
 func TestTrustMarkTypesHandlers_Update(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{}
 		app := setupTrustMarkTypesApp(mockStore)
@@ -407,6 +411,7 @@ func TestTrustMarkTypesHandlers_Update(t *testing.T) {
 }
 
 func TestTrustMarkTypesHandlers_Delete(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			deleteFn: func(id string) error {
@@ -457,6 +462,7 @@ func TestTrustMarkTypesHandlers_Delete(t *testing.T) {
 }
 
 func TestTrustMarkIssuersHandlers_List(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			listIssuersFn: func(id string) ([]model.TrustMarkIssuer, error) {
@@ -510,6 +516,7 @@ func TestTrustMarkIssuersHandlers_List(t *testing.T) {
 }
 
 func TestTrustMarkIssuersHandlers_Set(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			setIssuersFn: func(id string, issuers []model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
@@ -578,6 +585,7 @@ func TestTrustMarkIssuersHandlers_Set(t *testing.T) {
 }
 
 func TestTrustMarkIssuersHandlers_Add(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			addIssuerFn: func(id string, issuer model.AddTrustMarkIssuer) ([]model.TrustMarkIssuer, error) {
@@ -646,6 +654,7 @@ func TestTrustMarkIssuersHandlers_Add(t *testing.T) {
 }
 
 func TestTrustMarkIssuersHandlers_Delete(t *testing.T) {
+	t.Parallel()
 	t.Run("SuccessNumericID", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			deleteIssuerByIDFn: func(id string, issuerID uint) ([]model.TrustMarkIssuer, error) {
@@ -718,6 +727,7 @@ func TestTrustMarkIssuersHandlers_Delete(t *testing.T) {
 }
 
 func TestTrustMarkOwnerHandlers_Get(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			getOwnerFn: func(id string) (*model.TrustMarkOwner, error) {
@@ -771,6 +781,7 @@ func TestTrustMarkOwnerHandlers_Get(t *testing.T) {
 }
 
 func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			updateOwnerFn: func(id string, req model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
@@ -868,6 +879,7 @@ func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
 }
 
 func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			createOwnerFn: func(id string, req model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
@@ -965,6 +977,7 @@ func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
 }
 
 func TestTrustMarkOwnerHandlers_Delete(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		mockStore := &mockTrustMarkTypesStore{
 			deleteOwnerFn: func(id string) error {

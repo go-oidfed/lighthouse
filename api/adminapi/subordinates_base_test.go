@@ -70,6 +70,7 @@ func setupSubordinateBaseApp(t *testing.T) (*fiber.App, model.Backends) {
 // --- GET /subordinates TESTS ---
 
 func TestGetSubordinates(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/All", func(t *testing.T) {
 		app, backends := setupSubordinateBaseApp(t)
 
@@ -193,6 +194,7 @@ func TestGetSubordinates(t *testing.T) {
 // --- POST /subordinates TESTS ---
 
 func TestPostSubordinates(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateBaseApp(t)
 
@@ -288,6 +290,7 @@ func TestPostSubordinates(t *testing.T) {
 // --- GET /subordinates/:subordinateID TESTS ---
 
 func TestGetSubordinateByID(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateBaseApp(t)
 
@@ -334,6 +337,7 @@ func TestGetSubordinateByID(t *testing.T) {
 // --- PUT /subordinates/:subordinateID TESTS ---
 
 func TestPutSubordinateByID(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateBaseApp(t)
 
@@ -424,6 +428,7 @@ func TestPutSubordinateByID(t *testing.T) {
 // --- DELETE /subordinates/:subordinateID TESTS ---
 
 func TestDeleteSubordinateByID(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateBaseApp(t)
 
@@ -477,6 +482,7 @@ func TestDeleteSubordinateByID(t *testing.T) {
 // --- PUT /subordinates/:subordinateID/status TESTS ---
 
 func TestUpdateSubordinateStatus(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateBaseApp(t)
 
@@ -596,6 +602,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 // --- GET /subordinates/:subordinateID/history TESTS ---
 
 func TestGetSubordinateHistory(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/Default", func(t *testing.T) {
 		app, backends := setupSubordinateBaseApp(t)
 

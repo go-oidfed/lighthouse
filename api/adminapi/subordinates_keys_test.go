@@ -49,6 +49,7 @@ func createTestKey(kid string) jwk.Key {
 // --- GET, PUT, POST /subordinates/:subordinateID/jwks TESTS ---
 
 func TestSubordinateJWKS(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success/WithKeys", func(t *testing.T) {
 		app, backends := setupSubordinateKeysApp(t)
 
@@ -237,6 +238,7 @@ func TestSubordinateJWKS(t *testing.T) {
 // --- DELETE /subordinates/:subordinateID/jwks/:kid TESTS ---
 
 func TestSubordinateJWKDelete(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateKeysApp(t)
 

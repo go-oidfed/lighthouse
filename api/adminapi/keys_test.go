@@ -129,6 +129,7 @@ func injectTestKey(t *testing.T, app *fiber.App, kid string) {
 // --- PUBLIC KEY MANAGEMENT TESTS ---
 
 func TestPostPublicKey(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, km, _ := setupPublicKeyApp(t)
 
@@ -216,6 +217,7 @@ func TestPostPublicKey(t *testing.T) {
 }
 
 func TestGetPublicKeys(t *testing.T) {
+	t.Parallel()
 	t.Run("ReturnsInjectedKeys", func(t *testing.T) {
 		app, _, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-1")
@@ -259,6 +261,7 @@ func TestGetPublicKeys(t *testing.T) {
 }
 
 func TestDeletePublicKey(t *testing.T) {
+	t.Parallel()
 	t.Run("HardDelete", func(t *testing.T) {
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-to-delete")
@@ -323,6 +326,7 @@ func TestDeletePublicKey(t *testing.T) {
 }
 
 func TestUpdatePublicKeyExp(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "key-to-update")
@@ -389,6 +393,7 @@ func TestUpdatePublicKeyExp(t *testing.T) {
 }
 
 func TestRotatePublicKey(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, km, _ := setupPublicKeyApp(t)
 		injectTestKey(t, app, "old-key")
@@ -519,6 +524,7 @@ func TestRotatePublicKey(t *testing.T) {
 // --- JWKS TESTS ---
 
 func TestGetEntityConfigurationJWKS(t *testing.T) {
+	t.Parallel()
 	t.Run("ReturnsValidKeys", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{
@@ -668,6 +674,7 @@ func TestGetEntityConfigurationJWKS(t *testing.T) {
 // --- KMS MANAGEMENT TESTS ---
 
 func TestGetKMSInfo(t *testing.T) {
+	t.Parallel()
 	t.Run("ReturnsKMSDetails", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{
@@ -766,6 +773,7 @@ func (*mockFullKMSWithPending) GetPendingChanges() (*kms.PendingAlgChange, *kms.
 }
 
 func TestPutKMSAlg(t *testing.T) {
+	t.Parallel()
 	t.Run("NotSupportedWhenKeysNil", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{
@@ -897,6 +905,7 @@ func TestPutKMSAlg(t *testing.T) {
 }
 
 func TestPutKMSRSAKeyLen(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{
@@ -996,6 +1005,7 @@ func TestPutKMSRSAKeyLen(t *testing.T) {
 // --- KMS ROTATION TESTS ---
 
 func TestGetKMSRotation(t *testing.T) {
+	t.Parallel()
 	t.Run("ReturnsConfig", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{
@@ -1065,6 +1075,7 @@ func TestGetKMSRotation(t *testing.T) {
 }
 
 func TestPutKMSRotation(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{
@@ -1167,6 +1178,7 @@ func TestPutKMSRotation(t *testing.T) {
 }
 
 func TestPatchKMSRotation(t *testing.T) {
+	t.Parallel()
 	t.Run("PartialUpdate", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{
@@ -1284,6 +1296,7 @@ func TestPatchKMSRotation(t *testing.T) {
 }
 
 func TestPostKMSRotateAll(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		store := newTestStorage(t)
 		km := KeyManagement{

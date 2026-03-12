@@ -137,6 +137,7 @@ func newStubFedEntity() *mockFederationEntity {
 // --- TESTS ---
 
 func TestIsUniqueConstraintError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -162,6 +163,7 @@ func TestIsUniqueConstraintError(t *testing.T) {
 }
 
 func TestGetEntityConfiguration(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		payload := &oidfed.EntityStatementPayload{
 			Issuer:  "https://example.com",
@@ -214,6 +216,7 @@ func TestGetEntityConfiguration(t *testing.T) {
 }
 
 func TestGetAdditionalClaims(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		claims := []smodel.EntityConfigurationAdditionalClaim{
 			{ID: 1, Claim: "org_name", Value: "ACME", Crit: false},
@@ -266,6 +269,7 @@ func TestGetAdditionalClaims(t *testing.T) {
 }
 
 func TestPutAdditionalClaims(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -352,6 +356,7 @@ func TestPutAdditionalClaims(t *testing.T) {
 }
 
 func TestPostAdditionalClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -438,6 +443,7 @@ func TestPostAdditionalClaim(t *testing.T) {
 }
 
 func TestGetAdditionalClaimByID(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -499,6 +505,7 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 }
 
 func TestPutAdditionalClaimByID(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -605,6 +612,7 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 }
 
 func TestDeleteAdditionalClaimByID(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -657,6 +665,7 @@ func TestDeleteAdditionalClaimByID(t *testing.T) {
 }
 
 func TestGetLifetime(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -747,6 +756,7 @@ func TestGetLifetime(t *testing.T) {
 }
 
 func TestPutLifetime(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -866,6 +876,7 @@ func TestPutLifetime(t *testing.T) {
 }
 
 func TestGetMetadata(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -953,6 +964,7 @@ func TestGetMetadata(t *testing.T) {
 }
 
 func TestPutMetadata(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -1015,6 +1027,7 @@ func TestPutMetadata(t *testing.T) {
 }
 
 func TestGetMetadataClaim(t *testing.T) {
+	t.Parallel()
 	metaJSON := `{"openid_provider":{"issuer":"https://example.com","some_claim":123}}`
 
 	t.Run("Success", func(t *testing.T) {
@@ -1130,6 +1143,7 @@ func TestGetMetadataClaim(t *testing.T) {
 }
 
 func TestPutMetadataClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success_ExistingMeta", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -1258,6 +1272,7 @@ func TestPutMetadataClaim(t *testing.T) {
 }
 
 func TestDeleteMetadataClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -1410,6 +1425,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 }
 
 func TestGetMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -1515,6 +1531,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 }
 
 func TestPutMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -1624,6 +1641,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 }
 
 func TestPostMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success_MergesInto", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
@@ -1753,6 +1771,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 }
 
 func TestDeleteMetadataEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),

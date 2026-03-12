@@ -62,6 +62,7 @@ func setupSubordinateStatementApp(t *testing.T) (*fiber.App, model.Backends) {
 // --- GET /subordinates/:subordinateID/statement TESTS ---
 
 func TestSubordinateStatement(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupSubordinateStatementApp(t)
 

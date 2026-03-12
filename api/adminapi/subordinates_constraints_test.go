@@ -41,6 +41,7 @@ func setupSubordinateConstraintsApp(t *testing.T) (*fiber.App, model.Backends) {
 // --- GET, PUT, DELETE /subordinates/:subordinateID/constraints TESTS ---
 
 func TestSubordinateConstraintsAll(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupSubordinateConstraintsApp(t)
 
@@ -190,6 +191,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 // --- GET, PUT, DELETE /subordinates/:subordinateID/constraints/max-path-length TESTS ---
 
 func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupSubordinateConstraintsApp(t)
 
@@ -304,6 +306,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 // --- GET, PUT, DELETE /subordinates/:subordinateID/constraints/naming-constraints TESTS ---
 
 func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupSubordinateConstraintsApp(t)
 
@@ -421,6 +424,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 // --- GET, PUT, POST, DELETE /subordinates/:subordinateID/constraints/allowed-entity-types TESTS ---
 
 func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupSubordinateConstraintsApp(t)
 
@@ -588,6 +592,7 @@ func setupGeneralConstraintsApp(t *testing.T) (*fiber.App, model.Backends) {
 // --- GET, PUT /subordinates/constraints TESTS ---
 
 func TestGeneralConstraintsAll(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralConstraintsApp(t)
 
@@ -645,6 +650,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 // --- GET, PUT, DELETE /subordinates/constraints/max-path-length TESTS ---
 
 func TestGeneralConstraintsMaxPathLength(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralConstraintsApp(t)
 		length := 5
@@ -720,6 +726,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 // --- GET, PUT, DELETE /subordinates/constraints/naming-constraints TESTS ---
 
 func TestGeneralConstraintsNamingConstraints(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
@@ -799,6 +806,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 // --- GET, PUT, POST, DELETE /subordinates/constraints/allowed-entity-types TESTS ---
 
 func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{

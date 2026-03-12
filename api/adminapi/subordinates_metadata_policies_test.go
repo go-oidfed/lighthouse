@@ -41,6 +41,7 @@ func setupSubordinateMetadataPoliciesApp(t *testing.T) (*fiber.App, model.Backen
 // --- GET /subordinates/:subordinateID/metadata-policies TESTS ---
 
 func TestGetSubordinateMetadataPolicies(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/WithPolicies", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -113,6 +114,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 // --- PUT /subordinates/:subordinateID/metadata-policies TESTS ---
 
 func TestPutSubordinateMetadataPolicies(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -204,6 +206,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 // --- POST /subordinates/:subordinateID/metadata-policies TESTS ---
 
 func TestPostSubordinateMetadataPolicies(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/CopyFromGeneral", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -278,6 +281,7 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 // --- DELETE /subordinates/:subordinateID/metadata-policies TESTS ---
 
 func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -339,6 +343,7 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 // --- GET /subordinates/:subordinateID/metadata-policies/:entityType TESTS ---
 
 func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -406,6 +411,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 // --- PUT /subordinates/:subordinateID/metadata-policies/:entityType TESTS ---
 
 func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -480,6 +486,7 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 // --- POST /subordinates/:subordinateID/metadata-policies/:entityType TESTS ---
 
 func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/Merge", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -547,6 +554,7 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 // --- DELETE /subordinates/:subordinateID/metadata-policies/:entityType TESTS ---
 
 func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -615,6 +623,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 // --- GET /subordinates/:subordinateID/metadata-policies/:entityType/:claim TESTS ---
 
 func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -673,6 +682,7 @@ func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 // --- PUT /subordinates/:subordinateID/metadata-policies/:entityType/:claim TESTS ---
 
 func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -743,6 +753,7 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 // --- POST /subordinates/:subordinateID/metadata-policies/:entityType/:claim TESTS ---
 
 func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/Merge", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -800,6 +811,7 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 // --- DELETE /subordinates/:subordinateID/metadata-policies/:entityType/:claim TESTS ---
 
 func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -859,6 +871,7 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 // --- GET /subordinates/:subordinateID/metadata-policies/:entityType/:claim/:operator TESTS ---
 
 func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -918,6 +931,7 @@ func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 // --- PUT & POST /subordinates/:subordinateID/metadata-policies/:entityType/:claim/:operator TESTS ---
 
 func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -983,6 +997,7 @@ func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 // --- DELETE /subordinates/:subordinateID/metadata-policies/:entityType/:claim/:operator TESTS ---
 
 func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupSubordinateMetadataPoliciesApp(t)
 
@@ -1064,6 +1079,7 @@ func setupGeneralMetadataPoliciesApp(t *testing.T) (*fiber.App, model.Backends) 
 // --- GET & PUT /subordinates/metadata-policies TESTS ---
 
 func TestGetGeneralMetadataPolicies(t *testing.T) {
+	t.Parallel()
 	t.Run("Success/WithPolicies", func(t *testing.T) {
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
@@ -1117,6 +1133,7 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 }
 
 func TestPutGeneralMetadataPolicies(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
@@ -1171,6 +1188,7 @@ func TestPutGeneralMetadataPolicies(t *testing.T) {
 // --- /subordinates/metadata-policies/:entityType TESTS ---
 
 func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
@@ -1299,6 +1317,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 // --- /subordinates/metadata-policies/:entityType/:claim TESTS ---
 
 func TestGeneralMetadataPolicyByClaim(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
@@ -1425,6 +1444,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 // --- /subordinates/metadata-policies/:entityType/:claim/:operator TESTS ---
 
 func TestGeneralMetadataPolicyByOperator(t *testing.T) {
+	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 

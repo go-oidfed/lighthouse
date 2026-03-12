@@ -76,6 +76,7 @@ func assertStatus(t *testing.T, resp *http.Response, expected int) {
 // --- Test: GET /api/v1/admin/users/ ---
 
 func TestListUsers(t *testing.T) {
+	t.Parallel()
 	t.Run("Success_Empty", func(t *testing.T) {
 		store := &mockUsersStore{
 			ListFunc: func() ([]model.User, error) {
@@ -131,6 +132,7 @@ func TestListUsers(t *testing.T) {
 // --- Test: POST /api/v1/admin/users/ ---
 
 func TestCreateUser(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		store := &mockUsersStore{
 			CreateFunc: func(username, password, displayName string) (*model.User, error) {
@@ -247,6 +249,7 @@ func TestCreateUser(t *testing.T) {
 // --- Test: GET /api/v1/admin/users/:username ---
 
 func TestGetUser(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		store := &mockUsersStore{
 			GetFunc: func(username string) (*model.User, error) {
@@ -308,6 +311,7 @@ func TestGetUser(t *testing.T) {
 // --- Test: PUT /api/v1/admin/users/:username ---
 
 func TestUpdateUser(t *testing.T) {
+	t.Parallel()
 	t.Run("Success_DisplayName", func(t *testing.T) {
 		store := &mockUsersStore{
 			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
@@ -435,6 +439,7 @@ func TestUpdateUser(t *testing.T) {
 // --- Test: DELETE /api/v1/admin/users/:username ---
 
 func TestDeleteUser(t *testing.T) {
+	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		deleteCalled := false
 		store := &mockUsersStore{
@@ -491,6 +496,7 @@ func TestDeleteUser(t *testing.T) {
 // --- Test: Users endpoints with auth middleware integration ---
 
 func TestUsersWithAuthMiddleware(t *testing.T) {
+	t.Parallel()
 	// This test verifies that when auth middleware is applied, users endpoints
 	// correctly require auth when users exist.
 	newAppWithAuth := func(store *mockUsersStore) *fiber.App {
