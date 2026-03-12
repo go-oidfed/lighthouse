@@ -79,6 +79,7 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  metadata_policies  - Metadata policies (federation_data.metadata_policy_file)\n")
 		fmt.Fprintf(os.Stderr, "  config_lifetime    - Entity configuration lifetime (federation_data.configuration_lifetime)\n")
 		fmt.Fprintf(os.Stderr, "  statement_lifetime - Subordinate statement lifetime (endpoints.fetch.statement_lifetime)\n")
+		fmt.Fprintf(os.Stderr, "  extra_entity_config - Extra entity configuration claims (federation_data.extra_entity_configuration_data)\n")
 		fmt.Fprintf(os.Stderr, "  authority_hints    - Authority hints (federation_data.authority_hints)\n")
 		fmt.Fprintf(os.Stderr, "  metadata           - Federation entity metadata (federation_data.federation_entity_metadata)\n")
 		fmt.Fprintf(os.Stderr, "  trust_mark_specs   - Trust mark specifications (endpoints.trust_mark.trust_mark_specs)\n")
@@ -340,6 +341,9 @@ func (m *configMigrator) migrate() []migrationResult {
 	}
 	if m.shouldMigrate(sectionMetadata) {
 		results = append(results, m.migrateMetadata())
+	}
+	if m.shouldMigrate(sectionExtraEntityConfigData) {
+		results = append(results, m.migrateExtraEntityConfigData()...)
 	}
 	if m.shouldMigrate(sectionTrustMarkSpecs) {
 		results = append(results, m.migrateTrustMarkSpecs()...)
@@ -859,6 +863,90 @@ func (m *configMigrator) migrateMetadata() migrationResult {
 	}
 	result.details = "federation entity metadata set"
 	return result
+}
+
+func (m *configMigrator) migrateExtraEntityConfigData() []migrationResult {
+	var results []migrationResult
+
+	if len(m.config.Federation.ExtraEntityConfigurationData) == 0 {
+		results = append(results, migrationResult{
+			section: sectionExtraEntityConfigData,
+			action:  "skipped",
+			details: "not set in config",
+		})
+		return results
+	}
+
+	// Get existing claims
+	existingClaims, err := m.backends.AdditionalClaims.List()
+	if err != nil {
+		results = append(results, migrationResult{
+			section: sectionExtraEntityConfigData,
+			err:     err,
+		})
+		return results
+	}
+
+	existingMap := make(map[string]bool)
+	for _, c := range existingClaims {
+		existingMap[c.Claim] = true
+	}
+
+	for claimName, claimValue := range m.config.Federation.ExtraEntityConfigurationData {
+		result := migrationResult{
+			section: sectionExtraEntityConfigData,
+			details: claimName,
+		}
+
+		if existingMap[claimName] && !m.force {
+			result.action = "skipped"
+			result.details = fmt.Sprintf("%s already exists", claimName)
+			results = append(results, result)
+			continue
+		}
+
+		if m.dryRun {
+			if existingMap[claimName] {
+				result.action = "dry-run"
+				result.details = fmt.Sprintf("would overwrite %s", claimName)
+			} else {
+				result.action = "dry-run"
+				result.details = fmt.Sprintf("would create %s", claimName)
+			}
+			results = append(results, result)
+			continue
+		}
+
+		addClaim := model.AddAdditionalClaim{
+			Claim: claimName,
+			Value: claimValue,
+			Crit:  false, // All migrated claims are non-critical by default
+		}
+
+		if existingMap[claimName] {
+			// Update existing claim
+			if _, err := m.backends.AdditionalClaims.Update(claimName, addClaim); err != nil {
+				result.err = err
+				results = append(results, result)
+				continue
+			}
+			result.action = "overwritten"
+			result.details = claimName
+		} else {
+			// Create new claim
+			if _, err := m.backends.AdditionalClaims.Create(addClaim); err != nil {
+				result.err = err
+				results = append(results, result)
+				continue
+			}
+			result.action = "created"
+			result.details = claimName
+		}
+
+		results = append(results, result)
+	}
+
+	return results
 }
 
 func (m *configMigrator) migrateTrustMarkSpecs() []migrationResult {
@@ -1470,6 +1558,9 @@ func removeFederationDataFields(node *yaml.Node, sections map[migrationSection]b
 	}
 	if sections[sectionTrustMarkOwners] {
 		fieldsToRemove["trust_mark_owners"] = true
+	}
+	if sections[sectionExtraEntityConfigData] {
+		fieldsToRemove["extra_entity_configuration_data"] = true
 	}
 
 	removeFieldsFromMapping(node, fieldsToRemove)

@@ -937,6 +937,7 @@ The following fields are now managed in the database via the Admin API or `lhmig
 | `federation_data.metadata_policy_crit` | `metadata_policy_crit` | Critical metadata policy operators |
 | `federation_data.metadata_policy_file` | `metadata_policies` | Metadata policies (loaded from JSON file) |
 | `federation_data.configuration_lifetime` | `config_lifetime` | Entity configuration JWT lifetime |
+| `federation_data.extra_entity_configuration_data` | `extra_entity_config` | Extra claims for entity configuration |
 | `endpoints.fetch.statement_lifetime` | `statement_lifetime` | Subordinate statement JWT lifetime |
 | `federation_data.trust_mark_issuers` | `trust_mark_issuers` | Allowed trust mark issuers per type |
 | `federation_data.trust_mark_owners` | `trust_mark_owners` | Trust mark owners per type |
@@ -1053,6 +1054,7 @@ The `config2db` subcommand migrates configuration file values directly to the da
 - `metadata_crit` - Metadata policy crit operators
 - `metadata_policies` - Metadata policies
 - `config_lifetime` - Entity configuration lifetime
+- `extra_entity_config` - Extra entity configuration claims
 - `statement_lifetime` - Subordinate statement lifetime
 - `authority_hints` - Authority hints
 - `metadata` - Federation entity metadata

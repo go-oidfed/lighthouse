@@ -34,14 +34,15 @@ type migrationSigningConf struct {
 
 // migrationFederationConf holds federation config values that should be migrated to DB
 type migrationFederationConf struct {
-	EntityID              string                          `yaml:"entity_id"`
-	AuthorityHints        []string                        `yaml:"authority_hints"`
-	Constraints           *oidfed.ConstraintSpecification `yaml:"constraints"`
-	CriticalExtensions    []string                        `yaml:"crit"`
-	MetadataPolicyCrit    []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
-	MetadataPolicyFile    string                          `yaml:"metadata_policy_file"`
-	ConfigurationLifetime duration.DurationOption         `yaml:"configuration_lifetime"`
-	Metadata              migrationFederationMetadataConf `yaml:"federation_entity_metadata"`
+	EntityID                     string                          `yaml:"entity_id"`
+	AuthorityHints               []string                        `yaml:"authority_hints"`
+	Constraints                  *oidfed.ConstraintSpecification `yaml:"constraints"`
+	CriticalExtensions           []string                        `yaml:"crit"`
+	MetadataPolicyCrit           []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
+	MetadataPolicyFile           string                          `yaml:"metadata_policy_file"`
+	ConfigurationLifetime        duration.DurationOption         `yaml:"configuration_lifetime"`
+	Metadata                     migrationFederationMetadataConf `yaml:"federation_entity_metadata"`
+	ExtraEntityConfigurationData map[string]any                  `yaml:"extra_entity_configuration_data"`
 
 	// Trust mark related configuration
 	TrustMarks       []migrationTrustMarkConfig               `yaml:"trust_marks"`
@@ -165,22 +166,23 @@ type migrationCheckerConfig struct {
 type migrationSection string
 
 const (
-	sectionSigning            migrationSection = "signing"
-	sectionFederation         migrationSection = "federation"
-	sectionTrustMarkSpecs     migrationSection = "trust_mark_specs"
-	sectionTrustMarks         migrationSection = "trust_marks"
-	sectionAuthorityHints     migrationSection = "authority_hints"
-	sectionMetadata           migrationSection = "metadata"
-	sectionConstraints        migrationSection = "constraints"
-	sectionMetadataPolicyCrit migrationSection = "metadata_policy_crit"
-	sectionMetadataPolicies   migrationSection = "metadata_policies"
-	sectionConfigLifetime     migrationSection = "config_lifetime"
-	sectionStatementLifetime  migrationSection = "statement_lifetime"
-	sectionAlg                migrationSection = "alg"
-	sectionRSAKeyLen          migrationSection = "rsa_key_len"
-	sectionKeyRotation        migrationSection = "key_rotation"
-	sectionTrustMarkIssuers   migrationSection = "trust_mark_issuers"
-	sectionTrustMarkOwners    migrationSection = "trust_mark_owners"
+	sectionSigning               migrationSection = "signing"
+	sectionFederation            migrationSection = "federation"
+	sectionTrustMarkSpecs        migrationSection = "trust_mark_specs"
+	sectionTrustMarks            migrationSection = "trust_marks"
+	sectionAuthorityHints        migrationSection = "authority_hints"
+	sectionMetadata              migrationSection = "metadata"
+	sectionConstraints           migrationSection = "constraints"
+	sectionMetadataPolicyCrit    migrationSection = "metadata_policy_crit"
+	sectionMetadataPolicies      migrationSection = "metadata_policies"
+	sectionConfigLifetime        migrationSection = "config_lifetime"
+	sectionStatementLifetime     migrationSection = "statement_lifetime"
+	sectionAlg                   migrationSection = "alg"
+	sectionRSAKeyLen             migrationSection = "rsa_key_len"
+	sectionKeyRotation           migrationSection = "key_rotation"
+	sectionTrustMarkIssuers      migrationSection = "trust_mark_issuers"
+	sectionTrustMarkOwners       migrationSection = "trust_mark_owners"
+	sectionExtraEntityConfigData migrationSection = "extra_entity_config"
 )
 
 // allSections returns all available migration sections
@@ -196,6 +198,7 @@ func allSections() []migrationSection {
 		sectionStatementLifetime,
 		sectionAuthorityHints,
 		sectionMetadata,
+		sectionExtraEntityConfigData,
 		sectionTrustMarkSpecs,
 		sectionTrustMarks,
 		sectionTrustMarkIssuers,

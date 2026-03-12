@@ -313,8 +313,20 @@ Trust mark owners per trust mark type.
 <span class="badge badge-yellow">deprecated</span>
 <span class="badge badge-purple">object</span>
 
-Additional claims to include in the Entity Configuration. This option is defined but 
-**not used at runtime**. Use the Admin API to manage additional claims.
+Additional claims to include in the Entity Configuration. This configuration is now 
+managed in the database via the Admin API.
+
+!!! info "Migration"
+    
+    Use [`lhmigrate config2db`](../migration.md#config-to-database-migration-config2db) to 
+    migrate this value from a config file to the database:
+    
+    ```bash
+    lhmigrate config2db --config=config.yaml --db-dir=/data --only=extra_entity_config
+    ```
+    
+    All migrated claims will have `crit: false` (non-critical) by default. You can update
+    individual claims via the Admin API if you need to mark them as critical.
 
 ??? file "Legacy config.yaml (for migration only)"
 
