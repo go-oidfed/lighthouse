@@ -51,7 +51,7 @@ func init() {
 // EntityCheckerConfig is a type for configuring an EntityChecker through yaml
 type EntityCheckerConfig struct {
 	Type   string    `yaml:"type"`
-	Config yaml.Node `yaml:"config,omitempty"`
+	Config yaml.Node `yaml:"config,omitempty" ignored:"true"`
 }
 
 // EntityCheckerFromYAMLConfig passes the passed yaml config and returns the
