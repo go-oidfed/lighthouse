@@ -77,10 +77,7 @@ func TestSubordinateStatement(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/statement", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
@@ -101,8 +98,6 @@ func TestSubordinateStatement(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/9999/statement", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }

@@ -59,9 +59,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/additional-claims", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result []model.SubordinateAdditionalClaim
@@ -80,9 +78,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 		
 		// The ListAdditionalClaims endpoint returns an empty array when the subordinate has no claims
 		// or doesn't exist, so we expect a 200 instead of a 404 here.
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected status 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		
 		body, _ := io.ReadAll(resp.Body)
 		if string(body) != "[]" {
@@ -111,10 +107,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://claims-put.example.org")
 		if len(updated.SubordinateAdditionalClaims) != 2 {
@@ -149,9 +142,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
@@ -173,10 +164,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusCreated {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusCreated)
 
 		updated, _ := backends.Subordinates.Get("https://claims-post.example.org")
 		if len(updated.SubordinateAdditionalClaims) != 2 {
@@ -211,9 +199,7 @@ func TestSubordinateAdditionalClaimsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -243,9 +229,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/additional-claims/%d", saved.ID, claimID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result model.SubordinateAdditionalClaim
@@ -269,9 +253,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/additional-claims/missing", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
@@ -302,10 +284,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://claim-by-id-put.example.org")
 		
@@ -344,9 +323,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
@@ -375,9 +352,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/additional-claims/%d", saved.ID, claimID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://claim-by-id-delete.example.org")
 		if len(updated.SubordinateAdditionalClaims) != 1 || updated.SubordinateAdditionalClaims[0].Claim != "keep_me" {
@@ -411,9 +386,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/additional-claims/not_here", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500 when claim is missing, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -450,9 +423,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/additional-claims", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result []generalAdditionalClaim
@@ -469,9 +440,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/additional-claims", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200 (returning empty map), got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		if string(body) != "[]" {
@@ -497,9 +466,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated []generalAdditionalClaim
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, &updated)
@@ -529,9 +496,7 @@ func TestGeneralAdditionalClaimsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusCreated {
-			t.Fatalf("Expected status 201, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusCreated)
 
 		var updated []generalAdditionalClaim
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, &updated)
@@ -566,9 +531,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/additional-claims/1", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result generalAdditionalClaim
@@ -587,9 +550,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/additional-claims/999", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
@@ -607,9 +568,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated []generalAdditionalClaim
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, &updated)
@@ -638,9 +597,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/additional-claims/1", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated []generalAdditionalClaim
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, &updated)

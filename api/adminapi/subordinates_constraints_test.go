@@ -62,9 +62,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.ConstraintSpecification
@@ -88,9 +86,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 		
 		body, _ := io.ReadAll(resp.Body)
 		if string(body) != "{}" {
@@ -117,10 +113,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB
 		updated, _ := backends.Subordinates.Get("https://constraints-put.example.org")
@@ -160,9 +153,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://constraints-delete.example.org")
 		if updated.Constraints != nil {
@@ -188,9 +179,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		app, _ := setupSubordinateConstraintsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 // --- GET, PUT, DELETE /subordinates/:subordinateID/constraints/max-path-length TESTS ---
@@ -215,9 +204,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result int
@@ -242,9 +229,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("Expected status 404, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
@@ -265,10 +250,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://maxpath-put.example.org")
 		if updated.Constraints == nil || updated.Constraints.MaxPathLength == nil || *updated.Constraints.MaxPathLength != 3 {
@@ -298,9 +280,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://maxpath-delete.example.org")
 		if updated.Constraints.MaxPathLength != nil {
@@ -335,9 +315,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.NamingConstraints
@@ -362,9 +340,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("Expected status 404, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
@@ -386,10 +362,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://naming-put.example.org")
 		if updated.Constraints == nil || updated.Constraints.NamingConstraints == nil || len(updated.Constraints.NamingConstraints.Permitted) == 0 {
@@ -420,9 +393,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://naming-delete.example.org")
 		if updated.Constraints.NamingConstraints != nil {
@@ -455,9 +426,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result []string
@@ -482,9 +451,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("Expected status 404, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
@@ -508,10 +475,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://allowed-put.example.org")
 		if updated.Constraints == nil || len(updated.Constraints.AllowedEntityTypes) == 0 || updated.Constraints.AllowedEntityTypes[0] != "new_type" {
@@ -541,10 +505,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 		req.Header.Set("Content-Type", "text/plain")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusCreated {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusCreated)
 
 		updated, _ := backends.Subordinates.Get("https://allowed-post.example.org")
 		
@@ -574,9 +535,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types/delete_me", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://allowed-delete.example.org")
 		types := updated.Constraints.AllowedEntityTypes
@@ -623,9 +582,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.ConstraintSpecification
@@ -642,9 +599,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when policies are missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
@@ -656,9 +611,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
@@ -683,9 +636,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/constraints/max-path-length", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result int
@@ -706,9 +657,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
@@ -732,9 +681,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/constraints/max-path-length", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
@@ -763,9 +710,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/constraints/naming-constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.NamingConstraints
@@ -788,9 +733,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
@@ -815,9 +758,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/constraints/naming-constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
@@ -844,9 +785,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/constraints/allowed-entity-types", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result []string
@@ -868,9 +807,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
@@ -890,9 +827,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 		req.Header.Set("Content-Type", "text/plain")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusCreated {
-			t.Fatalf("Expected status 201, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusCreated)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
@@ -911,9 +846,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/constraints/allowed-entity-types/delete_me", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)

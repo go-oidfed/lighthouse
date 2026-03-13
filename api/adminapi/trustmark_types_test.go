@@ -166,9 +166,7 @@ func TestTrustMarkTypesHandlers_List(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types", http.NoBody)
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(body), "type1") {
 			t.Errorf("Expected response to contain 'type1'")
 		}
@@ -186,9 +184,7 @@ func TestTrustMarkTypesHandlers_List(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -204,9 +200,7 @@ func TestTrustMarkTypesHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, respBody := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusCreated {
-			t.Errorf("Expected 201, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusCreated)
 		if !strings.Contains(string(respBody), "type1") {
 			t.Errorf("Expected response to contain 'type1'")
 		}
@@ -220,9 +214,7 @@ func TestTrustMarkTypesHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("MissingType", func(t *testing.T) {
@@ -233,9 +225,7 @@ func TestTrustMarkTypesHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
@@ -251,9 +241,7 @@ func TestTrustMarkTypesHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusConflict {
-			t.Errorf("Expected 409, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusConflict)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -269,9 +257,7 @@ func TestTrustMarkTypesHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -289,9 +275,7 @@ func TestTrustMarkTypesHandlers_Get(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1", http.NoBody)
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(body), "type1") {
 			t.Errorf("Expected response to contain 'type1'")
 		}
@@ -309,9 +293,7 @@ func TestTrustMarkTypesHandlers_Get(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -327,9 +309,7 @@ func TestTrustMarkTypesHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, respBody := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(respBody), "updated-1") { // Default mock return
 			t.Errorf("Expected response to contain 'updated-1', got %s", string(respBody))
 		}
@@ -343,9 +323,7 @@ func TestTrustMarkTypesHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("MissingType", func(t *testing.T) {
@@ -356,9 +334,7 @@ func TestTrustMarkTypesHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("SuccessWithOwnerAndIssuers", func(t *testing.T) {
@@ -381,9 +357,7 @@ func TestTrustMarkTypesHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, respBody := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(respBody), "tx-updated") {
 			t.Errorf("Expected response to contain 'tx-updated'")
 		}
@@ -403,9 +377,7 @@ func TestTrustMarkTypesHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -423,9 +395,7 @@ func TestTrustMarkTypesHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Errorf("Expected 204, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNoContent)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -440,9 +410,7 @@ func TestTrustMarkTypesHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -457,9 +425,7 @@ func TestTrustMarkTypesHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -477,9 +443,7 @@ func TestTrustMarkIssuersHandlers_List(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1/issuers", http.NoBody)
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(body), "iss1") {
 			t.Errorf("Expected response to contain 'iss1'")
 		}
@@ -497,9 +461,7 @@ func TestTrustMarkIssuersHandlers_List(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1/issuers", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -514,9 +476,7 @@ func TestTrustMarkIssuersHandlers_List(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1/issuers", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -535,9 +495,7 @@ func TestTrustMarkIssuersHandlers_Set(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(body), "iss2") {
 			t.Errorf("Expected response to contain 'iss2'")
 		}
@@ -551,9 +509,7 @@ func TestTrustMarkIssuersHandlers_Set(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("TypeNotFound", func(t *testing.T) {
@@ -569,9 +525,7 @@ func TestTrustMarkIssuersHandlers_Set(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -587,9 +541,7 @@ func TestTrustMarkIssuersHandlers_Set(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -608,9 +560,7 @@ func TestTrustMarkIssuersHandlers_Add(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusCreated {
-			t.Errorf("Expected 201, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusCreated)
 		if !strings.Contains(string(body), "iss3") {
 			t.Errorf("Expected response to contain 'iss3'")
 		}
@@ -624,9 +574,7 @@ func TestTrustMarkIssuersHandlers_Add(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("TypeNotFound", func(t *testing.T) {
@@ -642,9 +590,7 @@ func TestTrustMarkIssuersHandlers_Add(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -660,9 +606,7 @@ func TestTrustMarkIssuersHandlers_Add(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -680,9 +624,7 @@ func TestTrustMarkIssuersHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/42", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 	})
 
 	t.Run("SuccessStringIssuer", func(t *testing.T) {
@@ -703,9 +645,7 @@ func TestTrustMarkIssuersHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/notanumber", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 	})
 
 	t.Run("IssuerNotFound", func(t *testing.T) {
@@ -720,9 +660,7 @@ func TestTrustMarkIssuersHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/42", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("DeleteError", func(t *testing.T) {
@@ -737,9 +675,7 @@ func TestTrustMarkIssuersHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/issuers/42", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -757,9 +693,7 @@ func TestTrustMarkOwnerHandlers_Get(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1/owner", http.NoBody)
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(body), "owner1") {
 			t.Errorf("Expected response to contain 'owner1'")
 		}
@@ -777,9 +711,7 @@ func TestTrustMarkOwnerHandlers_Get(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1/owner", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -794,9 +726,7 @@ func TestTrustMarkOwnerHandlers_Get(t *testing.T) {
 		req := httptest.NewRequest("GET", "/trust-marks/types/1/owner", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -815,9 +745,7 @@ func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected 200, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 		if !strings.Contains(string(body), "owner2") {
 			t.Errorf("Expected response to contain 'owner2'")
 		}
@@ -831,9 +759,7 @@ func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("MissingFields", func(t *testing.T) {
@@ -844,9 +770,7 @@ func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -862,9 +786,7 @@ func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
@@ -880,9 +802,7 @@ func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusConflict {
-			t.Errorf("Expected 409, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusConflict)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -898,9 +818,7 @@ func TestTrustMarkOwnerHandlers_Update(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -919,9 +837,7 @@ func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, body := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusCreated {
-			t.Errorf("Expected 201, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusCreated)
 		if !strings.Contains(string(body), "owner3") {
 			t.Errorf("Expected response to contain 'owner3'")
 		}
@@ -935,9 +851,7 @@ func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("MissingEntityID", func(t *testing.T) {
@@ -948,9 +862,7 @@ func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -966,9 +878,7 @@ func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("AlreadyExists", func(t *testing.T) {
@@ -984,9 +894,7 @@ func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusConflict {
-			t.Errorf("Expected 409, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusConflict)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -1002,9 +910,7 @@ func TestTrustMarkOwnerHandlers_Create(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }
 
@@ -1022,9 +928,7 @@ func TestTrustMarkOwnerHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/owner", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Errorf("Expected 204, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNoContent)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -1039,9 +943,7 @@ func TestTrustMarkOwnerHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/owner", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected 404, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("StoreError", func(t *testing.T) {
@@ -1056,8 +958,6 @@ func TestTrustMarkOwnerHandlers_Delete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/trust-marks/types/1/owner", http.NoBody)
 		resp, _ := doRequest(t, app, req)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }

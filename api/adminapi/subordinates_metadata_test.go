@@ -62,9 +62,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
@@ -89,9 +87,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when metadata is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -101,9 +97,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -130,10 +124,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://meta-put.example.org")
@@ -174,9 +165,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -187,9 +176,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -220,9 +207,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/custom_entity_type", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
@@ -238,9 +223,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 		app, _ := setupSubordinateMetadataApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata/custom", http.NoBody)
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
@@ -258,9 +241,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/missing_type", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when entity type is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -291,10 +272,7 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://meta-type-put.example.org")
@@ -327,9 +305,7 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -359,10 +335,7 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://meta-type-post.example.org")
 		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
@@ -389,9 +362,7 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -417,9 +388,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/delete_me", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://meta-type-delete.example.org")
 		extra := (*updated.Metadata).Extra
@@ -437,9 +406,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 		app, _ := setupSubordinateMetadataApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata/delete_me", http.NoBody)
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
@@ -456,9 +423,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/missing_type", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when trying to delete a missing entity type, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -488,9 +453,7 @@ func TestGetSubordinateMetadataClaim(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/target_type/target_claim", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result string
@@ -519,9 +482,7 @@ func TestGetSubordinateMetadataClaim(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/target_type/missing", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when claim is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -552,10 +513,7 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://meta-claim-put.example.org")
 		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
@@ -582,9 +540,7 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -612,9 +568,7 @@ func TestDeleteSubordinateMetadataClaim(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/target_type/delete_me", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://meta-claim-delete.example.org")
 		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
@@ -645,8 +599,6 @@ func TestDeleteSubordinateMetadataClaim(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/target_type/not_here", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when claim is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }

@@ -36,9 +36,7 @@ func TestSubordinateLifetime(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var lifetime int
@@ -95,9 +93,7 @@ func TestSubordinateLifetime(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("PUT EmptyBody", func(t *testing.T) {
@@ -108,9 +104,7 @@ func TestSubordinateLifetime(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("PUT NegativeValue", func(t *testing.T) {
@@ -121,9 +115,7 @@ func TestSubordinateLifetime(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("GET StorageError", func(t *testing.T) {
@@ -139,9 +131,7 @@ func TestSubordinateLifetime(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 
 	t.Run("PUT StorageError", func(t *testing.T) {
@@ -158,8 +148,6 @@ func TestSubordinateLifetime(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 500, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusInternalServerError)
 	})
 }

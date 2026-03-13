@@ -92,9 +92,7 @@ func TestGetSubordinates(t *testing.T) {
 		resp, _ := app.Test(req, -1)
 		body, _ := io.ReadAll(resp.Body)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d, body: %s", resp.StatusCode, string(body))
-		}
+		requireStatus(t, resp, http.StatusOK)
 		var subs []model.BasicSubordinateInfo
 		if err := json.Unmarshal(body, &subs); err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
@@ -126,9 +124,7 @@ func TestGetSubordinates(t *testing.T) {
 		resp, _ := app.Test(req, -1)
 		body, _ := io.ReadAll(resp.Body)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d, body: %s", resp.StatusCode, string(body))
-		}
+		requireStatus(t, resp, http.StatusOK)
 		var subs []model.BasicSubordinateInfo
 		json.Unmarshal(body, &subs)
 
@@ -164,9 +160,7 @@ func TestGetSubordinates(t *testing.T) {
 		resp, _ := app.Test(req, -1)
 		body, _ := io.ReadAll(resp.Body)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d, body: %s", resp.StatusCode, string(body))
-		}
+		requireStatus(t, resp, http.StatusOK)
 		var subs []model.BasicSubordinateInfo
 		json.Unmarshal(body, &subs)
 
@@ -182,9 +176,7 @@ func TestGetSubordinates(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates?status=unknown_status", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400 for invalid status, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 
 		body, _ := io.ReadAll(resp.Body)
 		var oidErr oidfed.Error
@@ -212,10 +204,7 @@ func TestPostSubordinates(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusCreated {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusCreated)
 
 		// Verify it was saved to DB
 		saved, err := backends.Subordinates.Get("https://new-sub.example.org")
@@ -248,9 +237,7 @@ func TestPostSubordinates(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("InvalidStatus", func(t *testing.T) {
@@ -262,9 +249,7 @@ func TestPostSubordinates(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("ActiveWithoutKeys", func(t *testing.T) {
@@ -277,9 +262,7 @@ func TestPostSubordinates(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
@@ -290,9 +273,7 @@ func TestPostSubordinates(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -318,9 +299,7 @@ func TestGetSubordinateByID(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var sub model.ExtendedSubordinateInfo
@@ -339,9 +318,7 @@ func TestGetSubordinateByID(t *testing.T) {
 		resp, _ := app.Test(req, -1)
 
 		// Could be 404 or 500 depending on GORM error parsing, handlers return NotFound or ServerError
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500 for missing ID, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -374,10 +351,7 @@ func TestPutSubordinateByID(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify it was updated in DB
 		updated, _ := backends.Subordinates.Get("https://update.example.org")
@@ -414,9 +388,7 @@ func TestPutSubordinateByID(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
@@ -433,9 +405,7 @@ func TestPutSubordinateByID(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -465,9 +435,7 @@ func TestDeleteSubordinateByID(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify it was deleted from DB
 		deleted, _ := backends.Subordinates.Get("https://delete.example.org")
@@ -489,9 +457,7 @@ func TestDeleteSubordinateByID(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/9999", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -515,10 +481,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 		req.Header.Set("Content-Type", "text/plain")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB status
 		updated, _ := backends.Subordinates.Get("https://status.example.org")
@@ -559,9 +522,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 		req.Header.Set("Content-Type", "text/plain")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("InvalidStatus", func(t *testing.T) {
@@ -580,9 +541,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 		req.Header.Set("Content-Type", "text/plain")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("ActiveWithoutKeys", func(t *testing.T) {
@@ -601,9 +560,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 		req.Header.Set("Content-Type", "text/plain")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -614,9 +571,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 		req.Header.Set("Content-Type", "text/plain")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -651,10 +606,7 @@ func TestGetSubordinateHistory(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result struct {
@@ -705,9 +657,7 @@ func TestGetSubordinateHistory(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history?limit=1&offset=1&type=updated", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
@@ -729,9 +679,7 @@ func TestGetSubordinateHistory(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/9999/history", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("InvalidQuery", func(t *testing.T) {
@@ -747,8 +695,6 @@ func TestGetSubordinateHistory(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history?limit=abc", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400 for bad query string, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }

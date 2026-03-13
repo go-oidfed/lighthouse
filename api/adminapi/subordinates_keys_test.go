@@ -69,9 +69,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
@@ -97,9 +95,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
@@ -116,9 +112,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		app, _ := setupSubordinateKeysApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/jwks", http.NoBody)
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
@@ -136,10 +130,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://jwks-put.example.org")
 		if updated.JWKS.Keys.Set == nil || updated.JWKS.Keys.Len() != 1 {
@@ -174,9 +165,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
@@ -199,10 +188,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusCreated {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusCreated)
 
 		updated, _ := backends.Subordinates.Get("https://jwks-post.example.org")
 		if updated.JWKS.Keys.Set == nil || updated.JWKS.Keys.Len() != 2 {
@@ -237,9 +223,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 // --- DELETE /subordinates/:subordinateID/jwks/:kid TESTS ---
@@ -265,9 +249,7 @@ func TestSubordinateJWKDelete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/jwks/delete-me", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://jwk-delete.example.org")
 		if updated.JWKS.Keys.Set == nil || updated.JWKS.Keys.Len() != 1 {
@@ -298,9 +280,7 @@ func TestSubordinateJWKDelete(t *testing.T) {
 		app, _ := setupSubordinateKeysApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/jwks/delete-me", http.NoBody)
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("NotFound/Key", func(t *testing.T) {
@@ -321,8 +301,6 @@ func TestSubordinateJWKDelete(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/jwks/missing-kid", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Errorf("Expected status 204 (idempotent) when key is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNoContent)
 	})
 }

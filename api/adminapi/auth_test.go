@@ -118,9 +118,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 
 	t.Run("HeaderWithoutBasicPrefix", func(t *testing.T) {
@@ -130,9 +128,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer token")
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 
 	t.Run("InvalidBase64Encoding", func(t *testing.T) {
@@ -142,9 +138,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", "Basic !@#invalidbase64")
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 
 	t.Run("MissingColonInDecodedCredentials", func(t *testing.T) {
@@ -155,9 +149,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 
 	t.Run("ValidCredentials", func(t *testing.T) {
@@ -167,9 +159,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
 		if body["username"] != "admin" {
 			t.Errorf("Expected username 'admin', got '%s'", body["username"])
@@ -186,9 +176,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", basicAuthHeader("admin", ""))
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
 		if body["username"] != "admin" {
 			t.Errorf("Expected username 'admin', got '%s'", body["username"])
@@ -205,9 +193,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", basicAuthHeader("", "password"))
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
 		if body["username"] != "" {
 			t.Errorf("Expected empty username, got '%s'", body["username"])
@@ -221,9 +207,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", basicAuthHeader("admin", "pass:word:123"))
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
 		if body["username"] != "admin" {
 			t.Errorf("Expected username 'admin', got '%s'", body["username"])
@@ -241,9 +225,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", "basic "+encoded) // lowercase "basic"
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d for lowercase prefix, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 
 	t.Run("EmptyAuthorizationHeader", func(t *testing.T) {
@@ -253,9 +235,7 @@ func TestParseBasicAuth(t *testing.T) {
 		req.Header.Set("Authorization", "")
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 
 	t.Run("BasicPrefixOnly", func(t *testing.T) {
@@ -266,9 +246,7 @@ func TestParseBasicAuth(t *testing.T) {
 		resp, _ := app.Test(req)
 
 		// "Basic " with empty payload should fail base64 decode or missing colon
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
 }
 
@@ -295,9 +273,7 @@ func TestAuthMiddleware(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusInternalServerError {
-			t.Errorf("Expected status %d, got %d", fiber.StatusInternalServerError, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusInternalServerError)
 		body := readJSONFromHTTP(t, resp.Body)
 		if body["error"] != "server_error" {
 			t.Errorf("Expected error 'server_error', got '%s'", body["error"])
@@ -315,9 +291,7 @@ func TestAuthMiddleware(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 	})
 
 	t.Run("CountGreaterThanZero_MissingAuth", func(t *testing.T) {
@@ -331,9 +305,7 @@ func TestAuthMiddleware(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 
 		wwwAuth := resp.Header.Get("WWW-Authenticate")
 		if wwwAuth != "Basic realm=admin" {
@@ -364,9 +336,7 @@ func TestAuthMiddleware(t *testing.T) {
 		req.Header.Set("Authorization", basicAuthHeader("admin", "wrongpassword"))
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusUnauthorized {
-			t.Errorf("Expected status %d, got %d", fiber.StatusUnauthorized, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusUnauthorized)
 
 		wwwAuth := resp.Header.Get("WWW-Authenticate")
 		if wwwAuth != "Basic realm=admin" {
@@ -397,9 +367,7 @@ func TestAuthMiddleware(t *testing.T) {
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 	})
 
 	t.Run("CountGreaterThanZero_DisabledUser", func(t *testing.T) {
@@ -420,9 +388,7 @@ func TestAuthMiddleware(t *testing.T) {
 		resp, _ := app.Test(req)
 
 		// Currently allowed because authMiddleware only checks Authenticate error
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 	})
 
 	t.Run("MultipleUsersInStore", func(t *testing.T) {
@@ -443,8 +409,6 @@ func TestAuthMiddleware(t *testing.T) {
 		req.Header.Set("Authorization", basicAuthHeader("user2", "pass2"))
 		resp, _ := app.Test(req)
 
-		if resp.StatusCode != fiber.StatusOK {
-			t.Errorf("Expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
-		}
+		assertStatus(t, resp, fiber.StatusOK)
 	})
 }

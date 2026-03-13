@@ -65,9 +65,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicies
@@ -96,9 +94,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("Expected status 404 when policies are missing, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNotFound)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -108,9 +104,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata-policies", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -141,10 +135,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://put-policy.example.org")
@@ -191,9 +182,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
@@ -204,9 +193,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 // --- POST /subordinates/:subordinateID/metadata-policies TESTS ---
@@ -238,10 +225,7 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusCreated {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusCreated)
 
 		// Verify DB update copied the global policy
 		updated, _ := backends.Subordinates.Get("https://post-policy.example.org")
@@ -280,9 +264,7 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("POST", "/subordinates/9999/metadata-policies", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -313,9 +295,7 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update (policy should be nil)
 		updated, _ := backends.Subordinates.Get("https://delete-policy.example.org")
@@ -344,9 +324,7 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata-policies", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
 
@@ -377,9 +355,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicy
@@ -395,9 +371,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata-policies/openid_relying_party", http.NoBody)
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
@@ -415,9 +389,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_provider", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when entity type is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -454,10 +426,7 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://put-type.example.org")
@@ -492,9 +461,7 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -528,10 +495,7 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update merged the policies
 		updated, _ := backends.Subordinates.Get("https://post-type.example.org")
@@ -562,9 +526,7 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -594,9 +556,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://delete-type.example.org")
@@ -614,9 +574,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata-policies/openid_relying_party", http.NoBody)
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusInternalServerError {
-			t.Errorf("Expected status 404 or 500, got %d", resp.StatusCode)
-		}
+		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
 	t.Run("NotFound/EntityType", func(t *testing.T) {
@@ -634,9 +592,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_provider", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Errorf("Expected status 204 when trying to delete a missing entity type (idempotent), got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNoContent)
 	})
 }
 
@@ -666,9 +622,7 @@ func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicyEntry
@@ -695,9 +649,7 @@ func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/missing", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when claim is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -732,10 +684,7 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://put-claim.example.org")
@@ -768,9 +717,7 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -804,10 +751,7 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://post-claim.example.org")
@@ -828,9 +772,7 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req := httptest.NewRequest("POST", "/subordinates/1/metadata-policies/openid_relying_party/contacts", strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -858,9 +800,7 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/delete_me", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://delete-claim.example.org")
@@ -890,9 +830,7 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/not_here", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when claim is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -921,9 +859,7 @@ func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result []any
@@ -952,9 +888,7 @@ func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when operator is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -987,10 +921,7 @@ func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://put-operator.example.org")
@@ -1020,9 +951,7 @@ func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -1052,9 +981,7 @@ func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/delete_me", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://delete-operator.example.org")
@@ -1086,9 +1013,7 @@ func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/not_here", saved.ID), http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404 when operator is missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -1130,9 +1055,7 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicies
@@ -1157,9 +1080,7 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 		// General policies behave differently than subordinate-specific policies.
 		// If no global policy is found in KV, the store returns an empty MetadataPolicies struct,
 		// and the handler returns 200 OK with `{}`, not a 404.
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected status 200 (returning empty object) when global policies are missing, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		if string(body) != "{}" {
@@ -1186,10 +1107,7 @@ func TestPutGeneralMetadataPolicies(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			b, _ := io.ReadAll(resp.Body)
-			t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(b))
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		var updated oidfed.MetadataPolicies
@@ -1217,9 +1135,7 @@ func TestPutGeneralMetadataPolicies(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status 400, got %d", resp.StatusCode)
-		}
+		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -1243,9 +1159,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicy
@@ -1274,9 +1188,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
@@ -1309,9 +1221,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
@@ -1341,9 +1251,7 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
@@ -1375,9 +1283,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party/contacts", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicyEntry
@@ -1406,9 +1312,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
@@ -1440,9 +1344,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
@@ -1470,9 +1372,7 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party/delete_me", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
@@ -1506,9 +1406,7 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party/contacts/add", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		body, _ := io.ReadAll(resp.Body)
 		var result []any
@@ -1537,9 +1435,7 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
@@ -1570,9 +1466,7 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party/contacts/delete_me", http.NoBody)
 		resp, _ := app.Test(req, -1)
 
-		if resp.StatusCode != http.StatusNoContent {
-			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
-		}
+		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.MetadataPolicies
 		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
