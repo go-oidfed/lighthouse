@@ -1,6 +1,7 @@
 arrange:
   - index.md
   - endpoints.md
+  - admin_api.md
   - entity_checks.md
   - trustmarks.md
   - statistics.md

@@ -34,19 +34,40 @@ type migrationSigningConf struct {
 
 // migrationFederationConf holds federation config values that should be migrated to DB
 type migrationFederationConf struct {
-	EntityID              string                          `yaml:"entity_id"`
-	AuthorityHints        []string                        `yaml:"authority_hints"`
-	Constraints           *oidfed.ConstraintSpecification `yaml:"constraints"`
-	CriticalExtensions    []string                        `yaml:"crit"`
-	MetadataPolicyCrit    []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
-	MetadataPolicyFile    string                          `yaml:"metadata_policy_file"`
-	ConfigurationLifetime duration.DurationOption         `yaml:"configuration_lifetime"`
-	Metadata              migrationFederationMetadataConf `yaml:"federation_entity_metadata"`
+	AuthorityHints               []string                        `yaml:"authority_hints"`
+	Constraints                  *oidfed.ConstraintSpecification `yaml:"constraints"`
+	MetadataPolicyCrit           []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
+	MetadataPolicyFile           string                          `yaml:"metadata_policy_file"`
+	ConfigurationLifetime        duration.DurationOption         `yaml:"configuration_lifetime"`
+	Metadata                     migrationFederationMetadataConf `yaml:"federation_entity_metadata"`
+	ExtraEntityConfigurationData map[string]any                  `yaml:"extra_entity_configuration_data"`
 
 	// Trust mark related configuration
-	TrustMarks       []any                                    `yaml:"trust_marks"`
+	TrustMarks       []migrationTrustMarkConfig               `yaml:"trust_marks"`
 	TrustMarkIssuers oidfed.AllowedTrustMarkIssuers           `yaml:"trust_mark_issuers"`
 	TrustMarkOwners  map[string]migrationTrustMarkOwnerConfig `yaml:"trust_mark_owners"`
+}
+
+// migrationTrustMarkConfig holds entity configuration trust mark config for migration
+// These are trust marks that should be published in the entity's own entity configuration
+type migrationTrustMarkConfig struct {
+	TrustMarkType      string                     `yaml:"trust_mark_type"`
+	TrustMarkIssuer    string                     `yaml:"trust_mark_issuer"`
+	TrustMarkJWT       string                     `yaml:"trust_mark_jwt"`
+	Refresh            bool                       `yaml:"refresh"`
+	MinLifetime        duration.DurationOption    `yaml:"min_lifetime"`
+	RefreshGracePeriod duration.DurationOption    `yaml:"refresh_grace_period"`
+	RefreshRateLimit   duration.DurationOption    `yaml:"refresh_rate_limit"`
+	SelfIssuanceSpec   *migrationSelfIssuanceSpec `yaml:"self_issuance_spec"`
+}
+
+// migrationSelfIssuanceSpec holds self-issuance specification for trust marks
+type migrationSelfIssuanceSpec struct {
+	Lifetime                 int            `yaml:"lifetime"`
+	Ref                      string         `yaml:"ref"`
+	LogoURI                  string         `yaml:"logo_uri"`
+	AdditionalClaims         map[string]any `yaml:"additional_claims"`
+	IncludeExtraClaimsInInfo bool           `yaml:"include_extra_claims_in_info"`
 }
 
 // migrationTrustMarkOwnerConfig holds trust mark owner config for migration
@@ -143,21 +164,23 @@ type migrationCheckerConfig struct {
 type migrationSection string
 
 const (
-	sectionSigning            migrationSection = "signing"
-	sectionFederation         migrationSection = "federation"
-	sectionTrustMarkSpecs     migrationSection = "trust_mark_specs"
-	sectionAuthorityHints     migrationSection = "authority_hints"
-	sectionMetadata           migrationSection = "metadata"
-	sectionConstraints        migrationSection = "constraints"
-	sectionMetadataPolicyCrit migrationSection = "metadata_policy_crit"
-	sectionMetadataPolicies   migrationSection = "metadata_policies"
-	sectionConfigLifetime     migrationSection = "config_lifetime"
-	sectionStatementLifetime  migrationSection = "statement_lifetime"
-	sectionAlg                migrationSection = "alg"
-	sectionRSAKeyLen          migrationSection = "rsa_key_len"
-	sectionKeyRotation        migrationSection = "key_rotation"
-	sectionTrustMarkIssuers   migrationSection = "trust_mark_issuers"
-	sectionTrustMarkOwners    migrationSection = "trust_mark_owners"
+	sectionSigning               migrationSection = "signing"
+	sectionFederation            migrationSection = "federation"
+	sectionTrustMarkSpecs        migrationSection = "trust_mark_specs"
+	sectionTrustMarks            migrationSection = "trust_marks"
+	sectionAuthorityHints        migrationSection = "authority_hints"
+	sectionMetadata              migrationSection = "metadata"
+	sectionConstraints           migrationSection = "constraints"
+	sectionMetadataPolicyCrit    migrationSection = "metadata_policy_crit"
+	sectionMetadataPolicies      migrationSection = "metadata_policies"
+	sectionConfigLifetime        migrationSection = "config_lifetime"
+	sectionStatementLifetime     migrationSection = "statement_lifetime"
+	sectionAlg                   migrationSection = "alg"
+	sectionRSAKeyLen             migrationSection = "rsa_key_len"
+	sectionKeyRotation           migrationSection = "key_rotation"
+	sectionTrustMarkIssuers      migrationSection = "trust_mark_issuers"
+	sectionTrustMarkOwners       migrationSection = "trust_mark_owners"
+	sectionExtraEntityConfigData migrationSection = "extra_entity_config"
 )
 
 // allSections returns all available migration sections
@@ -173,7 +196,9 @@ func allSections() []migrationSection {
 		sectionStatementLifetime,
 		sectionAuthorityHints,
 		sectionMetadata,
+		sectionExtraEntityConfigData,
 		sectionTrustMarkSpecs,
+		sectionTrustMarks,
 		sectionTrustMarkIssuers,
 		sectionTrustMarkOwners,
 	}

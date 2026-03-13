@@ -94,6 +94,62 @@ Using a separate port can be useful for:
             port: 8080
     ```
 
+### `actor_source`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`basic_auth`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_ACTOR_SOURCE`</span>
+
+Specifies the source for extracting the actor (user identity) for audit logging in Admin API requests.
+
+Available options:
+
+- `basic_auth` (default) - Extract actor from HTTP Basic Authentication username, use HTTP header as a fallback
+- `header` - Extract actor from a custom HTTP header (see `actor_header`), use HTTP Basic Authentication as a fallback
+
+This is useful when running behind a reverse proxy that handles authentication and passes 
+the authenticated user in a header.
+
+??? file "config.yaml"
+
+    ```yaml
+    api:
+        admin:
+            enabled: true
+            actor_source: basic_auth
+    ```
+
+??? file "config.yaml (header-based authentication)"
+
+    ```yaml
+    api:
+        admin:
+            enabled: true
+            actor_source: header
+            actor_header: X-Authenticated-User
+    ```
+
+### `actor_header`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`X-Actor`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_ACTOR_HEADER`</span>
+
+The HTTP header name to use for extracting the actor when `actor_source` is set to `header` or `both`.
+
+This allows integration with reverse proxies or identity-aware proxies that authenticate 
+users and pass their identity in a custom header.
+
+??? file "config.yaml"
+
+    ```yaml
+    api:
+        admin:
+            enabled: true
+            actor_source: header
+            actor_header: X-Authenticated-User
+    ```
+
 ### `password_hashing`
 <span class="badge badge-purple" title="Value Type">object / mapping</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
@@ -164,6 +220,8 @@ Length of the random salt in bytes.
             enabled: true
             users_enabled: true
             port: 0
+            actor_source: header
+            actor_header: X-Actor
             password_hashing:
                 time: 1
                 memory_kib: 65536

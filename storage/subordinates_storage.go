@@ -20,22 +20,31 @@ type SubordinateStorage struct {
 func (s *SubordinateStorage) Add(info model.ExtendedSubordinateInfo) error {
 	return s.db.Transaction(
 		func(tx *gorm.DB) error {
-			// Then save the subordinate info
+			// Save entity types separately to handle them with their own ON CONFLICT clause
+			entityTypes := info.SubordinateEntityTypes
+			info.SubordinateEntityTypes = nil // Prevent GORM from auto-creating associations
+
+			// Save the subordinate info (without associations)
 			if err := tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "entity_id"}},
-				UpdateAll: true,
+				Columns: []clause.Column{{Name: "entity_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"updated_at", "description", "status", "jwks_id",
+					"metadata", "metadata_policy", "constraints",
+				}),
 			}).Create(&info).Error; err != nil {
 				return err
 			}
-			// Insert entity type rows from pre-populated join slice (UnmarshalJSON)
-			if len(info.SubordinateEntityTypes) > 0 {
-				for i := range info.SubordinateEntityTypes {
-					info.SubordinateEntityTypes[i].SubordinateID = info.ID
+
+			// Insert entity type rows separately
+			if len(entityTypes) > 0 {
+				for i := range entityTypes {
+					entityTypes[i].SubordinateID = info.ID
 				}
+				// Use column-based conflict detection with DO NOTHING
 				if err := tx.Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "subordinate_id"}, {Name: "entity_type"}},
 					DoNothing: true,
-				}).Create(&info.SubordinateEntityTypes).Error; err != nil {
+				}).Create(&entityTypes).Error; err != nil {
 					return errors.Wrap(err, "failed to insert subordinate entity types")
 				}
 			}
@@ -165,10 +174,36 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 				return result.Error
 			}
 			info.ID = dbInfo.ID
-			return tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "entity_id"}},
-				UpdateAll: true,
-			}).Create(&info).Error
+
+			// Save entity types separately to handle them with their own ON CONFLICT clause
+			entityTypes := info.SubordinateEntityTypes
+			info.SubordinateEntityTypes = nil // Prevent GORM from auto-creating associations
+
+			// Upsert the subordinate info (without associations)
+			if err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{{Name: "entity_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"updated_at", "description", "status", "jwks_id",
+					"metadata", "metadata_policy", "constraints",
+				}),
+			}).Create(&info).Error; err != nil {
+				return err
+			}
+
+			// Insert entity type rows separately
+			if len(entityTypes) > 0 {
+				for i := range entityTypes {
+					entityTypes[i].SubordinateID = info.ID
+				}
+				// Use column-based conflict detection with DO NOTHING
+				if err := tx.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "subordinate_id"}, {Name: "entity_type"}},
+					DoNothing: true,
+				}).Create(&entityTypes).Error; err != nil {
+					return errors.Wrap(err, "failed to insert subordinate entity types")
+				}
+			}
+			return nil
 		},
 	)
 }

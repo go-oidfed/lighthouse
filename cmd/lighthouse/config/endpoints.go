@@ -33,7 +33,7 @@ import (
 type Endpoints struct {
 	// FetchEndpoint configures the fetch endpoint.
 	// Env prefix: LH_ENDPOINTS_FETCH_
-	FetchEndpoint fetchEndpointConf `yaml:"fetch" envconfig:"FETCH"`
+	FetchEndpoint lighthouse.EndpointConf `yaml:"fetch" envconfig:"FETCH"`
 	// ListEndpoint configures the list endpoint.
 	// Env prefix: LH_ENDPOINTS_LIST_
 	ListEndpoint lighthouse.EndpointConf `yaml:"list" envconfig:"LIST"`
@@ -48,7 +48,7 @@ type Endpoints struct {
 	TrustMarkedEntitiesListingEndpoint lighthouse.EndpointConf `yaml:"trust_mark_list" envconfig:"TRUST_MARK_LIST"`
 	// TrustMarkEndpoint configures the trust mark endpoint.
 	// Env prefix: LH_ENDPOINTS_TRUST_MARK_
-	TrustMarkEndpoint trustMarkEndpointConf `yaml:"trust_mark" envconfig:"TRUST_MARK"`
+	TrustMarkEndpoint lighthouse.EndpointConf `yaml:"trust_mark" envconfig:"TRUST_MARK"`
 	// HistoricalKeysEndpoint configures the historical keys endpoint.
 	// Env prefix: LH_ENDPOINTS_HISTORICAL_KEYS_
 	HistoricalKeysEndpoint lighthouse.EndpointConf `yaml:"historical_keys" envconfig:"HISTORICAL_KEYS"`
@@ -80,19 +80,6 @@ type checkedEndpointConf struct {
 	// CheckerConfig is the entity checker configuration.
 	// YAML only - too complex for env vars
 	CheckerConfig lighthouse.EntityCheckerConfig `yaml:"checker" envconfig:"-"`
-}
-
-// fetchEndpointConf holds fetch endpoint configuration.
-//
-// Environment variables (with prefix LH_ENDPOINTS_FETCH_):
-//   - LH_ENDPOINTS_FETCH_PATH: Endpoint path
-//   - LH_ENDPOINTS_FETCH_URL: Endpoint URL
-//   - LH_ENDPOINTS_FETCH_STATEMENT_LIFETIME: Subordinate statement lifetime (e.g., "166h")
-type fetchEndpointConf struct {
-	lighthouse.EndpointConf `yaml:",inline"`
-	// StatementLifetime is the lifetime of subordinate statements.
-	// Env: LH_ENDPOINTS_FETCH_STATEMENT_LIFETIME
-	StatementLifetime duration.DurationOption `yaml:"statement_lifetime" envconfig:"STATEMENT_LIFETIME"`
 }
 
 // resolveEndpointConf holds resolve endpoint configuration.
@@ -212,20 +199,6 @@ func (c *collectionEndpointConf) validate() error {
 	return nil
 }
 
-// trustMarkEndpointConf holds trust mark endpoint configuration.
-//
-// Environment variables (with prefix LH_ENDPOINTS_TRUST_MARK_):
-//   - LH_ENDPOINTS_TRUST_MARK_PATH: Endpoint path
-//   - LH_ENDPOINTS_TRUST_MARK_URL: Endpoint URL
-//
-// Note: trust_mark_specs is deprecated and YAML-only
-type trustMarkEndpointConf struct {
-	lighthouse.EndpointConf `yaml:",inline"`
-	// TrustMarkSpecs is deprecated. Use the Admin API instead.
-	// YAML only - deprecated and complex
-	TrustMarkSpecs []extendedTrustMarkSpec `yaml:"trust_mark_specs" envconfig:"-"`
-}
-
 type extendedTrustMarkSpec struct {
 	CheckerConfig        lighthouse.EntityCheckerConfig `yaml:"checker"`
 	oidfed.TrustMarkSpec `yaml:",inline"`
@@ -267,20 +240,7 @@ func (e *extendedTrustMarkSpec) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// validate implements configValidator for trustMarkEndpointConf
-func (c *trustMarkEndpointConf) validate() error {
-	if len(c.TrustMarkSpecs) > 0 {
-		log.Warn("DEPRECATED: 'trust_mark_specs' in config file is deprecated and will be ignored. " +
-			"Use the Admin API to manage trust mark specs in the database. " +
-			"A migration tool will be provided in a future release.")
-	}
-	return nil
-}
-
 var defaultEndpointConf = Endpoints{
-	FetchEndpoint: fetchEndpointConf{
-		StatementLifetime: duration.DurationOption(600000 * time.Second),
-	},
 	ResolveEndpoint: resolveEndpointConf{
 		GracePeriod:            duration.DurationOption(time.Hour),
 		TimeElapsedGraceFactor: 0.5,

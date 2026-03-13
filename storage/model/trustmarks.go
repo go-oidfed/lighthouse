@@ -63,9 +63,9 @@ type TrustMarkSubject struct {
 	CreatedAt        int            `json:"created_at"`
 	UpdatedAt        int            `json:"updated_at"`
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
-	TrustMarkSpecID  uint           `gorm:"index:,unique,composite:tmspec_subject" json:"-"`
+	TrustMarkSpecID  uint           `gorm:"uniqueIndex:idx_tmsubject_spec_entity" json:"-"`
 	TrustMarkSpec    TrustMarkSpec  `json:"-"`
-	EntityID         string         `gorm:"index:unique,composite:tmspec_subject" json:"entity_id"`
+	EntityID         string         `gorm:"uniqueIndex:idx_tmsubject_spec_entity" json:"entity_id"`
 	Status           Status         `gorm:"index" json:"status"`
 	AdditionalClaims map[string]any `gorm:"serializer:json" json:"additional_claims,omitempty"`
 	Description      string         `gorm:"type:text" json:"description,omitempty"`

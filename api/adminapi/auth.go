@@ -35,6 +35,8 @@ func authMiddleware(users model.UsersStore) fiber.Handler {
 			c.Set("WWW-Authenticate", "Basic realm=admin")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid_client", "error_description": "invalid credentials"})
 		}
+		// Store authenticated username for actor extraction
+		SetAuthUsername(c, username)
 		// All good
 		return c.Next()
 	}

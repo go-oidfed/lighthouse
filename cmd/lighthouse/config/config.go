@@ -55,9 +55,6 @@ type Config struct {
 	// Endpoints holds endpoints configuration.
 	// Env prefix: LH_ENDPOINTS_
 	Endpoints Endpoints `yaml:"endpoints" envconfig:"ENDPOINTS"`
-	// Federation holds federation configuration.
-	// Env prefix: LH_FEDERATION_DATA_
-	Federation federationConf `yaml:"federation_data" envconfig:"FEDERATION_DATA"`
 	// API holds API configuration.
 	// Env prefix: LH_API_
 	API apiConf `yaml:"api" envconfig:"API"`
@@ -102,14 +99,13 @@ func (c *Config) Validate() error {
 }
 
 var c = Config{
-	Server:     defaultServerConf,
-	Logging:    defaultLoggingConf,
-	Storage:    defaultStorageConf,
-	Signing:    defaultSigningConf,
-	Endpoints:  defaultEndpointConf,
-	Federation: defaultFederationConf,
-	API:        defaultAPIConf,
-	Stats:      defaultStatsConf,
+	Server:    defaultServerConf,
+	Logging:   defaultLoggingConf,
+	Storage:   defaultStorageConf,
+	Signing:   defaultSigningConf,
+	Endpoints: defaultEndpointConf,
+	API:       defaultAPIConf,
+	Stats:     defaultStatsConf,
 }
 
 // Get returns the Config

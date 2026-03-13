@@ -72,7 +72,7 @@ func handlePutSubordinateJWKS(storages model.Backends) fiber.Handler {
 			}
 			result = updatedJWKS
 			// Record JWKS replaced event
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKSReplaced)
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKSReplaced, WithActor(GetActor(c)))
 		})
 		if err != nil {
 			return handleTxError(c, err)
@@ -125,7 +125,7 @@ func handlePostSubordinateJWK(storages model.Backends) fiber.Handler {
 			result = updatedJWKS
 			// Record JWK added event
 			kid, _ := key.KeyID()
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKAdded, WithMessage("key added: "+kid))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKAdded, WithMessage("key added: "+kid), WithActor(GetActor(c)))
 		})
 		if err != nil {
 			return handleTxError(c, err)
@@ -173,7 +173,7 @@ func handleDeleteSubordinateJWK(storages model.Backends) fiber.Handler {
 				return err
 			}
 			// Record JWK removed event
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKRemoved, WithMessage("key removed: "+kid))
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKRemoved, WithMessage("key removed: "+kid), WithActor(GetActor(c)))
 		})
 		if err != nil {
 			return handleTxError(c, err)

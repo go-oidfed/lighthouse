@@ -21,9 +21,8 @@ import (
 //   - LH_STORAGE_DB: Database name
 //   - LH_STORAGE_DEBUG: Enable debug logging
 type storageConf struct {
-	// BackendType is deprecated and will be ignored.
-	// Env: - (not supported, deprecated)
-	BackendType backendType `yaml:"backend" envconfig:"-"`
+	// Deprecated: Only used for discovering a migration need
+	BackendType string `yaml:"backend" envconfig:"-"`
 	// Driver is the database driver type.
 	// Env: LH_STORAGE_DRIVER
 	Driver storage.DriverType `yaml:"driver" envconfig:"DRIVER"`
@@ -45,7 +44,7 @@ type storageConf struct {
 
 func (c *storageConf) validate() error {
 	if c.BackendType != "" {
-		return errors.New("backend types have been deprecated; please migrate to gorm")
+		return errors.New("backend types have been deprecated; please migrate")
 	}
 
 	if c.Driver == (storage.DriverSQLite) {
@@ -70,14 +69,6 @@ var defaultStorageConf = storageConf{
 	},
 	Debug: false,
 }
-
-type backendType string
-
-const (
-	BackendTypeJSON   backendType = "json"
-	BackendTypeBadger backendType = "badger"
-	BackendTypeGorm   backendType = "gorm"
-)
 
 // LoadStorageBackends loads and returns the storage backends for the passed Config
 func LoadStorageBackends(c storageConf) (model.Backends, error) {

@@ -80,16 +80,6 @@ type LightHouse struct {
 	trustMarkConfigProvider *storage.TrustMarkConfigProvider
 }
 
-// SubordinateStatementsConfig is a type for setting MetadataPolicies and additional attributes that should go into the
-// SubordinateStatements issued by this LightHouse
-type SubordinateStatementsConfig struct {
-	SubordinateStatementLifetime time.Duration
-	Constraints                  *oidfed.ConstraintSpecification
-	CriticalExtensions           []string
-	MetadataPolicyCrit           []oidfed.PolicyOperatorName
-	Extra                        map[string]any
-}
-
 // FiberServerConfig is the fiber.Config that is used to init the http fiber.App
 var FiberServerConfig = fiber.Config{
 	ReadTimeout:    3 * time.Second,
@@ -341,6 +331,10 @@ func NewLightHouse(
 				UsersEnabled:               admin.UsersEnabled,
 				Port:                       admin.Port,
 				TrustMarkConfigInvalidator: trustMarkConfigProvider,
+				Actor: adminapi.ActorConfig{
+					Header: admin.ActorHeader,
+					Source: adminapi.ActorSource(admin.ActorSource),
+				},
 			},
 		); err != nil {
 			return nil, err
@@ -546,6 +540,12 @@ type AdminAPIOptions struct {
 	UsersEnabled bool
 	// Port: 0 mounts on main server under /api/v1/admin; >0 starts a separate server on this port
 	Port int
+	// ActorHeader is the HTTP header name to extract the actor from for event history.
+	// Default: "X-Actor"
+	ActorHeader string
+	// ActorSource is the preferred source for actor extraction ("basic_auth" or "header").
+	// Default: "basic_auth" (tries basic auth username first, then falls back to header)
+	ActorSource string
 }
 
 // StatsOptions controls initialization of statistics collection.

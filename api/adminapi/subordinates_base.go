@@ -90,6 +90,7 @@ func (h *subordinatesBaseHandlers) create(c *fiber.Ctx) error {
 			model.EventTypeCreated,
 			WithStatus(stored.Status),
 			WithMessage(fmt.Sprintf("subordinate created: %s", stored.EntityID)),
+			WithActor(GetActor(c)),
 		)
 	})
 	if err != nil {
@@ -143,7 +144,7 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 		if err = tx.Subordinates.Update(existing.EntityID, *existing); err != nil {
 			return err
 		}
-		if err = RecordEvent(tx.SubordinateEvents, existing.ID, model.EventTypeUpdated, WithStatus(existing.Status)); err != nil {
+		if err = RecordEvent(tx.SubordinateEvents, existing.ID, model.EventTypeUpdated, WithStatus(existing.Status), WithActor(GetActor(c))); err != nil {
 			return err
 		}
 		result = existing
@@ -225,6 +226,7 @@ func (h *subordinatesBaseHandlers) updateStatus(c *fiber.Ctx) error {
 			model.EventTypeStatusUpdated,
 			WithStatus(status),
 			WithMessage(fmt.Sprintf("status changed from %s to %s", oldStatus, status)),
+			WithActor(GetActor(c)),
 		); err != nil {
 			return err
 		}

@@ -47,6 +47,13 @@ var subordinatesManageRequestsCmd = &cobra.Command{
 	Long:  "Manage subordinate requests interactively",
 	RunE:  manageSubordinateRequests,
 }
+var subordinatesStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Update subordinate status",
+	Long:  `Update the status of a subordinate to one of: active, blocked, pending, inactive`,
+	Args:  cobra.ExactArgs(2),
+	RunE:  updateSubordinateStatus,
+}
 
 var entityTypes []string
 var onlyIDs bool
@@ -63,6 +70,7 @@ func init() {
 	)
 	subordinatesRemoveCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
 	subordinatesBlockCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
+	subordinatesStatusCmd.Flags().StringVarP(&configFile, "config", "c", "config.yaml", "the config file to use")
 	subordinatesManageRequestsCmd.Flags().StringVarP(
 		&configFile, "config", "c", "config.yaml", "the config file to use",
 	)
@@ -76,6 +84,7 @@ func init() {
 	subordinatesCmd.AddCommand(subordinatesAddCmd)
 	subordinatesCmd.AddCommand(subordinatesRemoveCmd)
 	subordinatesCmd.AddCommand(subordinatesBlockCmd)
+	subordinatesCmd.AddCommand(subordinatesStatusCmd)
 	subordinatesCmd.AddCommand(subordinatesManageRequestsCmd)
 	rootCmd.AddCommand(subordinatesCmd)
 }
@@ -170,6 +179,29 @@ func blockSubordinate(_ *cobra.Command, args []string) error {
 		return errors.Wrap(err, "failed to block subordinate in storage")
 	}
 	fmt.Println("subordinate blocked successfully")
+	return nil
+}
+
+func updateSubordinateStatus(_ *cobra.Command, args []string) error {
+	if err := loadConfig(); err != nil {
+		return err
+	}
+	if err := subordinateStorage.Load(); err != nil {
+		return errors.Wrap(err, "failed to load subordinates from storage")
+	}
+
+	entityID := args[0]
+	statusStr := args[1]
+
+	status, err := model.ParseStatus(statusStr)
+	if err != nil {
+		return errors.Wrap(err, "invalid status (valid values: active, blocked, pending, inactive)")
+	}
+
+	if err := subordinateStorage.UpdateStatus(entityID, status); err != nil {
+		return errors.Wrap(err, "failed to update subordinate status")
+	}
+	fmt.Printf("subordinate status updated to '%s' successfully\n", status)
 	return nil
 }
 

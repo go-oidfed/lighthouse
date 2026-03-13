@@ -20,7 +20,7 @@ The statistics system captures:
 Statistics can be accessed via:
 
 - **REST API** - JSON endpoints under `/api/v1/admin/stats/`
-- **CLI** - `lhcli stats` commands
+- **CLI** - [`lhcli stats`](../deployment/lhcli.md#statistics) commands
 - **Export** - CSV or JSON file export
 
 ## Enabling Statistics
@@ -197,82 +197,22 @@ Returns a file download with the exported data.
 
 The `lhcli stats` command provides access to statistics from the command line.
 
-### Summary
-
 ```bash
+# View summary
 lhcli stats summary --from 2024-01-01 --to 2024-01-31
-```
 
-Output:
-```
-Statistics Summary (2024-01-01 to 2024-01-31)
-============================================================
-Total Requests:      1234567
-Total Errors:        1234
-Error Rate:          0.10%
-Avg Latency:         45.20 ms
-P50 Latency:         32 ms
-P95 Latency:         120 ms
-P99 Latency:         250 ms
-Unique Clients:      5678
-Unique User Agents:  42
-
-Requests by Endpoint:
-  well-known           500000
-  fetch                400000
-  resolve              334567
-```
-
-### Top Queries
-
-```bash
 # Top endpoints
 lhcli stats top endpoints --limit 20
 
-# Top user agents
-lhcli stats top user-agents --limit 10
+# Time series data
+lhcli stats timeseries --interval hour --endpoint fetch
 
-# Top clients by IP
-lhcli stats top clients --limit 10
-
-# Top countries (requires GeoIP)
-lhcli stats top countries --limit 10
+# Export to file
+lhcli stats export --format csv --output stats.csv
 ```
 
-### Time Series
-
-```bash
-lhcli stats timeseries --interval hour --endpoint fetch --from 2024-01-01
-```
-
-### Latency
-
-```bash
-lhcli stats latency --endpoint resolve
-```
-
-### Export
-
-```bash
-# Export to CSV
-lhcli stats export --format csv --output stats.csv --from 2024-01-01
-
-# Export to JSON (newline-delimited)
-lhcli stats export --format json --output stats.json --from 2024-01-01
-```
-
-### Maintenance
-
-```bash
-# Show what would be purged (dry run)
-lhcli stats purge --dry-run
-
-# Actually purge old data
-lhcli stats purge
-
-# Manually run aggregation for a specific date
-lhcli stats aggregate --date 2024-01-15
-```
+For complete CLI documentation including all commands, flags, and examples, 
+see the [lhcli stats reference](../deployment/lhcli.md#statistics).
 
 ## Data Retention
 

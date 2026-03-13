@@ -69,7 +69,7 @@ func (h *subordinateConstraintsHandlers) putAll(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated)
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithActor(GetActor(c)))
 		},
 	)
 	if err != nil {
@@ -104,7 +104,7 @@ func (h *subordinateConstraintsHandlers) postAll(c *fiber.Ctx) error {
 			}
 			result = info.Constraints
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("copied from general"),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("copied from general"), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -127,7 +127,7 @@ func (h *subordinateConstraintsHandlers) deleteAll(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted)
+			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithActor(GetActor(c)))
 		},
 	)
 	if err != nil {
@@ -174,7 +174,7 @@ func (h *subordinateConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("max_path_length"),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("max_path_length"), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -199,7 +199,7 @@ func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error
 					return err
 				}
 				return RecordEvent(
-					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("max_path_length"),
+					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("max_path_length"), WithActor(GetActor(c)),
 				)
 			}
 			return nil
@@ -243,7 +243,7 @@ func (h *subordinateConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) erro
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("naming_constraints"),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("naming_constraints"), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -268,7 +268,7 @@ func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) e
 					return err
 				}
 				return RecordEvent(
-					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("naming_constraints"),
+					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("naming_constraints"), WithActor(GetActor(c)),
 				)
 			}
 			return nil
@@ -314,7 +314,7 @@ func (h *subordinateConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) err
 			}
 			result = info.Constraints.AllowedEntityTypes
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -353,7 +353,7 @@ func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) er
 			}
 			result = info.Constraints.AllowedEntityTypes
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"), WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -397,7 +397,7 @@ func (h *subordinateConstraintsHandlers) deleteAllowedEntityType(c *fiber.Ctx) e
 			}
 			result = info.Constraints.AllowedEntityTypes
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("allowed_entity_types"),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("allowed_entity_types"), WithActor(GetActor(c)),
 			)
 		},
 	)

@@ -24,14 +24,116 @@ Federation Authority that can be configured according to your needs and
 requirements.
 
 
-## Read more
+## Getting Started
 
 <div class="grid cards" markdown>
 
-- [:material-file-cog: Configuration](config)
-- [:material-map-check: Features](features)
-- [:material-routes: Endpoints](features/endpoints.md)
-- [:material-police-badge: Automatic Entity Checks](features/entity_checks.md)
-- [:material-marker-check: Trust Marks](features/trustmarks.md)
+-   :material-rocket-launch:{ .lg .middle } **Deployment**
+
+    ---
+
+    Get LightHouse up and running with Docker and Caddy reverse proxy.
+
+    [:octicons-arrow-right-24: Deploy LightHouse](deployment/caddy.md)
+
+-   :material-file-cog:{ .lg .middle } **Configuration**
+
+    ---
+
+    Configure LightHouse via YAML config file or environment variables.
+
+    [:octicons-arrow-right-24: Configuration Guide](config)
+
+</div>
+
+## Core Features
+
+<div class="grid cards" markdown>
+
+-   :material-routes:{ .lg .middle } **Federation Endpoints**
+
+    ---
+
+    Entity configuration, fetch, resolve, list, and trust mark endpoints.
+
+    [:octicons-arrow-right-24: Endpoints](features/endpoints.md)
+
+-   :material-marker-check:{ .lg .middle } **Trust Marks**
+
+    ---
+
+    Issue, manage, and verify trust marks with delegation support.
+
+    [:octicons-arrow-right-24: Trust Marks](features/trustmarks.md)
+
+-   :material-police-badge:{ .lg .middle } **Entity Checks**
+
+    ---
+
+    Automatic validation of entities during enrollment and trust mark requests.
+
+    [:octicons-arrow-right-24: Entity Checks](features/entity_checks.md)
+
+-   :material-api:{ .lg .middle } **Admin API**
+
+    ---
+
+    RESTful API for managing subordinates, trust marks, keys, and configuration.
+
+    [:octicons-arrow-right-24: Admin API](features/admin_api.md)
+
+-   :material-chart-line:{ .lg .middle } **Statistics**
+
+    ---
+
+    Capture and analyze request metrics, latency, and usage patterns.
+
+    [:octicons-arrow-right-24: Statistics](features/statistics.md)
+
+-   :material-console:{ .lg .middle } **CLI Tool**
+
+    ---
+
+    Manage LightHouse from the command line with `lhcli`.
+
+    [:octicons-arrow-right-24: CLI Reference](deployment/lhcli.md)
+
+</div>
+
+## Resources
+
+<div class="grid cards" markdown>
+
+-   :material-map-check:{ .lg .middle } **Feature Overview**
+
+    ---
+
+    Complete list of supported and planned features.
+
+    [:octicons-arrow-right-24: Features](features)
+
+-   :material-walk:{ .lg .middle } **Migration Guide**
+
+    ---
+
+    Upgrade from LightHouse < 0.20.0 to the latest version.
+
+    [:octicons-arrow-right-24: Migration](migration)
+
+-   :fontawesome-brands-github:{ .lg .middle } **Source Code**
+
+    ---
+
+    View the source code, report issues, or contribute.
+
+    [:octicons-arrow-right-24: GitHub](https://github.com/go-oidfed/lighthouse)
+
+-   :simple-openid:{ .lg .middle } **go-oidfed Library**
+
+    ---
+
+    The underlying OpenID Federation library for Go.
+
+    [:octicons-arrow-right-24: go-oidfed](https://github.com/go-oidfed/lib)
 
 </div>
