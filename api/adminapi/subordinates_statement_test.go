@@ -18,18 +18,18 @@ import (
 // mockFedEntity implements oidfed.FederationEntity just enough for the statement generation to not panic
 type mockFedEntity struct{}
 
-func (_ mockFedEntity) EntityID() string {
+func (mockFedEntity) EntityID() string {
 	return "https://lighthouse.example.org"
 }
 
-func (_ mockFedEntity) EntityConfigurationPayload() (*oidfed.EntityStatementPayload, error) {
+func (mockFedEntity) EntityConfigurationPayload() (*oidfed.EntityStatementPayload, error) {
 	return nil, nil
 }
-func (_ mockFedEntity) EntityConfigurationJWT() ([]byte, error) { return nil, nil }
-func (_ mockFedEntity) SignEntityStatement(_ oidfed.EntityStatementPayload) ([]byte, error) {
+func (mockFedEntity) EntityConfigurationJWT() ([]byte, error) { return nil, nil }
+func (mockFedEntity) SignEntityStatement(_ oidfed.EntityStatementPayload) ([]byte, error) {
 	return nil, nil
 }
-func (_ mockFedEntity) SignEntityStatementWithHeaders(_ oidfed.EntityStatementPayload, _ jws.Headers) ([]byte, error) {
+func (mockFedEntity) SignEntityStatementWithHeaders(_ oidfed.EntityStatementPayload, _ jws.Headers) ([]byte, error) {
 	return nil, nil
 }
 
