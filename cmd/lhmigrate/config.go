@@ -209,7 +209,7 @@ func (t *configTransformer) transform() (string, error) {
 
 	// Parse as generic YAML to preserve structure
 	var root yaml.Node
-	if err := yaml.Unmarshal(content, &root); err != nil {
+	if err = yaml.Unmarshal(content, &root); err != nil {
 		return "", fmt.Errorf("failed to parse config file: %w", err)
 	}
 
@@ -223,10 +223,10 @@ func (t *configTransformer) transform() (string, error) {
 	var buf strings.Builder
 	encoder := yaml.NewEncoder(&buf)
 	encoder.SetIndent(2)
-	if err := encoder.Encode(&root); err != nil {
+	if err = encoder.Encode(&root); err != nil {
 		return "", fmt.Errorf("failed to encode transformed config: %w", err)
 	}
-	if err := encoder.Close(); err != nil {
+	if err = encoder.Close(); err != nil {
 		return "", fmt.Errorf("failed to close encoder: %w", err)
 	}
 

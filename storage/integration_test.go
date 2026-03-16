@@ -37,7 +37,7 @@ func TestSQLiteConnection(t *testing.T) {
 		t.Fatalf("Failed to get SQL DB: %v", err)
 	}
 
-	if err := sqlDB.Ping(); err != nil {
+	if err = sqlDB.Ping(); err != nil {
 		t.Fatalf("Failed to ping SQLite database: %v", err)
 	}
 }
@@ -73,7 +73,7 @@ func TestMySQLConnection(t *testing.T) {
 		t.Fatalf("Failed to get SQL DB: %v", err)
 	}
 
-	if err := sqlDB.Ping(); err != nil {
+	if err = sqlDB.Ping(); err != nil {
 		t.Fatalf("Failed to ping MySQL database: %v", err)
 	}
 }
@@ -109,7 +109,7 @@ func TestPostgresConnection(t *testing.T) {
 		t.Fatalf("Failed to get SQL DB: %v", err)
 	}
 
-	if err := sqlDB.Ping(); err != nil {
+	if err = sqlDB.Ping(); err != nil {
 		t.Fatalf("Failed to ping PostgreSQL database: %v", err)
 	}
 }

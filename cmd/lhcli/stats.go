@@ -452,13 +452,13 @@ func exportStats(_ *cobra.Command, _ []string) error {
 
 	switch statsFormat {
 	case "json":
-		if err := statsStorage.ExportJSON(from, to, w); err != nil {
+		if err = statsStorage.ExportJSON(from, to, w); err != nil {
 			return errors.Wrap(err, "failed to export JSON")
 		}
 	case "csv":
 		fallthrough
 	default:
-		if err := statsStorage.ExportCSV(from, to, w); err != nil {
+		if err = statsStorage.ExportCSV(from, to, w); err != nil {
 			return errors.Wrap(err, "failed to export CSV")
 		}
 	}

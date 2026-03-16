@@ -19,7 +19,7 @@ func cleanupConfigFile(configPath string, verbose bool) error {
 	}
 
 	var root yaml.Node
-	if err := yaml.Unmarshal(content, &root); err != nil {
+	if err = yaml.Unmarshal(content, &root); err != nil {
 		return fmt.Errorf("failed to parse config file: %w", err)
 	}
 
@@ -33,15 +33,15 @@ func cleanupConfigFile(configPath string, verbose bool) error {
 	var buf strings.Builder
 	encoder := yaml.NewEncoder(&buf)
 	encoder.SetIndent(2)
-	if err := encoder.Encode(&root); err != nil {
+	if err = encoder.Encode(&root); err != nil {
 		return fmt.Errorf("failed to encode config: %w", err)
 	}
-	if err := encoder.Close(); err != nil {
+	if err = encoder.Close(); err != nil {
 		return fmt.Errorf("failed to close encoder: %w", err)
 	}
 
 	// Write back to file
-	if err := os.WriteFile(configPath, []byte(buf.String()), 0644); err != nil {
+	if err = os.WriteFile(configPath, []byte(buf.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

@@ -201,14 +201,14 @@ func (m *dbMigrator) migrateOneSubordinate(legacy legacySubordinateInfo) dbMigra
 
 	if existing != nil {
 		// Update existing
-		if err := m.backends.Subordinates.Update(legacy.EntityID, newInfo); err != nil {
+		if err = m.backends.Subordinates.Update(legacy.EntityID, newInfo); err != nil {
 			result.err = fmt.Errorf("failed to update subordinate: %w", err)
 			return result
 		}
 		result.action = "updated"
 	} else {
 		// Create new
-		if err := m.backends.Subordinates.Add(newInfo); err != nil {
+		if err = m.backends.Subordinates.Add(newInfo); err != nil {
 			result.err = fmt.Errorf("failed to create subordinate: %w", err)
 			return result
 		}
@@ -545,7 +545,7 @@ func runDBMigration(args []string) int {
 		return 2
 	}
 
-	if err := validateDBFlags(driver, destDir, dbDSN); err != nil {
+	if err = validateDBFlags(driver, destDir, dbDSN); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}

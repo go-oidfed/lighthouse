@@ -150,7 +150,7 @@ func config2dbCmd(args []string) int {
 
 	// Validate config if requested
 	if validate {
-		if err := validateMigrationConfig(config, sections); err != nil {
+		if err = validateMigrationConfig(config, sections); err != nil {
 			log.WithError(err).Error("config validation failed")
 			return 1
 		}
@@ -163,7 +163,7 @@ func config2dbCmd(args []string) int {
 		return 2
 	}
 
-	if err := validateDBFlags(driver, dbDir, dbDSN); err != nil {
+	if err = validateDBFlags(driver, dbDir, dbDSN); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
@@ -240,7 +240,7 @@ func loadMigrationConfig(filename string) (*migrationConfig, error) {
 	}
 
 	var config migrationConfig
-	if err := yaml.Unmarshal(content, &config); err != nil {
+	if err = yaml.Unmarshal(content, &config); err != nil {
 		return nil, errors.Wrap(err, "failed to parse config file")
 	}
 
@@ -377,7 +377,7 @@ func (m *configMigrator) migrateAlg() migrationResult {
 		return result
 	}
 
-	if err := storage.SetSigningAlg(m.backends.KV, storage.SigningAlgWithNbf{
+	if err = storage.SetSigningAlg(m.backends.KV, storage.SigningAlgWithNbf{
 		SigningAlg: m.config.Signing.Alg,
 	}); err != nil {
 		result.err = err
@@ -422,7 +422,7 @@ func (m *configMigrator) migrateRSAKeyLen() migrationResult {
 		return result
 	}
 
-	if err := storage.SetRSAKeyLen(m.backends.KV, m.config.Signing.RSAKeyLen); err != nil {
+	if err = storage.SetRSAKeyLen(m.backends.KV, m.config.Signing.RSAKeyLen); err != nil {
 		result.err = err
 		return result
 	}
@@ -482,7 +482,7 @@ func (m *configMigrator) migrateKeyRotation() migrationResult {
 		return result
 	}
 
-	if err := storage.SetKeyRotation(m.backends.KV, rotationConfig); err != nil {
+	if err = storage.SetKeyRotation(m.backends.KV, rotationConfig); err != nil {
 		result.err = err
 		return result
 	}
@@ -524,7 +524,7 @@ func (m *configMigrator) migrateConstraints() migrationResult {
 		return result
 	}
 
-	if err := storage.SetConstraints(m.backends.KV, m.config.Federation.Constraints); err != nil {
+	if err = storage.SetConstraints(m.backends.KV, m.config.Federation.Constraints); err != nil {
 		result.err = err
 		return result
 	}
@@ -566,7 +566,7 @@ func (m *configMigrator) migrateMetadataPolicyCrit() migrationResult {
 		return result
 	}
 
-	if err := storage.SetMetadataPolicyCrit(m.backends.KV, m.config.Federation.MetadataPolicyCrit); err != nil {
+	if err = storage.SetMetadataPolicyCrit(m.backends.KV, m.config.Federation.MetadataPolicyCrit); err != nil {
 		result.err = err
 		return result
 	}
@@ -598,7 +598,7 @@ func (m *configMigrator) migrateMetadataPolicies() migrationResult {
 	}
 
 	var metadataPolicy oidfed.MetadataPolicies
-	if err := json.Unmarshal(policyContent, &metadataPolicy); err != nil {
+	if err = json.Unmarshal(policyContent, &metadataPolicy); err != nil {
 		result.err = fmt.Errorf("failed to parse metadata_policy_file %q: %w", m.config.Federation.MetadataPolicyFile, err)
 		return result
 	}
@@ -629,7 +629,7 @@ func (m *configMigrator) migrateMetadataPolicies() migrationResult {
 		return result
 	}
 
-	if err := m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &metadataPolicy); err != nil {
+	if err = m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &metadataPolicy); err != nil {
 		result.err = err
 		return result
 	}
@@ -671,7 +671,7 @@ func (m *configMigrator) migrateConfigLifetime() migrationResult {
 		return result
 	}
 
-	if err := storage.SetEntityConfigurationLifetime(m.backends.KV, m.config.Federation.ConfigurationLifetime.Duration()); err != nil {
+	if err = storage.SetEntityConfigurationLifetime(m.backends.KV, m.config.Federation.ConfigurationLifetime.Duration()); err != nil {
 		result.err = err
 		return result
 	}
@@ -715,7 +715,7 @@ func (m *configMigrator) migrateStatementLifetime() migrationResult {
 
 	// Set the lifetime in the database
 	seconds := int(m.config.Endpoints.Fetch.StatementLifetime.Duration().Seconds())
-	if err := m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, seconds); err != nil {
+	if err = m.backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, seconds); err != nil {
 		result.err = err
 		return result
 	}
@@ -839,7 +839,7 @@ func (m *configMigrator) migrateMetadata() migrationResult {
 		return result
 	}
 
-	if err := storage.SetMetadata(m.backends.KV, metadata); err != nil {
+	if err = storage.SetMetadata(m.backends.KV, metadata); err != nil {
 		result.err = err
 		return result
 	}
@@ -913,7 +913,7 @@ func (m *configMigrator) migrateExtraEntityConfigData() []migrationResult {
 
 		if existingMap[claimName] {
 			// Update existing claim
-			if _, err := m.backends.AdditionalClaims.Update(claimName, addClaim); err != nil {
+			if _, err = m.backends.AdditionalClaims.Update(claimName, addClaim); err != nil {
 				result.err = err
 				results = append(results, result)
 				continue
@@ -922,7 +922,7 @@ func (m *configMigrator) migrateExtraEntityConfigData() []migrationResult {
 			result.details = claimName
 		} else {
 			// Create new claim
-			if _, err := m.backends.AdditionalClaims.Create(addClaim); err != nil {
+			if _, err = m.backends.AdditionalClaims.Create(addClaim); err != nil {
 				result.err = err
 				results = append(results, result)
 				continue
@@ -1006,14 +1006,14 @@ func (m *configMigrator) migrateTrustMarkSpecs() []migrationResult {
 
 		if existingMap[spec.TrustMarkType] {
 			// Update existing
-			if _, err := m.backends.TrustMarkSpecs.Update(spec.TrustMarkType, newSpec); err != nil {
+			if _, err = m.backends.TrustMarkSpecs.Update(spec.TrustMarkType, newSpec); err != nil {
 				result.err = err
 			} else {
 				result.action = "overwritten"
 			}
 		} else {
 			// Create new
-			if _, err := m.backends.TrustMarkSpecs.Create(newSpec); err != nil {
+			if _, err = m.backends.TrustMarkSpecs.Create(newSpec); err != nil {
 				result.err = err
 			} else {
 				result.action = "created"
@@ -1308,14 +1308,14 @@ func (m *configMigrator) migrateTrustMarks() []migrationResult {
 
 		if existingMap[tm.TrustMarkType] {
 			// Update existing
-			if _, err := m.backends.PublishedTrustMarks.Update(tm.TrustMarkType, addTrustMark); err != nil {
+			if _, err = m.backends.PublishedTrustMarks.Update(tm.TrustMarkType, addTrustMark); err != nil {
 				result.err = fmt.Errorf("failed to update trust mark: %w", err)
 			} else {
 				result.action = "overwritten"
 			}
 		} else {
 			// Create new
-			if _, err := m.backends.PublishedTrustMarks.Create(addTrustMark); err != nil {
+			if _, err = m.backends.PublishedTrustMarks.Create(addTrustMark); err != nil {
 				result.err = fmt.Errorf("failed to create trust mark: %w", err)
 			} else {
 				result.action = "created"
@@ -1413,7 +1413,7 @@ func removeMigratedOptionsFromConfig(configFile string, sections []migrationSect
 	}
 
 	var root yaml.Node
-	if err := yaml.Unmarshal(content, &root); err != nil {
+	if err = yaml.Unmarshal(content, &root); err != nil {
 		return errors.Wrap(err, "failed to parse config file")
 	}
 
@@ -1430,15 +1430,15 @@ func removeMigratedOptionsFromConfig(configFile string, sections []migrationSect
 	var buf strings.Builder
 	encoder := yaml.NewEncoder(&buf)
 	encoder.SetIndent(2)
-	if err := encoder.Encode(&root); err != nil {
+	if err = encoder.Encode(&root); err != nil {
 		return errors.Wrap(err, "failed to encode config")
 	}
-	if err := encoder.Close(); err != nil {
+	if err = encoder.Close(); err != nil {
 		return errors.Wrap(err, "failed to close encoder")
 	}
 
 	// Write back to file
-	if err := os.WriteFile(configFile, []byte(buf.String()), 0644); err != nil {
+	if err = os.WriteFile(configFile, []byte(buf.String()), 0644); err != nil {
 		return errors.Wrap(err, "failed to write config file")
 	}
 
