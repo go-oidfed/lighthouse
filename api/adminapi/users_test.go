@@ -131,7 +131,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			CreateFunc: func(username, password, displayName string) (*model.User, error) {
+			CreateFunc: func(username, _, displayName string) (*model.User, error) {
 				return &model.User{
 					ID:          1,
 					Username:    username,
@@ -210,7 +210,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("ConflictAlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			CreateFunc: func(username, password, displayName string) (*model.User, error) {
+			CreateFunc: func(_, _, _ string) (*model.User, error) {
 				return nil, model.AlreadyExistsError("user already exists")
 			},
 		}
@@ -230,7 +230,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("InternalError", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			CreateFunc: func(username, password, displayName string) (*model.User, error) {
+			CreateFunc: func(_, _, _ string) (*model.User, error) {
 				return nil, fiber.ErrInternalServerError
 			},
 		}
@@ -281,7 +281,7 @@ func TestGetUser(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			GetFunc: func(username string) (*model.User, error) {
+			GetFunc: func(_ string) (*model.User, error) {
 				return nil, model.NotFoundError("user not found")
 			},
 		}
@@ -298,7 +298,7 @@ func TestGetUser(t *testing.T) {
 	t.Run("InternalError", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			GetFunc: func(username string) (*model.User, error) {
+			GetFunc: func(_ string) (*model.User, error) {
 				return nil, fiber.ErrInternalServerError
 			},
 		}
@@ -320,7 +320,7 @@ func TestUpdateUser(t *testing.T) {
 	t.Run("Success_DisplayName", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
+			UpdateFunc: func(username string, displayName *string, _ *string, _ *bool) (*model.User, error) {
 				dn := "Alice Updated"
 				if displayName != nil {
 					dn = *displayName
@@ -350,7 +350,7 @@ func TestUpdateUser(t *testing.T) {
 		t.Parallel()
 		updateCalled := false
 		store := &mockUsersStore{
-			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
+			UpdateFunc: func(username string, _ *string, newPassword *string, _ *bool) (*model.User, error) {
 				updateCalled = true
 				if newPassword == nil {
 					t.Error("Expected newPassword to be non-nil")
@@ -374,7 +374,7 @@ func TestUpdateUser(t *testing.T) {
 	t.Run("Success_Disabled", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
+			UpdateFunc: func(username string, _ *string, _ *string, disabled *bool) (*model.User, error) {
 				if disabled == nil || !*disabled {
 					t.Error("Expected disabled to be true")
 				}
@@ -400,7 +400,7 @@ func TestUpdateUser(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
+			UpdateFunc: func(_ string, _ *string, _ *string, _ *bool) (*model.User, error) {
 				return nil, model.NotFoundError("user not found")
 			},
 		}
@@ -430,7 +430,7 @@ func TestUpdateUser(t *testing.T) {
 	t.Run("InternalError", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			UpdateFunc: func(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
+			UpdateFunc: func(_ string, _ *string, _ *string, _ *bool) (*model.User, error) {
 				return nil, fiber.ErrInternalServerError
 			},
 		}
@@ -475,7 +475,7 @@ func TestDeleteUser(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			DeleteFunc: func(username string) error {
+			DeleteFunc: func(_ string) error {
 				return model.NotFoundError("user not found")
 			},
 		}
@@ -492,7 +492,7 @@ func TestDeleteUser(t *testing.T) {
 	t.Run("InternalError", func(t *testing.T) {
 		t.Parallel()
 		store := &mockUsersStore{
-			DeleteFunc: func(username string) error {
+			DeleteFunc: func(_ string) error {
 				return fiber.ErrInternalServerError
 			},
 		}

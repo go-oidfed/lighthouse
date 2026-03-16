@@ -113,7 +113,7 @@ func TestParseBasicAuth(t *testing.T) {
 	}
 
 	t.Run("MissingAuthorizationHeader", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		resp, _ := app.Test(req)
@@ -122,7 +122,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("HeaderWithoutBasicPrefix", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Bearer token")
@@ -132,7 +132,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("InvalidBase64Encoding", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Basic !@#invalidbase64")
@@ -142,7 +142,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("MissingColonInDecodedCredentials", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		encoded := base64.StdEncoding.EncodeToString([]byte("usernamepassword"))
@@ -153,7 +153,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("ValidCredentials", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
@@ -170,7 +170,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("EmptyPassword", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", ""))
@@ -187,7 +187,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("EmptyUsername", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("", "password"))
@@ -201,7 +201,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("PasswordWithColons", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "pass:word:123"))
@@ -218,7 +218,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("CaseSensitivePrefix", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		encoded := base64.StdEncoding.EncodeToString([]byte("admin:secret"))
@@ -229,7 +229,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("EmptyAuthorizationHeader", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "")
@@ -239,7 +239,7 @@ func TestParseBasicAuth(t *testing.T) {
 	})
 
 	t.Run("BasicPrefixOnly", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Basic ")
@@ -263,7 +263,7 @@ func TestAuthMiddleware(t *testing.T) {
 	}
 
 	t.Run("CountError", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupAuthApp(&mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 0, fiber.ErrInternalServerError
@@ -281,7 +281,7 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("CountZero_NoAuthRequired", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupAuthApp(&mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 0, nil
@@ -295,7 +295,7 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("CountGreaterThanZero_MissingAuth", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupAuthApp(&mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 1, nil
@@ -322,12 +322,12 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("CountGreaterThanZero_InvalidCredentials", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupAuthApp(&mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 1, nil
 			},
-			AuthenticateFunc: func(username, password string) (*model.User, error) {
+			AuthenticateFunc: func(_, _ string) (*model.User, error) {
 				return nil, fiber.ErrUnauthorized
 			},
 		})
@@ -353,12 +353,12 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("CountGreaterThanZero_ValidCredentials", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupAuthApp(&mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 1, nil
 			},
-			AuthenticateFunc: func(username, password string) (*model.User, error) {
+			AuthenticateFunc: func(username, _ string) (*model.User, error) {
 				return &model.User{Username: username}, nil
 			},
 		})
@@ -371,14 +371,14 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("CountGreaterThanZero_DisabledUser", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Even though the user is disabled, authMiddleware does not check the disabled field.
 		// This test documents that behavior. If disabled-user checking is added later, update here.
 		app := setupAuthApp(&mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 1, nil
 			},
-			AuthenticateFunc: func(username, password string) (*model.User, error) {
+			AuthenticateFunc: func(username, _ string) (*model.User, error) {
 				return &model.User{Username: username, Disabled: true}, nil
 			},
 		})
@@ -392,7 +392,7 @@ func TestAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("MultipleUsersInStore", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app := setupAuthApp(&mockUsersStore{
 			CountFunc: func() (int64, error) {
 				return 5, nil

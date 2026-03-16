@@ -268,7 +268,7 @@ func TestTrustMarkOwnersHandlers_Create(t *testing.T) {
 	t.Run("AlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			createFn: func(owner model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
+			createFn: func(_ model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
 				return nil, model.AlreadyExistsError("exists")
 			},
 		}
@@ -284,7 +284,7 @@ func TestTrustMarkOwnersHandlers_Create(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			createFn: func(owner model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
+			createFn: func(_ model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -303,7 +303,7 @@ func TestTrustMarkOwnersHandlers_Get(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			getFn: func(id string) (*model.TrustMarkOwner, error) {
+			getFn: func(_ string) (*model.TrustMarkOwner, error) {
 				return &model.TrustMarkOwner{EntityID: "owner1"}, nil
 			},
 		}
@@ -321,7 +321,7 @@ func TestTrustMarkOwnersHandlers_Get(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			getFn: func(id string) (*model.TrustMarkOwner, error) {
+			getFn: func(_ string) (*model.TrustMarkOwner, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -366,7 +366,7 @@ func TestTrustMarkOwnersHandlers_Update(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			updateFn: func(id string, owner model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
+			updateFn: func(_ string, _ model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -382,7 +382,7 @@ func TestTrustMarkOwnersHandlers_Update(t *testing.T) {
 	t.Run("AlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			updateFn: func(id string, owner model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
+			updateFn: func(_ string, _ model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
 				return nil, model.AlreadyExistsError("exists")
 			},
 		}
@@ -398,7 +398,7 @@ func TestTrustMarkOwnersHandlers_Update(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			updateFn: func(id string, owner model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
+			updateFn: func(_ string, _ model.AddTrustMarkOwner) (*model.TrustMarkOwner, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -428,7 +428,7 @@ func TestTrustMarkOwnersHandlers_Delete(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			deleteFn: func(id string) error {
+			deleteFn: func(_ string) error {
 				return model.NotFoundError("not found")
 			},
 		}
@@ -446,7 +446,7 @@ func TestTrustMarkOwnersHandlers_TypesList(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			typesFn: func(id string) ([]uint, error) {
+			typesFn: func(_ string) ([]uint, error) {
 				return []uint{1, 2}, nil
 			},
 		}
@@ -464,7 +464,7 @@ func TestTrustMarkOwnersHandlers_TypesList(t *testing.T) {
 	t.Run("OwnerNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			typesFn: func(id string) ([]uint, error) {
+			typesFn: func(_ string) ([]uint, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -479,12 +479,12 @@ func TestTrustMarkOwnersHandlers_TypesList(t *testing.T) {
 	t.Run("LoadTypesError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			typesFn: func(id string) ([]uint, error) {
+			typesFn: func(_ string) ([]uint, error) {
 				return []uint{1, 2}, nil
 			},
 		}
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -502,7 +502,7 @@ func TestTrustMarkOwnersHandlers_TypesSet(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			setTypesFn: func(id string, typeIdents []string) ([]uint, error) {
+			setTypesFn: func(_ string, _ []string) ([]uint, error) {
 				return []uint{3}, nil
 			},
 		}
@@ -532,7 +532,7 @@ func TestTrustMarkOwnersHandlers_TypesSet(t *testing.T) {
 	t.Run("OwnerNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			setTypesFn: func(id string, typeIdents []string) ([]uint, error) {
+			setTypesFn: func(_ string, _ []string) ([]uint, error) {
 				return nil, errors.New("db error") // Generic error since SetTypes doesn't explicitly return NotFound yet
 			},
 		}
@@ -548,12 +548,12 @@ func TestTrustMarkOwnersHandlers_TypesSet(t *testing.T) {
 	t.Run("LoadTypesError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			setTypesFn: func(id string, typeIdents []string) ([]uint, error) {
+			setTypesFn: func(_ string, _ []string) ([]uint, error) {
 				return []uint{1}, nil
 			},
 		}
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -572,7 +572,7 @@ func TestTrustMarkOwnersHandlers_TypesAdd(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			addTypeFn: func(id string, typeID uint) ([]uint, error) {
+			addTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return []uint{4}, nil
 			},
 		}
@@ -602,7 +602,7 @@ func TestTrustMarkOwnersHandlers_TypesAdd(t *testing.T) {
 	t.Run("OwnerNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			addTypeFn: func(id string, typeID uint) ([]uint, error) {
+			addTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -618,12 +618,12 @@ func TestTrustMarkOwnersHandlers_TypesAdd(t *testing.T) {
 	t.Run("LoadTypesError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			addTypeFn: func(id string, typeID uint) ([]uint, error) {
+			addTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return []uint{4}, nil
 			},
 		}
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -642,7 +642,7 @@ func TestTrustMarkOwnersHandlers_TypesDelete(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			deleteTypeFn: func(id string, typeID uint) ([]uint, error) {
+			deleteTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return []uint{}, nil
 			},
 		}
@@ -657,7 +657,7 @@ func TestTrustMarkOwnersHandlers_TypesDelete(t *testing.T) {
 	t.Run("TypeNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -672,7 +672,7 @@ func TestTrustMarkOwnersHandlers_TypesDelete(t *testing.T) {
 	t.Run("DeleteError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkOwnersStore{
-			deleteTypeFn: func(id string, typeID uint) ([]uint, error) {
+			deleteTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -775,7 +775,7 @@ func TestGlobalTrustMarkIssuersHandlers_Create(t *testing.T) {
 	t.Run("AlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			createFn: func(issuer model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
+			createFn: func(_ model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
 				return nil, model.AlreadyExistsError("exists")
 			},
 		}
@@ -791,7 +791,7 @@ func TestGlobalTrustMarkIssuersHandlers_Create(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			createFn: func(issuer model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
+			createFn: func(_ model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -810,7 +810,7 @@ func TestGlobalTrustMarkIssuersHandlers_Get(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			getFn: func(id string) (*model.TrustMarkIssuer, error) {
+			getFn: func(_ string) (*model.TrustMarkIssuer, error) {
 				return &model.TrustMarkIssuer{Issuer: "issuer1"}, nil
 			},
 		}
@@ -828,7 +828,7 @@ func TestGlobalTrustMarkIssuersHandlers_Get(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			getFn: func(id string) (*model.TrustMarkIssuer, error) {
+			getFn: func(_ string) (*model.TrustMarkIssuer, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -873,7 +873,7 @@ func TestGlobalTrustMarkIssuersHandlers_Update(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			updateFn: func(id string, issuer model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
+			updateFn: func(_ string, _ model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -889,7 +889,7 @@ func TestGlobalTrustMarkIssuersHandlers_Update(t *testing.T) {
 	t.Run("AlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			updateFn: func(id string, issuer model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
+			updateFn: func(_ string, _ model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
 				return nil, model.AlreadyExistsError("exists")
 			},
 		}
@@ -905,7 +905,7 @@ func TestGlobalTrustMarkIssuersHandlers_Update(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			updateFn: func(id string, issuer model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
+			updateFn: func(_ string, _ model.AddTrustMarkIssuer) (*model.TrustMarkIssuer, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -935,7 +935,7 @@ func TestGlobalTrustMarkIssuersHandlers_Delete(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			deleteFn: func(id string) error {
+			deleteFn: func(_ string) error {
 				return model.NotFoundError("not found")
 			},
 		}
@@ -953,7 +953,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesList(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			typesFn: func(id string) ([]uint, error) {
+			typesFn: func(_ string) ([]uint, error) {
 				return []uint{1, 2}, nil
 			},
 		}
@@ -971,7 +971,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesList(t *testing.T) {
 	t.Run("IssuerNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			typesFn: func(id string) ([]uint, error) {
+			typesFn: func(_ string) ([]uint, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -986,12 +986,12 @@ func TestGlobalTrustMarkIssuersHandlers_TypesList(t *testing.T) {
 	t.Run("LoadTypesError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			typesFn: func(id string) ([]uint, error) {
+			typesFn: func(_ string) ([]uint, error) {
 				return []uint{1, 2}, nil
 			},
 		}
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -1009,7 +1009,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesSet(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			setTypesFn: func(id string, typeIdents []string) ([]uint, error) {
+			setTypesFn: func(_ string, _ []string) ([]uint, error) {
 				return []uint{3}, nil
 			},
 		}
@@ -1039,7 +1039,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesSet(t *testing.T) {
 	t.Run("IssuerNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			setTypesFn: func(id string, typeIdents []string) ([]uint, error) {
+			setTypesFn: func(_ string, _ []string) ([]uint, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -1055,12 +1055,12 @@ func TestGlobalTrustMarkIssuersHandlers_TypesSet(t *testing.T) {
 	t.Run("LoadTypesError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			setTypesFn: func(id string, typeIdents []string) ([]uint, error) {
+			setTypesFn: func(_ string, _ []string) ([]uint, error) {
 				return []uint{1}, nil
 			},
 		}
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -1079,7 +1079,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesAdd(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			addTypeFn: func(id string, typeID uint) ([]uint, error) {
+			addTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return []uint{4}, nil
 			},
 		}
@@ -1109,7 +1109,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesAdd(t *testing.T) {
 	t.Run("IssuerNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			addTypeFn: func(id string, typeID uint) ([]uint, error) {
+			addTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -1125,12 +1125,12 @@ func TestGlobalTrustMarkIssuersHandlers_TypesAdd(t *testing.T) {
 	t.Run("LoadTypesError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			addTypeFn: func(id string, typeID uint) ([]uint, error) {
+			addTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return []uint{4}, nil
 			},
 		}
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -1149,7 +1149,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesDelete(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			deleteTypeFn: func(id string, typeID uint) ([]uint, error) {
+			deleteTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return []uint{}, nil
 			},
 		}
@@ -1164,7 +1164,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesDelete(t *testing.T) {
 	t.Run("TypeNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockTypesStore := &mockTrustMarkTypesStoreForOwners{
-			getFn: func(id string) (*model.TrustMarkType, error) {
+			getFn: func(_ string) (*model.TrustMarkType, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -1179,7 +1179,7 @@ func TestGlobalTrustMarkIssuersHandlers_TypesDelete(t *testing.T) {
 	t.Run("DeleteError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkIssuersStore{
-			deleteTypeFn: func(id string, typeID uint) ([]uint, error) {
+			deleteTypeFn: func(_ string, _ uint) ([]uint, error) {
 				return nil, errors.New("db error")
 			},
 		}

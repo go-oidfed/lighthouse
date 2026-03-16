@@ -51,7 +51,7 @@ func createTestKey(kid string) jwk.Key {
 func TestSubordinateJWKS(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success/WithKeys", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 
 		set := jwk.NewSet()
@@ -82,7 +82,7 @@ func TestSubordinateJWKS(t *testing.T) {
 	})
 
 	t.Run("GET Success/NoKeys", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -108,7 +108,7 @@ func TestSubordinateJWKS(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateKeysApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/jwks", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -116,7 +116,7 @@ func TestSubordinateJWKS(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -152,7 +152,7 @@ func TestSubordinateJWKS(t *testing.T) {
 	})
 
 	t.Run("PUT InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -169,7 +169,7 @@ func TestSubordinateJWKS(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 
 		set := jwk.NewSet()
@@ -208,9 +208,9 @@ func TestSubordinateJWKS(t *testing.T) {
 			t.Errorf("Expected JWKAdded event to be logged")
 		}
 	})
-	
+
 	t.Run("POST InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -226,12 +226,13 @@ func TestSubordinateJWKS(t *testing.T) {
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
+
 // --- DELETE /subordinates/:subordinateID/jwks/:kid TESTS ---
 
 func TestSubordinateJWKDelete(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 
 		set := jwk.NewSet()
@@ -276,7 +277,7 @@ func TestSubordinateJWKDelete(t *testing.T) {
 	})
 
 	t.Run("NotFound/Subordinate", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateKeysApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/jwks/delete-me", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -284,7 +285,7 @@ func TestSubordinateJWKDelete(t *testing.T) {
 	})
 
 	t.Run("NotFound/Key", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateKeysApp(t)
 
 		set := jwk.NewSet()

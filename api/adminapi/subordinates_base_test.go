@@ -72,7 +72,7 @@ func setupSubordinateBaseApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestGetSubordinates(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/All", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -104,7 +104,7 @@ func TestGetSubordinates(t *testing.T) {
 	})
 
 	t.Run("Success/ByStatus", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -134,7 +134,7 @@ func TestGetSubordinates(t *testing.T) {
 	})
 
 	t.Run("Success/ByEntityType", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -170,7 +170,7 @@ func TestGetSubordinates(t *testing.T) {
 	})
 
 	t.Run("InvalidStatus", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates?status=unknown_status", http.NoBody)
@@ -192,7 +192,7 @@ func TestGetSubordinates(t *testing.T) {
 func TestPostSubordinates(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		body := `{
@@ -229,7 +229,7 @@ func TestPostSubordinates(t *testing.T) {
 	})
 
 	t.Run("MissingEntityID", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		body := `{"status": "pending"}`
@@ -241,7 +241,7 @@ func TestPostSubordinates(t *testing.T) {
 	})
 
 	t.Run("InvalidStatus", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		body := `{"entity_id": "https://sub.example.org", "status": "unknown"}`
@@ -253,7 +253,7 @@ func TestPostSubordinates(t *testing.T) {
 	})
 
 	t.Run("ActiveWithoutKeys", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		// Trying to set active status but omitting jwks
@@ -266,7 +266,7 @@ func TestPostSubordinates(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(`not valid json`))
@@ -282,7 +282,7 @@ func TestPostSubordinates(t *testing.T) {
 func TestGetSubordinateByID(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		// Create a mock record
@@ -311,7 +311,7 @@ func TestGetSubordinateByID(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999", http.NoBody)
@@ -327,7 +327,7 @@ func TestGetSubordinateByID(t *testing.T) {
 func TestPutSubordinateByID(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		// Create a mock record
@@ -380,7 +380,7 @@ func TestPutSubordinateByID(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		body := `{"description": "New"}`
@@ -392,7 +392,7 @@ func TestPutSubordinateByID(t *testing.T) {
 	})
 
 	t.Run("InvalidBody", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -414,7 +414,7 @@ func TestPutSubordinateByID(t *testing.T) {
 func TestDeleteSubordinateByID(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		// Create a mock record
@@ -451,7 +451,7 @@ func TestDeleteSubordinateByID(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("DELETE", "/subordinates/9999", http.NoBody)
@@ -466,7 +466,7 @@ func TestDeleteSubordinateByID(t *testing.T) {
 func TestUpdateSubordinateStatus(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -507,7 +507,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 	})
 
 	t.Run("MissingStatus", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -526,7 +526,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 	})
 
 	t.Run("InvalidStatus", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -545,7 +545,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 	})
 
 	t.Run("ActiveWithoutKeys", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -564,7 +564,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("PUT", "/subordinates/9999/status", strings.NewReader("pending"))
@@ -580,7 +580,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 func TestGetSubordinateHistory(t *testing.T) {
 	t.Parallel()
 	t.Run("Success/Default", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -633,7 +633,7 @@ func TestGetSubordinateHistory(t *testing.T) {
 	})
 
 	t.Run("Success/WithOpts", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -673,7 +673,7 @@ func TestGetSubordinateHistory(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999/history", http.NoBody)
@@ -683,7 +683,7 @@ func TestGetSubordinateHistory(t *testing.T) {
 	})
 
 	t.Run("InvalidQuery", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{

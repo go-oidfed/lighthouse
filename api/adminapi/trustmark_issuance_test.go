@@ -198,7 +198,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	t.Run("AlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createFn: func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			createFn: func(_ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, model.AlreadyExistsError("exists")
 			},
 		}
@@ -214,7 +214,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createFn: func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			createFn: func(_ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -233,7 +233,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getFn: func(id string) (*model.TrustMarkSpec, error) {
+			getFn: func(_ string) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{TrustMarkType: "type1"}, nil
 			},
 		}
@@ -251,7 +251,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getFn: func(id string) (*model.TrustMarkSpec, error) {
+			getFn: func(_ string) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -266,7 +266,7 @@ func TestTrustMarkSpecHandlers_Get(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getFn: func(id string) (*model.TrustMarkSpec, error) {
+			getFn: func(_ string) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -284,7 +284,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateFn: func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			updateFn: func(_ string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return spec, nil
 			},
 		}
@@ -326,7 +326,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateFn: func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			updateFn: func(_ string, _ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -342,7 +342,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateFn: func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			updateFn: func(_ string, _ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -361,7 +361,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			patchFn: func(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
+			patchFn: func(_ string, _ map[string]any) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{TrustMarkType: "type3"}, nil
 			},
 		}
@@ -392,7 +392,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			patchFn: func(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
+			patchFn: func(_ string, _ map[string]any) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -408,7 +408,7 @@ func TestTrustMarkSpecHandlers_Patch(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			patchFn: func(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
+			patchFn: func(_ string, _ map[string]any) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -427,7 +427,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			deleteFn: func(id string) error {
+			deleteFn: func(_ string) error {
 				return nil
 			},
 		}
@@ -442,7 +442,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			deleteFn: func(id string) error {
+			deleteFn: func(_ string) error {
 				return model.NotFoundError("not found")
 			},
 		}
@@ -457,7 +457,7 @@ func TestTrustMarkSpecHandlers_Delete(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			deleteFn: func(id string) error {
+			deleteFn: func(_ string) error {
 				return errors.New("db error")
 			},
 		}
@@ -475,7 +475,7 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			listSubjectsFn: func(specID string, status *model.Status) ([]model.TrustMarkSubject, error) {
+			listSubjectsFn: func(_ string, _ *model.Status) ([]model.TrustMarkSubject, error) {
 				return []model.TrustMarkSubject{{EntityID: "sub1"}}, nil
 			},
 		}
@@ -503,7 +503,7 @@ func TestTrustMarkSubjectHandlers_List(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			listSubjectsFn: func(specID string, status *model.Status) ([]model.TrustMarkSubject, error) {
+			listSubjectsFn: func(_ string, _ *model.Status) ([]model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -521,7 +521,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createSubjectFn: func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			createSubjectFn: func(_ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return subject, nil
 			},
 		}
@@ -563,7 +563,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createSubjectFn: func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			createSubjectFn: func(_ string, _ *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -582,7 +582,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{EntityID: "sub1"}, nil
 			},
 		}
@@ -600,7 +600,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -615,7 +615,7 @@ func TestTrustMarkSubjectHandlers_Get(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -633,7 +633,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			updateSubjectFn: func(_, _ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return subject, nil
 			},
 		}
@@ -675,7 +675,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			updateSubjectFn: func(_, _ string, _ *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -691,7 +691,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			updateSubjectFn: func(_, _ string, _ *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -710,7 +710,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			deleteSubjectFn: func(specID, subjectID string) error {
+			deleteSubjectFn: func(_, _ string) error {
 				return nil
 			},
 		}
@@ -725,7 +725,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			deleteSubjectFn: func(specID, subjectID string) error {
+			deleteSubjectFn: func(_, _ string) error {
 				return model.NotFoundError("not found")
 			},
 		}
@@ -740,7 +740,7 @@ func TestTrustMarkSubjectHandlers_Delete(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			deleteSubjectFn: func(specID, subjectID string) error {
+			deleteSubjectFn: func(_, _ string) error {
 				return errors.New("db error")
 			},
 		}
@@ -758,7 +758,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
+			changeSubjectStatusFn: func(_, _ string, status model.Status) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{Status: status}, nil
 			},
 		}
@@ -799,7 +799,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
+			changeSubjectStatusFn: func(_, _ string, _ model.Status) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -815,7 +815,7 @@ func TestTrustMarkSubjectHandlers_UpdateStatus(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			changeSubjectStatusFn: func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error) {
+			changeSubjectStatusFn: func(_, _ string, _ model.Status) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -834,7 +834,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Run("GetAdditionalClaims_SuccessWithClaims", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{AdditionalClaims: map[string]any{"claim1": "val1"}}, nil
 			},
 		}
@@ -852,7 +852,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Run("GetAdditionalClaims_SuccessEmptyClaims", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{AdditionalClaims: nil}, nil
 			},
 		}
@@ -870,7 +870,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Run("GetAdditionalClaims_NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -885,10 +885,10 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Run("PutAdditionalClaims_Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{}, nil
 			},
-			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			updateSubjectFn: func(_, _ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return subject, nil
 			},
 		}
@@ -919,13 +919,13 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Run("CopyAdditionalClaims_Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getFn: func(id string) (*model.TrustMarkSpec, error) {
+			getFn: func(_ string) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{AdditionalClaims: map[string]any{"spec_claim": "spec_val"}}, nil
 			},
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{AdditionalClaims: map[string]any{"subj_claim": "subj_val"}}, nil
 			},
-			updateSubjectFn: func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			updateSubjectFn: func(_, _ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return subject, nil
 			},
 		}
@@ -943,7 +943,7 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Run("CopyAdditionalClaims_SpecNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getFn: func(id string) (*model.TrustMarkSpec, error) {
+			getFn: func(_ string) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("spec not found")
 			},
 		}
@@ -958,10 +958,10 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 	t.Run("CopyAdditionalClaims_SubjectNotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			getFn: func(id string) (*model.TrustMarkSpec, error) {
+			getFn: func(_ string) (*model.TrustMarkSpec, error) {
 				return &model.TrustMarkSpec{}, nil
 			},
-			getSubjectFn: func(specID, subjectID string) (*model.TrustMarkSubject, error) {
+			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("subj not found")
 			},
 		}

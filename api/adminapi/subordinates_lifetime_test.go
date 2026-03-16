@@ -121,7 +121,7 @@ func TestSubordinateLifetime(t *testing.T) {
 	t.Run("GET StorageError", func(t *testing.T) {
 		t.Parallel()
 		kv := &mockKeyValueStore{
-			getAsFn: func(scope, key string, out any) (bool, error) {
+			getAsFn: func(_, _ string, _ any) (bool, error) {
 				return false, errors.New("db read error")
 			},
 		}
@@ -137,7 +137,7 @@ func TestSubordinateLifetime(t *testing.T) {
 	t.Run("PUT StorageError", func(t *testing.T) {
 		t.Parallel()
 		kv := &mockKeyValueStore{
-			setAnyFn: func(scope, key string, v any) error {
+			setAnyFn: func(_, _ string, _ any) error {
 				return errors.New("db write error")
 			},
 		}

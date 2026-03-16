@@ -422,7 +422,7 @@ func TestGetAdditionalClaimByID(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
-				getFn: func(ident string) (*smodel.EntityConfigurationAdditionalClaim, error) {
+				getFn: func(_ string) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return &smodel.EntityConfigurationAdditionalClaim{
 						ID: 42, Claim: "org_name", Value: "ACME",
 					}, nil
@@ -481,7 +481,7 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
-				updateFn: func(ident string, item smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
+				updateFn: func(_ string, item smodel.AddAdditionalClaim) (*smodel.EntityConfigurationAdditionalClaim, error) {
 					return &smodel.EntityConfigurationAdditionalClaim{
 						ID: 5, Claim: item.Claim, Value: item.Value, Crit: item.Crit,
 					}, nil
@@ -583,7 +583,7 @@ func TestDeleteAdditionalClaimByID(t *testing.T) {
 		app := setupEntityConfigTestApp(
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{
-				deleteFn: func(ident string) error {
+				deleteFn: func(_ string) error {
 					return nil
 				},
 			},
@@ -659,7 +659,7 @@ func TestGetLifetime(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getAsFn: func(scope, key string, out any) (bool, error) {
+				getAsFn: func(_, _ string, _ any) (bool, error) {
 					return false, nil // Not found
 				},
 			},
@@ -679,7 +679,7 @@ func TestGetLifetime(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getAsFn: func(scope, key string, out any) (bool, error) {
+				getAsFn: func(_, _ string, _ any) (bool, error) {
 					return false, errors.New("kv db down")
 				},
 			},
@@ -696,7 +696,7 @@ func TestGetLifetime(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getAsFn: func(scope, key string, out any) (bool, error) {
+				getAsFn: func(_, _ string, out any) (bool, error) {
 					ptr := out.(*int)
 					*ptr = 0
 					return true, nil
@@ -790,7 +790,7 @@ func TestPutLifetime(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				setAnyFn: func(scope, key string, v any) error {
+				setAnyFn: func(_, _ string, _ any) error {
 					return errors.New("db error")
 				},
 			},
@@ -808,7 +808,7 @@ func TestPutLifetime(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				setAnyFn: func(scope, key string, v any) error {
+				setAnyFn: func(_, _ string, v any) error {
 					if v.(int) != 0 {
 						t.Errorf("expected 0 to be saved, got %v", v)
 					}
@@ -862,7 +862,7 @@ func TestGetMetadata(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
 			},
@@ -882,7 +882,7 @@ func TestGetMetadata(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -899,7 +899,7 @@ func TestGetMetadata(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -957,7 +957,7 @@ func TestPutMetadata(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, _ datatypes.JSON) error {
 					return errors.New("db down")
 				},
 			},
@@ -981,7 +981,7 @@ func TestGetMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(metaJSON), nil
 				},
 			},
@@ -1001,7 +1001,7 @@ func TestGetMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
 			},
@@ -1018,7 +1018,7 @@ func TestGetMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(metaJSON), nil
 				},
 			},
@@ -1035,7 +1035,7 @@ func TestGetMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(metaJSON), nil
 				},
 			},
@@ -1052,7 +1052,7 @@ func TestGetMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -1069,7 +1069,7 @@ func TestGetMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -1089,10 +1089,10 @@ func TestPutMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"old":123}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					s := string(value)
 					if !strings.Contains(s, `"old":123`) || !strings.Contains(s, `"new":456`) {
 						t.Errorf("expected merged json, got %s", s)
@@ -1114,10 +1114,10 @@ func TestPutMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					if !strings.Contains(string(value), `"new":456`) {
 						t.Errorf("expected json, got %s", value)
 					}
@@ -1152,7 +1152,7 @@ func TestPutMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db down during get")
 				},
 			},
@@ -1170,10 +1170,10 @@ func TestPutMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, _ datatypes.JSON) error {
 					return errors.New("db down during set")
 				},
 			},
@@ -1191,7 +1191,7 @@ func TestPutMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -1212,10 +1212,10 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"target":123,"other":456}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					s := string(value)
 					if strings.Contains(s, `"target"`) {
 						t.Errorf("claim was not deleted: %s", s)
@@ -1239,10 +1239,10 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"only_claim":1}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					s := string(value)
 					if strings.Contains(s, `"openid_provider"`) {
 						t.Errorf("entity type should be removed when its last claim is deleted: %s", s)
@@ -1263,7 +1263,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
 			},
@@ -1280,10 +1280,10 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"other_type":{"target":123}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, _ datatypes.JSON) error {
 					t.Errorf("set should not be called")
 					return nil
 				},
@@ -1301,7 +1301,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -1318,7 +1318,7 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -1335,10 +1335,10 @@ func TestDeleteMetadataClaim(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"target":123}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, _ datatypes.JSON) error {
 					return errors.New("db error")
 				},
 			},
@@ -1358,7 +1358,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"issuer":"https://example.com"}}`), nil
 				},
 			},
@@ -1382,7 +1382,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
 			},
@@ -1402,7 +1402,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"oauth_client":{"x":1}}`), nil
 				},
 			},
@@ -1422,7 +1422,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -1439,7 +1439,7 @@ func TestGetMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -1459,10 +1459,10 @@ func TestPutMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"old":1},"other":{}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					s := string(value)
 					if strings.Contains(s, `"old":1`) {
 						t.Errorf("should have replaced openid_provider entirely: %s", s)
@@ -1504,7 +1504,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -1522,10 +1522,10 @@ func TestPutMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, _ datatypes.JSON) error {
 					return errors.New("db error")
 				},
 			},
@@ -1543,7 +1543,7 @@ func TestPutMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -1564,10 +1564,10 @@ func TestPostMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"old":1}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					s := string(value)
 					if !strings.Contains(s, `"old":1`) || !strings.Contains(s, `"new":2`) {
 						t.Errorf("should merge existing and new: %s", s)
@@ -1589,10 +1589,10 @@ func TestPostMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					s := string(value)
 					if !strings.Contains(s, `"openid_provider":{"new":2}`) {
 						t.Errorf("should create new: %s", s)
@@ -1628,7 +1628,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -1646,10 +1646,10 @@ func TestPostMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, _ datatypes.JSON) error {
 					return errors.New("db error")
 				},
 			},
@@ -1667,7 +1667,7 @@ func TestPostMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -1688,10 +1688,10 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"target":123},"other":{}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, value datatypes.JSON) error {
 					s := string(value)
 					if strings.Contains(s, `"openid_provider"`) {
 						t.Errorf("entity type was not deleted: %s", s)
@@ -1715,7 +1715,7 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, nil
 				},
 			},
@@ -1732,7 +1732,7 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{bad-json`), nil
 				},
 			},
@@ -1749,7 +1749,7 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return nil, errors.New("db error")
 				},
 			},
@@ -1766,10 +1766,10 @@ func TestDeleteMetadataEntityType(t *testing.T) {
 			newStubFedEntity(),
 			&mockAdditionalClaimsStore{},
 			&mockKeyValueStore{
-				getFn: func(scope, key string) (datatypes.JSON, error) {
+				getFn: func(_, _ string) (datatypes.JSON, error) {
 					return datatypes.JSON(`{"openid_provider":{"target":123}}`), nil
 				},
-				setFn: func(scope, key string, value datatypes.JSON) error {
+				setFn: func(_, _ string, _ datatypes.JSON) error {
 					return errors.New("db error")
 				},
 			},

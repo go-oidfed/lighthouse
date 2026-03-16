@@ -43,7 +43,7 @@ func setupSubordinateConstraintsApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestSubordinateConstraintsAll(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -74,7 +74,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("GET NoConstraints", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -87,7 +87,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		resp, _ := app.Test(req, -1)
 
 		requireStatus(t, resp, http.StatusOK)
-		
+
 		body, _ := io.ReadAll(resp.Body)
 		if string(body) != "{}" {
 			t.Errorf("Expected empty json object for nil constraints, got %s", string(body))
@@ -95,7 +95,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -136,7 +136,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -173,21 +173,22 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 			t.Errorf("Expected ConstraintsDeleted event to be logged")
 		}
 	})
-	
+
 	t.Run("NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupSubordinateConstraintsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
+
 // --- GET, PUT, DELETE /subordinates/:subordinateID/constraints/max-path-length TESTS ---
 
 func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -216,7 +217,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -233,7 +234,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -256,13 +257,13 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 		if updated.Constraints == nil || updated.Constraints.MaxPathLength == nil || *updated.Constraints.MaxPathLength != 3 {
 			t.Errorf("Expected max_path_length to be set to 3")
 		}
-		if updated.Constraints.AllowedEntityTypes == nil || updated.Constraints.AllowedEntityTypes[0] != "keep_me" {
+		if len(updated.Constraints.AllowedEntityTypes) == 0 || updated.Constraints.AllowedEntityTypes[0] != "keep_me" {
 			t.Errorf("Expected sibling constraints to be untouched")
 		}
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -297,7 +298,7 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -327,7 +328,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -344,7 +345,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -374,7 +375,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -410,7 +411,7 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -438,7 +439,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("GET NotFound", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
 			BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -455,7 +456,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -465,7 +466,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 			},
 			Constraints: &oidfed.ConstraintSpecification{
 				AllowedEntityTypes: []string{"old_type"},
-				MaxPathLength: &length,
+				MaxPathLength:      &length,
 			},
 		})
 		saved, _ := backends.Subordinates.Get("https://allowed-put.example.org")
@@ -487,7 +488,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -508,7 +509,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 		requireStatus(t, resp, http.StatusCreated)
 
 		updated, _ := backends.Subordinates.Get("https://allowed-post.example.org")
-		
+
 		// POST should merge the new type with the old type
 		types := updated.Constraints.AllowedEntityTypes
 		if len(types) != 2 {
@@ -517,7 +518,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupSubordinateConstraintsApp(t)
 
 		length := 5
@@ -527,7 +528,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 			},
 			Constraints: &oidfed.ConstraintSpecification{
 				AllowedEntityTypes: []string{"delete_me", "keep_me"},
-				MaxPathLength: &length,
+				MaxPathLength:      &length,
 			},
 		})
 		saved, _ := backends.Subordinates.Get("https://allowed-delete.example.org")
@@ -539,7 +540,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 
 		updated, _ := backends.Subordinates.Get("https://allowed-delete.example.org")
 		types := updated.Constraints.AllowedEntityTypes
-		
+
 		if len(types) != 1 || types[0] != "keep_me" {
 			t.Errorf("Expected delete_me to be removed, leaving keep_me. Got: %+v", types)
 		}
@@ -571,7 +572,7 @@ func setupGeneralConstraintsApp(t *testing.T) (*fiber.App, model.Backends) {
 func TestGeneralConstraintsAll(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 
 		length := 5
@@ -594,7 +595,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("GET NoConstraints", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, _ := setupGeneralConstraintsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
 		resp, _ := app.Test(req, -1)
@@ -603,7 +604,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 
 		body := `{"max_path_length": 3}`
@@ -626,7 +627,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		length := 5
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
@@ -647,7 +648,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"keep_me"},
@@ -664,17 +665,17 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		if updated.MaxPathLength == nil || *updated.MaxPathLength != 3 {
 			t.Errorf("Expected max_path_length to be 3")
 		}
-		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+		if len(updated.AllowedEntityTypes) == 0 || updated.AllowedEntityTypes[0] != "keep_me" {
 			t.Errorf("Expected sibling constraints to be untouched")
 		}
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		length := 5
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
-			MaxPathLength: &length,
+			MaxPathLength:      &length,
 			AllowedEntityTypes: []string{"keep_me"},
 		})
 
@@ -688,7 +689,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		if updated.MaxPathLength != nil {
 			t.Errorf("Expected max_path_length to be nil")
 		}
-		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+		if len(updated.AllowedEntityTypes) == 0 || updated.AllowedEntityTypes[0] != "keep_me" {
 			t.Errorf("Expected AllowedEntityTypes to be safely retained")
 		}
 	})
@@ -699,7 +700,7 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			NamingConstraints: &oidfed.NamingConstraints{
@@ -722,7 +723,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"keep_me"},
@@ -740,13 +741,13 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 		if updated.NamingConstraints == nil || len(updated.NamingConstraints.Permitted) == 0 || updated.NamingConstraints.Permitted[0] != "new.example.com" {
 			t.Errorf("Expected naming constraints to be set")
 		}
-		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+		if len(updated.AllowedEntityTypes) == 0 || updated.AllowedEntityTypes[0] != "keep_me" {
 			t.Errorf("Expected sibling constraints to be untouched")
 		}
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			NamingConstraints: &oidfed.NamingConstraints{
@@ -765,7 +766,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 		if updated.NamingConstraints != nil {
 			t.Errorf("Expected naming constraints to be nil")
 		}
-		if updated.AllowedEntityTypes == nil || updated.AllowedEntityTypes[0] != "keep_me" {
+		if len(updated.AllowedEntityTypes) == 0 || updated.AllowedEntityTypes[0] != "keep_me" {
 			t.Errorf("Expected AllowedEntityTypes to be retained safely")
 		}
 	})
@@ -776,7 +777,7 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Parallel()
 	t.Run("GET Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"openid_relying_party"},
@@ -797,7 +798,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("PUT Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"old_type"},
@@ -817,7 +818,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("POST Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"old_type"},
@@ -837,7 +838,7 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	})
 
 	t.Run("DELETE Success", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"delete_me", "keep_me"},
