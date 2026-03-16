@@ -65,7 +65,7 @@ This quickstart covers the complete migration workflow. Run these commands in or
       -v ./:/data \
       --network db-net
       --entrypoint /lhmigrate
-      go-oidfed/lighthouse \
+      oidfed/lighthouse:0.20.0 \
       all \
       --config=/data/config.yaml \
       # ... other flags
