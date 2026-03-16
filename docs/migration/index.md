@@ -55,6 +55,22 @@ We still try to make it as easy as possible to migrate your deployment.
 
 This quickstart covers the complete migration workflow. Run these commands in order.
 
+!!! tip "Using Docker"
+    If you're using the Docker image instead of building the tool locally, replace 
+    `./lhmigrate` with the Docker command. Make sure to mount all required directories (and connect to the 
+    db-container network if applicable):
+    
+    ```bash
+    docker run --rm \
+      -v ./:/data \
+      --network db-net
+      --entrypoint /lhmigrate
+      go-oidfed/lighthouse \
+      all \
+      --config=/data/config.yaml \
+      # ... other flags
+    ```
+
 Select your **previous storage backend** (JSON or BadgerDB) and your **target database** (SQLite, MySQL, or PostgreSQL):
 
 === "JSON to SQLite"
