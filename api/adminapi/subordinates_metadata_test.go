@@ -132,7 +132,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 			t.Fatalf("Expected Metadata to be saved in DB, got nil")
 		}
 
-		rpMeta := (*updated.Metadata).RelyingParty
+		rpMeta := updated.Metadata.RelyingParty
 		if rpMeta.ClientName != "New App Name" {
 			t.Errorf("Expected 'New App Name', got: %+v", rpMeta.ClientName)
 		}
@@ -276,7 +276,7 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://meta-type-put.example.org")
-		extra := (*updated.Metadata).Extra
+		extra := updated.Metadata.Extra
 
 		if extra["old_type"] == nil {
 			t.Errorf("Expected non-target entity types to be untouched")
@@ -338,7 +338,7 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://meta-type-post.example.org")
-		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
+		target := updated.Metadata.Extra["target_type"].(map[string]any)
 
 		if target["existing_claim"] != "kept" {
 			t.Errorf("Expected existing claim to be kept during merge")
@@ -391,7 +391,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://meta-type-delete.example.org")
-		extra := (*updated.Metadata).Extra
+		extra := updated.Metadata.Extra
 
 		if extra["delete_me"] != nil {
 			t.Errorf("Expected delete_me entity type to be entirely removed")
@@ -516,7 +516,7 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 		requireStatus(t, resp, http.StatusOK)
 
 		updated, _ := backends.Subordinates.Get("https://meta-claim-put.example.org")
-		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
+		target := updated.Metadata.Extra["target_type"].(map[string]any)
 
 		if target["safe_claim"] != "untouched" {
 			t.Errorf("Expected sibling claim to remain untouched")
@@ -571,7 +571,7 @@ func TestDeleteSubordinateMetadataClaim(t *testing.T) {
 		requireStatus(t, resp, http.StatusNoContent)
 
 		updated, _ := backends.Subordinates.Get("https://meta-claim-delete.example.org")
-		target := (*updated.Metadata).Extra["target_type"].(map[string]any)
+		target := updated.Metadata.Extra["target_type"].(map[string]any)
 
 		if _, ok := target["delete_me"]; ok {
 			t.Errorf("Expected claim delete_me to be deleted")

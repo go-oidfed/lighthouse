@@ -829,7 +829,7 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 
 		// Verify DB update
 		updated, _ := backends.Subordinates.Get("https://delete-claim.example.org")
-		rpPol := (*updated.MetadataPolicy).RelyingParty
+		rpPol := updated.MetadataPolicy.RelyingParty
 
 		if _, ok := rpPol["delete_me"]; ok {
 			t.Errorf("Expected claim \"delete_me\" to be deleted")

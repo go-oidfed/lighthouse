@@ -566,7 +566,7 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 		}
 		app := newAppWithAuth(store)
 
-		req := httptest.NewRequest("GET", "/api/v1/admin/users/", nil)
+		req := httptest.NewRequest("GET", "/api/v1/admin/users/", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "pass"))
 		resp, _ := app.Test(req)
 		assertStatus(t, resp, fiber.StatusOK)
