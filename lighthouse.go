@@ -42,10 +42,16 @@ const MaximumEntityConfigurationCachePeriod = 8 * time.Hour
 type EndpointConf struct {
 	// Path is the internal path for the endpoint.
 	// Env: LH_ENDPOINTS_<ENDPOINT>_PATH
-	Path string `yaml:"path" envconfig:"PATH"`
+	//
+	// NOTE: We intentionally omit the envconfig tag here. Using envconfig:"PATH"
+	// would cause the library to also check the bare "PATH" env var as a fallback,
+	// which collides with the system PATH and corrupts endpoint URLs.
+	// By omitting the tag, envconfig uses the field name "Path" directly,
+	// resulting in the correct LH_ENDPOINTS_<ENDPOINT>_PATH without fallback issues.
+	Path string `yaml:"path"`
 	// URL is the external URL for the endpoint.
 	// Env: LH_ENDPOINTS_<ENDPOINT>_URL
-	URL string `yaml:"url" envconfig:"URL"`
+	URL string `yaml:"url"`
 }
 
 // IsSet returns a bool indicating if this endpoint was configured or not
