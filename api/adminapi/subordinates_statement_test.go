@@ -3,7 +3,6 @@ package adminapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -72,16 +71,20 @@ func TestSubordinateStatement(t *testing.T) {
 				EntityID: "https://statement.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://statement.example.org")
+		saved, err := backends.Subordinates.Get("https://statement.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/statement", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result["iss"] != "https://lighthouse.example.org" {
 			t.Errorf("Expected issuer to be lighthouse, got %v", result["iss"])
@@ -96,7 +99,7 @@ func TestSubordinateStatement(t *testing.T) {
 		app, _ := setupSubordinateStatementApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999/statement", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})

@@ -29,7 +29,10 @@ func doRequest(t *testing.T, app *fiber.App, req *http.Request) (*http.Response,
 func requireStatus(t *testing.T, resp *http.Response, expected int) {
 	t.Helper()
 	if resp.StatusCode != expected {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Expected status %d, got %d (failed to read body: %v)", expected, resp.StatusCode, err)
+		}
 		t.Fatalf("Expected status %d, got %d. Body: %s", expected, resp.StatusCode, string(body))
 	}
 }
@@ -58,7 +61,10 @@ func assertStatusOneOf(t *testing.T, resp *http.Response, expected ...int) {
 func requireStatusMsg(t *testing.T, resp *http.Response, expected int, msg string) {
 	t.Helper()
 	if resp.StatusCode != expected {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("%s: expected status %d, got %d (failed to read body: %v)", msg, expected, resp.StatusCode, err)
+		}
 		t.Fatalf("%s: expected status %d, got %d. Body: %s", msg, expected, resp.StatusCode, string(body))
 	}
 }

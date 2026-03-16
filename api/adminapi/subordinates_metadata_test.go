@@ -3,7 +3,6 @@ package adminapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,16 +56,20 @@ func TestGetSubordinateMetadata(t *testing.T) {
 			},
 			Metadata: meta,
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-get.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if rp, ok := result["openid_relying_party"].(map[string]any); !ok || rp["client_name"] != "My App" {
 			t.Errorf("Failed to retrieve correctly unmarshaled metadata: %+v", result)
@@ -82,10 +85,13 @@ func TestGetSubordinateMetadata(t *testing.T) {
 				EntityID: "https://no-meta.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://no-meta.example.org")
+		saved, err := backends.Subordinates.Get("https://no-meta.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -95,7 +101,7 @@ func TestGetSubordinateMetadata(t *testing.T) {
 		app, _ := setupSubordinateMetadataApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -112,7 +118,10 @@ func TestPutSubordinateMetadata(t *testing.T) {
 				EntityID: "https://meta-put.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-put.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"openid_relying_party": {
@@ -122,12 +131,15 @@ func TestPutSubordinateMetadata(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://meta-put.example.org")
+		updated, err := backends.Subordinates.Get("https://meta-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Metadata == nil {
 			t.Fatalf("Expected Metadata to be saved in DB, got nil")
 		}
@@ -138,7 +150,10 @@ func TestPutSubordinateMetadata(t *testing.T) {
 		}
 
 		// Verify Event logging
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypeMetadataUpdated {
@@ -159,11 +174,14 @@ func TestPutSubordinateMetadata(t *testing.T) {
 				EntityID: "https://bad-body.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -174,7 +192,7 @@ func TestPutSubordinateMetadata(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/9999/metadata", strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -202,16 +220,20 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 			},
 			Metadata: meta,
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-type-get.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-type-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/custom_entity_type", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result["custom_claim"] != "hello" {
 			t.Errorf("Failed to retrieve entity type metadata: %+v", result)
@@ -222,7 +244,7 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateMetadataApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata/custom", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
@@ -236,10 +258,13 @@ func TestGetSubordinateMetadataEntityType(t *testing.T) {
 			},
 			Metadata: &oidfed.Metadata{},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-meta-type.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-meta-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/missing_type", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -264,18 +289,24 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-type-put.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-type-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{"new_claim": "new_value"}`
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata/target_type", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://meta-type-put.example.org")
+		updated, err := backends.Subordinates.Get("https://meta-type-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		extra := updated.Metadata.Extra
 
 		if extra["old_type"] == nil {
@@ -299,11 +330,14 @@ func TestPutSubordinateMetadataEntityType(t *testing.T) {
 				EntityID: "https://bad-body-meta-put.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body-meta-put.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body-meta-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata/target_type", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -327,17 +361,23 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-type-post.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-type-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{"new_claim": "merged"}`
 
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata/target_type", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		updated, _ := backends.Subordinates.Get("https://meta-type-post.example.org")
+		updated, err := backends.Subordinates.Get("https://meta-type-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		target := updated.Metadata.Extra["target_type"].(map[string]any)
 
 		if target["existing_claim"] != "kept" {
@@ -356,11 +396,14 @@ func TestPostSubordinateMetadataEntityType(t *testing.T) {
 				EntityID: "https://bad-body-meta-post.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body-meta-post.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body-meta-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata/target_type", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -383,14 +426,20 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-type-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-type-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/delete_me", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
-		updated, _ := backends.Subordinates.Get("https://meta-type-delete.example.org")
+		updated, err := backends.Subordinates.Get("https://meta-type-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		extra := updated.Metadata.Extra
 
 		if extra["delete_me"] != nil {
@@ -405,7 +454,7 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateMetadataApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata/delete_me", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
@@ -418,10 +467,13 @@ func TestDeleteSubordinateMetadataEntityType(t *testing.T) {
 			},
 			Metadata: &oidfed.Metadata{},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-meta-delete-type.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-meta-delete-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/missing_type", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -448,16 +500,20 @@ func TestGetSubordinateMetadataClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-claim-get.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-claim-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/target_type/target_claim", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result string
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result != "found_it" {
 			t.Errorf("Failed to retrieve claim metadata: got %s", result)
@@ -477,10 +533,13 @@ func TestGetSubordinateMetadataClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-meta-claim.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-meta-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata/target_type/missing", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -505,17 +564,23 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-claim-put.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-claim-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `"new_value"` // Notice we send just a JSON string here since it is a single claim value
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata/target_type/target_claim", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		updated, _ := backends.Subordinates.Get("https://meta-claim-put.example.org")
+		updated, err := backends.Subordinates.Get("https://meta-claim-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		target := updated.Metadata.Extra["target_type"].(map[string]any)
 
 		if target["safe_claim"] != "untouched" {
@@ -534,11 +599,14 @@ func TestPutSubordinateMetadataClaim(t *testing.T) {
 				EntityID: "https://bad-body-meta-claim-put.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body-meta-claim-put.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body-meta-claim-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata/target_type/target_claim", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -563,14 +631,20 @@ func TestDeleteSubordinateMetadataClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://meta-claim-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://meta-claim-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/target_type/delete_me", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
-		updated, _ := backends.Subordinates.Get("https://meta-claim-delete.example.org")
+		updated, err := backends.Subordinates.Get("https://meta-claim-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		target := updated.Metadata.Extra["target_type"].(map[string]any)
 
 		if _, ok := target["delete_me"]; ok {
@@ -594,10 +668,13 @@ func TestDeleteSubordinateMetadataClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-meta-claim-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-meta-claim-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata/target_type/not_here", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})

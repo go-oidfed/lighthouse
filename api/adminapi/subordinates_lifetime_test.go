@@ -3,7 +3,6 @@ package adminapi
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,13 +33,14 @@ func TestSubordinateLifetime(t *testing.T) {
 		app, _ := setupSubordinateLifetimeApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var lifetime int
-		json.Unmarshal(body, &lifetime)
+		if err := json.Unmarshal(body, &lifetime); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if lifetime == 0 {
 			t.Errorf("Expected a non-zero default lifetime")
@@ -55,7 +55,7 @@ func TestSubordinateLifetime(t *testing.T) {
 		body := `7200`
 		putReq := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader(body))
 		putReq.Header.Set("Content-Type", "application/json")
-		putResp, _ := app.Test(putReq, -1)
+		putResp, _ := doRequest(t, app, putReq)
 
 		if putResp.StatusCode != http.StatusOK {
 			t.Fatalf("Expected status 200, got %d", putResp.StatusCode)
@@ -63,15 +63,16 @@ func TestSubordinateLifetime(t *testing.T) {
 
 		// GET to verify update
 		getReq := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
-		getResp, _ := app.Test(getReq, -1)
+		getResp, b := doRequest(t, app, getReq)
 
 		if getResp.StatusCode != http.StatusOK {
 			t.Fatalf("Expected GET status 200, got %d", getResp.StatusCode)
 		}
 
-		b, _ := io.ReadAll(getResp.Body)
 		var lifetime int
-		json.Unmarshal(b, &lifetime)
+		if err := json.Unmarshal(b, &lifetime); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if lifetime != 7200 {
 			t.Errorf("Expected lifetime to be 7200, got %d", lifetime)
@@ -79,7 +80,10 @@ func TestSubordinateLifetime(t *testing.T) {
 
 		// Verify KV DB Update directly
 		var updated int
-		found, _ := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, &updated)
+		found, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, &updated)
+		if err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if !found || updated != 7200 {
 			t.Errorf("Expected lifetime in KV to be 7200")
 		}
@@ -91,7 +95,7 @@ func TestSubordinateLifetime(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -102,7 +106,7 @@ func TestSubordinateLifetime(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader(""))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -113,7 +117,7 @@ func TestSubordinateLifetime(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader("-100"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -129,7 +133,7 @@ func TestSubordinateLifetime(t *testing.T) {
 		registerGeneralSubordinateLifetime(app, kv)
 
 		req := httptest.NewRequest("GET", "/subordinates/lifetime", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusInternalServerError)
 	})
@@ -146,7 +150,7 @@ func TestSubordinateLifetime(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/lifetime", strings.NewReader("3600"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusInternalServerError)
 	})

@@ -116,7 +116,10 @@ func TestParseBasicAuth(t *testing.T) {
 		t.Parallel()
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
@@ -126,7 +129,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Bearer token")
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
@@ -136,7 +142,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Basic !@#invalidbase64")
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
@@ -147,7 +156,10 @@ func TestParseBasicAuth(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		encoded := base64.StdEncoding.EncodeToString([]byte("usernamepassword"))
 		req.Header.Set("Authorization", "Basic "+encoded)
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
@@ -157,7 +169,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
@@ -174,7 +189,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", ""))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
@@ -191,7 +209,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("", "password"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
@@ -205,7 +226,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "pass:word:123"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusOK)
 		body := readJSONFromHTTP(t, resp.Body)
@@ -223,7 +247,10 @@ func TestParseBasicAuth(t *testing.T) {
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		encoded := base64.StdEncoding.EncodeToString([]byte("admin:secret"))
 		req.Header.Set("Authorization", "basic "+encoded) // lowercase "basic"
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
@@ -233,7 +260,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "")
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 	})
@@ -243,7 +273,10 @@ func TestParseBasicAuth(t *testing.T) {
 		app := setupApp()
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", "Basic ")
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		// "Basic " with empty payload should fail base64 decode or missing colon
 		assertStatus(t, resp, fiber.StatusUnauthorized)
@@ -271,7 +304,10 @@ func TestAuthMiddleware(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusInternalServerError)
 		body := readJSONFromHTTP(t, resp.Body)
@@ -289,7 +325,10 @@ func TestAuthMiddleware(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusOK)
 	})
@@ -303,7 +342,10 @@ func TestAuthMiddleware(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 
@@ -334,7 +376,10 @@ func TestAuthMiddleware(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "wrongpassword"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusUnauthorized)
 
@@ -365,7 +410,10 @@ func TestAuthMiddleware(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusOK)
 	})
@@ -385,7 +433,10 @@ func TestAuthMiddleware(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "secret123"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		// Currently allowed because authMiddleware only checks Authenticate error
 		assertStatus(t, resp, fiber.StatusOK)
@@ -407,7 +458,10 @@ func TestAuthMiddleware(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/test", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("user2", "pass2"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 
 		assertStatus(t, resp, fiber.StatusOK)
 	})

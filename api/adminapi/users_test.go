@@ -203,7 +203,10 @@ func TestCreateUser(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/api/v1/admin/users/", bytes.NewReader([]byte("not json")))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 		assertStatus(t, resp, fiber.StatusBadRequest)
 	})
 
@@ -423,7 +426,10 @@ func TestUpdateUser(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/api/v1/admin/users/alice", bytes.NewReader([]byte("not json")))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 		assertStatus(t, resp, fiber.StatusBadRequest)
 	})
 
@@ -568,7 +574,10 @@ func TestUsersWithAuthMiddleware(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/api/v1/admin/users/", http.NoBody)
 		req.Header.Set("Authorization", basicAuthHeader("admin", "pass"))
-		resp, _ := app.Test(req)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
 		assertStatus(t, resp, fiber.StatusOK)
 	})
 

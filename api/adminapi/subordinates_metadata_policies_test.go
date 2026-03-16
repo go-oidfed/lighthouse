@@ -3,7 +3,6 @@ package adminapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -87,16 +86,20 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 			},
 			MetadataPolicy: policy,
 		})
-		saved, _ := backends.Subordinates.Get("https://has-policy.example.org")
+		saved, err := backends.Subordinates.Get("https://has-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicies
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result.RelyingParty == nil {
 			t.Fatalf("Expected RelyingParty policy to be set")
@@ -116,10 +119,13 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 				EntityID: "https://no-policy.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://no-policy.example.org")
+		saved, err := backends.Subordinates.Get("https://no-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNotFound)
 	})
@@ -129,7 +135,7 @@ func TestGetSubordinateMetadataPolicies(t *testing.T) {
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata-policies", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -148,7 +154,10 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 				EntityID: "https://put-policy.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://put-policy.example.org")
+		saved, err := backends.Subordinates.Get("https://put-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"openid_relying_party": {
@@ -160,12 +169,15 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://put-policy.example.org")
+		updated, err := backends.Subordinates.Get("https://put-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		rpPol := requireMetadataPolicies(t, updated.MetadataPolicy).RelyingParty
 		contacts, ok := rpPol["contacts"]
 		if !ok {
@@ -176,7 +188,10 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 		}
 
 		// Verify Event logging
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypePolicyUpdated {
@@ -198,11 +213,14 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 				EntityID: "https://bad-body.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -213,7 +231,7 @@ func TestPutSubordinateMetadataPolicies(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/9999/metadata-policies", strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -235,7 +253,9 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 				},
 			},
 		}
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, globalPolicy)
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, globalPolicy); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		// Create a mock record with no policy
 		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
@@ -243,15 +263,21 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 				EntityID: "https://post-policy.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://post-policy.example.org")
+		saved, err := backends.Subordinates.Get("https://post-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusCreated)
 
 		// Verify DB update copied the global policy
-		updated, _ := backends.Subordinates.Get("https://post-policy.example.org")
+		updated, err := backends.Subordinates.Get("https://post-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		opPol := requireMetadataPolicies(t, updated.MetadataPolicy).OpenIDProvider
 		if opPol == nil {
 			t.Errorf("Expected OpenIDProvider policy to exist")
@@ -263,7 +289,10 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 		}
 
 		// Verify Event logging
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypePolicyUpdated {
@@ -281,7 +310,7 @@ func TestPostSubordinateMetadataPolicies(t *testing.T) {
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("POST", "/subordinates/9999/metadata-policies", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -309,21 +338,30 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 			},
 			MetadataPolicy: initialPolicy,
 		})
-		saved, _ := backends.Subordinates.Get("https://delete-policy.example.org")
+		saved, err := backends.Subordinates.Get("https://delete-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update (policy should be nil)
-		updated, _ := backends.Subordinates.Get("https://delete-policy.example.org")
+		updated, err := backends.Subordinates.Get("https://delete-policy.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.MetadataPolicy != nil {
 			t.Fatalf("Expected MetadataPolicy to be nil after deletion")
 		}
 
 		// Verify Event logging
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypePolicyDeleted {
@@ -341,7 +379,7 @@ func TestDeleteSubordinateMetadataPolicies(t *testing.T) {
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata-policies", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -369,16 +407,20 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 			},
 			MetadataPolicy: policy,
 		})
-		saved, _ := backends.Subordinates.Get("https://entity-type-get.example.org")
+		saved, err := backends.Subordinates.Get("https://entity-type-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicy
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if contacts, ok := result["contacts"]; !ok || contacts["add"] == nil {
 			t.Errorf("Failed to retrieve entity type policy: %+v", result)
@@ -389,7 +431,7 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/metadata-policies/openid_relying_party", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
@@ -403,10 +445,13 @@ func TestGetSubordinateMetadataPolicyByEntityType(t *testing.T) {
 			},
 			MetadataPolicy: &oidfed.MetadataPolicies{},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-type.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_provider", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -433,7 +478,10 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://put-type.example.org")
+		saved, err := backends.Subordinates.Get("https://put-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"new_claim": {
@@ -443,12 +491,15 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://put-type.example.org")
+		updated, err := backends.Subordinates.Get("https://put-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		policies := requireMetadataPolicies(t, updated.MetadataPolicy)
 		rpPol := policies.RelyingParty
 		opPol := policies.OpenIDProvider
@@ -475,11 +526,14 @@ func TestPutSubordinateMetadataPolicyByEntityType(t *testing.T) {
 				EntityID: "https://bad-body-put-type.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body-put-type.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body-put-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -503,7 +557,10 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://post-type.example.org")
+		saved, err := backends.Subordinates.Get("https://post-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"new_claim": {
@@ -513,12 +570,15 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update merged the policies
-		updated, _ := backends.Subordinates.Get("https://post-type.example.org")
+		updated, err := backends.Subordinates.Get("https://post-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		rpPol := requireMetadataPolicies(t, updated.MetadataPolicy).RelyingParty
 
 		// Old claim should still exist
@@ -540,11 +600,14 @@ func TestPostSubordinateMetadataPolicyByEntityType(t *testing.T) {
 				EntityID: "https://bad-body-post-type.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body-post-type.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body-post-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -571,15 +634,21 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://delete-type.example.org")
+		saved, err := backends.Subordinates.Get("https://delete-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://delete-type.example.org")
+		updated, err := backends.Subordinates.Get("https://delete-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		policies := requireMetadataPolicies(t, updated.MetadataPolicy)
 
 		if policies.RelyingParty != nil {
@@ -594,7 +663,7 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/metadata-policies/openid_relying_party", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
@@ -608,10 +677,13 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 			},
 			MetadataPolicy: &oidfed.MetadataPolicies{},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-delete-type.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-delete-type.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_provider", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNoContent)
 	})
@@ -638,16 +710,20 @@ func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://claim-get.example.org")
+		saved, err := backends.Subordinates.Get("https://claim-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicyEntry
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		addVal, ok := result["add"]
 		if !ok {
@@ -669,10 +745,13 @@ func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {
 				RelyingParty: oidfed.MetadataPolicy{}, // exists but empty
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-claim.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/missing", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -699,7 +778,10 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://put-claim.example.org")
+		saved, err := backends.Subordinates.Get("https://put-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"value": "new_direct_value"
@@ -707,12 +789,15 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://put-claim.example.org")
+		updated, err := backends.Subordinates.Get("https://put-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		rpPol := requireMetadataPolicies(t, updated.MetadataPolicy).RelyingParty
 
 		if rpPol["safe_claim"] == nil {
@@ -736,11 +821,14 @@ func TestPutSubordinateMetadataPolicyByClaim(t *testing.T) {
 				EntityID: "https://bad-body-put-claim.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body-put-claim.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body-put-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -766,7 +854,10 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://post-claim.example.org")
+		saved, err := backends.Subordinates.Get("https://post-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"value": "merged_value"
@@ -774,12 +865,15 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://post-claim.example.org")
+		updated, err := backends.Subordinates.Get("https://post-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		contacts := requireMetadataPolicies(t, updated.MetadataPolicy).RelyingParty["contacts"]
 
 		// POST merges, so both operators should exist in this specific claim
@@ -796,7 +890,7 @@ func TestPostSubordinateMetadataPolicyByClaim(t *testing.T) {
 		app, _ := setupSubordinateMetadataPoliciesApp(t)
 		req := httptest.NewRequest("POST", "/subordinates/1/metadata-policies/openid_relying_party/contacts", strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
 }
@@ -820,15 +914,21 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://delete-claim.example.org")
+		saved, err := backends.Subordinates.Get("https://delete-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/delete_me", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://delete-claim.example.org")
+		updated, err := backends.Subordinates.Get("https://delete-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		rpPol := updated.MetadataPolicy.RelyingParty
 
 		if _, ok := rpPol["delete_me"]; ok {
@@ -850,10 +950,13 @@ func TestDeleteSubordinateMetadataPolicyByClaim(t *testing.T) {
 				RelyingParty: oidfed.MetadataPolicy{},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-delete-claim.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-delete-claim.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/not_here", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -879,16 +982,20 @@ func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://operator-get.example.org")
+		saved, err := backends.Subordinates.Get("https://operator-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result []any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if first := requireFirstStringInAnySliceValue(t, result, "operator policy"); first != "admin@example.org" {
 			t.Errorf("Failed to retrieve operator policy correctly: %+v", result)
@@ -908,10 +1015,13 @@ func TestGetSubordinateMetadataPolicyByOperator(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-operator.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-operator.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -938,18 +1048,24 @@ func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://put-operator.example.org")
+		saved, err := backends.Subordinates.Get("https://put-operator.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `["new@example.org"]`
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://put-operator.example.org")
+		updated, err := backends.Subordinates.Get("https://put-operator.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		contacts := requireMetadataPolicies(t, updated.MetadataPolicy).RelyingParty["contacts"]
 
 		if contacts["value"] != "untouched" {
@@ -969,11 +1085,14 @@ func TestPutSubordinateMetadataPolicyByOperator(t *testing.T) {
 				EntityID: "https://bad-body-put-op.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body-put-op.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body-put-op.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/add", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -1000,15 +1119,21 @@ func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://delete-operator.example.org")
+		saved, err := backends.Subordinates.Get("https://delete-operator.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/delete_me", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify DB update
-		updated, _ := backends.Subordinates.Get("https://delete-operator.example.org")
+		updated, err := backends.Subordinates.Get("https://delete-operator.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		contacts := requireMetadataPolicies(t, updated.MetadataPolicy).RelyingParty["contacts"]
 
 		if _, ok := contacts["delete_me"]; ok {
@@ -1032,10 +1157,13 @@ func TestDeleteSubordinateMetadataPolicyByOperator(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-delete-op.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-delete-op.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/metadata-policies/openid_relying_party/contacts/not_here", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -1074,16 +1202,19 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 				},
 			},
 		}
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, policy)
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, policy); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicies
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result.RelyingParty == nil {
 			t.Fatalf("Expected RelyingParty policy to be set")
@@ -1102,14 +1233,13 @@ func TestGetGeneralMetadataPolicies(t *testing.T) {
 		app, _ := setupGeneralMetadataPoliciesApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		// General policies behave differently than subordinate-specific policies.
 		// If no global policy is found in KV, the store returns an empty MetadataPolicies struct,
 		// and the handler returns 200 OK with `{}`, not a 404.
 		assertStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		if string(body) != "{}" {
 			t.Errorf("Expected empty JSON object '{}', got %s", string(body))
 		}
@@ -1132,13 +1262,16 @@ func TestPutGeneralMetadataPolicies(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB update
 		var updated oidfed.MetadataPolicies
-		found, _ := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		found, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if !found {
 			t.Fatalf("Expected MetadataPolicy to be saved in KV")
 		}
@@ -1159,7 +1292,7 @@ func TestPutGeneralMetadataPolicies(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies", strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -1180,16 +1313,19 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 				},
 			},
 		}
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, policy)
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, policy); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicy
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if contacts, ok := result["contacts"]; !ok || contacts["add"] == nil {
 			t.Errorf("Failed to retrieve entity type policy: %+v", result)
@@ -1200,24 +1336,28 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"old_claim": oidfed.MetadataPolicyEntry{"value": "old"},
 			},
 			OpenIDProvider: oidfed.MetadataPolicy{
 				"untouched": oidfed.MetadataPolicyEntry{"value": "safe"},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		body := `{"new_claim": {"value": "new"}}`
 		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies/openid_relying_party", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		rpPol := updated.RelyingParty
 		opPol := updated.OpenIDProvider
 
@@ -1236,21 +1376,25 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"existing_claim": oidfed.MetadataPolicyEntry{"value": "kept"},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		body := `{"new_claim": {"add": ["merged"]}}`
 		req := httptest.NewRequest("POST", "/subordinates/metadata-policies/openid_relying_party", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		rpPol := updated.RelyingParty
 
 		if existing, ok := rpPol["existing_claim"]; !ok || existing["value"] != "kept" {
@@ -1265,22 +1409,26 @@ func TestGeneralMetadataPolicyByEntityType(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"contacts": oidfed.MetadataPolicyEntry{"value": "delete-me"},
 			},
 			OpenIDProvider: oidfed.MetadataPolicy{
 				"issuer": oidfed.MetadataPolicyEntry{"value": "keep-me"},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if updated.RelyingParty != nil {
 			t.Errorf("Expected RelyingParty to be deleted")
 		}
@@ -1298,22 +1446,25 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"contacts": oidfed.MetadataPolicyEntry{
 					"add": []any{"admin@example.org"},
 				},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party/contacts", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.MetadataPolicyEntry
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		addVal, ok := result["add"]
 		if !ok {
@@ -1328,24 +1479,28 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"contacts": oidfed.MetadataPolicyEntry{
 					"add": []any{"old@example.org"},
 				},
 				"safe_claim": oidfed.MetadataPolicyEntry{"value": "untouched"},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		body := `{"value": "new_direct_value"}`
 		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies/openid_relying_party/contacts", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		rpPol := updated.RelyingParty
 		contacts := rpPol["contacts"]
 
@@ -1361,23 +1516,27 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"contacts": oidfed.MetadataPolicyEntry{
 					"add": []any{"old@example.org"},
 				},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		body := `{"value": "merged_value"}`
 		req := httptest.NewRequest("POST", "/subordinates/metadata-policies/openid_relying_party/contacts", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		contacts := updated.RelyingParty["contacts"]
 
 		if contacts["add"] == nil {
@@ -1392,20 +1551,24 @@ func TestGeneralMetadataPolicyByClaim(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"delete_me": oidfed.MetadataPolicyEntry{"value": "bye"},
 				"keep_me":   oidfed.MetadataPolicyEntry{"value": "staying"},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party/delete_me", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		rpPol := updated.RelyingParty
 
 		if _, ok := rpPol["delete_me"]; ok {
@@ -1425,22 +1588,25 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"contacts": oidfed.MetadataPolicyEntry{
 					"add": []any{"admin@example.org"},
 				},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/metadata-policies/openid_relying_party/contacts/add", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result []any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if first := requireFirstStringInAnySliceValue(t, result, "operator policy"); first != "admin@example.org" {
 			t.Errorf("Failed to retrieve operator policy: %+v", result)
@@ -1451,24 +1617,28 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"contacts": oidfed.MetadataPolicyEntry{
 					"add":   []any{"old@example.org"},
 					"value": "untouched",
 				},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		body := `["new@example.org"]`
 		req := httptest.NewRequest("PUT", "/subordinates/metadata-policies/openid_relying_party/contacts/add", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		contacts := updated.RelyingParty["contacts"]
 
 		if contacts["value"] != "untouched" {
@@ -1483,22 +1653,26 @@ func TestGeneralMetadataPolicyByOperator(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralMetadataPoliciesApp(t)
 
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &oidfed.MetadataPolicies{
 			RelyingParty: oidfed.MetadataPolicy{
 				"contacts": oidfed.MetadataPolicyEntry{
 					"delete_me": "gone",
 					"keep_me":   "staying",
 				},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", "/subordinates/metadata-policies/openid_relying_party/contacts/delete_me", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.MetadataPolicies
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		contacts := updated.RelyingParty["contacts"]
 
 		if _, ok := contacts["delete_me"]; ok {

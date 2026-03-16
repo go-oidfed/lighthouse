@@ -3,7 +3,6 @@ package adminapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -89,8 +88,7 @@ func TestGetSubordinates(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("GET", "/subordinates", http.NoBody)
-		resp, _ := app.Test(req, -1)
-		body, _ := io.ReadAll(resp.Body)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 		var subs []model.BasicSubordinateInfo
@@ -121,12 +119,13 @@ func TestGetSubordinates(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("GET", "/subordinates?status=active", http.NoBody)
-		resp, _ := app.Test(req, -1)
-		body, _ := io.ReadAll(resp.Body)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 		var subs []model.BasicSubordinateInfo
-		json.Unmarshal(body, &subs)
+		if err := json.Unmarshal(body, &subs); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if len(subs) != 1 || subs[0].EntityID != "https://active.example.org" {
 			t.Errorf("Expected only active subordinate, got: %+v", subs)
@@ -157,12 +156,13 @@ func TestGetSubordinates(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("GET", "/subordinates?entity_type=openid_relying_party", http.NoBody)
-		resp, _ := app.Test(req, -1)
-		body, _ := io.ReadAll(resp.Body)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 		var subs []model.BasicSubordinateInfo
-		json.Unmarshal(body, &subs)
+		if err := json.Unmarshal(body, &subs); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if len(subs) != 1 || subs[0].EntityID != "https://rp.example.org" {
 			t.Errorf("Expected only RP subordinate, got: %+v", subs)
@@ -174,13 +174,14 @@ func TestGetSubordinates(t *testing.T) {
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates?status=unknown_status", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 
-		body, _ := io.ReadAll(resp.Body)
 		var oidErr oidfed.Error
-		json.Unmarshal(body, &oidErr)
+		if err := json.Unmarshal(body, &oidErr); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 		if oidErr.Error != "invalid_request" {
 			t.Errorf("Expected 'invalid_request' error, got %q", oidErr.Error)
 		}
@@ -202,7 +203,7 @@ func TestPostSubordinates(t *testing.T) {
 		}`
 		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusCreated)
 
@@ -235,7 +236,7 @@ func TestPostSubordinates(t *testing.T) {
 		body := `{"status": "pending"}`
 		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -247,7 +248,7 @@ func TestPostSubordinates(t *testing.T) {
 		body := `{"entity_id": "https://sub.example.org", "status": "unknown"}`
 		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -260,7 +261,7 @@ func TestPostSubordinates(t *testing.T) {
 		body := `{"entity_id": "https://sub.example.org", "status": "active"}`
 		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -271,7 +272,7 @@ func TestPostSubordinates(t *testing.T) {
 
 		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(`not valid json`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -294,16 +295,20 @@ func TestGetSubordinateByID(t *testing.T) {
 		})
 
 		// Grab the actual inserted ID to test the endpoint
-		saved, _ := backends.Subordinates.Get("https://specific.example.org")
+		saved, err := backends.Subordinates.Get("https://specific.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var sub model.ExtendedSubordinateInfo
-		json.Unmarshal(body, &sub)
+		if err := json.Unmarshal(body, &sub); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if sub.EntityID != "https://specific.example.org" {
 			t.Errorf("Expected entity ID 'https://specific.example.org', got %s", sub.EntityID)
@@ -315,7 +320,7 @@ func TestGetSubordinateByID(t *testing.T) {
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		// Could be 404 or 500 depending on GORM error parsing, handlers return NotFound or ServerError
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
@@ -341,7 +346,10 @@ func TestPutSubordinateByID(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://update.example.org")
+		saved, err := backends.Subordinates.Get("https://update.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"description": "New Description",
@@ -349,12 +357,15 @@ func TestPutSubordinateByID(t *testing.T) {
 		}`
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify it was updated in DB
-		updated, _ := backends.Subordinates.Get("https://update.example.org")
+		updated, err := backends.Subordinates.Get("https://update.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Description != "New Description" {
 			t.Errorf("Expected description 'New Description', got %q", updated.Description)
 		}
@@ -366,7 +377,10 @@ func TestPutSubordinateByID(t *testing.T) {
 		}
 
 		// Verify event was created
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		foundUpdateEvent := false
 		for _, e := range events {
 			if e.Type == model.EventTypeUpdated {
@@ -386,7 +400,7 @@ func TestPutSubordinateByID(t *testing.T) {
 		body := `{"description": "New"}`
 		req := httptest.NewRequest("PUT", "/subordinates/9999", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -399,11 +413,14 @@ func TestPutSubordinateByID(t *testing.T) {
 				EntityID: "https://bad-body.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-body.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-body.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -424,7 +441,10 @@ func TestDeleteSubordinateByID(t *testing.T) {
 				Status:   model.StatusActive,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://delete.example.org")
+		saved, err := backends.Subordinates.Get("https://delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		// Create a mock event for this subordinate
 		backends.SubordinateEvents.Add(model.SubordinateEvent{
@@ -433,12 +453,15 @@ func TestDeleteSubordinateByID(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		// Verify it was deleted from DB
-		deleted, _ := backends.Subordinates.Get("https://delete.example.org")
+		deleted, err := backends.Subordinates.Get("https://delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if deleted != nil {
 			t.Errorf("Expected subordinate to be deleted, but it still exists")
 		}
@@ -455,7 +478,7 @@ func TestDeleteSubordinateByID(t *testing.T) {
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("DELETE", "/subordinates/9999", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -475,22 +498,31 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 				Status:   model.StatusPending,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://status.example.org")
+		saved, err := backends.Subordinates.Get("https://status.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("blocked"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB status
-		updated, _ := backends.Subordinates.Get("https://status.example.org")
+		updated, err := backends.Subordinates.Get("https://status.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Status != model.StatusBlocked {
 			t.Errorf("Expected status blocked, got %s", updated.Status)
 		}
 
 		// Verify StatusUpdated event
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		foundEvent := false
 		for _, e := range events {
 			if e.Type == model.EventTypeStatusUpdated {
@@ -516,11 +548,14 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 				Status:   model.StatusPending,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://missing-status.example.org")
+		saved, err := backends.Subordinates.Get("https://missing-status.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("  "))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -535,11 +570,14 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 				Status:   model.StatusPending,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://invalid-status.example.org")
+		saved, err := backends.Subordinates.Get("https://invalid-status.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("unknown-status"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -554,11 +592,14 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 				Status:   model.StatusPending,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://no-keys.example.org")
+		saved, err := backends.Subordinates.Get("https://no-keys.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", saved.ID), strings.NewReader("active"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -569,7 +610,7 @@ func TestUpdateSubordinateStatus(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", "/subordinates/9999/status", strings.NewReader("pending"))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -589,7 +630,10 @@ func TestGetSubordinateHistory(t *testing.T) {
 				Status:   model.StatusPending,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://history.example.org")
+		saved, err := backends.Subordinates.Get("https://history.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		// Create mock events
 		backends.SubordinateEvents.Add(model.SubordinateEvent{
@@ -604,11 +648,10 @@ func TestGetSubordinateHistory(t *testing.T) {
 		})
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result struct {
 			Events     []eventResponse `json:"events"`
 			Pagination struct {
@@ -642,7 +685,10 @@ func TestGetSubordinateHistory(t *testing.T) {
 				Status:   model.StatusPending,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://history-opts.example.org")
+		saved, err := backends.Subordinates.Get("https://history-opts.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		backends.SubordinateEvents.Add(model.SubordinateEvent{
 			SubordinateID: saved.ID,
@@ -655,13 +701,14 @@ func TestGetSubordinateHistory(t *testing.T) {
 
 		// Query for limit=1, offset=1 (should return only the older/newer event depending on DB order)
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history?limit=1&offset=1&type=updated", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		pag := result["pagination"].(map[string]any)
 		if int(pag["limit"].(float64)) != 1 {
@@ -677,7 +724,7 @@ func TestGetSubordinateHistory(t *testing.T) {
 		app, _ := setupSubordinateBaseApp(t)
 
 		req := httptest.NewRequest("GET", "/subordinates/9999/history", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
@@ -690,10 +737,13 @@ func TestGetSubordinateHistory(t *testing.T) {
 				EntityID: "https://bad-query.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://bad-query.example.org")
+		saved, err := backends.Subordinates.Get("https://bad-query.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/history?limit=abc", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})

@@ -3,7 +3,6 @@ package adminapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,16 +56,20 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 			},
 			Constraints: constraints,
 		})
-		saved, _ := backends.Subordinates.Get("https://constraints-get.example.org")
+		saved, err := backends.Subordinates.Get("https://constraints-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.ConstraintSpecification
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result.MaxPathLength == nil || *result.MaxPathLength != 5 {
 			t.Errorf("Failed to retrieve correctly unmarshaled constraints: %+v", result)
@@ -81,14 +84,16 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 				EntityID: "https://no-constraints.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://no-constraints.example.org")
+		saved, err := backends.Subordinates.Get("https://no-constraints.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		if string(body) != "{}" {
 			t.Errorf("Expected empty json object for nil constraints, got %s", string(body))
 		}
@@ -103,7 +108,10 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 				EntityID: "https://constraints-put.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://constraints-put.example.org")
+		saved, err := backends.Subordinates.Get("https://constraints-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{
 			"max_path_length": 3
@@ -111,18 +119,24 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/constraints", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		// Verify DB
-		updated, _ := backends.Subordinates.Get("https://constraints-put.example.org")
+		updated, err := backends.Subordinates.Get("https://constraints-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Constraints == nil || updated.Constraints.MaxPathLength == nil || *updated.Constraints.MaxPathLength != 3 {
 			t.Errorf("Expected constraints to be updated in DB")
 		}
 
 		// Verify Event
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypeConstraintsUpdated {
@@ -148,20 +162,29 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 				MaxPathLength: &length,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://constraints-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://constraints-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
-		updated, _ := backends.Subordinates.Get("https://constraints-delete.example.org")
+		updated, err := backends.Subordinates.Get("https://constraints-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Constraints != nil {
 			t.Errorf("Expected Constraints to be nil after deletion")
 		}
 
 		// Verify Event
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypeConstraintsDeleted {
@@ -178,7 +201,7 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateConstraintsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/constraints", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 }
@@ -200,16 +223,20 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 				MaxPathLength: &length,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://maxpath-get.example.org")
+		saved, err := backends.Subordinates.Get("https://maxpath-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result int
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result != 5 {
 			t.Errorf("Failed to retrieve max path length: %d", result)
@@ -225,10 +252,13 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 			},
 			Constraints: &oidfed.ConstraintSpecification{},
 		})
-		saved, _ := backends.Subordinates.Get("https://maxpath-missing.example.org")
+		saved, err := backends.Subordinates.Get("https://maxpath-missing.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNotFound)
 	})
@@ -245,15 +275,21 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 				AllowedEntityTypes: []string{"keep_me"},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://maxpath-put.example.org")
+		saved, err := backends.Subordinates.Get("https://maxpath-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), strings.NewReader(`3`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		updated, _ := backends.Subordinates.Get("https://maxpath-put.example.org")
+		updated, err := backends.Subordinates.Get("https://maxpath-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Constraints == nil || updated.Constraints.MaxPathLength == nil || *updated.Constraints.MaxPathLength != 3 {
 			t.Errorf("Expected max_path_length to be set to 3")
 		}
@@ -276,14 +312,20 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 				AllowedEntityTypes: []string{"keep_me"},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://maxpath-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://maxpath-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/max-path-length", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
-		updated, _ := backends.Subordinates.Get("https://maxpath-delete.example.org")
+		updated, err := backends.Subordinates.Get("https://maxpath-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Constraints.MaxPathLength != nil {
 			t.Errorf("Expected max_path_length to be nil after deletion")
 		}
@@ -311,16 +353,20 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 				},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://naming-get.example.org")
+		saved, err := backends.Subordinates.Get("https://naming-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.NamingConstraints
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if len(result.Permitted) == 0 || result.Permitted[0] != "example.com" {
 			t.Errorf("Failed to retrieve naming constraints: %+v", result)
@@ -336,10 +382,13 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 			},
 			Constraints: &oidfed.ConstraintSpecification{},
 		})
-		saved, _ := backends.Subordinates.Get("https://naming-missing.example.org")
+		saved, err := backends.Subordinates.Get("https://naming-missing.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNotFound)
 	})
@@ -356,16 +405,22 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 				AllowedEntityTypes: []string{"keep_me"},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://naming-put.example.org")
+		saved, err := backends.Subordinates.Get("https://naming-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{"permitted": ["new.example.com"], "excluded": ["bad.example.com"]}`
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		updated, _ := backends.Subordinates.Get("https://naming-put.example.org")
+		updated, err := backends.Subordinates.Get("https://naming-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Constraints == nil || updated.Constraints.NamingConstraints == nil || len(updated.Constraints.NamingConstraints.Permitted) == 0 {
 			t.Errorf("Expected naming constraints to be set")
 		}
@@ -389,14 +444,20 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 				AllowedEntityTypes: []string{"keep_me"},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://naming-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://naming-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
-		updated, _ := backends.Subordinates.Get("https://naming-delete.example.org")
+		updated, err := backends.Subordinates.Get("https://naming-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Constraints.NamingConstraints != nil {
 			t.Errorf("Expected naming constraints to be nil after deletion")
 		}
@@ -422,16 +483,20 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 				AllowedEntityTypes: []string{"openid_relying_party"},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://allowed-get.example.org")
+		saved, err := backends.Subordinates.Get("https://allowed-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result []string
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if len(result) == 0 || result[0] != "openid_relying_party" {
 			t.Errorf("Failed to retrieve allowed entity types: %+v", result)
@@ -447,10 +512,13 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 			},
 			Constraints: &oidfed.ConstraintSpecification{},
 		})
-		saved, _ := backends.Subordinates.Get("https://allowed-missing.example.org")
+		saved, err := backends.Subordinates.Get("https://allowed-missing.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNotFound)
 	})
@@ -469,16 +537,22 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 				MaxPathLength:      &length,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://allowed-put.example.org")
+		saved, err := backends.Subordinates.Get("https://allowed-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `["new_type"]`
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		updated, _ := backends.Subordinates.Get("https://allowed-put.example.org")
+		updated, err := backends.Subordinates.Get("https://allowed-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.Constraints == nil || len(updated.Constraints.AllowedEntityTypes) == 0 || updated.Constraints.AllowedEntityTypes[0] != "new_type" {
 			t.Errorf("Expected allowed entity types to be replaced")
 		}
@@ -499,16 +573,22 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 				AllowedEntityTypes: []string{"old_type"},
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://allowed-post.example.org")
+		saved, err := backends.Subordinates.Get("https://allowed-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `merged_type`
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusCreated)
 
-		updated, _ := backends.Subordinates.Get("https://allowed-post.example.org")
+		updated, err := backends.Subordinates.Get("https://allowed-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		// POST should merge the new type with the old type
 		types := updated.Constraints.AllowedEntityTypes
@@ -531,14 +611,20 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 				MaxPathLength:      &length,
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://allowed-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://allowed-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/constraints/allowed-entity-types/delete_me", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		updated, _ := backends.Subordinates.Get("https://allowed-delete.example.org")
+		updated, err := backends.Subordinates.Get("https://allowed-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		types := updated.Constraints.AllowedEntityTypes
 
 		if len(types) != 1 || types[0] != "keep_me" {
@@ -576,18 +662,21 @@ func TestGeneralConstraintsAll(t *testing.T) {
 		app, backends := setupGeneralConstraintsApp(t)
 
 		length := 5
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			MaxPathLength: &length,
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.ConstraintSpecification
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if result.MaxPathLength == nil || *result.MaxPathLength != 5 {
 			t.Errorf("Failed to retrieve constraints: %+v", result)
@@ -598,7 +687,7 @@ func TestGeneralConstraintsAll(t *testing.T) {
 		t.Parallel()
 		app, _ := setupGeneralConstraintsApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/constraints", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNotFound)
 	})
@@ -610,12 +699,14 @@ func TestGeneralConstraintsAll(t *testing.T) {
 		body := `{"max_path_length": 3}`
 		req := httptest.NewRequest("PUT", "/subordinates/constraints", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if updated.MaxPathLength == nil || *updated.MaxPathLength != 3 {
 			t.Errorf("Expected max_path_length to be 3")
 		}
@@ -630,18 +721,21 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		length := 5
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			MaxPathLength: &length,
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/constraints/max-path-length", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result int
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 		if result != 5 {
 			t.Errorf("Failed to retrieve max path length: %d", result)
 		}
@@ -650,18 +744,22 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 	t.Run("PUT Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"keep_me"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", "/subordinates/constraints/max-path-length", strings.NewReader(`3`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if updated.MaxPathLength == nil || *updated.MaxPathLength != 3 {
 			t.Errorf("Expected max_path_length to be 3")
 		}
@@ -674,18 +772,22 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
 		length := 5
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			MaxPathLength:      &length,
 			AllowedEntityTypes: []string{"keep_me"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", "/subordinates/constraints/max-path-length", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if updated.MaxPathLength != nil {
 			t.Errorf("Expected max_path_length to be nil")
 		}
@@ -702,20 +804,23 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	t.Run("GET Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			NamingConstraints: &oidfed.NamingConstraints{
 				Permitted: []string{"example.com"},
 			},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/constraints/naming-constraints", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result oidfed.NamingConstraints
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if len(result.Permitted) == 0 || result.Permitted[0] != "example.com" {
 			t.Errorf("Failed to retrieve naming constraints: %+v", result)
@@ -725,19 +830,23 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	t.Run("PUT Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"keep_me"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		body := `{"permitted": ["new.example.com"], "excluded": ["bad.example.com"]}`
 		req := httptest.NewRequest("PUT", "/subordinates/constraints/naming-constraints", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if updated.NamingConstraints == nil || len(updated.NamingConstraints.Permitted) == 0 || updated.NamingConstraints.Permitted[0] != "new.example.com" {
 			t.Errorf("Expected naming constraints to be set")
 		}
@@ -749,20 +858,24 @@ func TestGeneralConstraintsNamingConstraints(t *testing.T) {
 	t.Run("DELETE Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			NamingConstraints: &oidfed.NamingConstraints{
 				Permitted: []string{"example.com"},
 			},
 			AllowedEntityTypes: []string{"keep_me"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", "/subordinates/constraints/naming-constraints", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if updated.NamingConstraints != nil {
 			t.Errorf("Expected naming constraints to be nil")
 		}
@@ -779,18 +892,21 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Run("GET Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"openid_relying_party"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", "/subordinates/constraints/allowed-entity-types", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result []string
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		if len(result) == 0 || result[0] != "openid_relying_party" {
 			t.Errorf("Failed to retrieve allowed entity types: %+v", result)
@@ -800,18 +916,22 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Run("PUT Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"old_type"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", "/subordinates/constraints/allowed-entity-types", strings.NewReader(`["new_type"]`))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if len(updated.AllowedEntityTypes) == 0 || updated.AllowedEntityTypes[0] != "new_type" {
 			t.Errorf("Expected allowed entity types to be replaced")
 		}
@@ -820,18 +940,22 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Run("POST Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"old_type"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("POST", "/subordinates/constraints/allowed-entity-types", strings.NewReader(`merged_type`))
 		req.Header.Set("Content-Type", "text/plain")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusCreated)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if len(updated.AllowedEntityTypes) != 2 {
 			t.Errorf("Expected 2 allowed entity types after merge")
 		}
@@ -840,17 +964,21 @@ func TestGeneralConstraintsAllowedEntityTypes(t *testing.T) {
 	t.Run("DELETE Success", func(t *testing.T) {
 		t.Parallel()
 		app, backends := setupGeneralConstraintsApp(t)
-		backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
+		if err := backends.KV.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
 			AllowedEntityTypes: []string{"delete_me", "keep_me"},
-		})
+		}); err != nil {
+			t.Fatalf("Failed to set KV value: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", "/subordinates/constraints/allowed-entity-types/delete_me", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
 		var updated oidfed.ConstraintSpecification
-		backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated)
+		if _, err := backends.KV.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &updated); err != nil {
+			t.Fatalf("Failed to get KV value: %v", err)
+		}
 		if len(updated.AllowedEntityTypes) != 1 || updated.AllowedEntityTypes[0] != "keep_me" {
 			t.Errorf("Expected delete_me to be removed")
 		}

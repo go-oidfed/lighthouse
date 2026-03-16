@@ -3,7 +3,6 @@ package adminapi
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -42,7 +41,10 @@ func setupSubordinateKeysApp(t *testing.T) (*fiber.App, model.Backends) {
 // createTestKey creates a generic RS256 JWK for testing
 func createTestKey(kid string) jwk.Key {
 	raw := fmt.Sprintf(`{"kty":"RSA","kid":%q,"n":"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw","e":"AQAB"}`, kid)
-	k, _ := jwk.ParseKey([]byte(raw))
+	k, err := jwk.ParseKey([]byte(raw))
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse test JWK: %v", err))
+	}
 	return k
 }
 
@@ -64,16 +66,20 @@ func TestSubordinateJWKS(t *testing.T) {
 			},
 			JWKS: model.JWKS{Keys: jwx.JWKS{Set: set}},
 		})
-		saved, _ := backends.Subordinates.Get("https://jwks-get.example.org")
+		saved, err := backends.Subordinates.Get("https://jwks-get.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		keys, ok := result["keys"].([]any)
 		if !ok || len(keys) != 1 {
@@ -90,16 +96,20 @@ func TestSubordinateJWKS(t *testing.T) {
 			},
 			// No JWKS set
 		})
-		saved, _ := backends.Subordinates.Get("https://jwks-empty.example.org")
+		saved, err := backends.Subordinates.Get("https://jwks-empty.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, body := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		body, _ := io.ReadAll(resp.Body)
 		var result map[string]any
-		json.Unmarshal(body, &result)
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
 
 		keys, ok := result["keys"].([]any)
 		if !ok || len(keys) != 0 {
@@ -111,7 +121,7 @@ func TestSubordinateJWKS(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateKeysApp(t)
 		req := httptest.NewRequest("GET", "/subordinates/9999/jwks", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
@@ -123,22 +133,31 @@ func TestSubordinateJWKS(t *testing.T) {
 				EntityID: "https://jwks-put.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://jwks-put.example.org")
+		saved, err := backends.Subordinates.Get("https://jwks-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{"keys":[{"kty":"RSA","kid":"new-key","n":"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw","e":"AQAB"}]}`
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusOK)
 
-		updated, _ := backends.Subordinates.Get("https://jwks-put.example.org")
+		updated, err := backends.Subordinates.Get("https://jwks-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.JWKS.Keys.Set == nil || updated.JWKS.Keys.Len() != 1 {
 			t.Errorf("Expected JWKS to be replaced in DB")
 		}
 
 		// Verify Event
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypeJWKSReplaced {
@@ -159,11 +178,14 @@ func TestSubordinateJWKS(t *testing.T) {
 				EntityID: "https://jwks-bad-put.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://jwks-bad-put.example.org")
+		saved, err := backends.Subordinates.Get("https://jwks-bad-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -181,22 +203,31 @@ func TestSubordinateJWKS(t *testing.T) {
 			},
 			JWKS: model.JWKS{Keys: jwx.JWKS{Set: set}},
 		})
-		saved, _ := backends.Subordinates.Get("https://jwks-post.example.org")
+		saved, err := backends.Subordinates.Get("https://jwks-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		body := `{"kty":"RSA","kid":"new-key","n":"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw","e":"AQAB"}`
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusCreated)
 
-		updated, _ := backends.Subordinates.Get("https://jwks-post.example.org")
+		updated, err := backends.Subordinates.Get("https://jwks-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.JWKS.Keys.Set == nil || updated.JWKS.Keys.Len() != 2 {
 			t.Errorf("Expected new JWK to be merged into DB, got length %d", updated.JWKS.Keys.Len())
 		}
 
 		// Verify Event
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypeJWKAdded {
@@ -217,11 +248,14 @@ func TestSubordinateJWKS(t *testing.T) {
 				EntityID: "https://jwks-bad-post.example.org",
 			},
 		})
-		saved, _ := backends.Subordinates.Get("https://jwks-bad-post.example.org")
+		saved, err := backends.Subordinates.Get("https://jwks-bad-post.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("POST", fmt.Sprintf("/subordinates/%d/jwks", saved.ID), strings.NewReader("bad json"))
 		req.Header.Set("Content-Type", "application/json")
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusBadRequest)
 	})
@@ -245,14 +279,20 @@ func TestSubordinateJWKDelete(t *testing.T) {
 			},
 			JWKS: model.JWKS{Keys: jwx.JWKS{Set: set}},
 		})
-		saved, _ := backends.Subordinates.Get("https://jwk-delete.example.org")
+		saved, err := backends.Subordinates.Get("https://jwk-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/jwks/delete-me", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		requireStatus(t, resp, http.StatusNoContent)
 
-		updated, _ := backends.Subordinates.Get("https://jwk-delete.example.org")
+		updated, err := backends.Subordinates.Get("https://jwk-delete.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 		if updated.JWKS.Keys.Set == nil || updated.JWKS.Keys.Len() != 1 {
 			t.Fatalf("Expected exactly 1 key remaining, got %d", updated.JWKS.Keys.Len())
 		}
@@ -263,7 +303,10 @@ func TestSubordinateJWKDelete(t *testing.T) {
 		}
 
 		// Verify Event
-		events, _, _ := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
+		if err != nil {
+			t.Fatalf("Failed to get events: %v", err)
+		}
 		found := false
 		for _, e := range events {
 			if e.Type == model.EventTypeJWKRemoved {
@@ -280,7 +323,7 @@ func TestSubordinateJWKDelete(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateKeysApp(t)
 		req := httptest.NewRequest("DELETE", "/subordinates/9999/jwks/delete-me", http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 		assertStatusOneOf(t, resp, http.StatusNotFound, http.StatusInternalServerError)
 	})
 
@@ -297,10 +340,13 @@ func TestSubordinateJWKDelete(t *testing.T) {
 			},
 			JWKS: model.JWKS{Keys: jwx.JWKS{Set: set}},
 		})
-		saved, _ := backends.Subordinates.Get("https://jwk-delete-missing.example.org")
+		saved, err := backends.Subordinates.Get("https://jwk-delete-missing.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
 
 		req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%d/jwks/missing-kid", saved.ID), http.NoBody)
-		resp, _ := app.Test(req, -1)
+		resp, _ := doRequest(t, app, req)
 
 		assertStatus(t, resp, http.StatusNoContent)
 	})
