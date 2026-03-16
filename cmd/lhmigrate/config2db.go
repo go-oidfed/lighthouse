@@ -157,26 +157,14 @@ func config2dbCmd(args []string) int {
 	}
 
 	// Connect to database
-	var driver storage.DriverType
-	switch strings.ToLower(dbType) {
-	case string(storage.DriverSQLite):
-		driver = storage.DriverSQLite
-	case string(storage.DriverMySQL):
-		driver = storage.DriverMySQL
-	case string(storage.DriverPostgres):
-		driver = storage.DriverPostgres
-	default:
-		fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", dbType)
+	driver, err := storage.ParseDriverType(strings.ToLower(dbType))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", err)
 		return 2
 	}
 
-	if driver == storage.DriverSQLite && dbDir == "" {
-		fmt.Fprintln(os.Stderr, "--db-dir is required for sqlite")
-		return 2
-	}
-
-	if (driver == storage.DriverMySQL || driver == storage.DriverPostgres) && dbDSN == "" {
-		fmt.Fprintln(os.Stderr, "--db-dsn is required for mysql/postgres")
+	if err := validateDBFlags(driver, dbDir, dbDSN); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 

@@ -38,7 +38,7 @@ func NewFileStorage(basepath string) *FileStorage {
 	}
 }
 
-func (store *FileStorage) SubordinateStorage() loadLegacySubordinateInfos {
+func (store *FileStorage) subordinateStorage() loadLegacySubordinateInfos {
 	return func() ([]legacySubordinateInfo, error) {
 		data, err := os.ReadFile(store.files["subordinates"].path)
 		if err != nil {

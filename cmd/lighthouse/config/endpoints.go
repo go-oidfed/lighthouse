@@ -4,16 +4,13 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/fatih/structs"
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/zachmann/go-utils/duration"
-	"gopkg.in/yaml.v3"
 	"tideland.dev/go/slices"
 
 	"github.com/go-oidfed/lighthouse"
-	"github.com/go-oidfed/lighthouse/internal/utils"
 )
 
 // Endpoints holds configuration for the different possible endpoints.
@@ -196,47 +193,6 @@ func (c *collectionEndpointConf) validate() error {
 	if len(c.AllowedTrustAnchors) == 0 {
 		return errors.New("at least one allowed trust anchor must be specified if periodic collection is used")
 	}
-	return nil
-}
-
-type extendedTrustMarkSpec struct {
-	CheckerConfig        lighthouse.EntityCheckerConfig `yaml:"checker"`
-	oidfed.TrustMarkSpec `yaml:",inline"`
-}
-
-// UnmarshalYAML implements the yaml.Unmarshaler interface
-func (e *extendedTrustMarkSpec) UnmarshalYAML(node *yaml.Node) error {
-	type forChecker struct {
-		CheckerConfig lighthouse.EntityCheckerConfig `yaml:"checker"`
-	}
-	mm := e.TrustMarkSpec
-	var fc forChecker
-
-	if err := node.Decode(&fc); err != nil {
-		return errors.WithStack(err)
-	}
-	if err := node.Decode(&mm); err != nil {
-		return errors.WithStack(err)
-	}
-	extra := make(map[string]interface{})
-	if err := node.Decode(&extra); err != nil {
-		return errors.WithStack(err)
-	}
-	s1 := structs.New(fc)
-	s2 := structs.New(mm)
-	for _, tag := range utils.FieldTagNames(s1.Fields(), "yaml") {
-		delete(extra, tag)
-	}
-	for _, tag := range utils.FieldTagNames(s2.Fields(), "yaml") {
-		delete(extra, tag)
-	}
-	if len(extra) == 0 {
-		extra = nil
-	}
-
-	mm.Extra = extra
-	e.TrustMarkSpec = mm
-	e.CheckerConfig = fc.CheckerConfig
 	return nil
 }
 

@@ -31,8 +31,8 @@ type BadgerStorage struct {
 	loaded bool
 }
 
-// SubordinateStorage gives a SubordinateBadgerStorage
-func (store *BadgerStorage) SubordinateStorage() loadLegacySubordinateInfos {
+// subordinateStorage gives a SubordinateBadgerStorage
+func (store *BadgerStorage) subordinateStorage() loadLegacySubordinateInfos {
 	return func() (infos []legacySubordinateInfo, err error) {
 		s := &BadgerSubStorage{
 			db:     store,

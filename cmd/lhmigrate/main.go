@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
+
 	"github.com/go-oidfed/lighthouse/storage"
 )
 
@@ -19,7 +20,9 @@ func usage() {
 	_, _ = fmt.Fprintf(os.Stderr, "lhmigrate: migrate legacy data and keys to new formats\n")
 	_, _ = fmt.Fprintf(os.Stderr, "\n")
 	_, _ = fmt.Fprintf(os.Stderr, "Subcommands:\n")
-	_, _ = fmt.Fprintf(os.Stderr, "  all       Run all migration steps in sequence (config, keys, config2db, db, cleanup)\n")
+	_, _ = fmt.Fprintf(
+		os.Stderr, "  all       Run all migration steps in sequence (config, keys, config2db, db, cleanup)\n",
+	)
 	_, _ = fmt.Fprintf(os.Stderr, "  keys      Migrate signing keys (subcommands: public, kms) [alias: signing]\n")
 	_, _ = fmt.Fprintf(os.Stderr, "  config2db Migrate config file values to database\n")
 	_, _ = fmt.Fprintf(os.Stderr, "  db        Migrate legacy storage data (JSON/Badger) to GORM-based database\n")
@@ -49,7 +52,10 @@ func publicCmd(args []string) int {
 	fs.StringVar(&typeID, "type", "federation", "Key type identifier (e.g., 'federation')")
 	fs.StringVar(&typeID, "t", "federation", "Key type identifier (shorthand)")
 	// --db-type
-	fs.StringVar(&destDB, "db-type", "", "Destination database type: sqlite|mysql|postgres (optional; defaults to filesystem if empty)")
+	fs.StringVar(
+		&destDB, "db-type", "",
+		"Destination database type: sqlite|mysql|postgres (optional; defaults to filesystem if empty)",
+	)
 	// --db-dsn
 	fs.StringVar(&destDSN, "db-dsn", "", "Destination DSN for mysql/postgres (ignored for sqlite)")
 	// --db-debug
@@ -59,7 +65,10 @@ func publicCmd(args []string) int {
 	fs.BoolVar(&verbose, "v", false, "Verbose logging (shorthand)")
 
 	fs.Usage = func() {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys public --source <legacy_dir> --dest <dest> --type <typeID> [--db-type=<sqlite|mysql|postgres>] [--db-dsn=<dsn>] [--db-debug]\n")
+		_, _ = fmt.Fprintf(
+			os.Stderr,
+			"Usage: lhmigrate keys public --source <legacy_dir> --dest <dest> --type <typeID> [--db-type=<sqlite|mysql|postgres>] [--db-dsn=<dsn>] [--db-debug]\n",
+		)
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -120,7 +129,12 @@ func publicCmd(args []string) int {
 			_, _ = fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", destDB)
 			return 2
 		}
-		cfg := storage.Config{Driver: driver, DSN: destDSN, DataDir: dst, Debug: dbDebug}
+		cfg := storage.Config{
+			Driver:  driver,
+			DSN:     destDSN,
+			DataDir: dst,
+			Debug:   dbDebug,
+		}
 		db, err := storage.Connect(cfg)
 		if err != nil {
 			log.WithError(err).Error("failed to connect to destination database")
@@ -193,7 +207,10 @@ func kmsCmd(args []string) int {
 	// --pks-type (required)
 	fs.StringVar(&pksType, "pks-type", "", "Public key storage type: fs (filesystem) or db (database) [required]")
 	// --db-type
-	fs.StringVar(&destDB, "db-type", "", "Database type for public key storage: sqlite|mysql|postgres (required when --pks-type=db)")
+	fs.StringVar(
+		&destDB, "db-type", "",
+		"Database type for public key storage: sqlite|mysql|postgres (required when --pks-type=db)",
+	)
 	// --db-dsn
 	fs.StringVar(&destDSN, "db-dsn", "", "Database DSN for mysql/postgres (ignored for sqlite)")
 	// --db-debug
@@ -204,11 +221,14 @@ func kmsCmd(args []string) int {
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprintf(
-			os.Stderr, "Usage: lhmigrate keys kms --source <legacy_dir> --dest <dest_dir> --type <typeID> --algs <list> --pks-type <fs|db> [options]\n",
+			os.Stderr,
+			"Usage: lhmigrate keys kms --source <legacy_dir> --dest <dest_dir> --type <typeID> --algs <list> --pks-type <fs|db> [options]\n",
 		)
 		_, _ = fmt.Fprintf(os.Stderr, "\nPublic key storage options:\n")
 		_, _ = fmt.Fprintf(os.Stderr, "  For filesystem:  --pks-type=fs\n")
-		_, _ = fmt.Fprintf(os.Stderr, "  For database:    --pks-type=db --db-type=<sqlite|mysql|postgres> [--db-dsn=<dsn>]\n\n")
+		_, _ = fmt.Fprintf(
+			os.Stderr, "  For database:    --pks-type=db --db-type=<sqlite|mysql|postgres> [--db-dsn=<dsn>]\n\n",
+		)
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -257,19 +277,13 @@ func kmsCmd(args []string) int {
 			fs.Usage()
 			return 2
 		}
-		switch destDB {
-		case string(storage.DriverSQLite):
-			dbDriver = storage.DriverSQLite
-		case string(storage.DriverMySQL):
-			dbDriver = storage.DriverMySQL
-		case string(storage.DriverPostgres):
-			dbDriver = storage.DriverPostgres
-		default:
-			_, _ = fmt.Fprintf(os.Stderr, "invalid --db-type: %s (must be sqlite, mysql, or postgres)\n", destDB)
+		dbDriver, err = storage.ParseDriverType(destDB)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", err)
 			return 2
 		}
-		if (dbDriver == storage.DriverMySQL || dbDriver == storage.DriverPostgres) && destDSN == "" {
-			_, _ = fmt.Fprintf(os.Stderr, "--db-dsn is required for %s\n", dbDriver)
+		if err := validateDBFlags(dbDriver, dst, destDSN); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
 			return 2
 		}
 	}
@@ -321,7 +335,12 @@ func kmsCmd(args []string) int {
 		}
 	} else {
 		// pksType == "db"
-		dbCfg := storage.Config{Driver: dbDriver, DSN: destDSN, DataDir: dst, Debug: dbDebug}
+		dbCfg := storage.Config{
+			Driver:  dbDriver,
+			DSN:     destDSN,
+			DataDir: dst,
+			Debug:   dbDebug,
+		}
 		db, dbErr := storage.Connect(dbCfg)
 		if dbErr != nil {
 			log.WithError(dbErr).Error("failed to connect to destination database for public key storage")
@@ -359,7 +378,10 @@ func kmsCmd(args []string) int {
 func keysCmd(args []string) int {
 	if len(args) < 1 {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
+		_, _ = fmt.Fprintf(
+			os.Stderr,
+			"\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n",
+		)
 		return 2
 	}
 	sub := args[0]
@@ -370,7 +392,10 @@ func keysCmd(args []string) int {
 		return kmsCmd(args[1:])
 	case "-h", "--help", "help":
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n")
+		_, _ = fmt.Fprintf(
+			os.Stderr,
+			"\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n",
+		)
 		return 0
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "unknown keys subcommand: %s\n", sub)

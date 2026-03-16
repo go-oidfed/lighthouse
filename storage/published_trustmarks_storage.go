@@ -185,72 +185,94 @@ func (s *PublishedTrustMarksStorage) Delete(ident string) error {
 	return nil
 }
 
-// validateAndExtractFromJWT validates the input and extracts trust_mark_type and issuer from JWT if needed.
-// Returns the resolved trust_mark_type and trust_mark_issuer.
-func (*PublishedTrustMarksStorage) validateAndExtractFromJWT(add *model.AddTrustMark) (trustMarkType, trustMarkIssuer string, err error) {
+// trustMarkCreationMode represents the mode of trust mark creation
+type trustMarkCreationMode int
+
+const (
+	modeNone trustMarkCreationMode = iota
+	modeExternalFetch
+	modeDirectJWT
+	modeSelfIssuance
+)
+
+// detectCreationMode determines the trust mark creation mode and validates it.
+func detectCreationMode(add *model.AddTrustMark) (trustMarkCreationMode, error) {
 	hasTrustMarkIssuer := add.TrustMarkIssuer != ""
 	hasTrustMarkJWT := add.TrustMark != ""
 	hasSelfIssuance := add.SelfIssuanceSpec != nil
 
-	// Count how many creation modes are being used
-	modeCount := 0
-	if hasTrustMarkIssuer && !hasTrustMarkJWT && !hasSelfIssuance {
-		modeCount++ // Mode 1: external fetching
-	}
-	if hasTrustMarkJWT {
-		modeCount++ // Mode 2: direct JWT
-	}
-	if hasSelfIssuance {
-		modeCount++ // Mode 3: self-issuance
+	// Self-issuance cannot be combined with other modes
+	if hasSelfIssuance && (hasTrustMarkJWT || hasTrustMarkIssuer) {
+		return modeNone, model.ValidationError("self_issuance_spec cannot be combined with trust_mark JWT or trust_mark_issuer")
 	}
 
-	if modeCount == 0 {
-		return "", "", model.ValidationError("must provide one of: (trust_mark_type + trust_mark_issuer), trust_mark JWT, or self_issuance_spec")
+	if hasSelfIssuance {
+		return modeSelfIssuance, nil
 	}
-	if modeCount > 1 {
-		// Allow JWT + trust_mark_type (type can be provided or extracted)
-		// But don't allow conflicting modes
-		if hasSelfIssuance && (hasTrustMarkJWT || hasTrustMarkIssuer) {
-			return "", "", model.ValidationError("self_issuance_spec cannot be combined with trust_mark JWT or trust_mark_issuer")
+	if hasTrustMarkJWT {
+		return modeDirectJWT, nil
+	}
+	if hasTrustMarkIssuer {
+		return modeExternalFetch, nil
+	}
+
+	return modeNone, model.ValidationError("must provide one of: (trust_mark_type + trust_mark_issuer), trust_mark JWT, or self_issuance_spec")
+}
+
+// extractFromJWTClaims extracts trust_mark_type and issuer from JWT claims,
+// validating against provided values if any.
+func extractFromJWTClaims(claims map[string]any, trustMarkType, trustMarkIssuer string) (string, string, error) {
+	// Extract trust mark type from JWT "id" claim
+	if jwtType, ok := claims["id"].(string); ok && jwtType != "" {
+		if trustMarkType == "" {
+			trustMarkType = jwtType
+		} else if trustMarkType != jwtType {
+			return "", "", model.ValidationError("trust_mark_type does not match JWT 'id' claim")
 		}
+	}
+
+	// Extract issuer from JWT "iss" claim
+	if jwtIssuer, ok := claims["iss"].(string); ok && jwtIssuer != "" {
+		if trustMarkIssuer == "" {
+			trustMarkIssuer = jwtIssuer
+		} else if trustMarkIssuer != jwtIssuer {
+			return "", "", model.ValidationError("trust_mark_issuer does not match JWT 'iss' claim")
+		}
+	}
+
+	return trustMarkType, trustMarkIssuer, nil
+}
+
+// validateAndExtractFromJWT validates the input and extracts trust_mark_type and issuer from JWT if needed.
+// Returns the resolved trust_mark_type and trust_mark_issuer.
+func (*PublishedTrustMarksStorage) validateAndExtractFromJWT(add *model.AddTrustMark) (trustMarkType, trustMarkIssuer string, err error) {
+	mode, err := detectCreationMode(add)
+	if err != nil {
+		return "", "", err
 	}
 
 	trustMarkType = add.TrustMarkType
 	trustMarkIssuer = add.TrustMarkIssuer
 
 	// If JWT is provided, parse it to extract/validate type and issuer
-	if hasTrustMarkJWT {
+	if mode == modeDirectJWT {
 		claims, parseErr := parseJWTClaims(add.TrustMark)
 		if parseErr != nil {
 			return "", "", model.ValidationError("invalid trust_mark JWT: " + parseErr.Error())
 		}
-
-		// Extract trust mark type from JWT "id" claim
-		if jwtType, ok := claims["id"].(string); ok && jwtType != "" {
-			if trustMarkType == "" {
-				trustMarkType = jwtType
-			} else if trustMarkType != jwtType {
-				return "", "", model.ValidationError("trust_mark_type does not match JWT 'id' claim")
-			}
-		}
-
-		// Extract issuer from JWT "iss" claim
-		if jwtIssuer, ok := claims["iss"].(string); ok && jwtIssuer != "" {
-			if trustMarkIssuer == "" {
-				trustMarkIssuer = jwtIssuer
-			} else if trustMarkIssuer != jwtIssuer {
-				return "", "", model.ValidationError("trust_mark_issuer does not match JWT 'iss' claim")
-			}
+		trustMarkType, trustMarkIssuer, err = extractFromJWTClaims(claims, trustMarkType, trustMarkIssuer)
+		if err != nil {
+			return "", "", err
 		}
 	}
 
-	// Self-issuance mode requires trust_mark_type
-	if hasSelfIssuance && trustMarkType == "" {
-		return "", "", model.ValidationError("trust_mark_type is required for self-issued trust marks")
-	}
-
-	// External fetching mode (no JWT, no self-issuance) requires both type and issuer
-	if !hasTrustMarkJWT && !hasSelfIssuance {
+	// Mode-specific validation
+	switch mode {
+	case modeSelfIssuance:
+		if trustMarkType == "" {
+			return "", "", model.ValidationError("trust_mark_type is required for self-issued trust marks")
+		}
+	case modeExternalFetch:
 		if trustMarkType == "" {
 			return "", "", model.ValidationError("trust_mark_type is required")
 		}

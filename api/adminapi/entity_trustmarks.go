@@ -15,6 +15,27 @@ type TrustMarkConfigInvalidator interface {
 	Invalidate()
 }
 
+// handleStoreError handles common store errors and returns appropriate HTTP responses.
+// Returns nil if err is nil, otherwise returns an error response.
+func handleStoreError(c *fiber.Ctx, err error, notFoundMsg string) error {
+	if err == nil {
+		return nil
+	}
+	var notFoundError model.NotFoundError
+	if errors.As(err, &notFoundError) {
+		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(notFoundMsg))
+	}
+	var alreadyExistsError model.AlreadyExistsError
+	if errors.As(err, &alreadyExistsError) {
+		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	var validationError model.ValidationError
+	if errors.As(err, &validationError) {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
+	}
+	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+}
+
 // registerEntityTrustMarks wires handlers for managing trust marks in the entity configuration.
 // The configInvalidator is called after successful mutations to invalidate cached configs.
 func registerEntityTrustMarks(
@@ -50,18 +71,9 @@ func registerEntityTrustMarks(
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-
 			item, err := store.Create(req)
 			if err != nil {
-				var alreadyExistsError model.AlreadyExistsError
-				if errors.As(err, &alreadyExistsError) {
-					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-				}
-				var validationError model.ValidationError
-				if errors.As(err, &validationError) {
-					return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+				return handleStoreError(c, err, "trust mark not found")
 			}
 			invalidateConfigs()
 			return c.Status(fiber.StatusCreated).JSON(item)
@@ -73,11 +85,7 @@ func registerEntityTrustMarks(
 		"/:trustMarkID", func(c *fiber.Ctx) error {
 			item, err := store.Get(c.Params("trustMarkID"))
 			if err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
-					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark not found"))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+				return handleStoreError(c, err, "trust mark not found")
 			}
 			return c.JSON(item)
 		},
@@ -90,22 +98,9 @@ func registerEntityTrustMarks(
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-
 			item, err := store.Update(c.Params("trustMarkID"), req)
 			if err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
-					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark not found"))
-				}
-				var alreadyExistsError model.AlreadyExistsError
-				if errors.As(err, &alreadyExistsError) {
-					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-				}
-				var validationError model.ValidationError
-				if errors.As(err, &validationError) {
-					return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+				return handleStoreError(c, err, "trust mark not found")
 			}
 			invalidateConfigs()
 			return c.JSON(item)
@@ -119,18 +114,9 @@ func registerEntityTrustMarks(
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-
 			item, err := store.Patch(c.Params("trustMarkID"), req)
 			if err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
-					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark not found"))
-				}
-				var validationError model.ValidationError
-				if errors.As(err, &validationError) {
-					return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+				return handleStoreError(c, err, "trust mark not found")
 			}
 			invalidateConfigs()
 			return c.JSON(item)
@@ -141,11 +127,7 @@ func registerEntityTrustMarks(
 	withCacheWipe.Delete(
 		"/:trustMarkID", func(c *fiber.Ctx) error {
 			if err := store.Delete(c.Params("trustMarkID")); err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
-					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark not found"))
-				}
-				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+				return handleStoreError(c, err, "trust mark not found")
 			}
 			invalidateConfigs()
 			return c.SendStatus(fiber.StatusNoContent)

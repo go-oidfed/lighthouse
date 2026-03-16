@@ -374,17 +374,18 @@ func (o *allOrchestrator) runKeysPublicStep() int {
 		return 0
 	}
 
-	args := []string{"--source=" + o.keysSource}
-
 	// Destination
 	dest := o.keysDest
 	if dest == "" {
 		dest = o.keysSource
 	}
-	args = append(args, "--dest="+dest)
 
-	// Key type
-	args = append(args, "--type="+o.keyType)
+	// Build args with required options
+	args := []string{
+		"--source=" + o.keysSource,
+		"--dest=" + dest,
+		"--type=" + o.keyType,
+	}
 
 	// Database options for DB destination
 	if o.pksType == "db" || o.dbType != "" {
@@ -422,19 +423,21 @@ func (o *allOrchestrator) runKeysKMSStep() int {
 		return 0
 	}
 
-	args := []string{"--source=" + o.keysSource}
-
 	// Destination
 	dest := o.keysDest
 	if dest == "" {
 		dest = o.keysSource
 	}
-	args = append(args, "--dest="+dest)
 
-	// Key type and algorithms
-	args = append(args, "--type="+o.keyType)
-	args = append(args, "--algs="+o.algsStr)
-	args = append(args, "--pks-type="+o.pksType)
+	// Build args with required options
+	args := []string{
+		"--source=" + o.keysSource,
+		"--dest=" + dest,
+		"--type=" + o.keyType,
+		"--algs=" + o.algsStr,
+		"--pks-type=" + o.pksType,
+		fmt.Sprintf("--rsa-len=%d", o.rsaKeyLen),
+	}
 
 	// Optional KMS settings
 	if o.defAlg != "" {
@@ -443,7 +446,6 @@ func (o *allOrchestrator) runKeysKMSStep() int {
 	if o.genKeys {
 		args = append(args, "--generate-missing")
 	}
-	args = append(args, fmt.Sprintf("--rsa-len=%d", o.rsaKeyLen))
 
 	// Database options
 	if o.pksType == "db" {

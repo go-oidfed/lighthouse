@@ -33,6 +33,21 @@ var SupportedDrivers = []DriverType{
 	DriverPostgres,
 }
 
+// ParseDriverType parses a string to a DriverType.
+// Returns an error if the string doesn't match a supported driver.
+func ParseDriverType(s string) (DriverType, error) {
+	switch DriverType(s) {
+	case DriverSQLite:
+		return DriverSQLite, nil
+	case DriverMySQL:
+		return DriverMySQL, nil
+	case DriverPostgres:
+		return DriverPostgres, nil
+	default:
+		return "", fmt.Errorf("unsupported database driver: %s (supported: sqlite, mysql, postgres)", s)
+	}
+}
+
 // DSN creates and returns a dsn connection string for the passed DriverType and DSNConf
 func DSN(driver DriverType, conf DSNConf) (string, error) {
 	switch driver {
@@ -158,7 +173,8 @@ func Connect(cfg Config) (*gorm.DB, error) {
 
 	return gorm.Open(
 		dialector, &gorm.Config{
-			Logger: logger.Default.LogMode(logMode),
+			Logger:                 logger.Default.LogMode(logMode),
+			SkipDefaultTransaction: true,
 		},
 	)
 }

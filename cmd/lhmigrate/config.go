@@ -160,7 +160,7 @@ func runConfigMigration(args []string) int {
 	}
 
 	// Load and transform
-	result, err := transformer.transform(dryRun)
+	result, err := transformer.transform()
 	if err != nil {
 		log.WithError(err).Error("Config transformation failed")
 		return 1
@@ -200,7 +200,7 @@ func runConfigMigration(args []string) int {
 }
 
 // transform loads the config file, transforms it, and returns the new YAML content
-func (t *configTransformer) transform(dryRun bool) (string, error) {
+func (t *configTransformer) transform() (string, error) {
 	// Read the original file
 	content, err := fileutils.ReadFile(t.inputPath)
 	if err != nil {
@@ -538,8 +538,6 @@ func (t *configTransformer) transformSigningNode(node *yaml.Node) {
 		"automatic_key_rollover": "key_rotation",
 	}
 
-	var toRemove []int
-
 	for i := 0; i < len(node.Content); i += 2 {
 		if i+1 >= len(node.Content) {
 			break
@@ -564,15 +562,11 @@ func (t *configTransformer) transformSigningNode(node *yaml.Node) {
 		if fieldsToComment[keyNode.Value] {
 			// Add comment indicating it's now in database
 			keyNode.HeadComment = fmt.Sprintf("# DEPRECATED: '%s' is now managed in the database.\n# Use 'lhmigrate config2db' to migrate this value, or the Admin API.", keyNode.Value)
-			toRemove = append(toRemove, i)
 			if t.verbose {
 				log.WithField("field", keyNode.Value).Info("Marked signing field as deprecated (moved to database)")
 			}
 		}
 	}
-
-	// Remove deprecated fields (keeping them as comments would require custom output)
-	// For now, we just add comments - the actual removal is optional
 }
 
 // transformFederationNode handles federation_data section transformation

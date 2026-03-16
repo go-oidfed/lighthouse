@@ -116,6 +116,44 @@ func GetEntityConfigurationAdditionalClaims(store model.AdditionalClaimsStore) (
 
 var DefaultSigningAlg = jwa.ES512()
 
+// sortAlgsByNbf sorts signing algorithms by their not-before time.
+// Algorithms with nil Nbf come first, then sorted by Nbf ascending.
+func sortAlgsByNbf(algs []SigningAlgWithNbf) {
+	slices.SortFunc(
+		algs, func(a, b SigningAlgWithNbf) int {
+			if a.Nbf == nil && b.Nbf != nil {
+				return -1
+			}
+			if b.Nbf == nil && a.Nbf != nil {
+				return 1
+			}
+			if a.Nbf == nil && b.Nbf == nil {
+				return 0
+			}
+			return cmp.Compare(a.Nbf.UnixNano(), b.Nbf.UnixNano())
+		},
+	)
+}
+
+// findCurrentAlgIndex finds the index of the currently active algorithm.
+// Returns -1 if no current algorithm is found.
+func findCurrentAlgIndex(algs []SigningAlgWithNbf, now time.Time) int {
+	currentIndex := -1
+	for i, a := range algs {
+		if a.Nbf != nil && a.Nbf.Before(now) {
+			currentIndex = i
+		}
+		if currentIndex != -1 && a.Nbf != nil && a.Nbf.After(now) {
+			break
+		}
+	}
+	// Check if first algorithm has no Nbf (always valid)
+	if currentIndex == -1 && len(algs) > 0 && algs[0].Nbf == nil {
+		currentIndex = 0
+	}
+	return currentIndex
+}
+
 // GetSigningAlg returns the signing algorithm
 func GetSigningAlg(kvStorage model.KeyValueStore) (jwa.SignatureAlgorithm, error) {
 	if kvStorage == nil {
@@ -132,43 +170,22 @@ func GetSigningAlg(kvStorage model.KeyValueStore) (jwa.SignatureAlgorithm, error
 	if !found {
 		return DefaultSigningAlg, nil
 	}
-	slices.SortFunc(
-		algs, func(a, b SigningAlgWithNbf) int {
-			if a.Nbf == nil && b.Nbf != nil {
-				return -1
-			}
-			if b.Nbf == nil && a.Nbf != nil {
-				return 1
-			}
-			if a.Nbf == nil && b.Nbf == nil {
-				return 0
-			}
-			return cmp.Compare(a.Nbf.UnixNano(), b.Nbf.UnixNano())
-		},
-	)
-	currentIndex := -1
-	now := time.Now()
-	for i, a := range algs {
-		if a.Nbf != nil && a.Nbf.Before(now) {
-			currentIndex = i
-		}
-		if currentIndex != -1 && a.Nbf != nil && a.Nbf.After(now) {
-			break
-		}
-	}
+
+	sortAlgsByNbf(algs)
+	currentIndex := findCurrentAlgIndex(algs, time.Now())
+
 	if currentIndex == -1 {
-		if algs[0].Nbf == nil {
-			currentIndex = 0
-		} else {
-			// Only future algs stored, returning default
-			return DefaultSigningAlg, nil
-		}
+		// Only future algs stored, returning default
+		return DefaultSigningAlg, nil
 	}
+
 	alg := algs[currentIndex].SigningAlg
 	a, ok := jwa.LookupSignatureAlgorithm(alg)
 	if !ok {
 		return a, errors.Errorf("invalid signing algorithm: %s", alg)
 	}
+
+	// Clean up expired algorithms
 	if err = kvStorage.SetAny(
 		model.KeyValueScopeSigning,
 		model.KeyValueKeyAlg, algs[currentIndex:],

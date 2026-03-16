@@ -40,7 +40,7 @@ func (s *AdditionalClaimsStorage) Set(items []model.AddAdditionalClaim) (
 			},
 		)
 	}
-	return rows, s.db.Transaction(
+	err := s.db.Transaction(
 		func(tx *gorm.DB) error {
 			// delete all
 			if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&model.EntityConfigurationAdditionalClaim{}).Error; err != nil {
@@ -55,6 +55,10 @@ func (s *AdditionalClaimsStorage) Set(items []model.AddAdditionalClaim) (
 			return nil
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 func (s *AdditionalClaimsStorage) Create(item model.AddAdditionalClaim) (

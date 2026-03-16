@@ -109,14 +109,14 @@ func (m *dbMigrator) loadLegacySubordinates() ([]legacySubordinateInfo, error) {
 	switch m.sourceType {
 	case "json":
 		store := NewFileStorage(m.sourceDir)
-		loader := store.SubordinateStorage()
+		loader := store.subordinateStorage()
 		return loader()
 	case "badger":
 		store, err := NewBadgerStorage(m.sourceDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open badger storage: %w", err)
 		}
-		loader := store.SubordinateStorage()
+		loader := store.subordinateStorage()
 		return loader()
 	default:
 		return nil, fmt.Errorf("unsupported source type: %s", m.sourceType)
@@ -190,7 +190,7 @@ func (m *dbMigrator) migrateOneSubordinate(legacy legacySubordinateInfo) dbMigra
 	}
 
 	// Transform legacy to new format
-	newInfo := m.transformSubordinate(legacy)
+	newInfo := transformSubordinate(legacy)
 
 	// Warn about MetadataPolicyCrit if set (no longer per-subordinate)
 	if len(legacy.MetadataPolicyCrit) > 0 {
@@ -219,7 +219,7 @@ func (m *dbMigrator) migrateOneSubordinate(legacy legacySubordinateInfo) dbMigra
 }
 
 // transformSubordinate converts a legacy subordinate to the new format
-func (m *dbMigrator) transformSubordinate(legacy legacySubordinateInfo) model.ExtendedSubordinateInfo {
+func transformSubordinate(legacy legacySubordinateInfo) model.ExtendedSubordinateInfo {
 	// Convert entity types to join table format
 	entityTypes := make([]model.SubordinateEntityType, len(legacy.EntityTypes))
 	for i, et := range legacy.EntityTypes {
@@ -539,25 +539,14 @@ func runDBMigration(args []string) int {
 	}
 
 	// Parse destination database type
-	var driver storage.DriverType
-	switch strings.ToLower(dbType) {
-	case string(storage.DriverSQLite):
-		driver = storage.DriverSQLite
-	case string(storage.DriverMySQL):
-		driver = storage.DriverMySQL
-	case string(storage.DriverPostgres):
-		driver = storage.DriverPostgres
-	default:
-		fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", dbType)
+	driver, err := storage.ParseDriverType(strings.ToLower(dbType))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --db-type: %s\n", err)
 		return 2
 	}
 
-	if driver == storage.DriverSQLite && destDir == "" {
-		fmt.Fprintln(os.Stderr, "--dest is required for sqlite")
-		return 2
-	}
-	if (driver == storage.DriverMySQL || driver == storage.DriverPostgres) && dbDSN == "" {
-		fmt.Fprintln(os.Stderr, "--db-dsn is required for mysql/postgres")
+	if err := validateDBFlags(driver, destDir, dbDSN); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 
