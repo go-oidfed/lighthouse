@@ -352,6 +352,9 @@ func (h *metadataHandlers) deleteEntityType(c *fiber.Ctx) error {
 	if err != nil {
 		return serverError(c, err.Error())
 	}
+	if _, ok := meta[entityType]; !ok {
+		return c.SendStatus(fiber.StatusNoContent)
+	}
 	delete(meta, entityType)
 
 	if err := h.store.save(meta); err != nil {
