@@ -1,6 +1,9 @@
 package config
 
-import "github.com/go-oidfed/lighthouse/storage"
+import (
+	"github.com/go-oidfed/lighthouse"
+	"github.com/go-oidfed/lighthouse/storage"
+)
 
 // apiConf holds API-related configuration.
 //
@@ -28,6 +31,7 @@ type apiConf struct {
 //   - LH_API_ADMIN_PASSWORD_HASHING_*: Password hashing parameters
 //   - LH_API_ADMIN_ACTOR_HEADER: HTTP header name for actor extraction
 //   - LH_API_ADMIN_ACTOR_SOURCE: Preferred actor source ("basic_auth" or "header")
+//   - LH_API_ADMIN_CORS_*: CORS configuration (see CORSConf)
 type adminAPIConf struct {
 	// Enabled enables the admin API.
 	// Env: LH_API_ADMIN_ENABLED
@@ -49,6 +53,9 @@ type adminAPIConf struct {
 	// The system tries the preferred source first, then falls back to the other.
 	// Env: LH_API_ADMIN_ACTOR_SOURCE
 	ActorSource string `yaml:"actor_source" envconfig:"ACTOR_SOURCE"`
+	// CORS holds CORS configuration for the admin API.
+	// Env prefix: LH_API_ADMIN_CORS_
+	CORS lighthouse.CORSConf `yaml:"cors" envconfig:"CORS"`
 }
 
 var defaultAPIConf = apiConf{
@@ -65,5 +72,13 @@ var defaultAPIConf = apiConf{
 		},
 		ActorHeader: "X-Actor",
 		ActorSource: "basic_auth",
+		CORS: lighthouse.CORSConf{
+			Enabled:          false,
+			AllowOrigins:     "*",
+			AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+			AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
+			AllowCredentials: true,
+			MaxAge:           3600,
+		},
 	},
 }

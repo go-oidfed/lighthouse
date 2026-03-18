@@ -197,3 +197,115 @@ a proxy.
     server:
         forwarded_ip_header: X-Real-IP
     ```
+
+## `cors`
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Configuration for CORS (Cross-Origin Resource Sharing) on the main server.
+CORS allows web browsers to make requests to the API from different origins.
+
+This is useful when:
+
+- Hosting API documentation (like Swagger UI) on a different domain
+- Building web applications that consume the federation endpoints
+- Allowing third-party integrations
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        cors:
+            enabled: true
+            allow_origins: "*"
+            allow_methods: "GET,POST,HEAD,PUT,DELETE,PATCH"
+            allow_headers: "Origin,Content-Type,Accept"
+            allow_credentials: false
+            max_age: 3600
+    ```
+
+!!! note "Admin API CORS"
+    
+    The Admin API has its own separate CORS configuration under `api.admin.cors`.
+    This allows you to have different CORS policies for federation endpoints 
+    and admin endpoints.
+
+### `enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_CORS_ENABLED`</span>
+
+Enables or disables CORS middleware for the main server. When disabled, no 
+CORS headers are sent and cross-origin requests from browsers will be blocked.
+
+### `allow_origins`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`*`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_CORS_ALLOW_ORIGINS`</span>
+
+Comma-separated list of allowed origins, or `*` to allow all origins.
+
+Examples:
+
+- `*` - Allow all origins
+- `https://example.com` - Allow only example.com
+- `https://example.com,https://app.example.com` - Allow multiple specific origins
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        cors:
+            enabled: true
+            allow_origins: "https://example.com,https://app.example.com"
+    ```
+
+### `allow_methods`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`GET,POST,HEAD,PUT,DELETE,PATCH`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_CORS_ALLOW_METHODS`</span>
+
+Comma-separated list of allowed HTTP methods.
+
+### `allow_headers`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">empty (uses Fiber defaults)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_CORS_ALLOW_HEADERS`</span>
+
+Comma-separated list of allowed request headers. If empty, the Fiber CORS 
+middleware uses sensible defaults.
+
+### `allow_credentials`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_CORS_ALLOW_CREDENTIALS`</span>
+
+Indicates whether the request can include user credentials like cookies, 
+HTTP authentication, or client-side SSL certificates.
+
+!!! warning
+    
+    When `allow_credentials` is `true`, `allow_origins` cannot be set to `*`. 
+    You must specify explicit origins.
+
+### `expose_headers`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">empty</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_CORS_EXPOSE_HEADERS`</span>
+
+Comma-separated list of headers that browsers are allowed to access.
+
+### `max_age`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">`0`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_SERVER_CORS_MAX_AGE`</span>
+
+How long (in seconds) browsers should cache preflight request results. 
+A value of `0` means no caching.

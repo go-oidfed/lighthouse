@@ -210,6 +210,131 @@ Length of the derived key in bytes.
 
 Length of the random salt in bytes.
 
+### `cors`
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Configuration for CORS (Cross-Origin Resource Sharing) on the Admin API.
+CORS allows web browsers to make requests to the Admin API from different origins.
+
+This is particularly useful for:
+
+- Using the Swagger UI documentation from a different server
+- Building admin dashboards hosted on different domains
+- Testing the Admin API from development tools
+
+??? file "config.yaml"
+
+    ```yaml
+    api:
+        admin:
+            cors:
+                enabled: true
+                allow_origins: "*"
+                allow_methods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS"
+                allow_headers: "Origin,Content-Type,Accept,Authorization"
+                allow_credentials: true
+                max_age: 3600
+    ```
+
+!!! tip "Quick Enable for Swagger UI"
+    
+    To quickly enable CORS for using Swagger UI from a different origin, 
+    you can simply set:
+    
+    ```yaml
+    api:
+        admin:
+            cors:
+                enabled: true
+    ```
+    
+    Or via environment variable:
+    
+    ```bash
+    export LH_API_ADMIN_CORS_ENABLED=true
+    ```
+    
+    The defaults are configured to work with Swagger UI out of the box.
+
+!!! note "Separate from Main Server CORS"
+    
+    The Admin API has its own CORS configuration, separate from the main 
+    server's `server.cors` settings. This allows different policies for 
+    federation endpoints vs. admin endpoints.
+
+#### `enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_CORS_ENABLED`</span>
+
+Enables or disables CORS middleware for the Admin API.
+
+#### `allow_origins`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`*`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_CORS_ALLOW_ORIGINS`</span>
+
+Comma-separated list of allowed origins, or `*` to allow all origins.
+
+Examples:
+
+- `*` - Allow all origins
+- `https://admin.example.com` - Allow only admin.example.com
+- `https://admin.example.com,https://localhost:3000` - Allow multiple origins
+
+#### `allow_methods`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_CORS_ALLOW_METHODS`</span>
+
+Comma-separated list of allowed HTTP methods.
+
+#### `allow_headers`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">`Origin,Content-Type,Accept,Authorization`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_CORS_ALLOW_HEADERS`</span>
+
+Comma-separated list of allowed request headers. The default includes 
+`Authorization` to support HTTP Basic Authentication used by the Admin API.
+
+#### `allow_credentials`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`true`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_CORS_ALLOW_CREDENTIALS`</span>
+
+Indicates whether the request can include user credentials like cookies 
+or HTTP authentication headers. Default is `true` to support HTTP Basic 
+Authentication used by the Admin API.
+
+!!! warning
+    
+    When `allow_credentials` is `true`, `allow_origins` cannot be set to `*` 
+    in strict CORS implementations. However, Fiber's CORS middleware handles 
+    this by echoing back the requesting origin when credentials are allowed.
+
+#### `expose_headers`
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">empty</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_CORS_EXPOSE_HEADERS`</span>
+
+Comma-separated list of headers that browsers are allowed to access.
+
+#### `max_age`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">`3600`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_CORS_MAX_AGE`</span>
+
+How long (in seconds) browsers should cache preflight request results. 
+Default is 3600 (1 hour).
+
 ## Complete Example
 
 ??? file "config.yaml"
@@ -228,6 +353,13 @@ Length of the random salt in bytes.
                 parallelism: 4
                 key_len: 64
                 salt_len: 32
+            cors:
+                enabled: true
+                allow_origins: "*"
+                allow_methods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS"
+                allow_headers: "Origin,Content-Type,Accept,Authorization"
+                allow_credentials: true
+                max_age: 3600
     ```
 
 ## Security Considerations

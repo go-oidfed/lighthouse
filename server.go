@@ -12,6 +12,7 @@ package lighthouse
 //   - LH_SERVER_TLS_REDIRECT_HTTP: Redirect HTTP to HTTPS
 //   - LH_SERVER_TLS_CERT: Path to TLS certificate
 //   - LH_SERVER_TLS_KEY: Path to TLS private key
+//   - LH_SERVER_CORS_*: CORS configuration (see CORSConf)
 type ServerConf struct {
 	// IPListen is the IP address to listen on.
 	// Env: LH_SERVER_IP_LISTEN
@@ -37,8 +38,38 @@ type ServerConf struct {
 	// ForwardedIPHeader is the header name for forwarded IP.
 	// Env: LH_SERVER_FORWARDED_IP_HEADER
 	ForwardedIPHeader string `yaml:"forwarded_ip_header" envconfig:"FORWARDED_IP_HEADER"`
+	// CORS holds CORS middleware configuration for the main server.
+	// Env prefix: LH_SERVER_CORS_
+	CORS CORSConf `yaml:"cors" envconfig:"CORS"`
 	// Secure bool    `yaml:"-"`
 	// Basepath       string       `yaml:"-"`
+}
+
+// CORSConf holds CORS middleware configuration.
+//
+// Environment variables (with prefix based on parent, e.g., LH_SERVER_CORS_ or LH_API_ADMIN_CORS_):
+//   - *_ENABLED: Enable CORS middleware
+//   - *_ALLOW_ORIGINS: Comma-separated allowed origins or "*" for all
+//   - *_ALLOW_METHODS: Comma-separated allowed HTTP methods
+//   - *_ALLOW_HEADERS: Comma-separated allowed request headers
+//   - *_ALLOW_CREDENTIALS: Allow credentials (cookies, authorization headers)
+//   - *_EXPOSE_HEADERS: Comma-separated headers to expose to the browser
+//   - *_MAX_AGE: Preflight request cache duration in seconds
+type CORSConf struct {
+	// Enabled enables CORS middleware.
+	Enabled bool `yaml:"enabled" envconfig:"ENABLED"`
+	// AllowOrigins is a comma-separated list of allowed origins, or "*" for all.
+	AllowOrigins string `yaml:"allow_origins" envconfig:"ALLOW_ORIGINS"`
+	// AllowMethods is a comma-separated list of allowed HTTP methods.
+	AllowMethods string `yaml:"allow_methods" envconfig:"ALLOW_METHODS"`
+	// AllowHeaders is a comma-separated list of allowed request headers.
+	AllowHeaders string `yaml:"allow_headers" envconfig:"ALLOW_HEADERS"`
+	// AllowCredentials indicates whether credentials (cookies, authorization headers) are allowed.
+	AllowCredentials bool `yaml:"allow_credentials" envconfig:"ALLOW_CREDENTIALS"`
+	// ExposeHeaders is a comma-separated list of headers to expose to the browser.
+	ExposeHeaders string `yaml:"expose_headers" envconfig:"EXPOSE_HEADERS"`
+	// MaxAge is the preflight request cache duration in seconds.
+	MaxAge int `yaml:"max_age" envconfig:"MAX_AGE"`
 }
 
 // tlsConf holds TLS configuration.

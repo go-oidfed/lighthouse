@@ -18,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/compress"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
@@ -154,6 +155,12 @@ func NewLightHouse(
 	server.Use(compress.New())
 	server.Use(logger.New())
 	server.Use(requestid.New())
+
+	// Apply CORS middleware if enabled for main server
+	if serverConf.CORS.Enabled {
+		server.Use(cors.New(corsConfigFromConf(serverConf.CORS)))
+		log.Info("CORS enabled for main server")
+	}
 
 	// Initialize stats collector if enabled
 	var statsCollector *stats.Collector
@@ -323,14 +330,28 @@ func NewLightHouse(
 			adminApp.Use(compress.New())
 			adminApp.Use(logger.New())
 			adminApp.Use(requestid.New())
+			// Apply CORS middleware if enabled for admin API
+			if admin.CORS.Enabled {
+				adminApp.Use(cors.New(corsConfigFromConf(admin.CORS)))
+				log.Info("CORS enabled for admin API server")
+			}
 			entity.adminAPIServer = adminApp
 			entity.serverConf.AdminAPIPort = admin.Port
 		} else {
 			// Mount on main server
 			entity.adminAPIServer = server
 		}
+		// Create admin API router group
+		adminGroup := entity.adminAPIServer.Group("/api/v1/admin")
+		// Apply CORS to admin routes if enabled and either:
+		// - Admin API is on separate server (already handled above), OR
+		// - Admin API is on main server but has different CORS config than main server
+		if admin.CORS.Enabled && entity.adminAPIServer == server && !serverConf.CORS.Enabled {
+			adminGroup.Use(cors.New(corsConfigFromConf(admin.CORS)))
+			log.Info("CORS enabled for admin API routes on main server")
+		}
 		if err = adminapi.Register(
-			entity.adminAPIServer.Group("/api/v1/admin"), entityID, storages,
+			adminGroup, entityID, storages,
 			entity.FederationEntity,
 			keyManagement,
 			&adminapi.Options{
@@ -552,6 +573,8 @@ type AdminAPIOptions struct {
 	// ActorSource is the preferred source for actor extraction ("basic_auth" or "header").
 	// Default: "basic_auth" (tries basic auth username first, then falls back to header)
 	ActorSource string
+	// CORS holds CORS configuration for the admin API.
+	CORS CORSConf
 }
 
 // StatsOptions controls initialization of statistics collection.
@@ -591,4 +614,16 @@ type StatsOptions struct {
 
 	// Endpoints is a list of endpoint paths to track. Empty means all federation endpoints.
 	Endpoints []string
+}
+
+// corsConfigFromConf converts a CORSConf to a Fiber CORS middleware configuration.
+func corsConfigFromConf(conf CORSConf) cors.Config {
+	return cors.Config{
+		AllowOrigins:     conf.AllowOrigins,
+		AllowMethods:     conf.AllowMethods,
+		AllowHeaders:     conf.AllowHeaders,
+		AllowCredentials: conf.AllowCredentials,
+		ExposeHeaders:    conf.ExposeHeaders,
+		MaxAge:           conf.MaxAge,
+	}
 }

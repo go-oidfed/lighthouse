@@ -122,6 +122,7 @@ func main() {
 			Port:         c.API.Admin.Port,
 			ActorHeader:  c.API.Admin.ActorHeader,
 			ActorSource:  c.API.Admin.ActorSource,
+			CORS:         c.API.Admin.CORS,
 		},
 		statsOpts,
 	)
