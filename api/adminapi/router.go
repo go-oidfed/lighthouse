@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"embed"
+	"encoding/json"
 	"net"
 	neturl "net/url"
 	"strconv"
@@ -61,6 +62,18 @@ func Register(
 		},
 	)
 
+	// Serve OpenAPI spec as JSON (for client-side manipulation)
+	openapiJSON, err := yamlToJSON(openapiData)
+	if err != nil {
+		return errors.Wrap(err, "adminapi: failed to convert openapi.yaml to JSON")
+	}
+	r.Get(
+		"/openapi.json", func(c *fiber.Ctx) error {
+			c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+			return c.Send(openapiJSON)
+		},
+	)
+
 	r.Get(
 		"/docs", func(c *fiber.Ctx) error {
 			c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
@@ -77,6 +90,22 @@ func Register(
 			}
 			c.Set(fiber.HeaderContentType, "application/yaml")
 			return c.Send(data)
+		},
+	)
+
+	// Serve users OpenAPI spec as JSON
+	r.Get(
+		"/openapi-users.json", func(c *fiber.Ctx) error {
+			data, err := assets.ReadFile("openapi-users.yaml")
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+			}
+			jsonData, err := yamlToJSON(data)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+			}
+			c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+			return c.Send(jsonData)
 		},
 	)
 
@@ -213,4 +242,42 @@ func ensureBasicAuthSecurity(doc []byte) []byte {
 		return doc
 	}
 	return res
+}
+
+// yamlToJSON converts a YAML document to JSON.
+func yamlToJSON(yamlData []byte) ([]byte, error) {
+	var data any
+	if err := yaml.Unmarshal(yamlData, &data); err != nil {
+		return nil, err
+	}
+	// Convert map[string]any recursively (yaml.v3 uses map[string]any)
+	data = convertMapKeysToStrings(data)
+	return json.Marshal(data)
+}
+
+// convertMapKeysToStrings recursively converts map keys to strings for JSON compatibility.
+// YAML allows non-string keys, but JSON requires string keys.
+func convertMapKeysToStrings(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		m := make(map[string]any, len(x))
+		for k, val := range x {
+			m[k] = convertMapKeysToStrings(val)
+		}
+		return m
+	case map[any]any:
+		m := make(map[string]any, len(x))
+		for k, val := range x {
+			key, _ := k.(string)
+			m[key] = convertMapKeysToStrings(val)
+		}
+		return m
+	case []any:
+		for i, val := range x {
+			x[i] = convertMapKeysToStrings(val)
+		}
+		return x
+	default:
+		return v
+	}
 }

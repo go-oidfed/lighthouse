@@ -8,10 +8,131 @@
   <style>
     html, body { margin: 0; padding: 0; height: 100%; }
     #swagger-ui { height: 100%; }
+    .custom-server-controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .custom-server-controls input {
+      flex: 1;
+      padding: 5px 10px;
+      border: 1px solid #d9d9d9;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: sans-serif;
+    }
+    .custom-server-controls button {
+      padding: 5px 15px;
+      background: #4990e2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: sans-serif;
+    }
+    .custom-server-controls button:hover {
+      background: #357abd;
+    }
+    .custom-server-controls button.remove {
+      background: #d9534f;
+      padding: 5px 10px;
+    }
+    .custom-server-controls button.remove:hover {
+      background: #c9302c;
+    }
+    .custom-servers-list {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+    }
+    .custom-servers-list .custom-server-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
   </style>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
   <script>
+    // Storage key for custom servers (separate from admin API)
+    const CUSTOM_SERVERS_KEY = 'swagger-custom-servers-users';
+
+    function getCustomServers() {
+      try {
+        return JSON.parse(localStorage.getItem(CUSTOM_SERVERS_KEY)) || [];
+      } catch (e) { return []; }
+    }
+
+    function saveCustomServer(url) {
+      const servers = getCustomServers();
+      if (!servers.includes(url)) {
+        servers.push(url);
+        localStorage.setItem(CUSTOM_SERVERS_KEY, JSON.stringify(servers));
+      }
+    }
+
+    function removeCustomServer(url) {
+      const servers = getCustomServers().filter(s => s !== url);
+      localStorage.setItem(CUSTOM_SERVERS_KEY, JSON.stringify(servers));
+    }
+
+    // Plugin to wrap the Servers component with editable functionality
+    const EditableServersPlugin = (customServers) => () => ({
+      wrapComponents: {
+        ServersContainer: (Original, system) => (props) => {
+          const React = system.React;
+          const [customUrl, setCustomUrl] = React.useState('');
+
+          const handleAddServer = () => {
+            const url = customUrl.trim();
+            if (!url) return;
+            try {
+              new URL(url); // Validate URL
+              saveCustomServer(url);
+              window.location.reload();
+            } catch (e) {
+              alert('Please enter a valid URL');
+            }
+          };
+
+          const handleRemoveServer = (url) => {
+            removeCustomServer(url);
+            window.location.reload();
+          };
+
+          return React.createElement('div', null,
+            React.createElement(Original, props),
+            React.createElement('div', { className: 'custom-server-controls' },
+              React.createElement('input', {
+                type: 'text',
+                placeholder: 'Add custom server URL (e.g., https://example.com/admin)',
+                value: customUrl,
+                onChange: (e) => setCustomUrl(e.target.value),
+                onKeyPress: (e) => e.key === 'Enter' && handleAddServer()
+              }),
+              React.createElement('button', { onClick: handleAddServer }, 'Add Server')
+            ),
+            customServers.length > 0 && React.createElement('div', { className: 'custom-servers-list' },
+              'Custom servers: ',
+              customServers.map(url =>
+                React.createElement('span', { key: url, className: 'custom-server-item' },
+                  React.createElement('code', null, url),
+                  React.createElement('button', {
+                    className: 'remove',
+                    onClick: () => handleRemoveServer(url),
+                    title: 'Remove this server'
+                  }, 'x')
+                )
+              )
+            )
+          );
+        }
+      }
+    });
+
     // Link to main docs for convenience
     function renderLink() {
       const link = document.createElement('div');
@@ -19,21 +140,80 @@
       link.innerHTML = '<a href="../docs">Back to Admin API Docs</a>';
       document.body.appendChild(link);
     }
-  </script>
-  
-</head>
-<body onload="renderLink()">
-  <div id="swagger-ui"></div>
-  <script>
-    window.ui = SwaggerUIBundle({
-      url: '../openapi-users.yaml',
-      dom_id: '#swagger-ui',
-      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
-      layout: 'BaseLayout',
-      deepLinking: true,
-      filter: true,
-    });
-  </script>
-  </body>
-</html>
 
+    async function initSwaggerUI() {
+      try {
+        // Fetch the spec as JSON
+        const response = await fetch('../openapi-users.json');
+        if (!response.ok) {
+          throw new Error('Failed to fetch OpenAPI spec');
+        }
+        const spec = await response.json();
+
+        // Get current origin (request URL) - strip /api/v1/admin/docs/users from the path
+        // since the OpenAPI spec paths already include /api/v1/admin
+        const basePath = window.location.pathname.replace(/\/api\/v1\/admin\/docs\/users\/?$/, '');
+        const currentOrigin = window.location.origin + basePath;
+
+        // Get custom servers from localStorage
+        const customServers = getCustomServers();
+
+        // Build the servers list: current origin first, then spec servers, then custom
+        const specServers = spec.servers || [];
+        const allUrls = new Set();
+        const mergedServers = [];
+
+        // Add current origin as first (default) if not already in spec
+        const currentInSpec = specServers.some(s => s.url === currentOrigin);
+        if (!currentInSpec) {
+          mergedServers.push({ url: currentOrigin, description: 'Current instance (auto-detected)' });
+          allUrls.add(currentOrigin);
+        }
+
+        // Add spec servers
+        for (const server of specServers) {
+          if (!allUrls.has(server.url)) {
+            mergedServers.push(server);
+            allUrls.add(server.url);
+          }
+        }
+
+        // Add custom servers from localStorage
+        for (const url of customServers) {
+          if (!allUrls.has(url)) {
+            mergedServers.push({ url, description: 'Custom server (user-added)' });
+            allUrls.add(url);
+          }
+        }
+
+        spec.servers = mergedServers;
+
+        // Initialize Swagger UI with the modified spec
+        window.ui = SwaggerUIBundle({
+          spec: spec,
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          plugins: [EditableServersPlugin(customServers)],
+          layout: 'BaseLayout',
+          deepLinking: true,
+          filter: true,
+        });
+      } catch (error) {
+        console.error('Failed to initialize Swagger UI:', error);
+        // Fallback to basic initialization
+        window.ui = SwaggerUIBundle({
+          url: '../openapi-users.yaml',
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          layout: 'BaseLayout',
+          deepLinking: true,
+          filter: true,
+        });
+      }
+    }
+  </script>
+</head>
+<body onload="renderLink(); initSwaggerUI();">
+  <div id="swagger-ui"></div>
+</body>
+</html>
