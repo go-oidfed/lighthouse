@@ -80,6 +80,9 @@ func runConfigMigration(args []string) int {
 		fmt.Fprintf(os.Stderr, "  - storage.backend (json|badger) -> storage.driver (from --db-type, default: sqlite)\n")
 		fmt.Fprintf(os.Stderr, "  - storage.dsn set from --db-dsn (for mysql/postgres)\n")
 		fmt.Fprintf(os.Stderr, "  - storage.data_dir set from --db-dir (for sqlite)\n")
+		fmt.Fprintf(os.Stderr, "  - signing.key_dir -> signing.filesystem.key_dir (moved to subsection)\n")
+		fmt.Fprintf(os.Stderr, "  - signing.key_file -> signing.filesystem.key_file (moved to subsection)\n")
+		fmt.Fprintf(os.Stderr, "  - signing.kms: filesystem added if key_dir/key_file are present\n")
 		fmt.Fprintf(os.Stderr, "  - signing.automatic_key_rollover -> signing.key_rotation (renamed)\n")
 		fmt.Fprintf(os.Stderr, "  - signing.alg, rsa_key_len, key_rotation -> commented (now in database)\n")
 		fmt.Fprintf(os.Stderr, "  - federation_data.authority_hints -> commented (now in database)\n")
@@ -455,7 +458,7 @@ func (t *configTransformer) transformStorageNode(node *yaml.Node) {
 		if oldValue == "json" || oldValue == "badger" {
 			keyNode.Value = "driver"
 			valueNode.Value = targetDriver
-			keyNode.LineComment = fmt.Sprintf(" # Changed from 'backend: %s' - legacy backends no longer supported", oldValue)
+			keyNode.LineComment = fmt.Sprintf("Changed from 'backend: %s' - legacy backends no longer supported", oldValue)
 			if t.verbose {
 				log.WithFields(log.Fields{
 					"old": "backend: " + oldValue,
@@ -526,6 +529,9 @@ func (t *configTransformer) transformSigningNode(node *yaml.Node) {
 		return
 	}
 
+	// Move key_dir and key_file to filesystem subsection first
+	t.moveSigningFieldsToFilesystem(node)
+
 	// Fields to comment out (moved to database)
 	fieldsToComment := map[string]bool{
 		"alg":          true,
@@ -553,7 +559,7 @@ func (t *configTransformer) transformSigningNode(node *yaml.Node) {
 				}).Info("Renamed signing field")
 			}
 			keyNode.Value = newName
-			keyNode.LineComment = " # Renamed from 'automatic_key_rollover'"
+			keyNode.LineComment = "Renamed from 'automatic_key_rollover'"
 			// This field should also be commented as it's now in DB
 			fieldsToComment[newName] = true
 		}
@@ -565,6 +571,94 @@ func (t *configTransformer) transformSigningNode(node *yaml.Node) {
 			if t.verbose {
 				log.WithField("field", keyNode.Value).Info("Marked signing field as deprecated (moved to database)")
 			}
+		}
+	}
+}
+
+// moveSigningFieldsToFilesystem moves key_dir and key_file from signing to signing.filesystem
+func (t *configTransformer) moveSigningFieldsToFilesystem(node *yaml.Node) {
+	// Find existing filesystem node and fields to move
+	var filesystemNodeIndex int = -1
+	var fieldsFound []struct {
+		index int
+		key   *yaml.Node
+		value *yaml.Node
+	}
+	var hasKMS bool
+
+	for i := 0; i < len(node.Content); i += 2 {
+		if i+1 >= len(node.Content) {
+			break
+		}
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+
+		switch keyNode.Value {
+		case "filesystem":
+			filesystemNodeIndex = i
+		case "kms":
+			hasKMS = true
+		case "key_dir", "key_file":
+			fieldsFound = append(fieldsFound, struct {
+				index int
+				key   *yaml.Node
+				value *yaml.Node
+			}{i, keyNode, valueNode})
+		}
+	}
+
+	if len(fieldsFound) == 0 {
+		return // Nothing to move
+	}
+
+	// Get or create filesystem node
+	var filesystemNode *yaml.Node
+	if filesystemNodeIndex >= 0 {
+		filesystemNode = node.Content[filesystemNodeIndex+1]
+	} else {
+		// Create new filesystem mapping node
+		filesystemNode = &yaml.Node{Kind: yaml.MappingNode}
+		filesystemKeyNode := &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
+			Value: "filesystem",
+		}
+		node.Content = append(node.Content, filesystemKeyNode, filesystemNode)
+	}
+
+	// Move fields to filesystem (in reverse order to preserve indices during removal)
+	for i := len(fieldsFound) - 1; i >= 0; i-- {
+		f := fieldsFound[i]
+		// Add to filesystem node
+		f.key.LineComment = fmt.Sprintf("Moved from signing.%s", f.key.Value)
+		filesystemNode.Content = append(filesystemNode.Content, f.key, f.value)
+
+		// Remove from signing node
+		node.Content = append(node.Content[:f.index], node.Content[f.index+2:]...)
+
+		if t.verbose {
+			log.WithField("field", f.key.Value).Info("Moved signing field to filesystem subsection")
+		}
+	}
+
+	// Add kms: filesystem if not present
+	if !hasKMS {
+		kmsKeyNode := &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
+			Value: "kms",
+		}
+		kmsValueNode := &yaml.Node{
+			Kind:        yaml.ScalarNode,
+			Tag:         "!!str",
+			Value:       "filesystem",
+			LineComment: "Added automatically",
+		}
+		// Insert at beginning of signing node
+		node.Content = append([]*yaml.Node{kmsKeyNode, kmsValueNode}, node.Content...)
+
+		if t.verbose {
+			log.Info("Added kms: filesystem to signing section")
 		}
 	}
 }
