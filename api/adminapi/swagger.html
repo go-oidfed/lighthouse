@@ -57,8 +57,9 @@
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
   <script>
-    // Storage key for custom servers
+    // Storage keys for custom servers and selected server
     const CUSTOM_SERVERS_KEY = 'swagger-custom-servers-admin';
+    const SELECTED_SERVER_KEY = 'swagger-selected-server-admin';
 
     function getCustomServers() {
       try {
@@ -72,11 +73,25 @@
         servers.push(url);
         localStorage.setItem(CUSTOM_SERVERS_KEY, JSON.stringify(servers));
       }
+      // Also set this as the selected server
+      localStorage.setItem(SELECTED_SERVER_KEY, url);
     }
 
     function removeCustomServer(url) {
       const servers = getCustomServers().filter(s => s !== url);
       localStorage.setItem(CUSTOM_SERVERS_KEY, JSON.stringify(servers));
+      // Clear selected server if it was the removed one
+      if (localStorage.getItem(SELECTED_SERVER_KEY) === url) {
+        localStorage.removeItem(SELECTED_SERVER_KEY);
+      }
+    }
+
+    function getSelectedServer() {
+      return localStorage.getItem(SELECTED_SERVER_KEY);
+    }
+
+    function clearSelectedServer() {
+      localStorage.removeItem(SELECTED_SERVER_KEY);
     }
 
     // Plugin to wrap the Servers component with editable functionality
@@ -154,17 +169,32 @@
         const basePath = window.location.pathname.replace(/\/api\/v1\/admin\/docs\/?$/, '');
         const currentOrigin = window.location.origin + basePath;
 
-        // Get custom servers from localStorage
+        // Get custom servers and selected server from localStorage
         const customServers = getCustomServers();
+        const selectedServer = getSelectedServer();
 
-        // Build the servers list: current origin first, then spec servers, then custom
+        // Build the servers list
         const specServers = spec.servers || [];
         const allUrls = new Set();
         const mergedServers = [];
 
-        // Add current origin as first (default) if not already in spec
+        // If there's a selected server, add it first (makes it the default)
+        if (selectedServer && !allUrls.has(selectedServer)) {
+          // Find if it has a description from spec or custom servers
+          const specServer = specServers.find(s => s.url === selectedServer);
+          const isCustom = customServers.includes(selectedServer);
+          const description = specServer?.description || 
+            (selectedServer === currentOrigin ? 'Current instance (auto-detected)' : 
+             isCustom ? 'Custom server (user-added)' : 'Selected server');
+          mergedServers.push({ url: selectedServer, description });
+          allUrls.add(selectedServer);
+          // Clear the selected server after using it (one-time selection)
+          clearSelectedServer();
+        }
+
+        // Add current origin if not already added
         const currentInSpec = specServers.some(s => s.url === currentOrigin);
-        if (!currentInSpec) {
+        if (!currentInSpec && !allUrls.has(currentOrigin)) {
           mergedServers.push({ url: currentOrigin, description: 'Current instance (auto-detected)' });
           allUrls.add(currentOrigin);
         }
