@@ -943,6 +943,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnyValue'
+              example: Example value
           description: Successful response.
         '404':
           $ref: '#/components/responses/NotFoundError'
@@ -956,6 +957,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AnyValue'
+            example: Example value
         required: true
       tags:
         - Entity Configuration Metadata
@@ -965,12 +967,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnyValue'
+              example: Example value
           description: Successfully updated claim value.
         '201':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnyValue'
+              example: Example value
           description: Successfully created the claim.
         '400':
           $ref: '#/components/responses/BadRequestError'
@@ -1084,6 +1088,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Metadata'
+              example:
+                federation_entity:
+                  organization_name: Example Organization
+                  display_name: Example Federation Entity
+                  contacts:
+                    - admin@example.org
+                openid_provider:
+                  issuer: https://op.example.org
+                  authorization_endpoint: https://op.example.org/authorize
+                relying_party:
+                  client_id: client123
+                  redirect_uris:
+                    - https://rp.example.org/callback
           description: Successful response
         '500':
           $ref: '#/components/responses/ServerError'
@@ -1095,6 +1112,19 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Metadata'
+            example:
+              federation_entity:
+                organization_name: Example Organization
+                display_name: Example Federation Entity
+                contacts:
+                  - admin@example.org
+              openid_provider:
+                issuer: https://op.example.org
+                authorization_endpoint: https://op.example.org/authorize
+              relying_party:
+                client_id: client123
+                redirect_uris:
+                  - https://rp.example.org/callback
         required: true
       tags:
         - Entity Configuration Metadata
@@ -1104,6 +1134,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Metadata'
+              example:
+                federation_entity:
+                  organization_name: Example Organization
+                  display_name: Example Federation Entity
+                  contacts:
+                    - admin@example.org
+                openid_provider:
+                  issuer: https://op.example.org
+                  authorization_endpoint: https://op.example.org/authorize
+                relying_party:
+                  client_id: client123
+                  redirect_uris:
+                    - https://rp.example.org/callback
           description: Successful response
         '400':
           $ref: '#/components/responses/BadRequestError'
@@ -3511,6 +3554,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnyValue'
+              example: Example value
           description: Successful response.
         '404':
           $ref: '#/components/responses/NotFoundError'
@@ -3524,6 +3568,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AnyValue'
+            example: Example value
         required: true
       tags:
         - Subordinate Metadata
@@ -3533,12 +3578,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnyValue'
+              example: Example value
           description: Successfully updated claim value.
         '201':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnyValue'
+              example: Example value
           description: Successfully created the claim.
         '400':
           $ref: '#/components/responses/BadRequestError'
@@ -3654,6 +3701,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Metadata'
+              example:
+                federation_entity:
+                  organization_name: Example Organization
+                  display_name: Example Federation Entity
+                  contacts:
+                    - admin@example.org
+                openid_provider:
+                  issuer: https://op.example.org
+                  authorization_endpoint: https://op.example.org/authorize
+                relying_party:
+                  client_id: client123
+                  redirect_uris:
+                    - https://rp.example.org/callback
           description: Successful response
         '500':
           $ref: '#/components/responses/ServerError'
@@ -3665,6 +3725,19 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Metadata'
+            example:
+              federation_entity:
+                organization_name: Example Organization
+                display_name: Example Federation Entity
+                contacts:
+                  - admin@example.org
+              openid_provider:
+                issuer: https://op.example.org
+                authorization_endpoint: https://op.example.org/authorize
+              relying_party:
+                client_id: client123
+                redirect_uris:
+                  - https://rp.example.org/callback
         required: true
       tags:
         - Subordinate Metadata
@@ -3674,6 +3747,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Metadata'
+              example:
+                federation_entity:
+                  organization_name: Example Organization
+                  display_name: Example Federation Entity
+                  contacts:
+                    - admin@example.org
+                openid_provider:
+                  issuer: https://op.example.org
+                  authorization_endpoint: https://op.example.org/authorize
+                relying_party:
+                  client_id: client123
+                  redirect_uris:
+                    - https://rp.example.org/callback
           description: Successful response
         '400':
           $ref: '#/components/responses/BadRequestError'
@@ -4218,6 +4304,8 @@ components:
       description: Any JSON value. This intentionally permits any type.
       type: object
       additionalProperties: true
+      example:
+        Example: value
     ErrorResponse:
       title: Root Type for ErrorResponse
       description: Standard error response with code and description.
@@ -4519,6 +4607,20 @@ components:
       type: object
       additionalProperties:
         $ref: '#/components/schemas/EntityTypedMetadata'
+      example:
+        federation_entity:
+          organization_name: Example Organization
+          display_name: Example Federation Entity
+          contacts:
+            - admin@example.org
+        openid_provider:
+          issuer: https://op.example.org
+          authorization_endpoint: https://op.example.org/authorize
+          token_endpoint: https://op.example.org/token
+        relying_party:
+          client_id: client123
+          redirect_uris:
+            - https://rp.example.org/callback
     MetadataPolicyOperatorName:
       description: The name of a metadata policy operator
       type: string
