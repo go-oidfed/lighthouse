@@ -92,7 +92,7 @@ Configuration for the filesystem Key Management System.
 <span class="badge badge-cyan" title="Environment Variable">`LH_SIGNING_FILESYSTEM_KEY_DIR`</span>
 
 The `key_dir` option specifies the path to a directory that contains the private signing key(s).
-Keys are stored using the naming convention `<type>_<alg>.pem`, e.g., `federation_ES512.pem`.
+Keys are stored using the naming convention `<kid>.pem`.
 
 ??? file "config.yaml"
 
