@@ -17,16 +17,16 @@ import (
 type mockTrustMarkSpecStore struct {
 	model.TrustMarkSpecStore
 	listFn   func() ([]model.TrustMarkSpec, error)
-	createFn func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error)
+	createFn func(spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error)
 	getFn    func(id string) (*model.TrustMarkSpec, error)
-	updateFn func(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error)
+	updateFn func(id string, spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error)
 	patchFn  func(id string, updates map[string]any) (*model.TrustMarkSpec, error)
 	deleteFn func(id string) error
 
 	listSubjectsFn        func(specID string, status *model.Status) ([]model.TrustMarkSubject, error)
-	createSubjectFn       func(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error)
+	createSubjectFn       func(specID string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error)
 	getSubjectFn          func(specID, subjectID string) (*model.TrustMarkSubject, error)
-	updateSubjectFn       func(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error)
+	updateSubjectFn       func(specID, subjectID string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error)
 	deleteSubjectFn       func(specID, subjectID string) error
 	changeSubjectStatusFn func(specID, subjectID string, status model.Status) (*model.TrustMarkSubject, error)
 }
@@ -37,11 +37,13 @@ func (m *mockTrustMarkSpecStore) List() ([]model.TrustMarkSpec, error) {
 	}
 	return nil, nil
 }
-func (m *mockTrustMarkSpecStore) Create(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+func (m *mockTrustMarkSpecStore) Create(spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
 	if m.createFn != nil {
 		return m.createFn(spec)
 	}
-	return spec, nil
+	return &model.TrustMarkSpec{
+		TrustMarkType: spec.TrustMarkType,
+	}, nil
 }
 func (m *mockTrustMarkSpecStore) Get(id string) (*model.TrustMarkSpec, error) {
 	if m.getFn != nil {
@@ -49,11 +51,13 @@ func (m *mockTrustMarkSpecStore) Get(id string) (*model.TrustMarkSpec, error) {
 	}
 	return nil, nil
 }
-func (m *mockTrustMarkSpecStore) Update(id string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+func (m *mockTrustMarkSpecStore) Update(id string, spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
 	if m.updateFn != nil {
 		return m.updateFn(id, spec)
 	}
-	return spec, nil
+	return &model.TrustMarkSpec{
+		TrustMarkType: spec.TrustMarkType,
+	}, nil
 }
 func (m *mockTrustMarkSpecStore) Patch(id string, updates map[string]any) (*model.TrustMarkSpec, error) {
 	if m.patchFn != nil {
@@ -74,11 +78,13 @@ func (m *mockTrustMarkSpecStore) ListSubjects(specID string, status *model.Statu
 	}
 	return nil, nil
 }
-func (m *mockTrustMarkSpecStore) CreateSubject(specID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+func (m *mockTrustMarkSpecStore) CreateSubject(specID string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
 	if m.createSubjectFn != nil {
 		return m.createSubjectFn(specID, subject)
 	}
-	return subject, nil
+	return &model.TrustMarkSubject{
+		EntityID: subject.EntityID,
+	}, nil
 }
 func (m *mockTrustMarkSpecStore) GetSubject(specID, subjectID string) (*model.TrustMarkSubject, error) {
 	if m.getSubjectFn != nil {
@@ -86,11 +92,13 @@ func (m *mockTrustMarkSpecStore) GetSubject(specID, subjectID string) (*model.Tr
 	}
 	return nil, nil
 }
-func (m *mockTrustMarkSpecStore) UpdateSubject(specID, subjectID string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+func (m *mockTrustMarkSpecStore) UpdateSubject(specID, subjectID string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
 	if m.updateSubjectFn != nil {
 		return m.updateSubjectFn(specID, subjectID, subject)
 	}
-	return subject, nil
+	return &model.TrustMarkSubject{
+		EntityID: subject.EntityID,
+	}, nil
 }
 func (m *mockTrustMarkSpecStore) DeleteSubject(specID, subjectID string) error {
 	if m.deleteSubjectFn != nil {
@@ -156,8 +164,8 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createFn: func(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
-				return spec, nil
+			createFn: func(spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
+				return &model.TrustMarkSpec{TrustMarkType: spec.TrustMarkType}, nil
 			},
 		}
 		app := setupTrustMarkIssuanceApp(mockStore)
@@ -198,7 +206,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	t.Run("AlreadyExists", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createFn: func(_ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			createFn: func(_ *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, model.AlreadyExistsError("exists")
 			},
 		}
@@ -214,7 +222,7 @@ func TestTrustMarkSpecHandlers_Create(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createFn: func(_ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			createFn: func(_ *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -284,8 +292,8 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateFn: func(_ string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
-				return spec, nil
+			updateFn: func(_ string, spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
+				return &model.TrustMarkSpec{TrustMarkType: spec.TrustMarkType}, nil
 			},
 		}
 		app := setupTrustMarkIssuanceApp(mockStore)
@@ -326,7 +334,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateFn: func(_ string, _ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			updateFn: func(_ string, _ *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -342,7 +350,7 @@ func TestTrustMarkSpecHandlers_Update(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateFn: func(_ string, _ *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+			updateFn: func(_ string, _ *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -521,8 +529,8 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createSubjectFn: func(_ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
-				return subject, nil
+			createSubjectFn: func(_ string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{EntityID: subject.EntityID}, nil
 			},
 		}
 		app := setupTrustMarkIssuanceApp(mockStore)
@@ -563,7 +571,7 @@ func TestTrustMarkSubjectHandlers_Create(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			createSubjectFn: func(_ string, _ *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			createSubjectFn: func(_ string, _ *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -633,8 +641,8 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateSubjectFn: func(_, _ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
-				return subject, nil
+			updateSubjectFn: func(_, _ string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{EntityID: subject.EntityID}, nil
 			},
 		}
 		app := setupTrustMarkIssuanceApp(mockStore)
@@ -675,7 +683,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateSubjectFn: func(_, _ string, _ *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			updateSubjectFn: func(_, _ string, _ *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, model.NotFoundError("not found")
 			},
 		}
@@ -691,7 +699,7 @@ func TestTrustMarkSubjectHandlers_Update(t *testing.T) {
 	t.Run("StoreError", func(t *testing.T) {
 		t.Parallel()
 		mockStore := &mockTrustMarkSpecStore{
-			updateSubjectFn: func(_, _ string, _ *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+			updateSubjectFn: func(_, _ string, _ *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
 				return nil, errors.New("db error")
 			},
 		}
@@ -888,8 +896,8 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{}, nil
 			},
-			updateSubjectFn: func(_, _ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
-				return subject, nil
+			updateSubjectFn: func(_, _ string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{EntityID: subject.EntityID, AdditionalClaims: subject.AdditionalClaims}, nil
 			},
 		}
 		app := setupTrustMarkIssuanceApp(mockStore)
@@ -925,8 +933,8 @@ func TestTrustMarkSubjectHandlers_AdditionalClaims(t *testing.T) {
 			getSubjectFn: func(_, _ string) (*model.TrustMarkSubject, error) {
 				return &model.TrustMarkSubject{AdditionalClaims: map[string]any{"subj_claim": "subj_val"}}, nil
 			},
-			updateSubjectFn: func(_, _ string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
-				return subject, nil
+			updateSubjectFn: func(_, _ string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
+				return &model.TrustMarkSubject{EntityID: subject.EntityID, AdditionalClaims: subject.AdditionalClaims}, nil
 			},
 		}
 		app := setupTrustMarkIssuanceApp(mockStore)

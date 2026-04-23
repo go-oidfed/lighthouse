@@ -133,18 +133,39 @@ type IssuedTrustMarkInstanceStore interface {
 type TrustMarkSpecStore interface {
 	// Spec operations
 	List() ([]TrustMarkSpec, error)
-	Create(spec *TrustMarkSpec) (*TrustMarkSpec, error)
+	Create(spec *AddTrustMarkSpec) (*TrustMarkSpec, error)
 	Get(ident string) (*TrustMarkSpec, error)
 	GetByType(trustMarkType string) (*TrustMarkSpec, error)
-	Update(ident string, spec *TrustMarkSpec) (*TrustMarkSpec, error)
+	Update(ident string, spec *AddTrustMarkSpec) (*TrustMarkSpec, error)
 	Patch(ident string, updates map[string]any) (*TrustMarkSpec, error)
 	Delete(ident string) error
 
 	// Subject operations
 	ListSubjects(specIdent string, status *Status) ([]TrustMarkSubject, error)
-	CreateSubject(specIdent string, subject *TrustMarkSubject) (*TrustMarkSubject, error)
+	CreateSubject(specIdent string, subject *AddTrustMarkSubject) (*TrustMarkSubject, error)
 	GetSubject(specIdent, subjectIdent string) (*TrustMarkSubject, error)
-	UpdateSubject(specIdent, subjectIdent string, subject *TrustMarkSubject) (*TrustMarkSubject, error)
+	UpdateSubject(specIdent, subjectIdent string, subject *AddTrustMarkSubject) (*TrustMarkSubject, error)
 	DeleteSubject(specIdent, subjectIdent string) error
 	ChangeSubjectStatus(specIdent, subjectIdent string, status Status) (*TrustMarkSubject, error)
+}
+
+// AddTrustMarkSpec represents the payload for creating or updating a TrustMarkSpec.
+type AddTrustMarkSpec struct {
+	TrustMarkType     string             `json:"trust_mark_type"`
+	Lifetime          uint               `json:"lifetime,omitempty"`
+	Ref               string             `json:"ref,omitempty"`
+	LogoURI           string             `json:"logo_uri,omitempty"`
+	DelegationJWT     string             `json:"delegation_jwt,omitempty"`
+	AdditionalClaims  map[string]any     `json:"additional_claims,omitempty"`
+	Description       string             `json:"description,omitempty"`
+	EligibilityConfig *EligibilityConfig `json:"eligibility_config,omitempty"`
+	CacheTTL          int                `json:"cache_ttl,omitempty"`
+}
+
+// AddTrustMarkSubject represents the payload for creating or updating a TrustMarkSubject.
+type AddTrustMarkSubject struct {
+	EntityID         string         `json:"entity_id"`
+	Status           Status         `json:"status"`
+	Description      string         `json:"description,omitempty"`
+	AdditionalClaims map[string]any `json:"additional_claims,omitempty"`
 }

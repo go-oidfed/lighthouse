@@ -59,7 +59,7 @@ func (h *subordinatesBaseHandlers) list(c *fiber.Ctx) error {
 }
 
 func (h *subordinatesBaseHandlers) create(c *fiber.Ctx) error {
-	var req model.ExtendedSubordinateInfo
+	var req model.AddSubordinate
 	req.Status = DefaultSubordinateStatus
 	if err := c.BodyParser(&req); err != nil {
 		return writeBadBody(c)
@@ -70,13 +70,30 @@ func (h *subordinatesBaseHandlers) create(c *fiber.Ctx) error {
 	if !req.Status.Valid() {
 		return writeBadRequest(c, "invalid status")
 	}
-	if req.Status == model.StatusActive && !jwksHasKeys(&req.JWKS) {
+	record := model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID:    req.EntityID,
+			Status:      req.Status,
+			Description: req.Description,
+		},
+	}
+	if req.RegisteredEntityTypes != nil {
+		record.SubordinateEntityTypes = make([]model.SubordinateEntityType, len(req.RegisteredEntityTypes))
+		for i, et := range req.RegisteredEntityTypes {
+			record.SubordinateEntityTypes[i] = model.SubordinateEntityType{EntityType: et}
+		}
+	}
+	if req.JWKS != nil {
+		record.JWKS = *req.JWKS
+	}
+
+	if record.Status == model.StatusActive && !jwksHasKeys(&record.JWKS) {
 		return writeBadRequest(c, "status cannot be active without keys")
 	}
 
 	var stored *model.ExtendedSubordinateInfo
 	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		if err := tx.Subordinates.Add(req); err != nil {
+		if err := tx.Subordinates.Add(record); err != nil {
 			return err
 		}
 		var err error
@@ -111,15 +128,10 @@ func (h *subordinatesBaseHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(*info)
 }
 
-type updateSubordinateRequest struct {
-	Description           *string  `json:"description"`
-	RegisteredEntityTypes []string `json:"registered_entity_types"`
-}
-
 func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
-	var body updateSubordinateRequest
+	var body model.UpdateSubordinate
 	if err := c.BodyParser(&body); err != nil {
 		return writeBadBody(c)
 	}

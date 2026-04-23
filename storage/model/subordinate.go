@@ -109,3 +109,18 @@ func (et PolicyOperators) ToPolicyOperatorNames() []oidfed.PolicyOperatorName {
 	}
 	return result
 }
+
+// AddSubordinate represents the payload for creating a new subordinate.
+type AddSubordinate struct {
+	EntityID              string   `json:"entity_id"`
+	Status                Status   `json:"status"`
+	Description           string   `json:"description,omitempty"`
+	RegisteredEntityTypes []string `json:"registered_entity_types,omitempty"`
+	JWKS                  *JWKS    `json:"jwks,omitempty"`
+}
+
+// UpdateSubordinate represents the payload for updating a subordinate.
+type UpdateSubordinate struct {
+	Description           *string  `json:"description,omitempty"`
+	RegisteredEntityTypes []string `json:"registered_entity_types,omitempty"`
+}

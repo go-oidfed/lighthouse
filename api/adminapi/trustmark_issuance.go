@@ -24,7 +24,7 @@ func (h *trustMarkSpecHandlers) list(c *fiber.Ctx) error {
 }
 
 func (h *trustMarkSpecHandlers) create(c *fiber.Ctx) error {
-	var spec model.TrustMarkSpec
+	var spec model.AddTrustMarkSpec
 	if err := c.BodyParser(&spec); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
@@ -47,7 +47,7 @@ func (h *trustMarkSpecHandlers) get(c *fiber.Ctx) error {
 }
 
 func (h *trustMarkSpecHandlers) update(c *fiber.Ctx) error {
-	var spec model.TrustMarkSpec
+	var spec model.AddTrustMarkSpec
 	if err := c.BodyParser(&spec); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
@@ -116,7 +116,7 @@ func (h *trustMarkSubjectHandlers) list(c *fiber.Ctx) error {
 
 func (h *trustMarkSubjectHandlers) create(c *fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
-	var subject model.TrustMarkSubject
+	var subject model.AddTrustMarkSubject
 	if err := c.BodyParser(&subject); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
@@ -146,7 +146,7 @@ func (h *trustMarkSubjectHandlers) get(c *fiber.Ctx) error {
 func (h *trustMarkSubjectHandlers) update(c *fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
-	var subject model.TrustMarkSubject
+	var subject model.AddTrustMarkSubject
 	if err := c.BodyParser(&subject); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
@@ -212,8 +212,13 @@ func (h *trustMarkSubjectHandlers) putAdditionalClaims(c *fiber.Ctx) error {
 	if err != nil {
 		return h.handleError(c, err)
 	}
-	subject.AdditionalClaims = claims
-	updated, err := h.store.UpdateSubject(specID, subjectID, subject)
+	updatePayload := &model.AddTrustMarkSubject{
+		EntityID:         subject.EntityID,
+		Status:           subject.Status,
+		Description:      subject.Description,
+		AdditionalClaims: claims,
+	}
+	updated, err := h.store.UpdateSubject(specID, subjectID, updatePayload)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
@@ -245,7 +250,13 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
 	}
 
 	subject.AdditionalClaims = mergedClaims
-	updated, err := h.store.UpdateSubject(specID, subjectID, subject)
+	updatePayload := &model.AddTrustMarkSubject{
+		EntityID:         subject.EntityID,
+		Status:           subject.Status,
+		Description:      subject.Description,
+		AdditionalClaims: mergedClaims,
+	}
+	updated, err := h.store.UpdateSubject(specID, subjectID, updatePayload)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}

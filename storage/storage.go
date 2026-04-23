@@ -947,14 +947,25 @@ func (s *TrustMarkSpecStorage) List() ([]model.TrustMarkSpec, error) {
 }
 
 // Create creates a new TrustMarkSpec
-func (s *TrustMarkSpecStorage) Create(spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
-	if err := s.db.Create(spec).Error; err != nil {
+func (s *TrustMarkSpecStorage) Create(spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
+	record := &model.TrustMarkSpec{
+		TrustMarkType:     spec.TrustMarkType,
+		Lifetime:          spec.Lifetime,
+		Ref:               spec.Ref,
+		LogoURI:           spec.LogoURI,
+		DelegationJWT:     spec.DelegationJWT,
+		AdditionalClaims:  spec.AdditionalClaims,
+		Description:       spec.Description,
+		EligibilityConfig: spec.EligibilityConfig,
+		CacheTTL:          spec.CacheTTL,
+	}
+	if err := s.db.Create(record).Error; err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, model.AlreadyExistsError("trust mark spec already exists for this type")
 		}
 		return nil, errors.Wrap(err, "trust_mark_specs: create failed")
 	}
-	return spec, nil
+	return record, nil
 }
 
 // findByIdent finds a TrustMarkSpec by ID or trust_mark_type
@@ -994,20 +1005,28 @@ func (s *TrustMarkSpecStorage) GetByType(trustMarkType string) (*model.TrustMark
 }
 
 // Update updates an existing TrustMarkSpec (full replacement)
-func (s *TrustMarkSpecStorage) Update(ident string, spec *model.TrustMarkSpec) (*model.TrustMarkSpec, error) {
+func (s *TrustMarkSpecStorage) Update(ident string, spec *model.AddTrustMarkSpec) (*model.TrustMarkSpec, error) {
 	existing, err := s.findByIdent(ident)
 	if err != nil {
 		return nil, err
 	}
-	spec.ID = existing.ID
-	spec.CreatedAt = existing.CreatedAt
-	if err = s.db.Save(spec).Error; err != nil {
+	existing.TrustMarkType = spec.TrustMarkType
+	existing.Lifetime = spec.Lifetime
+	existing.Ref = spec.Ref
+	existing.LogoURI = spec.LogoURI
+	existing.DelegationJWT = spec.DelegationJWT
+	existing.AdditionalClaims = spec.AdditionalClaims
+	existing.Description = spec.Description
+	existing.EligibilityConfig = spec.EligibilityConfig
+	existing.CacheTTL = spec.CacheTTL
+
+	if err = s.db.Save(existing).Error; err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, model.AlreadyExistsError("trust mark spec already exists for this type")
 		}
 		return nil, errors.Wrap(err, "trust_mark_specs: update failed")
 	}
-	return spec, nil
+	return existing, nil
 }
 
 // Patch partially updates a TrustMarkSpec
@@ -1056,12 +1075,19 @@ func (s *TrustMarkSpecStorage) ListSubjects(specIdent string, status *model.Stat
 
 // CreateSubject creates a new TrustMarkSubject for a TrustMarkSpec.
 // If a soft-deleted subject with the same entity_id exists, it will be restored.
-func (s *TrustMarkSpecStorage) CreateSubject(specIdent string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+func (s *TrustMarkSpecStorage) CreateSubject(specIdent string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
 	spec, err := s.findByIdent(specIdent)
 	if err != nil {
 		return nil, err
 	}
-	subject.TrustMarkSpecID = spec.ID
+
+	record := &model.TrustMarkSubject{
+		TrustMarkSpecID:  spec.ID,
+		EntityID:         subject.EntityID,
+		Status:           subject.Status,
+		Description:      subject.Description,
+		AdditionalClaims: subject.AdditionalClaims,
+	}
 
 	// Check for soft-deleted record with same entity_id (unscoped to include deleted)
 	var existing model.TrustMarkSubject
@@ -1085,13 +1111,13 @@ func (s *TrustMarkSpecStorage) CreateSubject(specIdent string, subject *model.Tr
 	}
 
 	// No existing record, create new
-	if err = s.db.Create(subject).Error; err != nil {
+	if err = s.db.Omit("TrustMarkSpec").Create(record).Error; err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, model.AlreadyExistsError("subject already exists for this trust mark spec")
 		}
 		return nil, errors.Wrap(err, "trust_mark_specs: create subject failed")
 	}
-	return subject, nil
+	return record, nil
 }
 
 // findSubjectByIdent finds a TrustMarkSubject by ID or entity_id within a spec
@@ -1123,21 +1149,23 @@ func (s *TrustMarkSpecStorage) GetSubject(specIdent, subjectIdent string) (*mode
 }
 
 // UpdateSubject updates an existing TrustMarkSubject
-func (s *TrustMarkSpecStorage) UpdateSubject(specIdent, subjectIdent string, subject *model.TrustMarkSubject) (*model.TrustMarkSubject, error) {
+func (s *TrustMarkSpecStorage) UpdateSubject(specIdent, subjectIdent string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
 	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
 	if err != nil {
 		return nil, err
 	}
-	subject.ID = existing.ID
-	subject.TrustMarkSpecID = existing.TrustMarkSpecID
-	subject.CreatedAt = existing.CreatedAt
-	if err = s.db.Save(subject).Error; err != nil {
+	existing.EntityID = subject.EntityID
+	existing.Status = subject.Status
+	existing.Description = subject.Description
+	existing.AdditionalClaims = subject.AdditionalClaims
+
+	if err = s.db.Save(existing).Error; err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, model.AlreadyExistsError("subject already exists for this trust mark spec")
 		}
 		return nil, errors.Wrap(err, "trust_mark_specs: update subject failed")
 	}
-	return subject, nil
+	return existing, nil
 }
 
 // DeleteSubject deletes a TrustMarkSubject and revokes all associated trust mark instances.

@@ -229,6 +229,47 @@ func TestPostSubordinates(t *testing.T) {
 		}
 	})
 
+	t.Run("Success_WithJWKS", func(t *testing.T) {
+		t.Parallel()
+		app, backends := setupSubordinateBaseApp(t)
+
+		body := `{
+			"entity_id": "https://new-sub-with-keys.example.org",
+			"status": "active",
+			"description": "A new active subordinate with keys",
+			"jwks": {
+				"keys": [
+					{
+						"kty": "RSA",
+						"kid": "key1",
+						"n": "test_n",
+						"e": "AQAB"
+					}
+				]
+			},
+			"registered_entity_types": ["openid_provider"]
+		}`
+		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, _ := doRequest(t, app, req)
+
+		requireStatus(t, resp, http.StatusCreated)
+
+		saved, err := backends.Subordinates.Get("https://new-sub-with-keys.example.org")
+		if err != nil || saved == nil {
+			t.Fatalf("Failed to find saved subordinate in DB")
+		}
+		if saved.Status != model.StatusActive {
+			t.Errorf("Expected status active, got %s", saved.Status)
+		}
+		if saved.JWKS.Keys.Len() != 1 {
+			t.Errorf("Expected 1 key in JWKS, got %d", saved.JWKS.Keys.Len())
+		}
+		if len(saved.SubordinateEntityTypes) != 1 || saved.SubordinateEntityTypes[0].EntityType != "openid_provider" {
+			t.Errorf("Expected 1 entity type 'openid_provider', got %v", saved.SubordinateEntityTypes)
+		}
+	})
+
 	t.Run("MissingEntityID", func(t *testing.T) {
 		t.Parallel()
 		app, _ := setupSubordinateBaseApp(t)

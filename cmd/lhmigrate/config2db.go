@@ -984,7 +984,7 @@ func (m *configMigrator) migrateTrustMarkSpecs() []migrationResult {
 			continue
 		}
 
-		newSpec := &model.TrustMarkSpec{
+		newSpec := &model.AddTrustMarkSpec{
 			TrustMarkType: spec.TrustMarkType,
 			Lifetime:      spec.Lifetime,
 			Ref:           spec.Ref,

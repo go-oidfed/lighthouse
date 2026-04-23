@@ -369,7 +369,7 @@ func (m *dbMigrator) migrateOneTrustMarkedEntity(trustMarkType, entityID string,
 		result.details = fmt.Sprintf("status -> %s", status.String())
 	} else {
 		// Create new subject
-		subject := &model.TrustMarkSubject{
+		subject := &model.AddTrustMarkSubject{
 			EntityID:    entityID,
 			Status:      status,
 			Description: "Migrated from legacy storage",
