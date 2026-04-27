@@ -29,9 +29,9 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
 			}
-			if !paginationSupported && req.FromEntityID != "" {
+			if !paginationSupported && req.From != "" {
 				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'from_entity_id' is not yet supported"))
+				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'from' is not supported"))
 			}
 			if req.TrustAnchor == "" {
 				req.TrustAnchor = fed.FederationEntity.EntityID()
@@ -44,7 +44,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 			}
 			if !paginationSupported && req.Limit != 0 {
 				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'limit' is not yet supported"))
+				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'limit' is not supported"))
 			}
 			if wantedButNotSupported := slices.Subtract(
 				req.EntityClaims, []string{
