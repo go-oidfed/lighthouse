@@ -233,7 +233,7 @@ func TestPostSubordinates(t *testing.T) {
 		t.Parallel()
 		app, backends := setupSubordinateBaseApp(t)
 
-		body := `{
+		body := fmt.Sprintf(`{
 			"entity_id": "https://new-sub-with-keys.example.org",
 			"status": "active",
 			"description": "A new active subordinate with keys",
@@ -242,13 +242,13 @@ func TestPostSubordinates(t *testing.T) {
 					{
 						"kty": "RSA",
 						"kid": "key1",
-						"n": "test_n",
+						"n": "%s",
 						"e": "AQAB"
 					}
 				]
 			},
 			"registered_entity_types": ["openid_provider"]
-		}`
+		}`, testRSAKeyN)
 		req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, _ := doRequest(t, app, req)
