@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-oidfed/lib"
 
-	"github.com/go-oidfed/lighthouse/storage"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 type enrollRequest struct {
@@ -17,13 +17,13 @@ type enrollRequest struct {
 // AddEnrollEndpoint adds an endpoint to enroll to this IA/TA
 func (fed *LightHouse) AddEnrollEndpoint(
 	endpoint EndpointConf,
-	store storage.SubordinateStorageBackend,
+	store model.SubordinateStorageBackend,
 	checker EntityChecker,
 ) {
-	if fed.Metadata.FederationEntity.Extra == nil {
-		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
+	if fed.fedMetadata.Extra == nil {
+		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.Metadata.FederationEntity.Extra["federation_enroll_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.Extra["federation_enroll_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}
@@ -38,14 +38,14 @@ func (fed *LightHouse) AddEnrollEndpoint(
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
 			}
-			storedInfo, err := store.Subordinate(req.Subject)
+			storedInfo, err := store.Get(req.Subject)
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 			}
 			if storedInfo != nil { // Already a subordinate
 				switch storedInfo.Status {
-				case storage.StatusActive:
+				case model.StatusActive:
 					// This is not necessarily needed, but we return a fetch response
 					payload := fed.CreateSubordinateStatement(storedInfo)
 					jwt, err := fed.SignEntityStatement(payload)
@@ -56,14 +56,14 @@ func (fed *LightHouse) AddEnrollEndpoint(
 					ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 					ctx.Status(fiber.StatusCreated)
 					return ctx.Send(jwt)
-				case storage.StatusPending:
+				case model.StatusPending:
 					ctx.Status(fiber.StatusAccepted)
 					return ctx.JSON(
 						oidfed.ErrorInvalidRequest(
 							"the enrollment needs to be approved by an administrator",
 						),
 					)
-				case storage.StatusBlocked:
+				case model.StatusBlocked:
 					ctx.Status(fiber.StatusForbidden)
 					return ctx.JSON(oidfed.ErrorInvalidRequest("the entity cannot enroll"))
 				default:
@@ -94,15 +94,19 @@ func (fed *LightHouse) AddEnrollEndpoint(
 				}
 			}
 
-			info := storage.SubordinateInfo{
-				JWKS:        entityConfig.JWKS,
-				EntityTypes: req.EntityTypes,
-				EntityID:    entityConfig.Subject,
-				Status:      storage.StatusActive,
+			subEntityTypes := make([]model.SubordinateEntityType, len(req.EntityTypes))
+			for i, t := range req.EntityTypes {
+				subEntityTypes[i] = model.SubordinateEntityType{EntityType: t}
 			}
-			if err = store.Write(
-				entityConfig.Subject, info,
-			); err != nil {
+			info := model.ExtendedSubordinateInfo{
+				JWKS: model.NewJWKS(entityConfig.JWKS),
+				BasicSubordinateInfo: model.BasicSubordinateInfo{
+					EntityID:               entityConfig.Subject,
+					SubordinateEntityTypes: subEntityTypes,
+					Status:                 model.StatusActive,
+				},
+			}
+			if err = store.Add(info); err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 			}

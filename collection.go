@@ -15,10 +15,10 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 	endpoint EndpointConf, collector oidfed.EntityCollector,
 	allowedTrustAnchors []string, paginationSupported bool,
 ) {
-	if fed.Metadata.FederationEntity.Extra == nil {
-		fed.Metadata.FederationEntity.Extra = make(map[string]interface{})
+	if fed.fedMetadata.Extra == nil {
+		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.Metadata.FederationEntity.Extra["federation_collection_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID)
+	fed.fedMetadata.Extra["federation_collection_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
 	}
@@ -29,12 +29,12 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
 			}
-			if !paginationSupported && req.FromEntityID != "" {
+			if !paginationSupported && req.From != "" {
 				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'from_entity_id' is not yet supported"))
+				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'from' is not supported"))
 			}
 			if req.TrustAnchor == "" {
-				req.TrustAnchor = fed.FederationEntity.EntityID
+				req.TrustAnchor = fed.FederationEntity.EntityID()
 			}
 			if len(allowedTrustAnchors) > 0 {
 				if !slices2.Contains(allowedTrustAnchors, req.TrustAnchor) {
@@ -44,7 +44,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 			}
 			if !paginationSupported && req.Limit != 0 {
 				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'limit' is not yet supported"))
+				return ctx.JSON(oidfed.ErrorUnsupportedParameter("parameter 'limit' is not supported"))
 			}
 			if wantedButNotSupported := slices.Subtract(
 				req.EntityClaims, []string{

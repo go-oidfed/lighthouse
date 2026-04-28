@@ -1,58 +1,293 @@
+# LightHouse Configuration Example
+# 
+# This file shows all available configuration options with their defaults.
+# For a minimal configuration, see the deployment documentation.
+#
+# Most federation-specific settings (metadata, authority hints, trust marks, etc.)
+# are managed in the database via the Admin API or 'lhmigrate config2db'.
+
+
+# =============================================================================
+# Entity Identifier (Required)
+# =============================================================================
+# The entity ID is the unique identifier for this federation entity.
+# It must be a valid URI and typically matches the base URL.
+entity_id: "https://ta.example.com"
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
 server:
+  # IP address to listen on (empty = all interfaces)
+  # ip_listen: "127.0.0.1"
+  
   port: 7672
+
+  # Trusted proxy headers (for X-Forwarded-For, etc.)
+  # trusted_proxies:
+  #   - "10.0.0.0/8"
+  #   - "172.16.0.0/12"
+  #   - "192.168.0.0/16"
+  
+  # Header name for forwarded IP (default: X-Forwarded-For)
+  # forwarded_ip_header: "X-Forwarded-For"
+  
+  # TLS configuration (optional - typically handled by reverse proxy)
+  # tls:
+  #   enabled: false
+  #   cert: "/path/to/cert.pem"
+  #   key: "/path/to/key.pem"
+  #   redirect_http: false
+
+# =============================================================================
+# Signing Configuration
+# =============================================================================
+# Private key management and signing settings.
+# Note: alg, rsa_key_len, and key_rotation are managed in the database.
+# Use 'lhmigrate config2db' or the Admin API to configure these.
 signing:
-  key_file: "/signing.key"
-federation_data:
-  entity_id: "https://ta.example.lh"
-  authority_hints:
-    - "https://trust-anchor.spid-cie.fedservice.lh/"
-  federation_entity_metadata:
-    display_name: "Example Federation TA"
-    organization_name: "Example Organization"
-  metadata_policy_file: "/metadata-policy.json"
+  # Key Management System: filesystem or pkcs11
+  kms: filesystem
+  
+  # Public key storage backend: db (recommended) or filesystem
+  pk_backend: db
+  
+  # Automatically generate signing keys if none exist
+  auto_generate_keys: true
+  
+  # Filesystem KMS configuration
+  filesystem:
+    key_dir: "/data/keys"
+    # Or use a single key file instead of a directory
+    # key_file: "/data/keys/signing.key"
+  
+  # PKCS#11 HSM configuration (alternative to filesystem)
+  # pkcs11:
+  #   module_path: "/usr/lib/softhsm/libsofthsm2.so"
+  #   token_label: "lighthouse"
+  #   # Or identify token by serial or slot number
+  #   # token_serial: "abc123"
+  #   # token_slot: 0
+  #   pin: "1234"
+  #   storage_dir: "/data/pkcs11"
+  #   # Advanced options
+  #   # max_sessions: 0
+  #   # user_type: 0
+  #   # no_login: false
+  #   # label_prefix: ""
+  #   # load_labels:
+  #   #   - "extra-key-1"
+
+# =============================================================================
+# Storage Configuration
+# =============================================================================
+# Database backend for storing federation data.
 storage:
-  backend: json
+  # Database driver: sqlite, mysql, or postgres
+  driver: sqlite
+  
+  # SQLite: data directory (database file will be lighthouse.db)
   data_dir: "/data"
+  
+  # MySQL/PostgreSQL: connection string (alternative to individual fields below)
+  # dsn: "host=localhost user=lighthouse password=secret dbname=lighthouse sslmode=disable"
+  
+  # Individual connection fields (alternative to dsn)
+  # user: "lighthouse"
+  # password: ""
+  # host: "localhost"
+  # port: 5432  # 3306 for MySQL, 5432 for PostgreSQL
+  # db: "lighthouse"
+  
+  # Enable database query logging (for debugging)
+  # debug: false
+  
+  # MySQL example:
+  # driver: mysql
+  # dsn: "lighthouse:password@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&parseTime=True"
+  
+  # PostgreSQL example:
+  # driver: postgres
+  # dsn: "host=localhost user=lighthouse password=secret dbname=lighthouse sslmode=disable"
+
+# =============================================================================
+# Admin API Configuration
+# =============================================================================
+api:
+  admin:
+    # Enable the Admin API
+    enabled: true
+    
+    # Enable user management endpoints
+    users_enabled: true
+    
+    # Separate port for Admin API (0 = same as main server)
+    # Recommended for production: use a separate port and restrict access
+    port: 0
+    
+    # preferred source for actor extraction: basic_auth or header
+    # actor_source: "header"
+    
+    # HTTP header name for actor extraction (when actor_source includes header)
+    # actor_header: "X-Actor"
+    
+    # Password hashing parameters (Argon2id)
+    # These are secure defaults - only change if you understand the implications
+    password_hashing:
+      time: 1
+      memory_kib: 65536
+      parallelism: 4
+      key_len: 64
+      salt_len: 32
+
+# =============================================================================
+# Federation Endpoints
+# =============================================================================
 endpoints:
+  # Fetch endpoint - retrieve subordinate statements
   fetch:
     path: "/fetch"
+  
+  # List endpoint - list subordinate entity IDs
   list:
     path: "/list"
+  
+  # Resolve endpoint - resolve trust chains
   resolve:
     path: "/resolve"
+    # Restrict which trust anchors can be used
+    # allowed_trust_anchors:
+    #   - "https://ta.example.org"
+    # Or use the same trust anchors as entity_collection endpoint
+    # use_entity_collection_allowed_trust_anchors: false
+    # Grace period for expiring entity statements
+    # grace_period: 1h
+    # time_elapsed_grace_factor: 0.5
+    # Proactive resolver: pre-resolve entities for faster responses
+    # proactive_resolver:
+    #   enabled: false
+    #   concurrency_limit: 64
+    #   queue_size: 10000
+    #   response_storage:
+    #     dir: ""
+    #     store_json: false
+    #     store_jwt: true
+  
+  # Historical keys endpoint - federation_historical_keys_endpoint
+  historical_keys:
+    path: "/historical-keys"
+  
+  # Trust mark endpoint - issue trust marks
+  trust_mark:
+    path: "/trustmark"
+    # Trust mark specs are managed via Admin API:
+    #   POST /api/v1/admin/trust-marks/issuance-spec
+  
+  # Trust mark status endpoint
+  trust_mark_status:
+    path: "/trustmark/status"
+  
+  # Trust mark list endpoint
+  trust_mark_list:
+    path: "/trustmark/list"
+  
+  # Entity collection endpoint
   entity_collection:
     path: "/entity-collection"
     allowed_trust_anchors:
       - "https://ta.example.org"
-    interval: 8h
-  trust_mark:
-    path: "/trustmark"
-    trust_mark_specs:
-      - trust_mark_type: "https://tm.example.org"
-        lifetime: 3600
-        ref: "https://tm.example.org/ref"
-        logo_uri: "https://tm.example.org/logo"
-        extra_claim: "example"
-        delegation_jwt:
-      - trust_mark_type: "https://edugain.org"
-        lifetime: 86400
-  trust_mark_status:
-    path: "/trustmark/status"
-  trust_mark_list:
-    path: "/trustmark/list"
-  enroll:
-    path: "/enroll"
-    checker:
-      type: multiple_or
-      config:
-        - type: trust_mark
-          config:
-            trust_mark_type: https://tm.example.org
-            trust_anchors:
-              - entity_id: https://ta.example.org
-        - type: trust_mark
-          config:
-            trust_mark_type: https://tm.example.com
-            trust_anchors:
-              - entity_id: https://example.com
-              - entity_id: https://foo.bar.com
+  #   interval: 8h
+  #   concurrency_limit: 64
+  #   pagination_limit: 100
+  
+  # Enrollment endpoint (optional) - automatic subordinate registration
+  # enroll:
+  #   path: "/enroll"
+  #   checker:
+  #     type: multiple_or
+  #     config:
+  #       - type: trust_mark
+  #         config:
+  #           trust_mark_type: "https://federation.example.com/trustmarks/member"
+  #           trust_anchors:
+  #             - entity_id: "https://ta.example.org"
+  
+  # Enrollment request endpoint (optional) - manual enrollment requests
+  # enroll_request:
+  #   path: "/enroll-request"
+  
+  # Trust mark request endpoint (optional) - request trust marks
+  # trust_mark_request:
+  #   path: "/trustmark-request"
+
+# =============================================================================
+# Statistics Collection (Optional)
+# =============================================================================
+# Capture request metrics for monitoring and analytics.
+# stats:
+#   enabled: false
+#   
+#   # Endpoints to collect statistics for (empty = all endpoints)
+#   # endpoints:
+#   #   - "fetch"
+#   #   - "resolve"
+#   
+#   # Ring buffer configuration
+#   # buffer:
+#   #   size: 10000
+#   #   flush_interval: 5s
+#   #   flush_threshold: 0.8
+#   
+#   # Data capture options
+#   # capture:
+#   #   client_ip: true
+#   #   user_agent: true
+#   #   query_params: true
+#   #   geo_ip:
+#   #     enabled: false
+#   #     database_path: "/path/to/GeoLite2-Country.mmdb"
+#   
+#   # Data retention
+#   # retention:
+#   #   detailed_days: 90
+#   #   aggregated_days: 365
+
+# =============================================================================
+# Logging Configuration (Optional)
+# =============================================================================
+# logging:
+#   # Startup banner options
+#   # banner:
+#   #   logo: true
+#   #   version: true
+#   
+#   # Internal (application) logging
+#   # internal:
+#   #   level: INFO    # DEBUG, INFO, WARN, ERROR
+#   #   dir: ""        # Directory for log files (empty = no file logging)
+#   #   stderr: false  # Also log to stderr
+#   #   # Smart logging: buffer logs and write on error
+#   #   smart:
+#   #     enabled: false
+#   #     dir: ""
+#   
+#   # Access logging
+#   # access:
+#   #   dir: ""        # Directory for access log files
+#   #   stderr: false  # Also log to stderr
+
+# =============================================================================
+# Cache Configuration (Optional)
+# =============================================================================
+# cache:
+#   # Disable caching entirely
+#   # disabled: false
+#   
+#   # Maximum lifetime for cached items
+#   # max_lifetime: 6h
+#   
+#   # Redis configuration (optional - uses in-memory cache if not set)
+#   # redis_addr: "localhost:6379"
+#   # username: ""
+#   # password: ""
+#   # redis_db: 0
