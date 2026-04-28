@@ -1,6 +1,6 @@
 module github.com/go-oidfed/lighthouse
 
-go 1.25.1
+go 1.25.9
 
 require (
 	github.com/adam-hanna/arrayOperations v1.0.1
