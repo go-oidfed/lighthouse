@@ -4,7 +4,7 @@ import (
 	"github.com/zachmann/go-utils/duration"
 )
 
-// cachingConf holds caching configuration.
+// CachingConf holds caching configuration.
 //
 // Environment variables (with prefix LH_CACHE_):
 //   - LH_CACHE_REDIS_ADDR: Redis server address
@@ -13,7 +13,7 @@ import (
 //   - LH_CACHE_REDIS_DB: Redis database number
 //   - LH_CACHE_DISABLED: Disable caching
 //   - LH_CACHE_MAX_LIFETIME: Maximum cache lifetime (e.g., "1h", "30m")
-type cachingConf struct {
+type CachingConf struct {
 	// RedisAddr is the Redis server address.
 	// Env: LH_CACHE_REDIS_ADDR
 	RedisAddr string `yaml:"redis_addr" envconfig:"REDIS_ADDR"`

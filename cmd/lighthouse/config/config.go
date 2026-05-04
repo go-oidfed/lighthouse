@@ -26,8 +26,8 @@ import (
 //   - LH_ENTITY_ID: Entity identifier URL
 //   - LH_SERVER_*: Server configuration (see ServerConf)
 //   - LH_LOGGING_*: Logging configuration (see loggingConf)
-//   - LH_STORAGE_*: Storage configuration (see storageConf)
-//   - LH_CACHE_*: Caching configuration (see cachingConf)
+//   - LH_STORAGE_*: Storage configuration (see StorageConf)
+//   - LH_CACHE_*: Caching configuration (see CachingConf)
 //   - LH_SIGNING_*: Signing configuration (see SigningConf)
 //   - LH_ENDPOINTS_*: Endpoints configuration (see Endpoints)
 //   - LH_FEDERATION_DATA_*: Federation configuration (see federationConf)
@@ -44,11 +44,11 @@ type Config struct {
 	// Env prefix: LH_LOGGING_
 	Logging loggingConf `yaml:"logging" envconfig:"LOGGING"`
 	// Storage holds storage configuration.
-	// Env prefix: LH_STORAGE_
-	Storage storageConf `yaml:"storage" envconfig:"STORAGE"`
+	// Env prefix: LH_SERVER_
+	Storage StorageConf `yaml:"storage" envconfig:"STORAGE"`
 	// Caching holds caching configuration.
 	// Env prefix: LH_CACHE_
-	Caching cachingConf `yaml:"cache" envconfig:"CACHE"`
+	Caching CachingConf `yaml:"cache" envconfig:"CACHE"`
 	// Signing holds signing configuration.
 	// Env prefix: LH_SIGNING_
 	Signing SigningConf `yaml:"signing" envconfig:"SIGNING"`

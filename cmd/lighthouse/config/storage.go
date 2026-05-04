@@ -8,7 +8,7 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-// storageConf holds storage/database configuration.
+// StorageConf holds storage/database configuration.
 //
 // Environment variables (with prefix LH_STORAGE_):
 //   - LH_STORAGE_DRIVER: Database driver (sqlite, mysql, postgres)
@@ -20,7 +20,7 @@ import (
 //   - LH_STORAGE_PORT: Database port
 //   - LH_STORAGE_DB: Database name
 //   - LH_STORAGE_DEBUG: Enable debug logging
-type storageConf struct {
+type StorageConf struct {
 	// Deprecated: Only used for discovering a migration need
 	BackendType string `yaml:"backend" envconfig:"-"`
 	// Driver is the database driver type.
@@ -42,7 +42,7 @@ type storageConf struct {
 
 // users hashing parameters moved under api.admin.users_hash
 
-func (c *storageConf) validate() error {
+func (c *StorageConf) validate() error {
 	if c.BackendType != "" {
 		return errors.New("backend types have been deprecated; please migrate")
 	}
@@ -60,7 +60,7 @@ func (c *storageConf) validate() error {
 	return err
 }
 
-var defaultStorageConf = storageConf{
+var defaultStorageConf = StorageConf{
 	Driver: storage.DriverSQLite,
 	DSNConf: storage.DSNConf{
 		User: "lighthouse",
@@ -71,7 +71,7 @@ var defaultStorageConf = storageConf{
 }
 
 // LoadStorageBackends loads and returns the storage backends for the passed Config
-func LoadStorageBackends(c storageConf) (model.Backends, error) {
+func LoadStorageBackends(c StorageConf) (model.Backends, error) {
 	cfg := storage.Config{
 		Driver:  c.Driver,
 		DSN:     c.DSN,
