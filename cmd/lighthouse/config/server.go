@@ -7,4 +7,9 @@ import (
 var defaultServerConf = lighthouse.ServerConf{
 	Port:              7672,
 	ForwardedIPHeader: "X-Forwarded-For",
+	CORS: lighthouse.CORSConf{
+		Enabled:      false,
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH",
+	},
 }
