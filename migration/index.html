@@ -1,0 +1,2939 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Gabriel Zachmann">
+      
+      
+      
+        <link rel="prev" href="../deployment/lhcli/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Migration to LightHouse 0.20.0 - LightHouse</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        
+        <link rel="stylesheet" href="../assets/external/fonts.googleapis.com/css.49ea35f2.css">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_markdown_exec_pyodide.css">
+    
+      <link rel="stylesheet" href="../assets/_markdown_exec_ansi.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../stylesheets/admonitions.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#migration-to-lighthouse-0200" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="LightHouse" class="md-header__button md-logo" aria-label="LightHouse" data-md-component="logo">
+      
+  <img src="../assets/logo_dm.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LightHouse
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Migration to LightHouse 0.20.0
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  LightHouse - A Configurable OIDFed Trust Anchor
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../features/" class="md-tabs__link">
+          
+  
+  
+    
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.25 22-2.75-3 1.16-1.18 1.59 1.59 3.59-3.59L23 17.23M20.5 3a.5.5 0 0 1 .5.5v9.86c-.64-.23-1.31-.36-2-.36-1.54 0-2.94.6-4 1.56V7.1L9 5v11.9l4.04 1.4c-.04.24-.04.47-.04.7 0 .46.06.92.16 1.36L9 18.9l-5.34 2.07c-.07.03-.11.03-.16.03a.5.5 0 0 1-.5-.5V5.38c0-.23.16-.41.35-.48L9 3l6 2.1L20.33 3"/></svg>
+    
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../config/" class="md-tabs__link">
+          
+  
+  
+    
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 2c-1.11 0-2 .89-2 2v16a2 2 0 0 0 2 2h6.68a7 7 0 0 1-.68-3 7 7 0 0 1 7-7 7 7 0 0 1 1 .08V8l-6-6zm7 1.5L18.5 9H13zM18 14a.26.26 0 0 0-.26.21l-.19 1.32c-.3.13-.59.29-.85.47l-1.24-.5c-.11 0-.24 0-.31.13l-1 1.73c-.06.11-.04.24.06.32l1.06.82a4.2 4.2 0 0 0 0 1l-1.06.82a.26.26 0 0 0-.06.32l1 1.73c.06.13.19.13.31.13l1.24-.5c.26.18.54.35.85.47l.19 1.32c.02.12.12.21.26.21h2c.11 0 .22-.09.24-.21l.19-1.32c.3-.13.57-.29.84-.47l1.23.5c.13 0 .26 0 .33-.13l1-1.73a.26.26 0 0 0-.06-.32l-1.07-.82c.02-.17.04-.33.04-.5s-.01-.33-.04-.5l1.06-.82a.26.26 0 0 0 .06-.32l-1-1.73c-.06-.13-.19-.13-.32-.13l-1.23.5c-.27-.18-.54-.35-.85-.47l-.19-1.32A.236.236 0 0 0 20 14zm1 3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5c-.84 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5"/></svg>
+    
+  
+  Config
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../deployment/" class="md-tabs__link">
+          
+  
+  
+    
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.13 22.19-1.63-3.83c1.57-.58 3.04-1.36 4.4-2.27zM5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39S16.66.269 11 5.93c-2.19 2.19-3.5 4.6-4.35 6.71-.28.75-.09 1.57.46 2.13l2.13 2.12c.55.56 1.37.74 2.12.46A19.1 19.1 0 0 0 18.07 13c5.66-5.66 3.54-10.61 3.54-10.61m-7.07 7.07c-.78-.78-.78-2.05 0-2.83s2.05-.78 2.83 0c.77.78.78 2.05 0 2.83s-2.05.78-2.83 0m-5.66 7.07-1.41-1.41zM6.24 22l3.64-3.64c-.34-.09-.67-.24-.97-.45L4.83 22zM2 22h1.41l4.77-4.76-1.42-1.41L2 20.59zm0-2.83 4.09-4.08c-.21-.3-.36-.62-.45-.97L2 17.76z"/></svg>
+    
+  
+  Deployment
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.12 10H19V8.2h-3.62l-2-3.33c-.3-.5-.84-.84-1.46-.84-.18 0-.34.03-.5.08L6 5.8V11h1.8V7.33l2.11-.66L6 22h1.8l2.87-8.11L13 17v5h1.8v-6.41l-2.49-4.54.73-2.87M14 3.8c1 0 1.8-.8 1.8-1.8S15 .2 14 .2 12.2 1 12.2 2 13 3.8 14 3.8"/></svg>
+    
+  
+  Migration to LightHouse 0.20.0
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="LightHouse" class="md-nav__button md-logo" aria-label="LightHouse" data-md-component="logo">
+      
+  <img src="../assets/logo_dm.svg" alt="logo">
+
+    </a>
+    LightHouse
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LightHouse - A Configurable OIDFed Trust Anchor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../features/" class="md-nav__link ">
+              
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.25 22-2.75-3 1.16-1.18 1.59 1.59 3.59-3.59L23 17.23M20.5 3a.5.5 0 0 1 .5.5v9.86c-.64-.23-1.31-.36-2-.36-1.54 0-2.94.6-4 1.56V7.1L9 5v11.9l4.04 1.4c-.04.24-.04.47-.04.7 0 .46.06.92.16 1.36L9 18.9l-5.34 2.07c-.07.03-.11.03-.16.03a.5.5 0 0 1-.5-.5V5.38c0-.23.16-.41.35-.48L9 3l6 2.1L20.33 3"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/endpoints/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11 10H5L3 8l2-2h6V3l1-1 1 1v1h6l2 2-2 2h-6v2h6l2 2-2 2h-6v6a2 2 0 0 1 2 2H9a2 2 0 0 1 2-2z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/admin_api/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 7H5a2 2 0 0 0-2 2v8h2v-4h2v4h2V9a2 2 0 0 0-2-2m0 4H5V9h2m7-2h-4v10h2v-4h2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2m0 4h-2V9h2m6 0v6h1v2h-4v-2h1V9h-1V7h4v2Z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/entity_checks/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m22 4-2-2c-1.15.64-2.6 1-4 1s-2.86-.37-4-1c-1.14.63-2.6 1-4 1s-2.85-.36-4-1L2 4s2 2 2 4-2 6-2 8c0 4 10 6 10 6s10-2 10-6c0-2-2-6-2-8s2-4 2-4m-6.95 12.45-3.08-1.86-3.07 1.86.82-3.5L7 10.61l3.58-.31L11.97 7l1.4 3.29 3.58.31-2.72 2.34z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Entity Checks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/trustmarks/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m10 16-5-5 1.41-1.42L10 13.17l7.59-7.59L19 7m0-6H5c-1.11 0-2 .89-2 2v12.93c0 .69.35 1.3.88 1.66L12 23l8.11-5.41c.53-.36.89-.97.89-1.66V3a2 2 0 0 0-2-2"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust Marks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/statistics/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics &amp; Analytics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../config/" class="md-nav__link ">
+              
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 2c-1.11 0-2 .89-2 2v16a2 2 0 0 0 2 2h6.68a7 7 0 0 1-.68-3 7 7 0 0 1 7-7 7 7 0 0 1 1 .08V8l-6-6zm7 1.5L18.5 9H13zM18 14a.26.26 0 0 0-.26.21l-.19 1.32c-.3.13-.59.29-.85.47l-1.24-.5c-.11 0-.24 0-.31.13l-1 1.73c-.06.11-.04.24.06.32l1.06.82a4.2 4.2 0 0 0 0 1l-1.06.82a.26.26 0 0 0-.06.32l1 1.73c.06.13.19.13.31.13l1.24-.5c.26.18.54.35.85.47l.19 1.32c.02.12.12.21.26.21h2c.11 0 .22-.09.24-.21l.19-1.32c.3-.13.57-.29.84-.47l1.23.5c.13 0 .26 0 .33-.13l1-1.73a.26.26 0 0 0-.06-.32l-1.07-.82c.02-.17.04-.33.04-.5s-.01-.33-.04-.5l1.06-.82a.26.26 0 0 0 .06-.32l-1-1.73c-.06-.13-.19-.13-.32-.13l-1.23.5c-.27-.18-.54-.35-.85-.47l-.19-1.32A.236.236 0 0 0 20 14zm1 3.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5c-.84 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Config
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/server/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 19h1a1 1 0 0 1 1 1h7v2h-7a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1H2v-2h7a1 1 0 0 1 1-1h1v-2H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-7zM4 3h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1m5 4h1V5H9zm0 8h1v-2H9zM5 5v2h2V5zm0 8v2h2v-2z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/logging/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.8 20c-.4 1.2-1.5 2-2.8 2H5c-1.7 0-3-1.3-3-3v-1h12.2c.4 1.2 1.5 2 2.8 2zM19 2c1.7 0 3 1.3 3 3v1h-2V5c0-.6-.4-1-1-1s-1 .4-1 1v13h-1c-.6 0-1-.4-1-1v-1H5V5c0-1.7 1.3-3 3-3zM8 6v2h7V6zm0 4v2h6v-2z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Logging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/storage/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4M4 9v3c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4s-8-1.79-8-4m0 5v3c0 2.21 3.58 4 8 4s8-1.79 8-4v-3c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/cache/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16.5 16.25 2.86 1.69-.75 1.22L15 17v-5h1.5zM23 16c0 3.87-3.13 7-7 7a7 7 0 0 1-5.75-3C6.18 19.79 3 18.08 3 16v-3c0 1.88 2.58 3.44 6.06 3.88C9.03 16.59 9 16.3 9 16c0-.38.04-.75.1-1.12-3.5-.43-6.1-2-6.1-3.88V8c0 2.09 3.2 3.8 7.27 4 .6-.86 1.37-1.56 2.26-2.07-.49.04-1.03.07-1.53.07-4.42 0-8-1.79-8-4s3.58-4 8-4 8 1.79 8 4c0 1.2-1.07 2.28-2.75 3 .75.04 1.5.19 2.19.45C18.79 9 19 8.5 19 8v1.68c2.36 1.13 4 3.53 4 6.32m-2 0c0-2.76-2.24-5-5-5s-5 2.24-5 5 2.24 5 5 5 5-2.24 5-5"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Cache
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/signing/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M22 22H2v-2h20zM6.2 17.3l-.7.7-1.4-1.4L2.7 18l-.7-.7 1.4-1.4L2 14.5l.7-.7 1.4 1.4 1.4-1.4.7.7-1.4 1.4zm10.02-2.87c0-.58-.72-1.23-2.16-1.97-1.83-.92-3.06-1.67-3.7-2.22-.65-.56-.97-1.18-.97-1.87 0-1.78.91-3.25 2.73-4.42s3.31-1.76 4.45-1.76c.74 0 1.28.13 1.61.39.32.25.5.69.5 1.32 0 .28-.12.52-.37.73-.24.2-.44.3-.57.3-.11 0-.31-.1-.61-.29l-.58-.26c-.47 0-1.41.33-2.84 1q-2.13.99-2.13 2.25c0 .51.24.97.74 1.37.5.42 1.39.93 2.68 1.53 1.03.47 1.86.97 2.5 1.54.6.54.91 1.18.91 1.93 0 1.34-.94 2.41-2.83 3.17-1.88.77-3.68 1.15-5.39 1.15-1.44 0-2.19-.49-2.19-1.46 0-.36.19-.59.5-.75.33-.16.66-.24 1-.24l.75.13.72.13c.98 0 2.03-.16 3.16-.49 1.13-.32 1.83-.73 2.09-1.21"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Signing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/endpoints/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11 10H5L3 8l2-2h6V3l1-1 1 1v1h6l2 2-2 2h-6v2h6l2 2-2 2h-6v6a2 2 0 0 1 2 2H9a2 2 0 0 1 2-2z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/federation_data/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14 2-3 1.5v16.44C7 19.5 4 17.46 4 15c0-2.25 2.5-4.15 6-4.78V8.19c-5.14.69-9 3.47-9 6.81 0 3.56 4.36 6.5 10 6.94h.09L14 20.5zm1 6.19v2.03c1.15.21 2.18.55 3.06 1L16.5 12l6.5 1.5-.5-4.5-2 1C19 9.12 17.12 8.47 15 8.19"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Federation Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/api/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 7H5a2 2 0 0 0-2 2v8h2v-4h2v4h2V9a2 2 0 0 0-2-2m0 4H5V9h2m7-2h-4v10h2v-4h2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2m0 4h-2V9h2m6 0v6h1v2h-4v-2h1V9h-1V7h4v2Z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config/stats/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../deployment/" class="md-nav__link ">
+              
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.13 22.19-1.63-3.83c1.57-.58 3.04-1.36 4.4-2.27zM5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39S16.66.269 11 5.93c-2.19 2.19-3.5 4.6-4.35 6.71-.28.75-.09 1.57.46 2.13l2.13 2.12c.55.56 1.37.74 2.12.46A19.1 19.1 0 0 0 18.07 13c5.66-5.66 3.54-10.61 3.54-10.61m-7.07 7.07c-.78-.78-.78-2.05 0-2.83s2.05-.78 2.83 0c.77.78.78 2.05 0 2.83s-2.05.78-2.83 0m-5.66 7.07-1.41-1.41zM6.24 22l3.64-3.64c-.34-.09-.67-.24-.97-.45L4.83 22zM2 22h1.41l4.77-4.76-1.42-1.41L2 20.59zm0-2.83 4.09-4.08c-.21-.3-.36-.62-.45-.97L2 17.76z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/caddy/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.983 11.078h2.119a.186.186 0 0 0 .186-.185V9.006a.186.186 0 0 0-.186-.186h-2.119a.185.185 0 0 0-.185.185v1.888c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 0 0 .186-.186V3.574a.186.186 0 0 0-.186-.185h-2.118a.185.185 0 0 0-.185.185v1.888c0 .102.082.185.185.185m0 2.716h2.118a.187.187 0 0 0 .186-.186V6.29a.186.186 0 0 0-.186-.185h-2.118a.185.185 0 0 0-.185.185v1.887c0 .102.082.185.185.186m-2.93 0h2.12a.186.186 0 0 0 .184-.186V6.29a.185.185 0 0 0-.185-.185H8.1a.185.185 0 0 0-.185.185v1.887c0 .102.083.185.185.186m-2.964 0h2.119a.186.186 0 0 0 .185-.186V6.29a.185.185 0 0 0-.185-.185H5.136a.186.186 0 0 0-.186.185v1.887c0 .102.084.185.186.186m5.893 2.715h2.118a.186.186 0 0 0 .186-.185V9.006a.186.186 0 0 0-.186-.186h-2.118a.185.185 0 0 0-.185.185v1.888c0 .102.082.185.185.185m-2.93 0h2.12a.185.185 0 0 0 .184-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.185.185 0 0 0-.184.185v1.888c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 0 0 .185-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.186.186 0 0 0-.186.186v1.887c0 .102.084.185.186.185m-2.92 0h2.12a.185.185 0 0 0 .184-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.185.185 0 0 0-.184.185v1.888c0 .102.082.185.185.185M23.763 9.89c-.065-.051-.672-.51-1.954-.51q-.508.001-1.01.087c-.248-1.7-1.653-2.53-1.716-2.566l-.344-.199-.226.327c-.284.438-.49.922-.612 1.43-.23.97-.09 1.882.403 2.661-.595.332-1.55.413-1.744.42H.751a.75.75 0 0 0-.75.748 11.4 11.4 0 0 0 .692 4.062c.545 1.428 1.355 2.48 2.41 3.124 1.18.723 3.1 1.137 5.275 1.137a15.7 15.7 0 0 0 2.93-.266 12.3 12.3 0 0 0 3.823-1.389 10.5 10.5 0 0 0 2.61-2.136c1.252-1.418 1.998-2.997 2.553-4.4h.221c1.372 0 2.215-.549 2.68-1.009.309-.293.55-.65.707-1.046l.098-.288Z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Caddy & Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/lhcli/" class="md-nav__link">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 19V7H4v12zm0-16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm-7 14v-2h5v2zm-3.42-4L5.57 9H8.4l3.3 3.3c.39.39.39 1.03 0 1.42L8.42 17H5.59z"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    LightHouse CLI (lhcli)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.12 10H19V8.2h-3.62l-2-3.33c-.3-.5-.84-.84-1.46-.84-.18 0-.34.03-.5.08L6 5.8V11h1.8V7.33l2.11-.66L6 22h1.8l2.87-8.11L13 17v5h1.8v-6.41l-2.49-4.54.73-2.87M14 3.8c1 0 1.8-.8 1.8-1.8S15 .2 14 .2 12.2 1 12.2 2 13 3.8 14 3.8"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration to LightHouse 0.20.0
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.12 10H19V8.2h-3.62l-2-3.33c-.3-.5-.84-.84-1.46-.84-.18 0-.34.03-.5.08L6 5.8V11h1.8V7.33l2.11-.66L6 22h1.8l2.87-8.11L13 17v5h1.8v-6.41l-2.49-4.54.73-2.87M14 3.8c1 0 1.8-.8 1.8-1.8S15 .2 14 .2 12.2 1 12.2 2 13 3.8 14 3.8"/></svg>
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration to LightHouse 0.20.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quickstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quickstart
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-the-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build the tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#signing-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing keys
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Signing keys">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-type-identifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key type identifiers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-key-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public key migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kms-private-key-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KMS (private key) migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-db-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data (DB) migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data (DB) migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-migration-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data migration sections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#important-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Important Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Config migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#transformations-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformations applied
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fields-moved-to-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields moved to database
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fields-not-migrated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields NOT migrated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fields-that-remain-in-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields that remain in config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-usage_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flags_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-to-database-migration-config2db" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config to Database migration (config2db)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Config to Database migration (config2db)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-usage_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flags_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#after-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After migration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="migration-to-lighthouse-0200">Migration to LightHouse 0.20.0<a class="headerlink" href="#migration-to-lighthouse-0200" title="Permanent link">&para;</a></h1>
+<p>This page covers how to migrate to LightHouse &gt;= 0.20.0.
+LightHouse 0.20.0 is a major release with significant changes, including 
+key management and storage backends.</p>
+<div class="admonition danger">
+<p class="admonition-title">Breaking Changes</p>
+<p>You cannot directly upgrade from LightHouse &lt;0.20.0 to 0.20.0.</p>
+<p><strong>You MUST migrate your deployment.</strong></p>
+</div>
+<p>We still try to make it as easy as possible to migrate your deployment.</p>
+<div class="admonition warning">
+<p class="admonition-title">Backup Before Migration</p>
+<p>Before starting the migration process, create backups of:</p>
+<ul>
+<li>Your configuration file (<code>config.yaml</code>)</li>
+<li>Your data directory (e.g., <code>/var/lib/lighthouse</code>)</li>
+<li>Your signing keys directory</li>
+<li>Your "database"</li>
+</ul>
+<p>This ensures you can recover if anything goes wrong during migration.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Understanding the Changes in LightHouse 0.20.0</p>
+<p>The main addition in LightHouse 0.20.0 is an http admin API. This admin API 
+allows admins of LightHouse to manage almost all aspects of LightHouse via 
+this API. This has several implications. The following is a list of changes 
+that are relevant:</p>
+<ul>
+<li>LightHouse now has an admin API, which allows management of LightHouse via 
+  HTTP requests.</li>
+<li>The storage backend (database) is now driven by a SQL database.<ul>
+<li>Different databases are supported: SQLite, MySQL, and PostgreSQL.</li>
+<li>To keep existing data, you must migrate your database to the new backend.</li>
+</ul>
+</li>
+<li>The key management has been changed.<ul>
+<li>LightHouse supports private keys on the filesystem or in an HSM.<ul>
+<li>Existing keys can be migrated to the new filesystem KMS.</li>
+</ul>
+</li>
+<li>LightHouse can manage public keys on the filesystem or in the database 
+  (default is database).</li>
+</ul>
+</li>
+<li>The configuration file is not backwards compatible with previous versions.<ul>
+<li>Some options might have been renamed or removed.</li>
+<li>You must migrate your configuration file to the latest format.</li>
+<li>Several of the options can now be configured via the admin API, but 
+  have been removed from the configuration file.<ul>
+<li>There is a migration tool to read a config file and apply it to the 
+  database.</li>
+</ul>
+</li>
+<li>Most of the options can now be configured via environment variables.</li>
+</ul>
+</li>
+</ul>
+</div>
+<h2 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h2>
+<p>This quickstart covers the complete migration workflow. Run these commands in order.</p>
+<div class="admonition tip">
+<p class="admonition-title">Using Docker</p>
+<p>If you're using the Docker image instead of building the tool locally, replace 
+<code>./lhmigrate</code> with the Docker command. Make sure to mount all required directories (and connect to the 
+db-container network if applicable):</p>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-v<span class="w"> </span>./:/data<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--network<span class="w"> </span>db-net
+<span class="w">  </span>--entrypoint<span class="w"> </span>/lhmigrate
+<span class="w">  </span>oidfed/lighthouse:0.20.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/data/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="c1"># ... other flags</span>
+</code></pre></div>
+</div>
+<p>Select your <strong>previous storage backend</strong> (JSON or BadgerDB) and your <strong>target database</strong> (SQLite, MySQL, or PostgreSQL):</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:6"><input checked="checked" id="json-to-sqlite" name="__tabbed_1" type="radio" /><input id="badgerdb-to-sqlite" name="__tabbed_1" type="radio" /><input id="json-to-mysql" name="__tabbed_1" type="radio" /><input id="badgerdb-to-mysql" name="__tabbed_1" type="radio" /><input id="json-to-postgresql" name="__tabbed_1" type="radio" /><input id="badgerdb-to-postgresql" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="json-to-sqlite">JSON to SQLite</label><label for="badgerdb-to-sqlite">BadgerDB to SQLite</label><label for="json-to-mysql">JSON to MySQL</label><label for="badgerdb-to-mysql">BadgerDB to MySQL</label><label for="json-to-postgresql">JSON to PostgreSQL</label><label for="badgerdb-to-postgresql">BadgerDB to PostgreSQL</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="all-in-one" name="__tabbed_2" type="radio" /><input id="detailed" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="all-in-one">All in one</label><label for="detailed">Detailed</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># Run all migration steps in one command</span>
+./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-source<span class="o">=</span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-dest<span class="o">=</span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="o">=</span>db
+</code></pre></div>
+<p>This single command runs all migration steps in sequence:</p>
+<ol>
+<li><strong>config</strong> - Transform legacy config file to new format</li>
+<li><strong>keys-public</strong> - Migrate public keys (JWKS + history) to database</li>
+<li><strong>keys-kms</strong> - Migrate private keys to filesystem KMS</li>
+<li><strong>config2db</strong> - Migrate config values to database (with <code>--update-config</code>)</li>
+<li><strong>db</strong> - Migrate legacy storage data (subordinates, trust marks)</li>
+<li><strong>config-cleanup</strong> - Remove empty/leftover values from config file</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> to preview all changes without applying them:
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-source<span class="o">=</span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-dest<span class="o">=</span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="o">=</span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dry-run<span class="w"> </span>-v
+</code></pre></div></p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Skip Steps</p>
+<p>Use <code>--skip</code> to skip specific steps:
+<div class="highlight"><pre><span></span><code><span class="c1"># Skip key migrations if you don&#39;t have legacy keys</span>
+./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--skip<span class="o">=</span>keys-public,keys-kms
+</code></pre></div></p>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># 2. Migrate signing keys</span>
+<span class="c1"># 2a. Migrate public keys (JWKS + rotation history) to database</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse
+
+<span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
+<span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
+<span class="c1"># Trust mark specs must exist in the DB before trust marked entities can be migrated</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--update-config
+
+<span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/var/lib/lighthouse
+
+<span class="c1"># 6. Update your deployment to use the new config and data locations</span>
+mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> (or <code>-n -v</code>) to any command to preview changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Combined Config Migration</p>
+<p>Steps 3 and 4 can be combined into a single command:
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-config2db
+</code></pre></div></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="all-in-one_1" name="__tabbed_3" type="radio" /><input id="detailed_1" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="all-in-one_1">All in one</label><label for="detailed_1">Detailed</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># Run all migration steps in one command</span>
+./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-source<span class="o">=</span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-dest<span class="o">=</span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="o">=</span>db
+</code></pre></div>
+<p>This single command runs all migration steps in sequence:</p>
+<ol>
+<li><strong>config</strong> - Transform legacy config file to new format</li>
+<li><strong>keys-public</strong> - Migrate public keys (JWKS + history) to database</li>
+<li><strong>keys-kms</strong> - Migrate private keys to filesystem KMS</li>
+<li><strong>config2db</strong> - Migrate config values to database (with <code>--update-config</code>)</li>
+<li><strong>db</strong> - Migrate legacy storage data (subordinates, trust marks)</li>
+<li><strong>config-cleanup</strong> - Remove empty/leftover values from config file</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> to preview all changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Skip Steps</p>
+<p>Use <code>--skip</code> to skip specific steps (e.g., <code>--skip=keys-public,keys-kms</code>).</p>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># 2. Migrate signing keys</span>
+<span class="c1"># 2a. Migrate public keys (JWKS + rotation history) to database</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse
+
+<span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
+<span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
+<span class="c1"># Trust mark specs must exist in the DB before trust marked entities can be migrated</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--update-config
+
+<span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/var/lib/lighthouse
+
+<span class="c1"># 6. Update your deployment to use the new config and data locations</span>
+mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> (or <code>-n -v</code>) to any command to preview changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Combined Config Migration</p>
+<p>Steps 3 and 4 can be combined into a single command:
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-config2db
+</code></pre></div></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="all-in-one_2" name="__tabbed_4" type="radio" /><input id="detailed_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="all-in-one_2">All in one</label><label for="detailed_2">Detailed</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># Run all migration steps in one command</span>
+./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-source<span class="o">=</span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-dest<span class="o">=</span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="o">=</span>db
+</code></pre></div>
+<p>This single command runs all migration steps in sequence:</p>
+<ol>
+<li><strong>config</strong> - Transform legacy config file to new format</li>
+<li><strong>keys-public</strong> - Migrate public keys (JWKS + history) to database</li>
+<li><strong>keys-kms</strong> - Migrate private keys to filesystem KMS</li>
+<li><strong>config2db</strong> - Migrate config values to database (with <code>--update-config</code>)</li>
+<li><strong>db</strong> - Migrate legacy storage data (subordinates, trust marks)</li>
+<li><strong>config-cleanup</strong> - Remove empty/leftover values from config file</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> to preview all changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Skip Steps</p>
+<p>Use <code>--skip</code> to skip specific steps (e.g., <code>--skip=keys-public,keys-kms</code>).</p>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># 2. Migrate signing keys</span>
+<span class="c1"># 2a. Migrate public keys (JWKS + rotation history) to database</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
+<span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
+<span class="c1"># Trust mark specs must exist in the DB before trust marked entities can be migrated</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--update-config
+
+<span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 6. Update your deployment to use the new config and data locations</span>
+mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> (or <code>-n -v</code>) to any command to preview changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Combined Config Migration</p>
+<p>Steps 3 and 4 can be combined into a single command:
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-config2db
+</code></pre></div></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="tabbed-set tabbed-alternate" data-tabs="5:2"><input checked="checked" id="all-in-one_3" name="__tabbed_5" type="radio" /><input id="detailed_3" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="all-in-one_3">All in one</label><label for="detailed_3">Detailed</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># Run all migration steps in one command</span>
+./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-source<span class="o">=</span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-dest<span class="o">=</span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="o">=</span>db
+</code></pre></div>
+<p>This single command runs all migration steps in sequence:</p>
+<ol>
+<li><strong>config</strong> - Transform legacy config file to new format</li>
+<li><strong>keys-public</strong> - Migrate public keys (JWKS + history) to database</li>
+<li><strong>keys-kms</strong> - Migrate private keys to filesystem KMS</li>
+<li><strong>config2db</strong> - Migrate config values to database (with <code>--update-config</code>)</li>
+<li><strong>db</strong> - Migrate legacy storage data (subordinates, trust marks)</li>
+<li><strong>config-cleanup</strong> - Remove empty/leftover values from config file</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> to preview all changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Skip Steps</p>
+<p>Use <code>--skip</code> to skip specific steps (e.g., <code>--skip=keys-public,keys-kms</code>).</p>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># 2. Migrate signing keys</span>
+<span class="c1"># 2a. Migrate public keys (JWKS + rotation history) to database</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
+<span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
+<span class="c1"># Trust mark specs must exist in the DB before trust marked entities can be migrated</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--update-config
+
+<span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># 6. Update your deployment to use the new config and data locations</span>
+mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> (or <code>-n -v</code>) to any command to preview changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Combined Config Migration</p>
+<p>Steps 3 and 4 can be combined into a single command:
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-config2db
+</code></pre></div></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="tabbed-set tabbed-alternate" data-tabs="6:2"><input checked="checked" id="all-in-one_4" name="__tabbed_6" type="radio" /><input id="detailed_4" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="all-in-one_4">All in one</label><label for="detailed_4">Detailed</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># Run all migration steps in one command</span>
+./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-source<span class="o">=</span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-dest<span class="o">=</span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="o">=</span>db
+</code></pre></div>
+<p>This single command runs all migration steps in sequence:</p>
+<ol>
+<li><strong>config</strong> - Transform legacy config file to new format</li>
+<li><strong>keys-public</strong> - Migrate public keys (JWKS + history) to database</li>
+<li><strong>keys-kms</strong> - Migrate private keys to filesystem KMS</li>
+<li><strong>config2db</strong> - Migrate config values to database (with <code>--update-config</code>)</li>
+<li><strong>db</strong> - Migrate legacy storage data (subordinates, trust marks)</li>
+<li><strong>config-cleanup</strong> - Remove empty/leftover values from config file</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> to preview all changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Skip Steps</p>
+<p>Use <code>--skip</code> to skip specific steps (e.g., <code>--skip=keys-public,keys-kms</code>).</p>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># 2. Migrate signing keys</span>
+<span class="c1"># 2a. Migrate public keys (JWKS + rotation history) to database</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
+<span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
+<span class="c1"># Trust mark specs must exist in the DB before trust marked entities can be migrated</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--update-config
+
+<span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 6. Update your deployment to use the new config and data locations</span>
+mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> (or <code>-n -v</code>) to any command to preview changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Combined Config Migration</p>
+<p>Steps 3 and 4 can be combined into a single command:
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-config2db
+</code></pre></div></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="tabbed-set tabbed-alternate" data-tabs="7:2"><input checked="checked" id="all-in-one_5" name="__tabbed_7" type="radio" /><input id="detailed_5" name="__tabbed_7" type="radio" /><div class="tabbed-labels"><label for="all-in-one_5">All in one</label><label for="detailed_5">Detailed</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># Run all migration steps in one command</span>
+./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-source<span class="o">=</span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--keys-dest<span class="o">=</span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="o">=</span>db
+</code></pre></div>
+<p>This single command runs all migration steps in sequence:</p>
+<ol>
+<li><strong>config</strong> - Transform legacy config file to new format</li>
+<li><strong>keys-public</strong> - Migrate public keys (JWKS + history) to database</li>
+<li><strong>keys-kms</strong> - Migrate private keys to filesystem KMS</li>
+<li><strong>config2db</strong> - Migrate config values to database (with <code>--update-config</code>)</li>
+<li><strong>db</strong> - Migrate legacy storage data (subordinates, trust marks)</li>
+<li><strong>config-cleanup</strong> - Remove empty/leftover values from config file</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> to preview all changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Skip Steps</p>
+<p>Use <code>--skip</code> to skip specific steps (e.g., <code>--skip=keys-public,keys-kms</code>).</p>
+</div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. Build the migration tool (or use the docker image)</span>
+go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+
+<span class="c1"># 2. Migrate signing keys</span>
+<span class="c1"># 2a. Migrate public keys (JWKS + rotation history) to database</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
+<span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
+<span class="c1"># Trust mark specs must exist in the DB before trust marked entities can be migrated</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--update-config
+
+<span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># 6. Update your deployment to use the new config and data locations</span>
+mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Dry Run</p>
+<p>Add <code>--dry-run -v</code> (or <code>-n -v</code>) to any command to preview changes without applying them.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Combined Config Migration</p>
+<p>Steps 3 and 4 can be combined into a single command:
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-config2db
+</code></pre></div></p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<h2 id="build-the-tool">Build the tool<a class="headerlink" href="#build-the-tool" title="Permanent link">&para;</a></h2>
+<p>From the repository root:</p>
+<div class="highlight"><pre><span></span><code>go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>lhmigrate<span class="w"> </span>./cmd/lhmigrate
+</code></pre></div>
+<p>The <code>lhmigrate</code> tool is also already included in the docker image.</p>
+<h2 id="signing-keys">Signing keys<a class="headerlink" href="#signing-keys" title="Permanent link">&para;</a></h2>
+<p>The key migrations live under the <code>keys</code> command (alias: <code>signing</code>). There are two subcommands:</p>
+<ul>
+<li><code>public</code>: Migrate legacy public key storage (JWKS + rotation history) to the new filesystem public store.</li>
+<li><code>kms</code>: Migrate legacy private key files (<code>&lt;type&gt;_&lt;alg&gt;.pem</code>) to the filesystem KMS and align the public keys.</li>
+</ul>
+<h3 id="key-type-identifiers">Key type identifiers<a class="headerlink" href="#key-type-identifiers" title="Permanent link">&para;</a></h3>
+<p>Use <code>--type</code> (or <code>-t</code>) to choose the key group. For federation signing keys, <code>--type federation</code> (default) is typically used.</p>
+<h3 id="public-key-migration">Public key migration<a class="headerlink" href="#public-key-migration" title="Permanent link">&para;</a></h3>
+<p>Migrate legacy JWKS and rotation history to either filesystem storage (default) or the database-backed public key storage.</p>
+<p>Filesystem destination (default):</p>
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span>--source<span class="w"> </span>&lt;legacy_dir&gt;<span class="w"> </span>--dest<span class="w"> </span>&lt;dest_dir&gt;<span class="w"> </span>--type<span class="w"> </span>&lt;typeID&gt;
+</code></pre></div>
+<p>Database destination:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># SQLite</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span>--source<span class="w"> </span>&lt;legacy_dir&gt;<span class="w"> </span>--dest<span class="w"> </span>&lt;/path/to/sqlite_dir_or_db&gt;<span class="w"> </span>--type<span class="w"> </span>&lt;typeID&gt;<span class="w"> </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># MySQL</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span>--source<span class="w"> </span>&lt;legacy_dir&gt;<span class="w"> </span>--type<span class="w"> </span>&lt;typeID&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># PostgreSQL</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span>--source<span class="w"> </span>&lt;legacy_dir&gt;<span class="w"> </span>--type<span class="w"> </span>&lt;typeID&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=gorm password=gorm dbname=gorm port=9920&#39;</span>
+</code></pre></div>
+<p>Flags:</p>
+<ul>
+<li><code>--source</code>, <code>-s</code>: Path to legacy public key storage directory (required)</li>
+<li><code>--dest</code>, <code>-d</code>: Destination for filesystem store, or SQLite file/dir (default: same as <code>--source</code>)</li>
+<li><code>--type</code>, <code>-t</code>: Key type identifier (default: <code>federation</code>)</li>
+<li><code>--db-type</code>: Destination database type (<code>sqlite|mysql|postgres</code>). If omitted, filesystem destination is used.</li>
+<li><code>--db-dsn</code>: DSN for MySQL/Postgres. Ignored for SQLite.</li>
+<li><code>--db-debug</code>: Enable GORM debug logging.</li>
+<li><code>--verbose</code>, <code>-v</code>: Verbose CLI logging</li>
+</ul>
+<p>Examples:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Filesystem migration</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation
+
+<span class="c1"># SQLite DB migration (uses /var/lib/lighthouse/lighthouse.db if --dest is a directory)</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># MySQL DB migration</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># PostgreSQL DB migration</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lh password=secret dbname=lighthouse port=9920&#39;</span>
+</code></pre></div>
+<h3 id="kms-private-key-migration">KMS (private key) migration<a class="headerlink" href="#kms-private-key-migration" title="Permanent link">&para;</a></h3>
+<p>Expected legacy layout: one PEM per algorithm in <code>--source</code>, named <code>&lt;type&gt;_&lt;alg&gt;.pem</code> (e.g., <code>federation_ES256.pem</code>).</p>
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span>--source<span class="w"> </span>&lt;legacy_dir&gt;<span class="w"> </span>--dest<span class="w"> </span>&lt;dest_dir&gt;<span class="w"> </span>--type<span class="w"> </span>&lt;typeID&gt;<span class="w"> </span>--algs<span class="w"> </span>&lt;list&gt;<span class="w"> </span>--pks-type<span class="w"> </span>&lt;fs<span class="p">|</span>db&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</code></pre></div>
+<p>Flags:</p>
+<ul>
+<li><code>--source</code>, <code>-s</code>: Path to legacy key files directory (required)</li>
+<li><code>--dest</code>, <code>-d</code>: Destination directory for filesystem KMS (and public storage if <code>--pks-type=fs</code>)</li>
+<li><code>--type</code>, <code>-t</code>: Key type identifier (default: <code>federation</code>)</li>
+<li><code>--algs</code>, <code>-a</code>: Comma‑separated list of algorithms (e.g., <code>ES256,RS256</code>) (required)</li>
+<li><code>--pks-type</code>: Public key storage type: <code>fs</code> (filesystem) or <code>db</code> (database) (required)</li>
+<li><code>--db-type</code>: Database type for public key storage: <code>sqlite</code>, <code>mysql</code>, or <code>postgres</code> (required when <code>--pks-type=db</code>)</li>
+<li><code>--db-dsn</code>: Database DSN for MySQL/PostgreSQL (ignored for SQLite)</li>
+<li><code>--db-debug</code>: Enable GORM debug logging for DB operations</li>
+<li><code>--default</code>: Default algorithm to mark active after migration (optional)</li>
+<li><code>--generate-missing</code>, <code>-g</code>: Generate missing keys in destination if not present (optional)</li>
+<li><code>--rsa-len</code>: RSA key length when generating (default: <code>4096</code>)</li>
+<li><code>--verbose</code>, <code>-v</code>: Verbose logging</li>
+</ul>
+<p>Examples:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Migrate ES256 and RS256 keys with filesystem public key storage</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>fs
+
+<span class="c1"># Migrate keys with SQLite-based public key storage</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># Migrate keys with MySQL-based public key storage</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># Migrate keys with PostgreSQL-based public key storage</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+
+<span class="c1"># Migrate ES256, set it as default, with DB storage</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>ES256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--default<span class="w"> </span>ES256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>sqlite
+
+<span class="c1"># Generate missing keys in destination with filesystem storage</span>
+./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="w"> </span>/var/lib/lighthouse/keys<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--algs<span class="w"> </span>RS256<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--generate-missing<span class="w"> </span>--rsa-len<span class="w"> </span><span class="m">4096</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pks-type<span class="w"> </span>fs
+</code></pre></div>
+<h2 id="data-db-migration">Data (DB) migration<a class="headerlink" href="#data-db-migration" title="Permanent link">&para;</a></h2>
+<p>The <code>db</code> subcommand migrates legacy storage (JSON file or BadgerDB) to the new GORM‑based storage backends.</p>
+<h3 id="data-migration-sections">Data migration sections<a class="headerlink" href="#data-migration-sections" title="Permanent link">&para;</a></h3>
+<p>The following data is migrated:</p>
+<ul>
+<li><strong>subordinates</strong> - Subordinate entities and their JWKS, metadata, policies, and constraints</li>
+<li><strong>trust_marked_entities</strong> - Trust mark subject eligibility status (active, blocked, pending)</li>
+</ul>
+<h3 id="cli-usage">CLI Usage<a class="headerlink" href="#cli-usage" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="w"> </span>&lt;json<span class="p">|</span>badger&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>/path/to/source<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="w"> </span>&lt;sqlite<span class="p">|</span>mysql<span class="p">|</span>postgres&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--dest<span class="w"> </span>/path/to/sqlite<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-dsn<span class="w"> </span><span class="s2">&quot;dsn for mysql/postgres&quot;</span><span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--force<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--dry-run<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--only<span class="o">=</span>&lt;sections&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--skip<span class="o">=</span>&lt;sections&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>-v<span class="o">]</span>
+</code></pre></div>
+<h3 id="flags">Flags<a class="headerlink" href="#flags" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>--source-type</code>: Source storage type (<code>json</code> or <code>badger</code>) - <strong>required</strong></li>
+<li><code>--source</code>, <code>-s</code>: Path to legacy data directory - <strong>required</strong></li>
+<li><code>--db-type</code>: Destination database type (<code>sqlite</code>, <code>mysql</code>, or <code>postgres</code>) - default: <code>sqlite</code></li>
+<li><code>--dest</code>, <code>-d</code>: Destination data directory (for SQLite)</li>
+<li><code>--db-dsn</code>: Destination DSN (for MySQL/PostgreSQL)</li>
+<li><code>--db-debug</code>: Enable GORM debug logging</li>
+<li><code>--force</code>, <code>-f</code>: Overwrite existing records</li>
+<li><code>--dry-run</code>, <code>-n</code>: Preview only, don't make changes</li>
+<li><code>--only</code>: Comma-separated list of sections to migrate (default: all)</li>
+<li><code>--skip</code>: Comma-separated list of sections to skip</li>
+<li><code>--verbose</code>, <code>-v</code>: Verbose logging</li>
+</ul>
+<h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Migrate JSON file storage to SQLite</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/var/lib/lighthouse
+
+<span class="c1"># Migrate BadgerDB to PostgreSQL</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse&#39;</span>
+
+<span class="c1"># Dry run to preview migration</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dry-run<span class="w"> </span>-v
+
+<span class="c1"># Migrate only subordinates, skip trust marked entities</span>
+./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--only<span class="o">=</span>subordinates
+</code></pre></div>
+<h3 id="important-notes">Important Notes<a class="headerlink" href="#important-notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Trust marked entities require trust mark specs to exist in the database first. Run <code>lhmigrate config2db</code> before <code>lhmigrate db</code> if you have trust mark specs in your config file.</li>
+<li>Per-subordinate <code>MetadataPolicyCrit</code> is no longer supported. A warning will be logged if this field is present in legacy data; consider migrating to the global setting via <code>config2db</code>.</li>
+<li>Existing records are skipped by default. Use <code>--force</code> to overwrite.</li>
+</ul>
+<h2 id="config-migration">Config migration<a class="headerlink" href="#config-migration" title="Permanent link">&para;</a></h2>
+<p>The <code>config</code> subcommand transforms legacy configuration files to the new format compatible with LightHouse 0.20.0+.</p>
+<p>The <code>--db-type</code>, <code>--db-dsn</code>, and <code>--db-dir</code> options configure the <code>storage</code> section in the output config file, ensuring it has the correct database driver and connection settings. These options are also passed to <code>config2db</code> if <code>--run-config2db</code> is set.</p>
+<h3 id="transformations-applied">Transformations applied<a class="headerlink" href="#transformations-applied" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Old Config</th>
+<th>New Config</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>storage.backend</code> (json|badger)</td>
+<td><code>storage.driver</code></td>
+<td>Set from <code>--db-type</code> (default: sqlite)</td>
+</tr>
+<tr>
+<td><code>storage.dsn</code></td>
+<td><code>storage.dsn</code></td>
+<td>Set from <code>--db-dsn</code> (for mysql/postgres)</td>
+</tr>
+<tr>
+<td><code>storage.data_dir</code></td>
+<td><code>storage.data_dir</code></td>
+<td>Set from <code>--db-dir</code> (for sqlite)</td>
+</tr>
+<tr>
+<td><code>signing.automatic_key_rollover</code></td>
+<td><code>signing.key_rotation</code></td>
+<td>Renamed</td>
+</tr>
+<tr>
+<td><code>federation_data.entity_id</code></td>
+<td><code>entity_id</code></td>
+<td>Moved to top level</td>
+</tr>
+</tbody>
+</table>
+<p>Deprecated fields are preserved with comments indicating they should be migrated to the database.</p>
+<h3 id="fields-moved-to-database">Fields moved to database<a class="headerlink" href="#fields-moved-to-database" title="Permanent link">&para;</a></h3>
+<p>The following fields are now managed in the database via the Admin API or <code>lhmigrate config2db</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Config Path</th>
+<th>Migration Section</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>signing.alg</code></td>
+<td><code>alg</code></td>
+<td>Signing algorithm (e.g., ES256, RS256)</td>
+</tr>
+<tr>
+<td><code>signing.rsa_key_len</code></td>
+<td><code>rsa_key_len</code></td>
+<td>RSA key length (e.g., 2048, 4096)</td>
+</tr>
+<tr>
+<td><code>signing.key_rotation</code></td>
+<td><code>key_rotation</code></td>
+<td>Key rotation settings (enabled, interval, overlap)</td>
+</tr>
+<tr>
+<td><code>federation_data.authority_hints</code></td>
+<td><code>authority_hints</code></td>
+<td>List of authority hint entity IDs</td>
+</tr>
+<tr>
+<td><code>federation_data.federation_entity_metadata</code></td>
+<td><code>metadata</code></td>
+<td>Federation entity metadata (name, contacts, etc.)</td>
+</tr>
+<tr>
+<td><code>federation_data.constraints</code></td>
+<td><code>constraints</code></td>
+<td>Subordinate statement constraints</td>
+</tr>
+<tr>
+<td><code>federation_data.metadata_policy_crit</code></td>
+<td><code>metadata_policy_crit</code></td>
+<td>Critical metadata policy operators</td>
+</tr>
+<tr>
+<td><code>federation_data.metadata_policy_file</code></td>
+<td><code>metadata_policies</code></td>
+<td>Metadata policies (loaded from JSON file)</td>
+</tr>
+<tr>
+<td><code>federation_data.configuration_lifetime</code></td>
+<td><code>config_lifetime</code></td>
+<td>Entity configuration JWT lifetime</td>
+</tr>
+<tr>
+<td><code>federation_data.extra_entity_configuration_data</code></td>
+<td><code>extra_entity_config</code></td>
+<td>Extra claims for entity configuration</td>
+</tr>
+<tr>
+<td><code>endpoints.fetch.statement_lifetime</code></td>
+<td><code>statement_lifetime</code></td>
+<td>Subordinate statement JWT lifetime</td>
+</tr>
+<tr>
+<td><code>federation_data.trust_mark_issuers</code></td>
+<td><code>trust_mark_issuers</code></td>
+<td>Allowed trust mark issuers per type</td>
+</tr>
+<tr>
+<td><code>federation_data.trust_mark_owners</code></td>
+<td><code>trust_mark_owners</code></td>
+<td>Trust mark owners per type</td>
+</tr>
+<tr>
+<td><code>endpoints.trust_mark.trust_mark_specs</code></td>
+<td><code>trust_mark_specs</code></td>
+<td>Trust mark issuance specifications</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fields-not-migrated">Fields NOT migrated<a class="headerlink" href="#fields-not-migrated" title="Permanent link">&para;</a></h3>
+<p>The following configuration fields are <strong>not</strong> migrated by <code>config2db</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Config Path</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>federation_data.crit</code></td>
+<td>The <code>crit</code> attribute was used to mark critical claims in subordinate entity statements. This functionality has been replaced: additional claims can now be added to entity statements via the Admin API (<code>POST /admin/api/v1/subordinates/{id}/additional-claims</code>), and each claim can be individually marked as critical. Since the old config only specified which claims were critical but not the claim values themselves, there is nothing to migrate.</td>
+</tr>
+<tr>
+<td><code>federation_data.trust_anchors</code></td>
+<td>This field was not used at runtime and is therefore not migrated.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fields-that-remain-in-config">Fields that remain in config<a class="headerlink" href="#fields-that-remain-in-config" title="Permanent link">&para;</a></h3>
+<p>The following fields remain in the configuration file:</p>
+<table>
+<thead>
+<tr>
+<th>Config Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>entity_id</code></td>
+<td>The entity identifier (URI) - <strong>required</strong></td>
+</tr>
+<tr>
+<td><code>server.*</code></td>
+<td>Server settings (port, TLS, trusted proxies)</td>
+</tr>
+<tr>
+<td><code>storage.*</code></td>
+<td>Storage driver configuration (sqlite, mysql, postgres)</td>
+</tr>
+<tr>
+<td><code>signing.kms</code></td>
+<td>Key management system (filesystem, pkcs11)</td>
+</tr>
+<tr>
+<td><code>signing.pk_backend</code></td>
+<td>Public key storage backend (filesystem, db)</td>
+</tr>
+<tr>
+<td><code>signing.auto_generate_keys</code></td>
+<td>Auto-generate missing keys</td>
+</tr>
+<tr>
+<td><code>signing.filesystem.*</code></td>
+<td>Filesystem KMS settings</td>
+</tr>
+<tr>
+<td><code>signing.pkcs11.*</code></td>
+<td>PKCS#11 HSM settings</td>
+</tr>
+<tr>
+<td><code>endpoints.*</code></td>
+<td>Endpoint paths and settings (except <code>statement_lifetime</code>)</td>
+</tr>
+<tr>
+<td><code>api.*</code></td>
+<td>Admin API settings</td>
+</tr>
+<tr>
+<td><code>stats.*</code></td>
+<td>Statistics collection settings</td>
+</tr>
+<tr>
+<td><code>logging.*</code></td>
+<td>Logging configuration</td>
+</tr>
+<tr>
+<td><code>cache.*</code></td>
+<td>Caching configuration</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">federation_data section deprecated</p>
+<p>The entire <code>federation_data</code> section is deprecated. All its options are either 
+moved to top-level config (<code>entity_id</code>) or managed in the database. See 
+<a href="config/federation_data.md">Federation Data</a> for migration details.</p>
+</div>
+<h3 id="cli-usage_1">CLI Usage<a class="headerlink" href="#cli-usage_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>&lt;config.yaml&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--dest<span class="w"> </span>&lt;updated.yaml&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--run-config2db<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-type<span class="w"> </span>&lt;sqlite<span class="p">|</span>mysql<span class="p">|</span>postgres&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-dir<span class="w"> </span>&lt;path&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-dsn<span class="w"> </span>&lt;dsn&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--force<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--dry-run<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>-v<span class="o">]</span>
+</code></pre></div>
+<h3 id="flags_1">Flags<a class="headerlink" href="#flags_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>--source</code>, <code>-s</code>: Path to existing configuration file - <strong>required</strong></li>
+<li><code>--dest</code>, <code>-d</code>: Path to write updated configuration (default: stdout)</li>
+<li><code>--db-type</code>: Database type (<code>sqlite</code>, <code>mysql</code>, <code>postgres</code>) - configures <code>storage.driver</code> in output (default: <code>sqlite</code>)</li>
+<li><code>--db-dir</code>: Data directory - configures <code>storage.data_dir</code> in output (for SQLite)</li>
+<li><code>--db-dsn</code>: Database DSN - configures <code>storage.dsn</code> in output (for MySQL/PostgreSQL)</li>
+<li><code>--run-config2db</code>: Also run config2db migration after transformation</li>
+<li><code>--db-debug</code>: Enable GORM debug logging for config2db</li>
+<li><code>--force</code>, <code>-f</code>: Force overwrite in config2db</li>
+<li><code>--dry-run</code>, <code>-n</code>: Preview only, don't make changes</li>
+<li><code>--verbose</code>, <code>-v</code>: Verbose logging</li>
+</ul>
+<h3 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Transform config for SQLite</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>old-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>new-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse
+
+<span class="c1"># Transform config for PostgreSQL</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>old-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>new-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse&#39;</span>
+
+<span class="c1"># Transform config for MySQL</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>old-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>new-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+
+<span class="c1"># Transform and also migrate values to database (combined)</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="o">=</span>old-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dest<span class="o">=</span>new-config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-type<span class="o">=</span>sqlite<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-config2db
+
+<span class="c1"># Dry run to preview changes</span>
+./lhmigrate<span class="w"> </span>config<span class="w"> </span>--source<span class="o">=</span>old-config.yaml<span class="w"> </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span>--dry-run<span class="w"> </span>-v
+</code></pre></div>
+<h2 id="config-to-database-migration-config2db">Config to Database migration (config2db)<a class="headerlink" href="#config-to-database-migration-config2db" title="Permanent link">&para;</a></h2>
+<p>The <code>config2db</code> subcommand migrates configuration file values directly to the database. Optionally, it can also remove the migrated options from the config file using the <code>--update-config</code> flag.</p>
+<h3 id="sections">Sections<a class="headerlink" href="#sections" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>alg</code> - Signing algorithm</li>
+<li><code>rsa_key_len</code> - RSA key length</li>
+<li><code>key_rotation</code> - Key rotation configuration</li>
+<li><code>constraints</code> - Subordinate statement constraints</li>
+<li><code>metadata_crit</code> - Metadata policy crit operators</li>
+<li><code>metadata_policies</code> - Metadata policies</li>
+<li><code>config_lifetime</code> - Entity configuration lifetime</li>
+<li><code>extra_entity_config</code> - Extra entity configuration claims</li>
+<li><code>statement_lifetime</code> - Subordinate statement lifetime</li>
+<li><code>authority_hints</code> - Authority hints</li>
+<li><code>metadata</code> - Federation entity metadata</li>
+<li><code>trust_mark_specs</code> - Trust mark specifications (for issuance)</li>
+<li><code>trust_marks</code> - Entity configuration trust marks (published in own entity configuration)</li>
+<li><code>trust_mark_issuers</code> - Trust mark issuers</li>
+<li><code>trust_mark_owners</code> - Trust mark owners</li>
+</ul>
+<h3 id="cli-usage_2">CLI Usage<a class="headerlink" href="#cli-usage_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>&lt;config.yaml&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-type<span class="w"> </span>&lt;sqlite<span class="p">|</span>mysql<span class="p">|</span>postgres&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-dir<span class="w"> </span>&lt;path&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-dsn<span class="w"> </span>&lt;dsn&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--only<span class="o">=</span>&lt;sections&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--skip<span class="o">=</span>&lt;sections&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--update-config<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--force<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--dry-run<span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>-v<span class="o">]</span>
+</code></pre></div>
+<h3 id="flags_2">Flags<a class="headerlink" href="#flags_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>--config</code>, <code>-c</code>: Path to config file to migrate - <strong>required</strong></li>
+<li><code>--db-type</code>: Database type (<code>sqlite</code>, <code>mysql</code>, <code>postgres</code>) - default: <code>sqlite</code></li>
+<li><code>--db-dir</code>: Data directory (for SQLite)</li>
+<li><code>--db-dsn</code>: Database DSN (for MySQL/PostgreSQL)</li>
+<li><code>--db-debug</code>: Enable GORM debug logging</li>
+<li><code>--only</code>: Comma-separated list of sections to migrate (default: all)</li>
+<li><code>--skip</code>: Comma-separated list of sections to skip</li>
+<li><code>--update-config</code>: Remove successfully migrated options from the config file</li>
+<li><code>--validate</code>: Validate config values before migration (default: true)</li>
+<li><code>--force</code>, <code>-f</code>: Overwrite existing values in DB</li>
+<li><code>--dry-run</code>, <code>-n</code>: Show what would be written without actually writing</li>
+<li><code>--verbose</code>, <code>-v</code>: Verbose logging</li>
+</ul>
+<h3 id="examples_2">Examples<a class="headerlink" href="#examples_2" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="c1"># Migrate all config values to SQLite</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span>--config<span class="o">=</span>config.yaml<span class="w"> </span>--db-dir<span class="o">=</span>/var/lib/lighthouse
+
+<span class="c1"># Migrate and remove migrated options from config file</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--update-config
+
+<span class="c1"># Migrate only signing options</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="o">=</span>config.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--only<span class="o">=</span>alg,rsa_key_len,key_rotation
+
+<span class="c1"># Dry run with verbose output</span>
+./lhmigrate<span class="w"> </span>config2db<span class="w"> </span>--config<span class="o">=</span>config.yaml<span class="w"> </span>--db-dir<span class="o">=</span>/var/lib/lighthouse<span class="w"> </span>--dry-run<span class="w"> </span>-v
+</code></pre></div>
+<h2 id="after-migration">After migration<a class="headerlink" href="#after-migration" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Make sure Lighthouse points to the migrated key/data locations in your deployment.</li>
+<li>Back up your migrated directories and/or database.</li>
+<li>Validate signatures and application behavior in your environment.</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Use <code>-v</code> to enable verbose logging for key migrations.</li>
+<li>Check file permissions and paths for both source and destination.</li>
+<li>Verify algorithm names (<code>ES256</code>, <code>RS256</code>, etc.) are correct for KMS migration.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../deployment/lhcli/" class="md-footer__link md-footer__link--prev" aria-label="Previous: LightHouse CLI (lhcli)">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                LightHouse CLI (lhcli)
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 - 2025 Gabriel Zachmann
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/go-oidfed/lighthouse" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://hub.docker.com/r/oidfed/lighthouse" target="_blank" rel="noopener" title="hub.docker.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M349.9 236.3h-66.1v-59.4h66.1zm0-204.3h-66.1v60.7h66.1zm78.2 144.8H362v59.4h66.1zm-156.3-72.1h-66.1v60.1h66.1zm78.1 0h-66.1v60.1h66.1zm276.8 100c-14.4-9.7-47.6-13.2-73.1-8.4-3.3-24-16.7-44.9-41.1-63.7l-14-9.3-9.3 14c-18.4 27.8-23.4 73.6-3.7 103.8-8.7 4.7-25.8 11.1-48.4 10.7H2.4c-8.7 50.8 5.8 116.8 44 162.1 37.1 43.9 92.7 66.2 165.4 66.2 157.4 0 273.9-72.5 328.4-204.2 21.4.4 67.6.1 91.3-45.2 1.5-2.5 6.6-13.2 8.5-17.1zm-511.1-27.9h-66v59.4h66.1v-59.4zm78.1 0h-66.1v59.4h66.1zm78.1 0h-66.1v59.4h66.1zm-78.1-72.1h-66.1v60.1h66.1z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="mailto:oidfed@lists.kit.edu" target="_blank" rel="noopener" title="" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M536.4-26.3c9.8-3.5 20.6-1 28 6.3s9.8 18.2 6.3 28l-178 496.9c-5 13.9-18.1 23.1-32.8 23.1-14.2 0-27-8.6-32.3-21.7l-64.2-158c-4.5-11-2.5-23.6 5.2-32.6l94.5-112.4c5.1-6.1 4.7-15-.9-20.6s-14.6-6-20.6-.9l-112.4 94.3c-9.1 7.6-21.6 9.6-32.6 5.2L38.1 216.8c-13.1-5.3-21.7-18.1-21.7-32.3 0-14.7 9.2-27.8 23.1-32.8z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "content.code.copy", "content.code.annotate", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../assets/_markdown_exec_pyodide.js"></script>
+      
+        <script src="../assets/external/unpkg.com/mermaid@11/dist/mermaid.min.js"></script>
+      
+    
+  </body>
+</html>
