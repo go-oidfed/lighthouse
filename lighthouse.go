@@ -111,13 +111,68 @@ func NewLightHouse(
 	*LightHouse,
 	error,
 ) {
-
 	keyManagement, err := initKey(signingConf, storages)
 	if err != nil {
 		return nil, err
 	}
-	versatileSigner := kms.KMSToVersatileSignerWithJWKSFunc(
-		keyManagement.BasicKeys, func() (jwx.JWKS, error) {
+
+	versatileSigner, err := createVersatileSigner(keyManagement)
+	if err != nil {
+		return nil, err
+	}
+
+	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, keyManagement.BasicKeys.GetAlgs())
+
+	server, err := initFiberServer(serverConf)
+	if err != nil {
+		return nil, err
+	}
+
+	statsCollector, err := initStatsCollector(statsConfig, storages, server)
+	if err != nil {
+		return nil, err
+	}
+
+	trustMarkConfigProvider := storage.NewTrustMarkConfigProvider(
+		storages.PublishedTrustMarks,
+		entityID,
+		"",
+		func() *jwx.TrustMarkSigner { return generalSigner.TrustMarkSigner() },
+	)
+
+	entity := &LightHouse{
+		TrustMarkIssuer:         oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
+		GeneralJWTSigner:        generalSigner,
+		server:                  server,
+		serverConf:              serverConf,
+		LogoBanner:              true,
+		VersionBanner:           true,
+		keyManagement:           keyManagement,
+		storages:                storages,
+		statsCollector:          statsCollector,
+		trustMarkConfigProvider: trustMarkConfigProvider,
+	}
+
+	entity.FederationEntity = buildDynamicFederationEntity(entity, entityID, storages)
+
+	registerEntityConfigurationEndpoint(server, entity)
+
+	adminAPIServer, err := initAdminAPI(
+		admin, serverConf, server, entityID, storages,
+		entity.FederationEntity, keyManagement, trustMarkConfigProvider,
+	)
+	if err != nil {
+		return nil, err
+	}
+	entity.adminAPIServer = adminAPIServer
+
+	return entity, nil
+}
+
+func createVersatileSigner(keyManagement adminapi.KeyManagement) (jwx.VersatileSigner, error) {
+	return kms.KMSToVersatileSignerWithJWKSFunc(
+		keyManagement.BasicKeys,
+		func() (jwx.JWKS, error) {
 			kmsHistory, err := keyManagement.KMSManagedPKs.GetValid()
 			if err != nil {
 				return jwx.JWKS{}, err
@@ -137,67 +192,54 @@ func NewLightHouse(
 			}
 			return set, nil
 		},
-	)
+	), nil
+}
 
-	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, keyManagement.BasicKeys.GetAlgs())
+func initFiberServer(serverConf ServerConf) (*fiber.App, error) {
 	if tps := serverConf.TrustedProxies; len(tps) > 0 {
 		FiberServerConfig.TrustedProxies = serverConf.TrustedProxies
 		FiberServerConfig.EnableTrustedProxyCheck = true
-		// Only use proxy header when trusted proxies are configured,
-		// otherwise Fiber's c.IP() may return empty for direct connections
 		FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	}
-	// Enable prefork mode if configured
 	if serverConf.Prefork {
 		FiberServerConfig.Prefork = true
 	}
+
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
 	server.Use(compress.New())
 	server.Use(logger.New())
 	server.Use(requestid.New())
 
-	// Apply CORS middleware if enabled for main server
 	if serverConf.CORS.Enabled {
 		server.Use(cors.New(corsConfigFromConf(serverConf.CORS)))
 		log.Info("CORS enabled for main server")
 	}
 
-	// Initialize stats collector if enabled
-	var statsCollector *stats.Collector
-	if statsConfig.Enabled && storages.Stats != nil {
-		statsCollector, err = stats.NewCollector(statsConfig, storages.Stats)
-		if err != nil {
-			log.WithError(err).Warn("failed to initialize stats collector, statistics disabled")
-			statsCollector = nil
-		} else {
-			// Add stats middleware to capture request metrics
-			server.Use(statsCollector.Middleware())
-		}
+	return server, nil
+}
+
+func initStatsCollector(statsConfig apistats.Config, storages model.Backends, server *fiber.App) (
+	*stats.Collector, error,
+) {
+	if !statsConfig.Enabled || storages.Stats == nil {
+		return nil, nil
 	}
 
-	// Create trust mark config provider for entity configuration trust marks
-	trustMarkConfigProvider := storage.NewTrustMarkConfigProvider(
-		storages.PublishedTrustMarks,
-		entityID,
-		"", // Trust mark endpoint set later via AddTrustMarkEndpoint
-		func() *jwx.TrustMarkSigner { return generalSigner.TrustMarkSigner() },
-	)
-
-	entity := &LightHouse{
-		TrustMarkIssuer:         oidfed.NewTrustMarkIssuer(entityID, generalSigner.TrustMarkSigner(), nil),
-		GeneralJWTSigner:        generalSigner,
-		server:                  server,
-		serverConf:              serverConf,
-		LogoBanner:              true,
-		VersionBanner:           true,
-		keyManagement:           keyManagement,
-		storages:                storages,
-		statsCollector:          statsCollector,
-		trustMarkConfigProvider: trustMarkConfigProvider,
+	collector, err := stats.NewCollector(statsConfig, storages.Stats)
+	if err != nil {
+		log.WithError(err).Warn("failed to initialize stats collector, statistics disabled")
+		return nil, nil
 	}
 
-	entity.FederationEntity = &oidfed.DynamicFederationEntity{
+	server.Use(collector.Middleware())
+	return collector, nil
+}
+
+func buildDynamicFederationEntity(
+	entity *LightHouse, entityID string, storages model.Backends,
+) oidfed.FederationEntity {
+	return &oidfed.DynamicFederationEntity{
 		ID: entityID,
 		Metadata: func() (*oidfed.Metadata, error) {
 			m, err := storage.GetMetadata(storages.KV)
@@ -225,6 +267,7 @@ func NewLightHouse(
 			if bs, err := json.Marshal(entity.fedMetadata); err == nil {
 				_ = json.Unmarshal(bs, &overlay)
 			}
+
 			merged := utils.MergeMaps(true, base, overlay)
 			// Unmarshal merged back into FederationEntityMetadata
 			var mergedFE oidfed.FederationEntityMetadata
@@ -253,10 +296,10 @@ func NewLightHouse(
 			return storage.GetEntityConfigurationLifetime(storages.KV)
 		},
 		EntityStatementSigner: func() (*jwx.EntityStatementSigner, error) {
-			return generalSigner.EntityStatementSigner(), nil
+			return entity.GeneralJWTSigner.EntityStatementSigner(), nil
 		},
 		TrustMarks: func() ([]*oidfed.EntityConfigurationTrustMarkConfig, error) {
-			return trustMarkConfigProvider.GetConfigs()
+			return entity.trustMarkConfigProvider.GetConfigs()
 		},
 		TrustMarkIssuers: func() (oidfed.AllowedTrustMarkIssuers, error) {
 			return storages.TrustMarkTypes.IssuersByType()
@@ -276,7 +319,9 @@ func NewLightHouse(
 			return extra, crits, nil
 		},
 	}
+}
 
+func registerEntityConfigurationEndpoint(server *fiber.App, entity *LightHouse) {
 	server.Get(
 		"/.well-known/openid-federation", func(ctx *fiber.Ctx) error {
 			var cached []byte
@@ -307,53 +352,67 @@ func NewLightHouse(
 			return ctx.Send(jwt)
 		},
 	)
-	// Initialize Admin API according to options
-	if admin.Enabled {
-		if admin.Port > 0 && admin.Port != serverConf.Port {
-			// Separate admin server
-			adminApp := fiber.New(FiberServerConfig)
-			adminApp.Use(recover.New())
-			adminApp.Use(compress.New())
-			adminApp.Use(logger.New())
-			adminApp.Use(requestid.New())
-			// Apply CORS middleware if enabled for admin API
-			if admin.CORS.Enabled {
-				adminApp.Use(cors.New(corsConfigFromConf(admin.CORS)))
-				log.Info("CORS enabled for admin API server")
-			}
-			entity.adminAPIServer = adminApp
-			entity.serverConf.AdminAPIPort = admin.Port
-		} else {
-			// Mount on main server
-			entity.adminAPIServer = server
-		}
-		// Create admin API router group
-		adminGroup := entity.adminAPIServer.Group("/api/v1/admin")
-		// Apply CORS to admin routes if enabled and either:
-		// - Admin API is on separate server (already handled above), OR
-		// - Admin API is on main server but has different CORS config than main server
-		if admin.CORS.Enabled && entity.adminAPIServer == server && !serverConf.CORS.Enabled {
-			adminGroup.Use(cors.New(corsConfigFromConf(admin.CORS)))
-			log.Info("CORS enabled for admin API routes on main server")
-		}
-		if err = adminapi.Register(
-			adminGroup, entityID, storages,
-			entity.FederationEntity,
-			keyManagement,
-			&adminapi.Options{
-				UsersEnabled:               admin.UsersEnabled,
-				Port:                       admin.Port,
-				TrustMarkConfigInvalidator: trustMarkConfigProvider,
-				Actor: adminapi.ActorConfig{
-					Header: admin.ActorHeader,
-					Source: adminapi.ActorSource(admin.ActorSource),
-				},
-			},
-		); err != nil {
-			return nil, err
-		}
+}
+
+func initAdminAPI(
+	admin AdminAPIOptions,
+	serverConf ServerConf,
+	server *fiber.App,
+	entityID string,
+	storages model.Backends,
+	fedEntity oidfed.FederationEntity,
+	keyManagement adminapi.KeyManagement,
+	trustMarkConfigProvider *storage.TrustMarkConfigProvider,
+) (
+	*fiber.App,
+	error,
+) {
+	if !admin.Enabled {
+		return nil, nil
 	}
-	return entity, nil
+
+	var adminAPIServer *fiber.App
+	if admin.Port > 0 && admin.Port != serverConf.Port {
+		adminAPIServer = fiber.New(FiberServerConfig)
+		adminAPIServer.Use(recover.New())
+		adminAPIServer.Use(compress.New())
+		adminAPIServer.Use(logger.New())
+		adminAPIServer.Use(requestid.New())
+
+		if admin.CORS.Enabled {
+			adminAPIServer.Use(cors.New(corsConfigFromConf(admin.CORS)))
+			log.Info("CORS enabled for admin API server")
+		}
+	} else {
+		adminAPIServer = server
+	}
+
+	adminGroup := adminAPIServer.Group("/api/v1/admin")
+
+	if admin.CORS.Enabled && adminAPIServer == server && !serverConf.CORS.Enabled {
+		adminGroup.Use(cors.New(corsConfigFromConf(admin.CORS)))
+		log.Info("CORS enabled for admin API routes on main server")
+	}
+
+	err := adminapi.Register(
+		adminGroup, entityID, storages,
+		fedEntity,
+		keyManagement,
+		&adminapi.Options{
+			UsersEnabled:               admin.UsersEnabled,
+			Port:                       admin.Port,
+			TrustMarkConfigInvalidator: trustMarkConfigProvider,
+			Actor: adminapi.ActorConfig{
+				Header: admin.ActorHeader,
+				Source: adminapi.ActorSource(admin.ActorSource),
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return adminAPIServer, nil
 }
 
 // HttpHandlerFunc returns an http.HandlerFunc for serving all the necessary endpoints
