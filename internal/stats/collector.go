@@ -3,42 +3,16 @@ package stats
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/go-oidfed/lighthouse/api/stats"
 )
-
-// Config holds configuration for the stats collector.
-type Config struct {
-	// Enabled controls whether statistics collection is active.
-	Enabled bool
-
-	// Buffer configuration
-	BufferSize     int
-	FlushInterval  time.Duration
-	FlushThreshold float64
-
-	// Capture options
-	CaptureClientIP    bool
-	CaptureUserAgent   bool
-	CaptureQueryParams bool
-
-	// GeoIP configuration
-	GeoIPEnabled bool
-	GeoIPDBPath  string
-
-	// Retention
-	DetailedRetention   time.Duration
-	AggregatedRetention time.Duration
-
-	// Endpoints to track (empty = all federation endpoints)
-	Endpoints []string
-}
 
 // Collector manages statistics collection for federation endpoints.
 type Collector struct {
-	config  Config
+	config  stats.Config
 	buffer  *RingBuffer
 	flusher *Flusher
 	geoIP   GeoIPProvider
@@ -52,7 +26,7 @@ type Collector struct {
 }
 
 // NewCollector creates a new statistics collector.
-func NewCollector(cfg Config, storage StorageBackend) (*Collector, error) {
+func NewCollector(cfg stats.Config, storage StorageBackend) (*Collector, error) {
 	if !cfg.Enabled {
 		return nil, nil
 	}

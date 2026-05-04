@@ -25,6 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
+	apistats "github.com/go-oidfed/lighthouse/api/stats"
 	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/internal/stats"
 	"github.com/go-oidfed/lighthouse/internal/utils"
@@ -105,7 +106,7 @@ func NewLightHouse(
 	signingConf SigningConf,
 	storages model.Backends,
 	admin AdminAPIOptions,
-	statsOpts StatsOptions,
+	statsConfig apistats.Config,
 ) (
 	*LightHouse,
 	error,
@@ -164,23 +165,8 @@ func NewLightHouse(
 
 	// Initialize stats collector if enabled
 	var statsCollector *stats.Collector
-	if statsOpts.Enabled && storages.Stats != nil {
-		statsCollector, err = stats.NewCollector(
-			stats.Config{
-				Enabled:             true,
-				BufferSize:          statsOpts.BufferSize,
-				FlushInterval:       statsOpts.FlushInterval,
-				FlushThreshold:      statsOpts.FlushThreshold,
-				CaptureClientIP:     statsOpts.CaptureClientIP,
-				CaptureUserAgent:    statsOpts.CaptureUserAgent,
-				CaptureQueryParams:  statsOpts.CaptureQueryParams,
-				GeoIPEnabled:        statsOpts.GeoIPEnabled,
-				GeoIPDBPath:         statsOpts.GeoIPDBPath,
-				DetailedRetention:   statsOpts.DetailedRetention,
-				AggregatedRetention: statsOpts.AggregatedRetention,
-				Endpoints:           statsOpts.Endpoints,
-			}, storages.Stats,
-		)
+	if statsConfig.Enabled && storages.Stats != nil {
+		statsCollector, err = stats.NewCollector(statsConfig, storages.Stats)
 		if err != nil {
 			log.WithError(err).Warn("failed to initialize stats collector, statistics disabled")
 			statsCollector = nil
@@ -575,45 +561,6 @@ type AdminAPIOptions struct {
 	ActorSource string
 	// CORS holds CORS configuration for the admin API.
 	CORS CORSConf
-}
-
-// StatsOptions controls initialization of statistics collection.
-type StatsOptions struct {
-	// Enabled controls whether statistics collection is active.
-	Enabled bool
-
-	// BufferSize is the maximum number of entries in the ring buffer.
-	BufferSize int
-
-	// FlushInterval is how often the buffer is flushed to the database.
-	FlushInterval time.Duration
-
-	// FlushThreshold triggers a flush when the buffer is this percentage full.
-	FlushThreshold float64
-
-	// CaptureClientIP enables recording client IP addresses.
-	CaptureClientIP bool
-
-	// CaptureUserAgent enables recording User-Agent headers.
-	CaptureUserAgent bool
-
-	// CaptureQueryParams enables recording URL query parameters.
-	CaptureQueryParams bool
-
-	// GeoIPEnabled enables country lookup from IP addresses.
-	GeoIPEnabled bool
-
-	// GeoIPDBPath is the path to a MaxMind GeoLite2-Country.mmdb file.
-	GeoIPDBPath string
-
-	// DetailedRetention is how long to keep individual request logs.
-	DetailedRetention time.Duration
-
-	// AggregatedRetention is how long to keep daily aggregated statistics.
-	AggregatedRetention time.Duration
-
-	// Endpoints is a list of endpoint paths to track. Empty means all federation endpoints.
-	Endpoints []string
 }
 
 // corsConfigFromConf converts a CORSConf to a Fiber CORS middleware configuration.

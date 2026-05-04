@@ -5,6 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/zachmann/go-utils/fileutils"
+
+	apistats "github.com/go-oidfed/lighthouse/api/stats"
 )
 
 // StatsConf holds all statistics collection configuration.
@@ -193,6 +195,24 @@ func (s *StatsConf) DetailedRetention() time.Duration {
 // AggregatedRetention returns the retention period for aggregated stats as a Duration.
 func (s *StatsConf) AggregatedRetention() time.Duration {
 	return time.Duration(s.Retention.AggregatedDays) * 24 * time.Hour
+}
+
+// ToAPIConfig converts config.StatsConf to api/stats.Config.
+func (s *StatsConf) ToAPIConfig() apistats.Config {
+	return apistats.Config{
+		Enabled:             s.Enabled,
+		BufferSize:          s.Buffer.Size,
+		FlushInterval:       s.Buffer.FlushInterval,
+		FlushThreshold:      s.Buffer.FlushThreshold,
+		CaptureClientIP:     s.Capture.ClientIP,
+		CaptureUserAgent:    s.Capture.UserAgent,
+		CaptureQueryParams:  s.Capture.QueryParams,
+		GeoIPEnabled:        s.Capture.GeoIP.Enabled,
+		GeoIPDBPath:         s.Capture.GeoIP.DatabasePath,
+		DetailedRetention:   s.DetailedRetention(),
+		AggregatedRetention: s.AggregatedRetention(),
+		Endpoints:           s.Endpoints,
+	}
 }
 
 var defaultStatsConf = StatsConf{

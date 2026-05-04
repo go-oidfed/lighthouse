@@ -13,6 +13,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 
 	"github.com/go-oidfed/lighthouse"
+	"github.com/go-oidfed/lighthouse/api/stats"
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 	"github.com/go-oidfed/lighthouse/internal/logger"
 	"github.com/go-oidfed/lighthouse/storage"
@@ -40,7 +41,7 @@ func main() {
 
 	logStorageWarnings(c.Server, &c.Storage, &c.Caching)
 
-	statsOpts := buildStatsOptions(&c.Stats)
+	statsOpts := c.Stats.ToAPIConfig()
 
 	if c.Stats.Enabled {
 		if err := storage.MigrateStatsFromBackends(backs); err != nil {
@@ -126,24 +127,7 @@ func logStorageWarnings(server lighthouse.ServerConf, storageConf *config.Storag
 	}
 }
 
-func buildStatsOptions(stats *config.StatsConf) lighthouse.StatsOptions {
-	return lighthouse.StatsOptions{
-		Enabled:             stats.Enabled,
-		BufferSize:          stats.Buffer.Size,
-		FlushInterval:       stats.Buffer.FlushInterval,
-		FlushThreshold:      stats.Buffer.FlushThreshold,
-		CaptureClientIP:     stats.Capture.ClientIP,
-		CaptureUserAgent:    stats.Capture.UserAgent,
-		CaptureQueryParams:  stats.Capture.QueryParams,
-		GeoIPEnabled:        stats.Capture.GeoIP.Enabled,
-		GeoIPDBPath:         stats.Capture.GeoIP.DatabasePath,
-		DetailedRetention:   stats.DetailedRetention(),
-		AggregatedRetention: stats.AggregatedRetention(),
-		Endpoints:           stats.Endpoints,
-	}
-}
-
-func initLighthouse(c *config.Config, backs model.Backends, statsOpts lighthouse.StatsOptions) (
+func initLighthouse(c *config.Config, backs model.Backends, statsConfig stats.Config) (
 	*lighthouse.LightHouse, error,
 ) {
 	lh, err := lighthouse.NewLightHouse(
@@ -159,7 +143,7 @@ func initLighthouse(c *config.Config, backs model.Backends, statsOpts lighthouse
 			ActorSource:  c.API.Admin.ActorSource,
 			CORS:         c.API.Admin.CORS,
 		},
-		statsOpts,
+		statsConfig,
 	)
 	if err != nil {
 		return nil, err
