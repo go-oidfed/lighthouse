@@ -6,14 +6,14 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.10.3
+	github.com/go-oidfed/lib v0.10.4
 	github.com/gofiber/fiber/v2 v2.52.13
 	github.com/google/uuid v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lestrrat-go/jwx/v3 v3.1.0
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.18.0
+	github.com/redis/go-redis/v9 v9.19.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/vmihailenco/msgpack/v5 v5.4.1
@@ -38,7 +38,6 @@ require (
 	github.com/coreos/go-oidc/v3 v3.18.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dgraph-io/ristretto/v2 v2.3.0 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -56,7 +55,7 @@ require (
 	github.com/jarcoal/httpmock v1.4.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/dsig v1.3.0 // indirect
 	github.com/lestrrat-go/dsig-secp256k1 v1.0.0 // indirect
