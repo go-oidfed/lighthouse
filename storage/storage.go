@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -1035,11 +1036,44 @@ func (s *TrustMarkSpecStorage) Patch(ident string, updates map[string]any) (*mod
 	if err != nil {
 		return nil, err
 	}
-	if err = s.db.Model(existing).Updates(updates).Error; err != nil {
+
+	dbUpdates := make(map[string]any, len(updates))
+	for key, value := range updates {
+		switch key {
+		case "additional_claims":
+			if value == nil {
+				dbUpdates["additional_claims"] = nil
+			} else {
+				jsonBytes, err := json.Marshal(value)
+				if err != nil {
+					return nil, errors.Wrap(err, "trust_mark_specs: patch failed to serialize additional_claims")
+				}
+				dbUpdates["additional_claims"] = jsonBytes
+			}
+		case "eligibility_config":
+			if value == nil {
+				dbUpdates["eligibility_config"] = nil
+			} else {
+				jsonBytes, err := json.Marshal(value)
+				if err != nil {
+					return nil, errors.Wrap(err, "trust_mark_specs: patch failed to serialize eligibility_config")
+				}
+				dbUpdates["eligibility_config"] = jsonBytes
+			}
+		default:
+			dbUpdates[key] = value
+		}
+	}
+
+	if err = s.db.Model(existing).Updates(dbUpdates).Error; err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, model.AlreadyExistsError("trust mark spec already exists for this type")
 		}
 		return nil, errors.Wrap(err, "trust_mark_specs: patch failed")
+	}
+
+	if err = s.db.First(existing, existing.ID).Error; err != nil {
+		return nil, errors.Wrap(err, "trust_mark_specs: patch reload failed")
 	}
 	return existing, nil
 }
