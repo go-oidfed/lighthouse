@@ -13,6 +13,11 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
+type trustMarkQueryRequest struct {
+	Subject       string `json:"sub" form:"sub" query:"sub"`
+	TrustMarkType string `json:"trust_mark_type" form:"trust_mark_type" query:"trust_mark_type"`
+}
+
 // TrustMarkEndpointConfig holds configuration for the trust mark endpoint
 type TrustMarkEndpointConfig struct {
 	// Store for subject status (backward compatibility)
@@ -75,21 +80,24 @@ func (fed *LightHouse) handleTrustMarkRequest(
 	ctx *fiber.Ctx,
 	config TrustMarkEndpointConfig,
 ) error {
-	trustMarkType := ctx.Query("trust_mark_type")
-	sub := ctx.Query("sub")
+	var req trustMarkQueryRequest
+	if err := ctx.QueryParser(&req); err != nil {
+		ctx.Status(fiber.StatusBadRequest)
+		return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+	}
 
 	// Validate required parameters
-	if sub == "" {
+	if req.Subject == "" {
 		ctx.Status(fiber.StatusBadRequest)
 		return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
 	}
-	if trustMarkType == "" {
+	if req.TrustMarkType == "" {
 		ctx.Status(fiber.StatusBadRequest)
 		return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'trust_mark_type' not given"))
 	}
 
 	// Check if we support this trust mark type (uses provider if configured)
-	if !fed.TrustMarkIssuer.HasTrustMarkType(trustMarkType) {
+	if !fed.TrustMarkIssuer.HasTrustMarkType(req.TrustMarkType) {
 		ctx.Status(fiber.StatusNotFound)
 		return ctx.JSON(oidfed.ErrorNotFound("'trust_mark_type' not known"))
 	}
@@ -98,7 +106,7 @@ func (fed *LightHouse) handleTrustMarkRequest(
 	var dbSpec *model.TrustMarkSpec
 	var eligibilityConfig *model.EligibilityConfig
 	if config.SpecStore != nil {
-		spec, err := config.SpecStore.GetByType(trustMarkType)
+		spec, err := config.SpecStore.GetByType(req.TrustMarkType)
 		if err == nil {
 			dbSpec = spec
 			eligibilityConfig = spec.EligibilityConfig
@@ -113,9 +121,9 @@ func (fed *LightHouse) handleTrustMarkRequest(
 
 	// Check cache first (if enabled)
 	if config.Cache != nil && eligibilityConfig.CheckCacheTTL > 0 {
-		if eligible, httpCode, reason, found := config.Cache.Get(trustMarkType, sub); found {
+		if eligible, httpCode, reason, found := config.Cache.Get(req.TrustMarkType, req.Subject); found {
 			if eligible {
-				return fed.issueAndSendTrustMarkWithClaims(ctx, trustMarkType, sub, dbSpec, config)
+				return fed.issueAndSendTrustMarkWithClaims(ctx, req.TrustMarkType, req.Subject, dbSpec, config)
 			}
 			ctx.Status(httpCode)
 			return ctx.JSON(
@@ -128,18 +136,18 @@ func (fed *LightHouse) handleTrustMarkRequest(
 	}
 
 	// Run eligibility check based on mode
-	eligible, httpCode, reason := fed.checkEligibility(trustMarkType, sub, eligibilityConfig, config)
+	eligible, httpCode, reason := fed.checkEligibility(req.TrustMarkType, req.Subject, eligibilityConfig, config)
 
 	// Cache result if caching is enabled
 	if config.Cache != nil && eligibilityConfig.CheckCacheTTL > 0 {
 		config.Cache.Set(
-			trustMarkType, sub, eligible, httpCode, reason,
+			req.TrustMarkType, req.Subject, eligible, httpCode, reason,
 			time.Duration(eligibilityConfig.CheckCacheTTL)*time.Second,
 		)
 	}
 
 	if eligible {
-		return fed.issueAndSendTrustMarkWithClaims(ctx, trustMarkType, sub, dbSpec, config)
+		return fed.issueAndSendTrustMarkWithClaims(ctx, req.TrustMarkType, req.Subject, dbSpec, config)
 	}
 
 	ctx.Status(httpCode)
@@ -339,13 +347,15 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 			instance.TrustMarkSubjectID = subjectID
 		}
 
-		if err := config.InstanceStore.Create(instance); err != nil {
+		if err = config.InstanceStore.Create(instance); err != nil {
 			// Log the error but don't fail the request - the trust mark was issued successfully
-			log.WithError(err).WithFields(log.Fields{
-				"jti":             jti,
-				"trust_mark_type": trustMarkType,
-				"subject":         sub,
-			}).Warn("failed to persist issued trust mark instance")
+			log.WithError(err).WithFields(
+				log.Fields{
+					"jti":             jti,
+					"trust_mark_type": trustMarkType,
+					"subject":         sub,
+				},
+			).Warn("failed to persist issued trust mark instance")
 		}
 	}
 

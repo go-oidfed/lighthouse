@@ -23,9 +23,12 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 	}
 	fed.server.Get(
 		endpoint.Path, func(ctx *fiber.Ctx) error {
-			trustMarkType := ctx.Query("trust_mark_type")
-			sub := ctx.Query("sub")
-			if trustMarkType == "" {
+			var req trustMarkQueryRequest
+			if err := ctx.QueryParser(&req); err != nil {
+				ctx.Status(fiber.StatusBadRequest)
+				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+			}
+			if req.TrustMarkType == "" {
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(
 					oidfed.ErrorInvalidRequest(
@@ -35,7 +38,7 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 			}
 			if !slices.Contains(
 				fed.TrustMarkIssuer.TrustMarkTypes(),
-				trustMarkType,
+				req.TrustMarkType,
 			) {
 				ctx.Status(fiber.StatusNotFound)
 				return ctx.JSON(
@@ -46,19 +49,19 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 			entities := make([]string, 0)
 			var err error
 
-			if sub != "" {
+			if req.Subject != "" {
 				// Check if specific entity has an active (valid) trust mark instance
-				hasActive, err := instanceStore.HasActiveInstance(trustMarkType, sub)
+				hasActive, err := instanceStore.HasActiveInstance(req.TrustMarkType, req.Subject)
 				if err != nil {
 					ctx.Status(fiber.StatusInternalServerError)
 					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 				}
 				if hasActive {
-					entities = []string{sub}
+					entities = []string{req.Subject}
 				}
 			} else {
 				// List all entities with active (valid) trust mark instances
-				entities, err = instanceStore.ListActiveSubjects(trustMarkType)
+				entities, err = instanceStore.ListActiveSubjects(req.TrustMarkType)
 				if err != nil {
 					ctx.Status(fiber.StatusInternalServerError)
 					return ctx.JSON(oidfed.ErrorServerError(err.Error()))

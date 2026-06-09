@@ -25,9 +25,12 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 	}
 	fed.server.Get(
 		endpoint.Path, func(ctx *fiber.Ctx) error {
-			trustMarkType := ctx.Query("trust_mark_type")
-			sub := ctx.Query("sub")
-			if sub == "" {
+			var req trustMarkQueryRequest
+			if err := ctx.QueryParser(&req); err != nil {
+				ctx.Status(fiber.StatusBadRequest)
+				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+			}
+			if req.Subject == "" {
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(
 					oidfed.ErrorInvalidRequest(
@@ -35,7 +38,7 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 					),
 				)
 			}
-			if trustMarkType == "" {
+			if req.TrustMarkType == "" {
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(
 					oidfed.ErrorInvalidRequest(
@@ -45,7 +48,7 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 			}
 			if !slices.Contains(
 				fed.TrustMarkIssuer.TrustMarkTypes(),
-				trustMarkType,
+				req.TrustMarkType,
 			) {
 				ctx.Status(fiber.StatusNotFound)
 				return ctx.JSON(
@@ -53,7 +56,7 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 				)
 			}
 
-			status, err := store.TrustMarkedStatus(trustMarkType, sub)
+			status, err := store.TrustMarkedStatus(req.TrustMarkType, req.Subject)
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
@@ -71,7 +74,7 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 			case model.StatusInactive:
 				fallthrough
 			default:
-				if err = store.Request(trustMarkType, sub); err != nil {
+				if err = store.Request(req.TrustMarkType, req.Subject); err != nil {
 					ctx.Status(fiber.StatusInternalServerError)
 					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 				}

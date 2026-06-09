@@ -9,6 +9,10 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
+type fetchRequest struct {
+	Subject string `json:"sub" form:"sub" query:"sub"`
+}
+
 // AddFetchEndpoint adds a fetch endpoint
 func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.SubordinateStorageBackend) {
 	fed.fedMetadata.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
@@ -17,12 +21,16 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 	}
 	fed.server.Get(
 		endpoint.Path, func(ctx *fiber.Ctx) error {
-			sub := ctx.Query("sub")
-			if sub == "" {
+			var req fetchRequest
+			if err := ctx.QueryParser(&req); err != nil {
+				ctx.Status(fiber.StatusBadRequest)
+				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+			}
+			if req.Subject == "" {
 				ctx.Status(fiber.StatusBadRequest)
 				return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
 			}
-			info, err := store.Get(sub)
+			info, err := store.Get(req.Subject)
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))

@@ -18,6 +18,10 @@ type TrustMarkStatusConfig struct {
 	InstanceStore model.IssuedTrustMarkInstanceStore
 }
 
+type trustMarkStatusRequest struct {
+	TrustMark string `json:"trust_mark" form:"trust_mark"`
+}
+
 // TrustMarkStatusResponse represents the JWT payload for trust mark status response
 type TrustMarkStatusResponse struct {
 	Issuer    string `json:"iss"`
@@ -52,18 +56,21 @@ func (fed *LightHouse) handleTrustMarkStatusRequest(
 	ctx *fiber.Ctx,
 	config TrustMarkStatusConfig,
 ) error {
-	// Parse the trust_mark parameter from POST body
-	trustMarkJWT := ctx.FormValue("trust_mark")
-	if trustMarkJWT == "" {
+	var req trustMarkStatusRequest
+	if err := ctx.BodyParser(&req); err != nil {
+		ctx.Status(fiber.StatusBadRequest)
+		return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request body: " + err.Error()))
+	}
+	if req.TrustMark == "" {
 		ctx.Status(fiber.StatusBadRequest)
 		return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'trust_mark' not given"))
 	}
 
 	// Parse and validate the trust mark JWT
-	status, err := fed.determineTrustMarkStatus(trustMarkJWT, config)
+	status, err := fed.determineTrustMarkStatus(req.TrustMark, config)
 	if err != nil {
 		// If we can't parse the trust mark at all, it's invalid
-		return fed.sendTrustMarkStatusResponse(ctx, trustMarkJWT, model.TrustMarkStatusInvalid)
+		return fed.sendTrustMarkStatusResponse(ctx, req.TrustMark, model.TrustMarkStatusInvalid)
 	}
 
 	// If the trust mark is not found (unknown JTI), return 404
@@ -72,7 +79,7 @@ func (fed *LightHouse) handleTrustMarkStatusRequest(
 		return ctx.JSON(oidfed.ErrorNotFound("trust mark not found"))
 	}
 
-	return fed.sendTrustMarkStatusResponse(ctx, trustMarkJWT, status)
+	return fed.sendTrustMarkStatusResponse(ctx, req.TrustMark, status)
 }
 
 // determineTrustMarkStatus parses the trust mark JWT and determines its status
