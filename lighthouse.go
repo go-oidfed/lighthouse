@@ -54,6 +54,14 @@ type EndpointConf struct {
 	// URL is the external URL for the endpoint.
 	// Env: LH_ENDPOINTS_<ENDPOINT>_URL
 	URL string `yaml:"url"`
+	// AuthEnabled requires authentication for this endpoint (default: false).
+	// When global endpoints.auth.all_require_auth is true, this is forced on.
+	// Env: LH_ENDPOINTS_<ENDPOINT>_AUTH_ENABLED
+	AuthEnabled bool `yaml:"auth_enabled" envconfig:"AUTH_ENABLED"`
+	// AuthTrustAnchors is the list of trust anchors for endpoint authentication.
+	// If empty when auth is enabled, falls back to global endpoints.auth.trust_anchors.
+	// Env: LH_ENDPOINTS_<ENDPOINT>_AUTH_TRUST_ANCHORS (comma-separated)
+	AuthTrustAnchors oidfed.TrustAnchors `yaml:"auth_trust_anchors" envconfig:"AUTH_TRUST_ANCHORS"`
 }
 
 // IsSet returns a bool indicating if this endpoint was configured or not
@@ -461,11 +469,13 @@ func (fed *LightHouse) Start() {
 		if adminTLS {
 			log.WithField("port", conf.AdminAPIPort).Info("starting admin api server with TLS")
 			go func() {
-				log.WithError(fed.adminAPIServer.ListenTLS(
-					fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
-					fed.serverConf.AdminTLS.Cert,
-					fed.serverConf.AdminTLS.Key,
-				)).Fatal()
+				log.WithError(
+					fed.adminAPIServer.ListenTLS(
+						fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
+						fed.serverConf.AdminTLS.Cert,
+						fed.serverConf.AdminTLS.Key,
+					),
+				).Fatal()
 			}()
 		} else {
 			log.WithField("port", conf.AdminAPIPort).Info("starting admin api server")

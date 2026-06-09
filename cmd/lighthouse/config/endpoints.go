@@ -27,6 +27,7 @@ import (
 //   - LH_ENDPOINTS_ENROLL_REQUEST_PATH, LH_ENDPOINTS_ENROLL_REQUEST_URL
 //   - LH_ENDPOINTS_TRUST_MARK_REQUEST_PATH, LH_ENDPOINTS_TRUST_MARK_REQUEST_URL
 //   - LH_ENDPOINTS_ENTITY_COLLECTION_PATH, LH_ENDPOINTS_ENTITY_COLLECTION_URL, LH_ENDPOINTS_ENTITY_COLLECTION_*
+//   - LH_ENDPOINTS_AUTH_ALL_REQUIRE_AUTH, LH_ENDPOINTS_AUTH_TRUST_ANCHORS
 type Endpoints struct {
 	// FetchEndpoint configures the fetch endpoint.
 	// Env prefix: LH_ENDPOINTS_FETCH_
@@ -63,6 +64,10 @@ type Endpoints struct {
 	// EntityCollectionEndpoint configures the entity collection endpoint.
 	// Env prefix: LH_ENDPOINTS_ENTITY_COLLECTION_
 	EntityCollectionEndpoint collectionEndpointConf `yaml:"entity_collection" envconfig:"ENTITY_COLLECTION"`
+	// Auth holds global endpoint authentication defaults.
+	// Per-endpoint auth_enabled and auth_trust_anchors override these.
+	// Env prefix: LH_ENDPOINTS_AUTH_
+	Auth authConf `yaml:"auth" envconfig:"AUTH"`
 }
 
 // checkedEndpointConf holds endpoint configuration with an entity checker.
@@ -196,6 +201,21 @@ func (c *collectionEndpointConf) validate() error {
 	return nil
 }
 
+// authConf holds global endpoint authentication configuration.
+//
+// Environment variables (with prefix LH_ENDPOINTS_AUTH_):
+//   - LH_ENDPOINTS_AUTH_ALL_REQUIRE_AUTH: Enable auth on all endpoints
+//   - LH_ENDPOINTS_AUTH_TRUST_ANCHORS: Default trust anchors (comma-separated)
+type authConf struct {
+	// AllRequireAuth enables authentication on ALL endpoints.
+	// Per-endpoint auth_enabled cannot override this when true.
+	// Env: LH_ENDPOINTS_AUTH_ALL_REQUIRE_AUTH
+	AllRequireAuth bool `yaml:"all_require_auth" envconfig:"ALL_REQUIRE_AUTH"`
+	// TrustAnchors is the default trust anchor list for endpoint auth.
+	// Used when an endpoint has auth enabled but no own auth_trust_anchors.
+	TrustAnchors oidfed.TrustAnchors `yaml:"trust_anchors"`
+}
+
 var defaultEndpointConf = Endpoints{
 	ResolveEndpoint: resolveEndpointConf{
 		GracePeriod:            duration.DurationOption(time.Hour),
@@ -214,9 +234,41 @@ var defaultEndpointConf = Endpoints{
 	},
 }
 
+func (e *Endpoints) resolveAuthOptions() {
+	endpoints := []*lighthouse.EndpointConf{
+		&e.FetchEndpoint,
+		&e.ListEndpoint,
+		&e.ResolveEndpoint.EndpointConf,
+		&e.TrustMarkStatusEndpoint,
+		&e.TrustMarkedEntitiesListingEndpoint,
+		&e.TrustMarkEndpoint,
+		&e.HistoricalKeysEndpoint,
+		&e.EnrollmentEndpoint.EndpointConf,
+		&e.EnrollmentRequestEndpoint,
+		&e.TrustMarkRequestEndpoint,
+		&e.EntityCollectionEndpoint.EndpointConf,
+	}
+	for _, ep := range endpoints {
+		if e.Auth.AllRequireAuth {
+			ep.AuthEnabled = true
+		}
+		if ep.AuthEnabled && len(ep.AuthTrustAnchors) == 0 {
+			ep.AuthTrustAnchors = e.Auth.TrustAnchors
+		}
+	}
+}
+
 func (e *Endpoints) validate() error {
+	e.resolveAuthOptions()
+
 	oidfed.ResolverCacheGracePeriod = e.ResolveEndpoint.GracePeriod.Duration()
 	oidfed.ResolverCacheLifetimeElapsedGraceFactor = e.ResolveEndpoint.TimeElapsedGraceFactor
+
+	if e.Auth.AllRequireAuth && len(e.Auth.TrustAnchors) == 0 {
+		return errors.New(
+			"trust_anchors must be specified in endpoints.auth when all_require_auth is enabled",
+		)
+	}
 
 	v := reflect.ValueOf(e).Elem()
 	t := v.Type()
