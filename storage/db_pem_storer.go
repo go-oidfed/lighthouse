@@ -47,14 +47,14 @@ func (d *DBPEMStorer) ReadPEM(kid string) ([]byte, error) {
 		}
 		return nil, errors.WithStack(err)
 	}
-	return row.PEMData, nil
+	return []byte(row.PEMData), nil
 }
 
 // WritePEM stores or updates a PEM-encoded private key by KID.
 func (d *DBPEMStorer) WritePEM(kid string, data []byte) error {
 	entry := model.PrivateKeyEntry{
 		KID:     kid,
-		PEMData: data,
+		PEMData: model.PEMData(data),
 	}
 	return errors.WithStack(
 		d.db.Session(&gorm.Session{NewDB: true}).Table(d.tbl).Clauses(
