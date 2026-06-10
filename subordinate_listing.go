@@ -2,6 +2,8 @@ package lighthouse
 
 import (
 	arrays "github.com/adam-hanna/arrayOperations"
+	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/go-oidfed/lib"
@@ -18,11 +20,17 @@ func (fed *LightHouse) AddSubordinateListingEndpoint(
 	if endpoint.Path == "" {
 		return
 	}
-	fed.server.Get(
-		endpoint.Path, func(ctx *fiber.Ctx) error {
-			return handleSubordinateListing(ctx, store, trustMarkStore)
-		},
-	)
+	handler := func(ctx *fiber.Ctx) error {
+		return handleSubordinateListing(ctx, store, trustMarkStore)
+	}
+
+	if endpoint.AuthEnabled {
+		fed.server.Post(endpoint.Path, handler)
+		fed.fedMetadata.FederationListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
+	} else {
+		fed.server.Get(endpoint.Path, handler)
+	}
 }
 
 type SubordinateListingRequest struct {
@@ -37,7 +45,7 @@ func handleSubordinateListing(
 	trustMarkedEntitiesStorage model.TrustMarkedEntitiesStorageBackend,
 ) error {
 	var req SubordinateListingRequest
-	if err := ctx.QueryParser(&req); err != nil {
+	if err := parseRequest(ctx, &req); err != nil {
 		ctx.Status(fiber.StatusBadRequest)
 		return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
 	}

@@ -3,6 +3,7 @@ package lighthouse
 import (
 	"time"
 
+	"github.com/go-oidfed/lib/jwx"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 
@@ -40,6 +41,11 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 	fed.fedMetadata.FederationTrustMarkStatusEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return
+	}
+
+	if endpoint.AuthEnabled {
+		fed.fedMetadata.FederationTrustMarkStatusEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	}
 
 	fed.server.Post(

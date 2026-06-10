@@ -16,42 +16,48 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) {
 		return
 	}
 	signer := fed.GeneralJWTSigner.Typed(oidfedconst.JWTTypeJWKS)
-	fed.server.Get(
-		endpoint.Path, func(ctx *fiber.Ctx) error {
-			kmsHistory, err := fed.keyManagement.KMSManagedPKs.GetHistorical()
+	handler := func(ctx *fiber.Ctx) error {
+		kmsHistory, err := fed.keyManagement.KMSManagedPKs.GetHistorical()
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		apiHistory, err := fed.keyManagement.APIManagedPKs.GetHistorical()
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		allEntries := append(kmsHistory, apiHistory...)
+		keys := jwx.NewJWKS()
+		for _, k := range allEntries {
+			kk, err := k.JWK()
 			if err != nil {
 				ctx.Status(fiber.StatusInternalServerError)
 				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 			}
-			apiHistory, err := fed.keyManagement.APIManagedPKs.GetHistorical()
-			if err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			allEntries := append(kmsHistory, apiHistory...)
-			keys := jwx.NewJWKS()
-			for _, k := range allEntries {
-				kk, err := k.JWK()
-				if err != nil {
-					ctx.Status(fiber.StatusInternalServerError)
-					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-				}
-				_ = keys.AddKey(kk)
-			}
+			_ = keys.AddKey(kk)
+		}
 
-			jwt, err := signer.JWT(
-				map[string]any{
-					"iss":  fed.FederationEntity.EntityID(),
-					"iat":  unixtime.Now(),
-					"keys": keys,
-				},
-			)
-			if err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeJWKS)
-			return ctx.Send(jwt)
-		},
-	)
+		jwt, err := signer.JWT(
+			map[string]any{
+				"iss":  fed.FederationEntity.EntityID(),
+				"iat":  unixtime.Now(),
+				"keys": keys,
+			},
+		)
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeJWKS)
+		return ctx.Send(jwt)
+	}
+
+	if endpoint.AuthEnabled {
+		fed.server.Post(endpoint.Path, handler)
+		fed.fedMetadata.FederationHistoricalLKeysEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
+	} else {
+		fed.server.Get(endpoint.Path, handler)
+	}
 }

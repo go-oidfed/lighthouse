@@ -1,6 +1,7 @@
 package lighthouse
 
 import (
+	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 
@@ -19,34 +20,40 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 	if endpoint.Path == "" {
 		return
 	}
-	fed.server.Get(
-		endpoint.Path, func(ctx *fiber.Ctx) error {
-			var req fetchRequest
-			if err := ctx.QueryParser(&req); err != nil {
-				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
-			}
-			if req.Subject == "" {
-				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
-			}
-			info, err := store.Get(req.Subject)
-			if err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if info == nil {
-				ctx.Status(fiber.StatusNotFound)
-				return ctx.JSON(oidfed.ErrorNotFound("the requested entity identifier is not found"))
-			}
-			payload := fed.CreateSubordinateStatement(info)
-			jwt, err := fed.SignEntityStatement(payload)
-			if err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
-			return ctx.Send(jwt)
-		},
-	)
+	handler := func(ctx *fiber.Ctx) error {
+		var req fetchRequest
+		if err := parseRequest(ctx, &req); err != nil {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+		}
+		if req.Subject == "" {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
+		}
+		info, err := store.Get(req.Subject)
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		if info == nil {
+			ctx.Status(fiber.StatusNotFound)
+			return ctx.JSON(oidfed.ErrorNotFound("the requested entity identifier is not found"))
+		}
+		payload := fed.CreateSubordinateStatement(info)
+		jwt, err := fed.SignEntityStatement(payload)
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
+		return ctx.Send(jwt)
+	}
+
+	if endpoint.AuthEnabled {
+		fed.server.Post(endpoint.Path, handler)
+		fed.fedMetadata.FederationFetchEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
+	} else {
+		fed.server.Get(endpoint.Path, handler)
+	}
 }

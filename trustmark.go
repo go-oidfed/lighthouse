@@ -3,6 +3,7 @@ package lighthouse
 import (
 	"time"
 
+	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -68,11 +69,17 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 	if endpoint.Path == "" {
 		return
 	}
-	fed.server.Get(
-		endpoint.Path, func(ctx *fiber.Ctx) error {
-			return fed.handleTrustMarkRequest(ctx, config)
-		},
-	)
+	handler := func(ctx *fiber.Ctx) error {
+		return fed.handleTrustMarkRequest(ctx, config)
+	}
+
+	if endpoint.AuthEnabled {
+		fed.server.Post(endpoint.Path, handler)
+		fed.fedMetadata.FederationTrustMarkEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
+	} else {
+		fed.server.Get(endpoint.Path, handler)
+	}
 }
 
 // handleTrustMarkRequest handles a trust mark request with the new eligibility system
@@ -81,7 +88,7 @@ func (fed *LightHouse) handleTrustMarkRequest(
 	config TrustMarkEndpointConfig,
 ) error {
 	var req trustMarkQueryRequest
-	if err := ctx.QueryParser(&req); err != nil {
+	if err := parseRequest(ctx, &req); err != nil {
 		ctx.Status(fiber.StatusBadRequest)
 		return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
 	}

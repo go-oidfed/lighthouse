@@ -36,6 +36,20 @@ import (
 
 const MaximumEntityConfigurationCachePeriod = 8 * time.Hour
 
+// parseRequest populates req from query parameters (GET) and, for POST requests,
+// also from the request body (form or JSON).
+func parseRequest(ctx *fiber.Ctx, req interface{}) error {
+	if err := ctx.QueryParser(req); err != nil {
+		return err
+	}
+	if ctx.Method() == fiber.MethodPost {
+		if err := ctx.BodyParser(req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // EndpointConf is a type for configuring an endpoint with an internal and external path.
 //
 // Environment variables use the parent endpoint's prefix, e.g.:
