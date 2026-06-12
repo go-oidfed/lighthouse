@@ -28,6 +28,8 @@ Per-endpoint `auth_enabled` and `auth_trust_anchors` values override these defau
             all_require_auth: true
             trust_anchors:
                 - entity_id: https://trust-anchor.example.com
+            jti_backend: cache
+            jti_cleanup_interval: 1h
         fetch:
             path: /fetch
         resolve:
@@ -52,6 +54,34 @@ When `false` (default), only endpoints with `auth_enabled: true` require authent
 Default list of trust anchors used for endpoint authentication. When an endpoint has authentication
 enabled but does not specify its own `auth_trust_anchors`, these trust anchors are used as a
 fallback.
+
+### `jti_backend`
+<span class="badge badge-purple" title="Value Type">string (`"cache"` or `"db"`)</span>
+<span class="badge badge-blue" title="Default Value">`"cache"`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_AUTH_JTI_BACKEND`</span>
+
+Specifies the backend used for JWT ID (JTI) replay prevention storage. Valid values:
+
+- `"cache"` — Uses the configured cache backend (Redis or in-memory). JTIs expire
+  automatically based on their TTL. No cleanup required.
+- `"db"` — Uses the database table `jtis_used`. Requires periodic cleanup via
+  [`jti_cleanup_interval`](#jti_cleanup_interval).
+
+The JTI storage prevents replay attacks by ensuring each client assertion JWT can only
+be used once.
+
+### `jti_cleanup_interval`
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-blue" title="Default Value">`1h`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_AUTH_JTI_CLEANUP_INTERVAL`</span>
+
+How often to clean up expired JTIs from the database. Only applicable when
+[`jti_backend`](#jti_backend) is set to `"db"`.
+
+The cleanup runs as a background goroutine and removes JTIs whose expiration time
+has passed.
 
 ### Per-endpoint auth options
 

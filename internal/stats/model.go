@@ -20,10 +20,11 @@ type RequestLog struct {
 	DurationMs int    `gorm:"not null" json:"duration_ms"`
 
 	// Client info
-	ClientIP      string `gorm:"size:45;index:idx_rl_ip" json:"client_ip,omitempty"`
-	CountryCode   string `gorm:"size:2" json:"country_code,omitempty"`
-	UserAgent     string `gorm:"type:text" json:"user_agent,omitempty"`
-	UserAgentHash uint32 `gorm:"index:idx_rl_ua_hash" json:"user_agent_hash,omitempty"`
+	ClientIP       string `gorm:"size:45;index:idx_rl_ip" json:"client_ip,omitempty"`
+	CountryCode    string `gorm:"size:2" json:"country_code,omitempty"`
+	UserAgent      string `gorm:"type:text" json:"user_agent,omitempty"`
+	UserAgentHash  uint32 `gorm:"index:idx_rl_ua_hash" json:"user_agent_hash,omitempty"`
+	ClientEntityID string `gorm:"size:255;index:idx_rl_client" json:"client_entity_id,omitempty"`
 
 	// Request details
 	QueryParams  json.RawMessage `gorm:"type:json" json:"query_params,omitempty"`

@@ -13,7 +13,7 @@ monitoring, analysis, and reporting on how your federation is being used.
 The statistics system captures:
 
 - **Request metrics**: Endpoint, method, status code, response time
-- **Client information**: IP address, User-Agent, country (optional)
+- **Client information**: IP address, User-Agent, country (optional), authenticated entity ID
 - **Request details**: Query parameters, request/response sizes
 - **Error tracking**: Error types and frequencies
 

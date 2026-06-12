@@ -6,9 +6,11 @@ import (
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 
 	oidfed "github.com/go-oidfed/lib"
 
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -18,10 +20,10 @@ import (
 func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 	endpoint EndpointConf,
 	instanceStore model.IssuedTrustMarkInstanceStore,
-) {
+) error {
 	fed.fedMetadata.FederationTrustMarkListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
 	handler := func(ctx *fiber.Ctx) error {
 		var req trustMarkQueryRequest
@@ -76,10 +78,22 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 	}
 
 	if endpoint.AuthEnabled {
-		fed.server.Post(endpoint.Path, handler)
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for trust marked entities listing endpoint")
+		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
 		fed.fedMetadata.FederationTrustMarkListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
 		fed.server.Get(endpoint.Path, handler)
 	}
+
+	return nil
 }

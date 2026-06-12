@@ -1,12 +1,13 @@
 package lighthouse
 
 import (
+	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 
-	"github.com/go-oidfed/lib"
-
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -20,13 +21,13 @@ func (fed *LightHouse) AddEnrollEndpoint(
 	endpoint EndpointConf,
 	store model.SubordinateStorageBackend,
 	checker EntityChecker,
-) {
+) error {
 	if fed.fedMetadata.Extra == nil {
 		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
 	fed.fedMetadata.Extra["federation_enroll_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
 	handler := func(ctx *fiber.Ctx) error {
 		var req enrollRequest
@@ -123,13 +124,22 @@ func (fed *LightHouse) AddEnrollEndpoint(
 	}
 
 	if endpoint.AuthEnabled {
-		fed.server.Post(endpoint.Path, handler)
-		if fed.fedMetadata.Extra == nil {
-			fed.fedMetadata.Extra = make(map[string]interface{})
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for enroll endpoint")
 		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
 		fed.fedMetadata.Extra["federation_enroll_endpoint_auth_methods"] = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
 		fed.server.Get(endpoint.Path, handler)
 	}
+
+	return nil
 }

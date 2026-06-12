@@ -1,9 +1,21 @@
 package model
 
 import (
+	"time"
+
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"gorm.io/gorm"
 )
+
+// JTIStorageBackend defines the interface for JTI replay prevention storage
+type JTIStorageBackend interface {
+	// Exists checks if a JTI has been used
+	Exists(jti string) (bool, error)
+	// Store marks a JTI as used with expiration
+	Store(jti string, expiresAt time.Time) error
+	// Cleanup removes expired JTIs (optional, for periodic cleanup)
+	Cleanup() error
+}
 
 // TransactionFunc is a function that executes within a database transaction.
 // All storage backends in the provided Backends operate within the same transaction.
@@ -30,6 +42,7 @@ type Backends struct {
 	Users               UsersStore
 	PKStorages          func(string) public.PublicKeyStorage
 	Stats               StatsStorageBackend
+	JTI                 JTIStorageBackend
 
 	// Transaction wraps multiple storage operations in a single DB transaction.
 	// All backends provided to the TransactionFunc operate within the same transaction.

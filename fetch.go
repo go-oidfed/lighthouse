@@ -1,12 +1,13 @@
 package lighthouse
 
 import (
+	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 
-	"github.com/go-oidfed/lib"
-
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -15,10 +16,10 @@ type fetchRequest struct {
 }
 
 // AddFetchEndpoint adds a fetch endpoint
-func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.SubordinateStorageBackend) {
+func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.SubordinateStorageBackend) error {
 	fed.fedMetadata.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
 	handler := func(ctx *fiber.Ctx) error {
 		var req fetchRequest
@@ -50,10 +51,22 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 	}
 
 	if endpoint.AuthEnabled {
-		fed.server.Post(endpoint.Path, handler)
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for fetch endpoint")
+		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
 		fed.fedMetadata.FederationFetchEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
 		fed.server.Get(endpoint.Path, handler)
 	}
+
+	return nil
 }

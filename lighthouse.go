@@ -108,6 +108,7 @@ type LightHouse struct {
 	storages                model.Backends
 	statsCollector          *stats.Collector
 	trustMarkConfigProvider *storage.TrustMarkConfigProvider
+	jtiCleanupStop          func()
 }
 
 // FiberServerConfig is the fiber.Config that is used to init the http fiber.App
@@ -449,6 +450,11 @@ func (fed *LightHouse) Listen(addr string) error {
 	return fed.server.Listen(addr)
 }
 
+// SetJTICleanupStop sets the cleanup stop function
+func (fed *LightHouse) SetJTICleanupStop(stop func()) {
+	fed.jtiCleanupStop = stop
+}
+
 //go:embed banner.txt
 var bannerTxt string
 
@@ -528,6 +534,11 @@ func (fed *LightHouse) Start() {
 
 // Stop gracefully shuts down the LightHouse server and its components.
 func (fed *LightHouse) Stop() error {
+	// Stop JTI cleanup if running
+	if fed.jtiCleanupStop != nil {
+		fed.jtiCleanupStop()
+	}
+
 	// Stop stats collector if running
 	if fed.statsCollector != nil {
 		if err := fed.statsCollector.Stop(); err != nil {

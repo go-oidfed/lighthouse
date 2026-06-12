@@ -97,6 +97,7 @@ type StatsBufferConf struct {
 //   - LH_STATS_CAPTURE_CLIENT_IP: Capture client IP
 //   - LH_STATS_CAPTURE_USER_AGENT: Capture User-Agent
 //   - LH_STATS_CAPTURE_QUERY_PARAMS: Capture query parameters
+//   - LH_STATS_CAPTURE_CLIENT_ENTITY_ID: Capture authenticated client entity ID
 //   - LH_STATS_CAPTURE_GEO_IP_ENABLED: Enable GeoIP lookup
 //   - LH_STATS_CAPTURE_GEO_IP_DATABASE_PATH: Path to GeoLite2 database
 type StatsCaptureConf struct {
@@ -111,6 +112,10 @@ type StatsCaptureConf struct {
 	// QueryParams records URL query parameters as JSON.
 	// Env: LH_STATS_CAPTURE_QUERY_PARAMS
 	QueryParams bool `yaml:"query_params" envconfig:"QUERY_PARAMS"`
+
+	// ClientEntityID records the authenticated client entity ID (from private_key_jwt auth).
+	// Env: LH_STATS_CAPTURE_CLIENT_ENTITY_ID
+	ClientEntityID bool `yaml:"client_entity_id" envconfig:"CLIENT_ENTITY_ID"`
 
 	// GeoIP enables country lookup from IP addresses.
 	// Env prefix: LH_STATS_CAPTURE_GEO_IP_
@@ -200,18 +205,19 @@ func (s *StatsConf) AggregatedRetention() time.Duration {
 // ToAPIConfig converts config.StatsConf to api/stats.Config.
 func (s *StatsConf) ToAPIConfig() apistats.Config {
 	return apistats.Config{
-		Enabled:             s.Enabled,
-		BufferSize:          s.Buffer.Size,
-		FlushInterval:       s.Buffer.FlushInterval,
-		FlushThreshold:      s.Buffer.FlushThreshold,
-		CaptureClientIP:     s.Capture.ClientIP,
-		CaptureUserAgent:    s.Capture.UserAgent,
-		CaptureQueryParams:  s.Capture.QueryParams,
-		GeoIPEnabled:        s.Capture.GeoIP.Enabled,
-		GeoIPDBPath:         s.Capture.GeoIP.DatabasePath,
-		DetailedRetention:   s.DetailedRetention(),
-		AggregatedRetention: s.AggregatedRetention(),
-		Endpoints:           s.Endpoints,
+		Enabled:               s.Enabled,
+		BufferSize:            s.Buffer.Size,
+		FlushInterval:         s.Buffer.FlushInterval,
+		FlushThreshold:        s.Buffer.FlushThreshold,
+		CaptureClientIP:       s.Capture.ClientIP,
+		CaptureUserAgent:      s.Capture.UserAgent,
+		CaptureQueryParams:    s.Capture.QueryParams,
+		CaptureClientEntityID: s.Capture.ClientEntityID,
+		GeoIPEnabled:          s.Capture.GeoIP.Enabled,
+		GeoIPDBPath:           s.Capture.GeoIP.DatabasePath,
+		DetailedRetention:     s.DetailedRetention(),
+		AggregatedRetention:   s.AggregatedRetention(),
+		Endpoints:             s.Endpoints,
 	}
 }
 
@@ -223,9 +229,10 @@ var defaultStatsConf = StatsConf{
 		FlushThreshold: 0.8,
 	},
 	Capture: StatsCaptureConf{
-		ClientIP:    true,
-		UserAgent:   true,
-		QueryParams: true,
+		ClientIP:       true,
+		UserAgent:      true,
+		QueryParams:    true,
+		ClientEntityID: true,
 		GeoIP: StatsGeoIPConf{
 			Enabled: false,
 		},

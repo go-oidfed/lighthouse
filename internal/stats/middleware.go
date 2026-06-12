@@ -20,6 +20,9 @@ type MiddlewareConfig struct {
 	// CaptureQueryParams enables capturing URL query parameters.
 	CaptureQueryParams bool
 
+	// CaptureClientEntityID enables capturing authenticated client entity ID from Fiber context.
+	CaptureClientEntityID bool
+
 	// GeoIP provides country lookup from IP addresses. Can be nil.
 	GeoIP GeoIPProvider
 
@@ -96,6 +99,13 @@ func Middleware(cfg MiddlewareConfig) fiber.Handler {
 			entry.ErrorType = categorizeError(err, entry.StatusCode)
 		} else if entry.StatusCode >= 400 {
 			entry.ErrorType = categorizeStatusCode(entry.StatusCode)
+		}
+
+		// Capture client entity ID from context (if set by auth middleware)
+		if cfg.CaptureClientEntityID {
+			if clientID, ok := c.Locals("client_entity_id").(string); ok && clientID != "" {
+				entry.ClientEntityID = clientID
+			}
 		}
 
 		// Write to buffer (non-blocking)

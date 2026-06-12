@@ -87,6 +87,7 @@ The `capture` option controls what data is collected from each request.
             client_ip: true
             user_agent: true
             query_params: true
+            client_entity_id: true
             geo_ip:
                 enabled: false
                 database_path: /path/to/GeoLite2-Country.mmdb
@@ -117,6 +118,19 @@ Records the `User-Agent` header from requests.
 
 Records URL query parameters as JSON. This is useful for analyzing which 
 entities are being fetched or resolved most frequently.
+
+### `client_entity_id`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`true`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STATS_CAPTURE_CLIENT_ENTITY_ID`</span>
+
+Records the authenticated client entity ID (from `private_key_jwt`
+authentication). Only populated when a request is authenticated via
+client assertion.
+
+This is useful for identifying which entities are using authenticated
+endpoints and tracking usage patterns per entity.
 
 ### `geo_ip`
 <span class="badge badge-purple" title="Value Type">object</span>
@@ -217,6 +231,7 @@ For environment variables, use comma-separated values: `LH_STATS_ENDPOINTS="/.we
             client_ip: true
             user_agent: true
             query_params: true
+            client_entity_id: true
             geo_ip:
                 enabled: true
                 database_path: /data/GeoLite2-Country.mmdb

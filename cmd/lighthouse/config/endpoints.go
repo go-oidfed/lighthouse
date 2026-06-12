@@ -11,6 +11,7 @@ import (
 	"tideland.dev/go/slices"
 
 	"github.com/go-oidfed/lighthouse"
+	"github.com/go-oidfed/lighthouse/storage"
 )
 
 // Endpoints holds configuration for the different possible endpoints.
@@ -206,6 +207,8 @@ func (c *collectionEndpointConf) validate() error {
 // Environment variables (with prefix LH_ENDPOINTS_AUTH_):
 //   - LH_ENDPOINTS_AUTH_ALL_REQUIRE_AUTH: Enable auth on all endpoints
 //   - LH_ENDPOINTS_AUTH_TRUST_ANCHORS: Default trust anchors (comma-separated)
+//   - LH_ENDPOINTS_AUTH_JTI_BACKEND: JTI storage backend ("cache" or "db")
+//   - LH_ENDPOINTS_AUTH_JTI_CLEANUP_INTERVAL: Cleanup interval for DB backend (e.g., "1h")
 type authConf struct {
 	// AllRequireAuth enables authentication on ALL endpoints.
 	// Per-endpoint auth_enabled cannot override this when true.
@@ -213,10 +216,22 @@ type authConf struct {
 	AllRequireAuth bool `yaml:"all_require_auth" envconfig:"ALL_REQUIRE_AUTH"`
 	// TrustAnchors is the default trust anchor list for endpoint auth.
 	// Used when an endpoint has auth enabled but no own auth_trust_anchors.
-	TrustAnchors oidfed.TrustAnchors `yaml:"trust_anchors"`
+	TrustAnchors oidfed.TrustAnchors `yaml:"trust_anchors" envconfig:"TRUST_ANCHORS"`
+	// JTIBackend specifies where to store used JTIs ("cache" or "db").
+	// Default: "cache"
+	// Env: LH_ENDPOINTS_AUTH_JTI_BACKEND
+	JTIBackend storage.JTIStorageType `yaml:"jti_backend" envconfig:"JTI_BACKEND"`
+	// JTICleanupInterval is how often to clean up expired JTIs (DB backend only).
+	// Default: 1h
+	// Env: LH_ENDPOINTS_AUTH_JTI_CLEANUP_INTERVAL
+	JTICleanupInterval duration.DurationOption `yaml:"jti_cleanup_interval" envconfig:"JTI_CLEANUP_INTERVAL"`
 }
 
 var defaultEndpointConf = Endpoints{
+	Auth: authConf{
+		JTIBackend:         storage.JTIStorageCache,
+		JTICleanupInterval: duration.DurationOption(time.Hour),
+	},
 	ResolveEndpoint: resolveEndpointConf{
 		GracePeriod:            duration.DurationOption(time.Hour),
 		TimeElapsedGraceFactor: 0.5,

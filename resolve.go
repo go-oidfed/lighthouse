@@ -10,15 +10,18 @@ import (
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
+
+	"github.com/go-oidfed/lighthouse/middleware"
 )
 
 // AddResolveEndpoint adds a resolve endpoint
 func (fed *LightHouse) AddResolveEndpoint(
 	endpoint EndpointConf, allowedTrustAnchors []string, proactiveResolver *oidfed.ProactiveResolver,
-) {
+) error {
 	fed.fedMetadata.FederationResolveEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
 
 	writeResponse := func(ctx *fiber.Ctx, res *oidfed.ResolveResponse) error {
@@ -90,12 +93,24 @@ func (fed *LightHouse) AddResolveEndpoint(
 	}
 
 	if endpoint.AuthEnabled {
-		fed.server.Post(endpoint.Path, handler)
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for resolve endpoint")
+		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
 		fed.fedMetadata.FederationResolveEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
 		fed.server.Get(endpoint.Path, handler)
 	}
+
+	return nil
 }
 
 func createResolveResponse(

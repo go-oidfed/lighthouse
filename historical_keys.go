@@ -1,19 +1,21 @@
 package lighthouse
 
 import (
+	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 
-	"github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lighthouse/middleware"
 )
 
 // AddHistoricalKeysEndpoint adds the federation historical keys endpoint
-func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) {
+func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) error {
 	fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
 	signer := fed.GeneralJWTSigner.Typed(oidfedconst.JWTTypeJWKS)
 	handler := func(ctx *fiber.Ctx) error {
@@ -54,10 +56,22 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) {
 	}
 
 	if endpoint.AuthEnabled {
-		fed.server.Post(endpoint.Path, handler)
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for historical keys endpoint")
+		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
 		fed.fedMetadata.FederationHistoricalLKeysEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
 		fed.server.Get(endpoint.Path, handler)
 	}
+
+	return nil
 }
