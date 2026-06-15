@@ -23,7 +23,7 @@ func jtiCacheKey(jti string) string {
 }
 
 // Exists checks if a JTI has been used
-func (s *JTICacheStorage) Exists(jti string) (bool, error) {
+func (*JTICacheStorage) Exists(jti string) (bool, error) {
 	key := jtiCacheKey(jti)
 	var dummy bool
 	found, err := cache.Get(key, &dummy)
@@ -34,7 +34,7 @@ func (s *JTICacheStorage) Exists(jti string) (bool, error) {
 }
 
 // Store marks a JTI as used with expiration
-func (s *JTICacheStorage) Store(jti string, expiresAt time.Time) error {
+func (*JTICacheStorage) Store(jti string, expiresAt time.Time) error {
 	key := jtiCacheKey(jti)
 	ttl := time.Until(expiresAt)
 
@@ -54,7 +54,7 @@ func (s *JTICacheStorage) Store(jti string, expiresAt time.Time) error {
 }
 
 // Cleanup is a no-op for cache backend since expiration is automatic
-func (s *JTICacheStorage) Cleanup() error {
+func (*JTICacheStorage) Cleanup() error {
 	return nil
 }
 

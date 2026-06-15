@@ -116,7 +116,7 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 }
 
 // getErrorStatus maps OAuth 2.0 error codes to HTTP status codes
-func (a *PrivateKeyJWTAuth) getErrorStatus(errorCode string) int {
+func (*PrivateKeyJWTAuth) getErrorStatus(errorCode string) int {
 	switch errorCode {
 	case "invalid_request":
 		return fiber.StatusBadRequest
@@ -276,7 +276,7 @@ func (a *PrivateKeyJWTAuth) resolveClientTrustChain(clientEntityID string) (*oid
 }
 
 // verifySignature verifies the JWT signature using the client's public keys from entity statement
-func (a *PrivateKeyJWTAuth) verifySignature(clientAssertion string, entityStmt *oidfed.EntityStatement) error {
+func (*PrivateKeyJWTAuth) verifySignature(clientAssertion string, entityStmt *oidfed.EntityStatement) error {
 	// Get the client's federation signing keys from the entity statement
 	if entityStmt == nil {
 		return ErrInvalidClient("entity statement is nil")
