@@ -90,8 +90,8 @@ icon: material/map-check
 ## Technical
 
 - [X] Endpoints supporting GET requests
-- [ ] Endpoints supporting POST requests
-- [ ] Endpoints supporting Client Authentication
+- [X] Endpoints supporting POST requests
+- [X] Endpoints supporting Client Authentication
 - [X] JWT Type Verification
 
 ## Statistics
