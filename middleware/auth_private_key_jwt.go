@@ -82,7 +82,7 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 		}
 
 		// Parse and validate the JWT
-		clientEntityID, entityStatement, err := a.validateAssertion(ctx.Context(), clientAssertion)
+		clientEntityID, entityStatement, err := a.validateAssertion(clientAssertion)
 		if err != nil {
 			// Convert AuthError to proper OAuth 2.0 error response
 			if authErr, ok := err.(*AuthError); ok {
@@ -132,7 +132,7 @@ func (*PrivateKeyJWTAuth) getErrorStatus(errorCode string) int {
 }
 
 // validateAssertion validates the client assertion JWT and returns the client entity ID and entity statement
-func (a *PrivateKeyJWTAuth) validateAssertion(httpCtx interface{}, clientAssertion string) (
+func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 	string, *oidfed.EntityStatement, error,
 ) {
 	// First pass: parse without verification to extract claims
