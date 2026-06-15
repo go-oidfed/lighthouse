@@ -1,10 +1,13 @@
 package lighthouse
 
 import (
-	"github.com/gofiber/fiber/v2"
-
 	"github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/oidfedconst"
+	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -13,79 +16,97 @@ import (
 func (fed *LightHouse) AddEnrollRequestEndpoint(
 	endpoint EndpointConf,
 	store model.SubordinateStorageBackend,
-) {
+) error {
 	if fed.fedMetadata.Extra == nil {
 		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
 	fed.fedMetadata.Extra["federation_enroll_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
-	fed.server.Get(
-		endpoint.Path, func(ctx *fiber.Ctx) error {
-			var req enrollRequest
-			if err := ctx.QueryParser(&req); err != nil {
-				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+	handler := func(ctx *fiber.Ctx) error {
+		var req enrollRequest
+		if err := parseRequest(ctx, &req); err != nil {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+		}
+		if req.Subject == "" {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
+		}
+		storedInfo, err := store.Get(req.Subject)
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		if storedInfo != nil { // Already a subordinate
+			switch storedInfo.Status {
+			case model.StatusActive:
+				ctx.Status(fiber.StatusNoContent)
+				return nil
+			case model.StatusBlocked:
+				ctx.Status(fiber.StatusForbidden)
+				return ctx.JSON(
+					oidfed.ErrorInvalidRequest(
+						"the entity cannot enroll",
+					),
+				)
+			case model.StatusPending:
+				ctx.Status(fiber.StatusAccepted)
+				return nil
+			case model.StatusInactive:
+			default:
 			}
-			if req.Subject == "" {
-				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
-			}
-			storedInfo, err := store.Get(req.Subject)
-			if err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if storedInfo != nil { // Already a subordinate
-				switch storedInfo.Status {
-				case model.StatusActive:
-					ctx.Status(fiber.StatusNoContent)
-					return nil
-				case model.StatusBlocked:
-					ctx.Status(fiber.StatusForbidden)
-					return ctx.JSON(
-						oidfed.ErrorInvalidRequest(
-							"the entity cannot enroll",
-						),
-					)
-				case model.StatusPending:
-					ctx.Status(fiber.StatusAccepted)
-					return nil
-				case model.StatusInactive:
-				default:
-				}
-			}
+		}
 
-			entityConfig, err := oidfed.GetEntityConfiguration(req.Subject)
-			if err != nil {
-				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(oidfed.ErrorInvalidRequest("could not obtain entity configuration"))
-			}
-			if len(req.EntityTypes) == 0 {
-				req.EntityTypes = entityConfig.Metadata.GuessEntityTypes()
-			}
+		entityConfig, err := oidfed.GetEntityConfiguration(req.Subject)
+		if err != nil {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest("could not obtain entity configuration"))
+		}
+		if len(req.EntityTypes) == 0 {
+			req.EntityTypes = entityConfig.Metadata.GuessEntityTypes()
+		}
 
-			subEntityTypes := make([]model.SubordinateEntityType, len(req.EntityTypes))
-			for i, t := range req.EntityTypes {
-				subEntityTypes[i] = model.SubordinateEntityType{EntityType: t}
-			}
-			info := model.ExtendedSubordinateInfo{
-				JWKS: model.NewJWKS(entityConfig.JWKS),
-				BasicSubordinateInfo: model.BasicSubordinateInfo{
-					EntityID:               entityConfig.Subject,
-					SubordinateEntityTypes: subEntityTypes,
-					Status:                 model.StatusPending,
-				},
-			}
-			if err = store.Update(
-				entityConfig.Subject, info,
-			); err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			ctx.Status(fiber.StatusAccepted)
-			return nil
-		},
-	)
+		subEntityTypes := make([]model.SubordinateEntityType, len(req.EntityTypes))
+		for i, t := range req.EntityTypes {
+			subEntityTypes[i] = model.SubordinateEntityType{EntityType: t}
+		}
+		info := model.ExtendedSubordinateInfo{
+			JWKS: model.NewJWKS(entityConfig.JWKS),
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID:               entityConfig.Subject,
+				SubordinateEntityTypes: subEntityTypes,
+				Status:                 model.StatusPending,
+			},
+		}
+		if err = store.Update(
+			entityConfig.Subject, info,
+		); err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		ctx.Status(fiber.StatusAccepted)
+		return nil
+	}
+
+	if endpoint.AuthEnabled {
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for enroll request endpoint")
+		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.fedMetadata.Extra["federation_enroll_request_endpoint_auth_methods"] = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
+	} else {
+		fed.server.Get(endpoint.Path, handler)
+	}
+
+	return nil
 }

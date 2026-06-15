@@ -34,7 +34,7 @@ func main() {
 		log.WithError(err).Fatal("failed to initialize cache")
 	}
 
-	backs, err := initStorage(&c.Storage, c.API.Admin.Argon2idParams)
+	backs, err := initStorage(&c.Storage, c.API.Admin.Argon2idParams, c.Endpoints.Auth.JTIBackend)
 	if err != nil {
 		log.WithError(err).Fatal("failed to initialize storage")
 	}
@@ -44,7 +44,7 @@ func main() {
 	statsOpts := c.Stats.ToAPIConfig()
 
 	if c.Stats.Enabled {
-		if err := storage.MigrateStatsFromBackends(backs); err != nil {
+		if err = storage.MigrateStatsFromBackends(backs); err != nil {
 			log.WithError(err).Warn("failed to migrate stats tables")
 		}
 	}
@@ -99,13 +99,16 @@ func initCache(caching *config.CachingConf) error {
 	return nil
 }
 
-func initStorage(storageConf *config.StorageConf, usersHash storage.Argon2idParams) (model.Backends, error) {
+func initStorage(
+	storageConf *config.StorageConf, usersHash storage.Argon2idParams, jtiBackend storage.JTIStorageType,
+) (model.Backends, error) {
 	cfg := storage.Config{
-		Driver:    storageConf.Driver,
-		DSN:       storageConf.DSN,
-		DataDir:   storageConf.DataDir,
-		Debug:     storageConf.Debug,
-		UsersHash: usersHash,
+		Driver:         storageConf.Driver,
+		DSN:            storageConf.DSN,
+		DataDir:        storageConf.DataDir,
+		Debug:          storageConf.Debug,
+		UsersHash:      usersHash,
+		JTIStorageType: jtiBackend,
 	}
 	return storage.LoadStorageBackends(cfg)
 }
@@ -152,6 +155,11 @@ func initLighthouse(c *config.Config, backs model.Backends, statsConfig stats.Co
 		return nil, err
 	}
 
+	// Start JTI cleanup goroutine if using DB backend
+	if c.Endpoints.Auth.JTIBackend == storage.JTIStorageDB {
+		lh.SetJTICleanupStop(startJTICleanup(backs.JTI, c.Endpoints.Auth.JTICleanupInterval.Duration()))
+	}
+
 	lh.LogoBanner = c.Logging.Banner.Logo
 	lh.VersionBanner = c.Logging.Banner.Version
 
@@ -177,11 +185,15 @@ func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model
 	var proactiveResolver *oidfed.ProactiveResolver
 
 	if endpoint := c.Endpoints.FetchEndpoint; endpoint.IsSet() {
-		lh.AddFetchEndpoint(endpoint, backs.Subordinates)
+		if err := lh.AddFetchEndpoint(endpoint, backs.Subordinates); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.ListEndpoint; endpoint.IsSet() {
-		lh.AddSubordinateListingEndpoint(endpoint, backs.Subordinates, backs.TrustMarks)
+		if err := lh.AddSubordinateListingEndpoint(endpoint, backs.Subordinates, backs.TrustMarks); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.ResolveEndpoint; endpoint.IsSet() {
@@ -199,19 +211,27 @@ func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model
 				QueueSize:   endpoint.ProactiveResolver.QueueSize,
 			}
 		}
-		lh.AddResolveEndpoint(endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver)
+		if err := lh.AddResolveEndpoint(
+			endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkStatusEndpoint(
+		if err := lh.AddTrustMarkStatusEndpoint(
 			endpoint, lighthouse.TrustMarkStatusConfig{
 				InstanceStore: backs.TrustMarkInstances,
 			},
-		)
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.TrustMarkedEntitiesListingEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarkInstances)
+		if err := lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarkInstances); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.TrustMarkEndpoint; endpoint.IsSet() {
@@ -223,7 +243,7 @@ func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model
 		stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
 		defer stopIssuedCacheCleanup()
 
-		lh.AddTrustMarkEndpointWithConfig(
+		if err := lh.AddTrustMarkEndpointWithConfig(
 			endpoint, lighthouse.TrustMarkEndpointConfig{
 				Store:                backs.TrustMarks,
 				SpecStore:            backs.TrustMarkSpecs,
@@ -231,15 +251,21 @@ func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model
 				Cache:                eligibilityCache,
 				IssuedTrustMarkCache: issuedTrustMarkCache,
 			},
-		)
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {
-		lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks)
+		if err := lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.HistoricalKeysEndpoint; endpoint.IsSet() {
-		lh.AddHistoricalKeysEndpoint(endpoint)
+		if err := lh.AddHistoricalKeysEndpoint(endpoint); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.EnrollmentEndpoint; endpoint.IsSet() {
@@ -251,11 +277,15 @@ func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model
 				return nil, err
 			}
 		}
-		lh.AddEnrollEndpoint(endpoint.EndpointConf, backs.Subordinates, checker)
+		if err := lh.AddEnrollEndpoint(endpoint.EndpointConf, backs.Subordinates, checker); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.EnrollmentRequestEndpoint; endpoint.IsSet() {
-		lh.AddEnrollRequestEndpoint(endpoint, backs.Subordinates)
+		if err := lh.AddEnrollRequestEndpoint(endpoint, backs.Subordinates); err != nil {
+			return nil, err
+		}
 	}
 
 	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() {
@@ -277,9 +307,11 @@ func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model
 			}
 			collector = pec
 		}
-		lh.AddEntityCollectionEndpoint(
+		if err := lh.AddEntityCollectionEndpoint(
 			endpoint.EndpointConf, collector, endpoint.AllowedTrustAnchors, endpoint.PaginationLimit > 0,
-		)
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	return proactiveResolver, nil
@@ -311,4 +343,25 @@ func startBackgroundServices(proactiveResolver *oidfed.ProactiveResolver, c *con
 	}
 
 	return nil
+}
+
+func startJTICleanup(jtiStorage model.JTIStorageBackend, interval time.Duration) func() {
+	ticker := time.NewTicker(interval)
+	done := make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := jtiStorage.Cleanup(); err != nil {
+					log.WithError(err).Warn("JTI cleanup failed")
+				}
+			case <-done:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	return func() { close(done) }
 }

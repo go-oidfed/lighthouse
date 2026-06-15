@@ -13,9 +13,10 @@ type Config struct {
 	FlushThreshold float64
 
 	// Capture options
-	CaptureClientIP    bool
-	CaptureUserAgent   bool
-	CaptureQueryParams bool
+	CaptureClientIP       bool
+	CaptureUserAgent      bool
+	CaptureQueryParams    bool
+	CaptureClientEntityID bool
 
 	// GeoIP configuration
 	GeoIPEnabled bool

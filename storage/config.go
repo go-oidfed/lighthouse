@@ -118,6 +118,8 @@ type Config struct {
 	Debug bool `yaml:"debug"`
 	// UsersHash defines parameters for hashing admin user passwords
 	UsersHash Argon2idParams
+	// JTIStorageType controls the storage type for JTI storage
+	JTIStorageType JTIStorageType
 }
 
 // Argon2idParams configures Argon2id hashing parameters.
@@ -185,18 +187,22 @@ func LoadStorageBackends(cfg Config) (model.Backends, error) {
 	if err != nil {
 		return model.Backends{}, err
 	}
-	return warehouse.Backends(), nil
+	return warehouse.Backends(cfg.JTIStorageType)
 }
 
 // Backends returns all storage backends with transaction support.
-func (s *Storage) Backends() model.Backends {
-	return s.backendsWithDB(s.db, true)
+func (s *Storage) Backends(jtiType JTIStorageType) (model.Backends, error) {
+	return s.backendsWithDB(s.db, true, jtiType)
 }
 
 // backendsWithDB creates Backends using the provided gorm.DB.
 // If withTransaction is true, the Transaction field is populated to enable
 // wrapping multiple operations in a single database transaction.
-func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool) model.Backends {
+func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool, jtiType JTIStorageType) (model.Backends, error) {
+	jti, err := NewJTIStorage(jtiType, db)
+	if err != nil {
+		return model.Backends{}, err
+	}
 	backends := model.Backends{
 		DB:                  db,
 		Subordinates:        &SubordinateStorage{db: db},
@@ -211,23 +217,29 @@ func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool) model.Backen
 		AdditionalClaims:    &AdditionalClaimsStorage{db: db},
 		PublishedTrustMarks: &PublishedTrustMarksStorage{db: db},
 		KV:                  &KeyValueStorage{db: db},
-		Users:               &UsersStorage{db: db, params: s.userParams},
+		Users: &UsersStorage{
+			db:     db,
+			params: s.userParams,
+		},
 		PKStorages: func(typeID string) public.PublicKeyStorage {
 			return NewDBPublicKeyStorage(db, typeID)
 		},
 		Stats: NewStatsStorage(db),
+		JTI:   jti,
 	}
 
 	if withTransaction {
 		backends.Transaction = func(fn model.TransactionFunc) error {
-			return s.db.Transaction(func(tx *gorm.DB) error {
-				// Create backends that operate within the transaction
-				// withTransaction=false to prevent nested transactions
-				txBackends := s.backendsWithDB(tx, false)
-				return fn(&txBackends)
-			})
+			return s.db.Transaction(
+				func(tx *gorm.DB) error {
+					// Create backends that operate within the transaction
+					// withTransaction=false to prevent nested transactions
+					txBackends, _ := s.backendsWithDB(tx, false, jtiType)
+					return fn(&txBackends)
+				},
+			)
 		}
 	}
 
-	return backends
+	return backends, nil
 }

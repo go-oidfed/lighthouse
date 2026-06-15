@@ -42,6 +42,7 @@ var models = []any{
 	&model.SubordinateAdditionalClaim{},
 	&model.EntityConfigurationAdditionalClaim{},
 	&model.User{},
+	&model.JTIUsed{},
 }
 
 // statsModels contains models for the stats feature.

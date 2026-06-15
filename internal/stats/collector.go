@@ -76,12 +76,13 @@ func (c *Collector) Middleware() fiber.Handler {
 	}
 
 	return Middleware(MiddlewareConfig{
-		CaptureClientIP:    c.config.CaptureClientIP,
-		CaptureUserAgent:   c.config.CaptureUserAgent,
-		CaptureQueryParams: c.config.CaptureQueryParams,
-		GeoIP:              c.geoIP,
-		TrackedEndpoints:   c.trackedEndpoints,
-		Buffer:             c.buffer,
+		CaptureClientIP:       c.config.CaptureClientIP,
+		CaptureUserAgent:      c.config.CaptureUserAgent,
+		CaptureQueryParams:    c.config.CaptureQueryParams,
+		CaptureClientEntityID: c.config.CaptureClientEntityID,
+		GeoIP:                 c.geoIP,
+		TrackedEndpoints:      c.trackedEndpoints,
+		Buffer:                c.buffer,
 	})
 }
 

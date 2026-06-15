@@ -2,10 +2,13 @@ package lighthouse
 
 import (
 	arrays "github.com/adam-hanna/arrayOperations"
-	"github.com/gofiber/fiber/v2"
-
 	"github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/oidfedconst"
+	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -13,16 +16,34 @@ import (
 func (fed *LightHouse) AddSubordinateListingEndpoint(
 	endpoint EndpointConf, store model.SubordinateStorageBackend,
 	trustMarkStore model.TrustMarkedEntitiesStorageBackend,
-) {
+) error {
 	fed.fedMetadata.FederationListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
-	fed.server.Get(
-		endpoint.Path, func(ctx *fiber.Ctx) error {
-			return handleSubordinateListing(ctx, store, trustMarkStore)
-		},
-	)
+	handler := func(ctx *fiber.Ctx) error {
+		return handleSubordinateListing(ctx, store, trustMarkStore)
+	}
+
+	if endpoint.AuthEnabled {
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for subordinate listing endpoint")
+		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.fedMetadata.FederationListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
+	} else {
+		fed.server.Get(endpoint.Path, handler)
+	}
+
+	return nil
 }
 
 type SubordinateListingRequest struct {
@@ -37,7 +58,7 @@ func handleSubordinateListing(
 	trustMarkedEntitiesStorage model.TrustMarkedEntitiesStorageBackend,
 ) error {
 	var req SubordinateListingRequest
-	if err := ctx.QueryParser(&req); err != nil {
+	if err := parseRequest(ctx, &req); err != nil {
 		ctx.Status(fiber.StatusBadRequest)
 		return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
 	}

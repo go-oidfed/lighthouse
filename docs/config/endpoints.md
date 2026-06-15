@@ -14,6 +14,123 @@ enabled endpoints.
     **YAML-Only Options**: `endpoints.enroll.checker` and `endpoints.trust_mark.trust_mark_specs` 
     are too complex for environment variables and can only be set via YAML.
 
+## `auth`
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The `auth` section provides global authentication defaults for all federation endpoints.
+Per-endpoint `auth_enabled` and `auth_trust_anchors` values override these defaults.
+
+??? file "config.yaml"
+
+    ```yaml
+    endpoints:
+        auth:
+            all_require_auth: true
+            trust_anchors:
+                - entity_id: https://trust-anchor.example.com
+            jti_backend: cache
+            jti_cleanup_interval: 1h
+        fetch:
+            path: /fetch
+        resolve:
+            path: /resolve
+    ```
+
+### `all_require_auth`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_AUTH_ALL_REQUIRE_AUTH`</span>
+
+When set to `true`, authentication is required on **all** federation endpoints.
+
+When `false` (default), only endpoints with `auth_enabled: true` require authentication.
+
+### `trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional; required if `all_require_auth` is true</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Default list of trust anchors used for endpoint authentication. When an endpoint has authentication
+enabled but does not specify its own `auth_trust_anchors`, these trust anchors are used as a
+fallback.
+
+### `jti_backend`
+<span class="badge badge-purple" title="Value Type">string (`"cache"` or `"db"`)</span>
+<span class="badge badge-blue" title="Default Value">`"cache"`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_AUTH_JTI_BACKEND`</span>
+
+Specifies the backend used for JWT ID (JTI) replay prevention storage. Valid values:
+
+- `"cache"` — Uses the configured cache backend (Redis or in-memory). JTIs expire
+  automatically based on their TTL. No cleanup required.
+- `"db"` — Uses the database table `jtis_used`. Requires periodic cleanup via
+  [`jti_cleanup_interval`](#jti_cleanup_interval).
+
+The JTI storage prevents replay attacks by ensuring each client assertion JWT can only
+be used once.
+
+### `jti_cleanup_interval`
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-blue" title="Default Value">`1h`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_AUTH_JTI_CLEANUP_INTERVAL`</span>
+
+How often to clean up expired JTIs from the database. Only applicable when
+[`jti_backend`](#jti_backend) is set to `"db"`.
+
+The cleanup runs as a background goroutine and removes JTIs whose expiration time
+has passed.
+
+### Per-endpoint auth options
+
+Each individual endpoint also supports the following two options that override the global defaults.
+
+#### `auth_enabled`
+
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_<ENDPOINT>_AUTH_ENABLED`</span>
+
+Requires authentication for this specific endpoint. Ignored when
+[`endpoints.auth.all_require_auth`](#all_require_auth) is `true`.
+
+#### `auth_trust_anchors`
+
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors for authenticating requests to this endpoint. When not set and auth is enabled on
+this endpoint, falls back to [`endpoints.auth.trust_anchors`](#trust_anchors).
+
+### TrustAnchor format
+
+Each trust anchor entry is an object with the following fields:
+
+```yaml
+trust_anchors:
+  - entity_id: https://trust-anchor.example.com
+    jwks:
+      keys:
+        - ...
+```
+
+#### `entity_id`
+<span class="badge badge-purple" title="Value Type">string (URI)</span>
+<span class="badge badge-red" title="Required">required</span>
+
+The Entity ID of the Trust Anchor.
+
+#### `jwks`
+<span class="badge badge-purple" title="Value Type">JWKS</span>
+<span class="badge badge-green" title="Optional">optional</span>
+
+A JWKS containing the Trust Anchor's public keys. If not provided, the Trust Anchor's entity
+configuration will be fetched to obtain the keys.
+
 ## `fetch`
 Under the `fetch` option the Federation Subordinate Fetching Endpoint is configured.
 
@@ -50,6 +167,23 @@ in the Entity Configuration. This option is usually not set. There are two cases
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_FETCH_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
 
 ### `statement_lifetime`
 <span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
@@ -105,6 +239,23 @@ in the Entity Configuration. This option is usually not set. There are two cases
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
 
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_LIST_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
+
 ## `resolve`
 Under the `resolve` option the Resolve Endpoint is configured.
 
@@ -141,6 +292,23 @@ in the Entity Configuration. This option is usually not set. There are two cases
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_RESOLVE_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
 
 ### `grace_period`
 <span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
@@ -331,6 +499,23 @@ in the Entity Configuration. This option is usually not set. There are two cases
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
 
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_TRUST_MARK_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
+
 ### `trust_mark_specs`
 <span class="badge badge-purple" title="Value Type">list</span>
 <span class="badge badge-yellow" title="Deprecation status">deprecated</span>
@@ -445,6 +630,23 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
 
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_TRUST_MARK_REQUEST_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
+
 ## `trust_mark_status`
 Under the `trust_mark_status` option the Federation Trust Mark Status Endpoint is configured.
 
@@ -479,6 +681,23 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_TRUST_MARK_STATUS_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
 
 ## `trust_mark_list`
 Under the `trust_mark_list` option the Federation Trust Marked Entities Listing Endpoint is configured.
@@ -515,6 +734,23 @@ Federation Metadata in the Entity Configuration. This option is usually not set.
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
 
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_TRUST_MARK_LIST_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
+
 ## `historical_keys`
 Under the `historical_keys` option the Federation Historical Keys Endpoint is configured.
 
@@ -549,6 +785,23 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_HISTORICAL_KEYS_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
 
 ## `enroll`
 Under the `enroll` option a custom / proprietary endpoint can be configured. This endpoint allows an
@@ -594,6 +847,23 @@ in the Entity Configuration. This option is usually not set. There are two cases
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_ENROLL_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
 
 #### `checker`
 <span class="badge badge-purple" title="Value Type">object / mapping</span>
@@ -659,6 +929,23 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
 
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_ENROLL_REQUEST_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
+
 ## `entity_collection`
 Under the `entity_collection` option the Federation Entity Collection Endpoint is configured. This endpoint follows a 
 work-in-progress extension draft, currently available at: https://zachmann.github.io/openid-federation-entity-collection/main.html
@@ -700,6 +987,23 @@ Metadata in the Entity Configuration. This option is usually not set. There are 
 
 - To overwrite the default constructing of the external url from the provided `path`. This should usually not be needed.
 - To use an external Endpoint.
+
+### `auth_enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_ENDPOINTS_ENTITY_COLLECTION_AUTH_ENABLED`</span>
+
+Requires authentication for requests to this endpoint. See the [`auth`](#auth) section for global
+authentication settings.
+
+### `auth_trust_anchors`
+<span class="badge badge-purple" title="Value Type">list of [TrustAnchor](#trustanchor-configuration)</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-yellow" title="YAML Only">YAML only</span>
+
+Trust anchors used to authenticate requests to this endpoint. When not set, falls back to
+[`endpoints.auth.trust_anchors`](#trust_anchors).
 
 ### `allowed_trust_anchors`
 <span class="badge badge-purple" title="Value Type">list of strings</span>

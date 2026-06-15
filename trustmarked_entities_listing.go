@@ -3,10 +3,14 @@ package lighthouse
 import (
 	"slices"
 
+	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 
 	oidfed "github.com/go-oidfed/lib"
 
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -16,59 +20,80 @@ import (
 func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 	endpoint EndpointConf,
 	instanceStore model.IssuedTrustMarkInstanceStore,
-) {
+) error {
 	fed.fedMetadata.FederationTrustMarkListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
-		return
+		return nil
 	}
-	fed.server.Get(
-		endpoint.Path, func(ctx *fiber.Ctx) error {
-			trustMarkType := ctx.Query("trust_mark_type")
-			sub := ctx.Query("sub")
-			if trustMarkType == "" {
-				ctx.Status(fiber.StatusBadRequest)
-				return ctx.JSON(
-					oidfed.ErrorInvalidRequest(
-						"required parameter 'trust_mark_type' not given",
-					),
-				)
-			}
-			if !slices.Contains(
-				fed.TrustMarkIssuer.TrustMarkTypes(),
-				trustMarkType,
-			) {
-				ctx.Status(fiber.StatusNotFound)
-				return ctx.JSON(
-					oidfed.ErrorNotFound("'trust_mark_type' not known"),
-				)
-			}
+	handler := func(ctx *fiber.Ctx) error {
+		var req trustMarkQueryRequest
+		if err := parseRequest(ctx, &req); err != nil {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request parameters: " + err.Error()))
+		}
+		if req.TrustMarkType == "" {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(
+				oidfed.ErrorInvalidRequest(
+					"required parameter 'trust_mark_type' not given",
+				),
+			)
+		}
+		if !slices.Contains(
+			fed.TrustMarkIssuer.TrustMarkTypes(),
+			req.TrustMarkType,
+		) {
+			ctx.Status(fiber.StatusNotFound)
+			return ctx.JSON(
+				oidfed.ErrorNotFound("'trust_mark_type' not known"),
+			)
+		}
 
-			entities := make([]string, 0)
-			var err error
+		entities := make([]string, 0)
+		var err error
 
-			if sub != "" {
-				// Check if specific entity has an active (valid) trust mark instance
-				hasActive, err := instanceStore.HasActiveInstance(trustMarkType, sub)
-				if err != nil {
-					ctx.Status(fiber.StatusInternalServerError)
-					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-				}
-				if hasActive {
-					entities = []string{sub}
-				}
-			} else {
-				// List all entities with active (valid) trust mark instances
-				entities, err = instanceStore.ListActiveSubjects(trustMarkType)
-				if err != nil {
-					ctx.Status(fiber.StatusInternalServerError)
-					return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-				}
-				if entities == nil {
-					entities = make([]string, 0)
-				}
+		if req.Subject != "" {
+			// Check if specific entity has an active (valid) trust mark instance
+			hasActive, err := instanceStore.HasActiveInstance(req.TrustMarkType, req.Subject)
+			if err != nil {
+				ctx.Status(fiber.StatusInternalServerError)
+				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 			}
+			if hasActive {
+				entities = []string{req.Subject}
+			}
+		} else {
+			// List all entities with active (valid) trust mark instances
+			entities, err = instanceStore.ListActiveSubjects(req.TrustMarkType)
+			if err != nil {
+				ctx.Status(fiber.StatusInternalServerError)
+				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+			}
+			if entities == nil {
+				entities = make([]string, 0)
+			}
+		}
 
-			return ctx.JSON(entities)
-		},
-	)
+		return ctx.JSON(entities)
+	}
+
+	if endpoint.AuthEnabled {
+		auth, err := middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for trust marked entities listing endpoint")
+		}
+
+		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.fedMetadata.FederationTrustMarkListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
+	} else {
+		fed.server.Get(endpoint.Path, handler)
+	}
+
+	return nil
 }
