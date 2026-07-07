@@ -4,7 +4,7 @@ go 1.25.9
 
 require (
 	github.com/adam-hanna/arrayOperations v1.0.1
-	github.com/dgraph-io/badger/v4 v4.9.2
+	github.com/dgraph-io/badger/v4 v4.9.3
 	github.com/fatih/structs v1.1.0
 	github.com/go-oidfed/lib v0.10.12
 	github.com/gofiber/fiber/v2 v2.52.13
