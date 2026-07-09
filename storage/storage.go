@@ -43,6 +43,8 @@ var models = []any{
 	&model.EntityConfigurationAdditionalClaim{},
 	&model.User{},
 	&model.JTIUsed{},
+	&model.TrustAnchor{},
+	&model.FederationEndpoint{},
 }
 
 // statsModels contains models for the stats feature.

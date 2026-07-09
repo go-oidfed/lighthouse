@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-oidfed/lib/cache"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 
@@ -57,6 +58,14 @@ func main() {
 	setupTrustMarkIssuer(lh, c.EntityID, &backs)
 
 	log.Info("Initialized Entity")
+
+	// Build the trust anchor repository and start the JWKS refresher.
+	// Only in the parent process (prefork children resolve TA JWKS from DB per request).
+	if !fiber.IsChild() {
+		if err := setupTrustAnchorRepoAndRefresher(lh, &backs); err != nil {
+			log.WithError(err).Fatal("failed to setup trust anchor repository / refresher")
+		}
+	}
 
 	proactiveResolver, err := registerEndpoints(lh, &c, &backs)
 	if err != nil {
@@ -177,6 +186,35 @@ func setupTrustMarkIssuer(lh *lighthouse.LightHouse, entityID string, backs *mod
 		lh.TrustMarkIssuer.SetProvider(dbProvider)
 		log.Info("Configured DB-based TrustMarkSpecProvider")
 	}
+}
+
+// setupTrustAnchorRepoAndRefresher builds the trust anchor repository from the
+// database and starts the TA JWKS refresher. Must only be called in the parent
+// process (prefork children resolve TA JWKS from the DB per request).
+func setupTrustAnchorRepoAndRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
+	if backs.TrustAnchors == nil {
+		log.Warn("Trust anchor storage not available; skipping TA repository setup")
+		return nil
+	}
+	repo := lighthouse.NewTrustAnchorRepo(backs.TrustAnchors)
+	if err := repo.Load(); err != nil {
+		return errors.Wrap(err, "failed to load trust anchor repository")
+	}
+	log.WithField("count", repo.Count()).Info("Loaded trust anchor repository")
+	lh.SetTrustAnchorRepo(repo)
+
+	if repo.Count() == 0 || len(repo.AllWithJWKSUpdate()) == 0 {
+		log.Debug("No trust anchors with enable_jwks_update=true; skipping refresher")
+		return nil
+	}
+
+	dbJWKStorage := storage.NewDBJWKStorage(storage.NewTrustAnchorStorage(backs.DB))
+	refresher, err := lighthouse.SetupTAJWKSRefresher(repo, dbJWKStorage)
+	if err != nil {
+		return errors.Wrap(err, "failed to start TA JWKS refresher")
+	}
+	lh.SetTAJWKSRefresher(refresher)
+	return nil
 }
 
 func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model.Backends) (

@@ -216,6 +216,8 @@ func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool, jtiType JTIS
 		TrustMarkIssuers:    &TrustMarkIssuersStorage{db: db},
 		AdditionalClaims:    &AdditionalClaimsStorage{db: db},
 		PublishedTrustMarks: &PublishedTrustMarksStorage{db: db},
+		TrustAnchors:        NewTrustAnchorStorage(db),
+		FederationEndpoints: NewFederationEndpointStorage(db),
 		KV:                  &KeyValueStorage{db: db},
 		Users: &UsersStorage{
 			db:     db,

@@ -108,6 +108,8 @@ type LightHouse struct {
 	storages                model.Backends
 	statsCollector          *stats.Collector
 	trustMarkConfigProvider *storage.TrustMarkConfigProvider
+	trustAnchorRepo         *TrustAnchorRepo
+	taJWKSRefresher         *oidfed.TAJWKSRefresher
 	jtiCleanupStop          func()
 }
 
@@ -455,6 +457,26 @@ func (fed *LightHouse) SetJTICleanupStop(stop func()) {
 	fed.jtiCleanupStop = stop
 }
 
+// TrustAnchorRepo returns the trust anchor repository, or nil if not initialized.
+func (fed *LightHouse) TrustAnchorRepo() *TrustAnchorRepo {
+	return fed.trustAnchorRepo
+}
+
+// SetTrustAnchorRepo sets the trust anchor repository.
+func (fed *LightHouse) SetTrustAnchorRepo(repo *TrustAnchorRepo) {
+	fed.trustAnchorRepo = repo
+}
+
+// TAJWKSRefresher returns the TA JWKS refresher, or nil if not initialized.
+func (fed *LightHouse) TAJWKSRefresher() *oidfed.TAJWKSRefresher {
+	return fed.taJWKSRefresher
+}
+
+// SetTAJWKSRefresher sets the TA JWKS refresher.
+func (fed *LightHouse) SetTAJWKSRefresher(r *oidfed.TAJWKSRefresher) {
+	fed.taJWKSRefresher = r
+}
+
 //go:embed banner.txt
 var bannerTxt string
 
@@ -534,6 +556,11 @@ func (fed *LightHouse) Start() {
 
 // Stop gracefully shuts down the LightHouse server and its components.
 func (fed *LightHouse) Stop() error {
+	// Stop TA JWKS refresher if running
+	if fed.taJWKSRefresher != nil {
+		fed.taJWKSRefresher.Stop()
+	}
+
 	// Stop JTI cleanup if running
 	if fed.jtiCleanupStop != nil {
 		fed.jtiCleanupStop()
