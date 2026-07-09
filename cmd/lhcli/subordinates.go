@@ -114,10 +114,12 @@ func addSubordinate(_ *cobra.Command, args []string) error {
 	// because this will also verify the signature.
 	resolver := oidfed.TrustResolver{
 		TrustAnchors: oidfed.TrustAnchors{
-			{
-				EntityID: entityID,
-				JWKS:     entityJWKS,
-			},
+			func() *oidfed.TrustAnchor {
+				t := &oidfed.
+					TrustAnchor{EntityID: entityID}
+				t.SetJWKS(entityJWKS)
+				return t
+			}(),
 		},
 		StartingEntity: entityID,
 		Types:          entityTypes,

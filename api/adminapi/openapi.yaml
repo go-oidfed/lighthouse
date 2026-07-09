@@ -4424,6 +4424,29 @@ components:
           format: int64
           description: Overlap window where old and new keys are both valid, in seconds.
           example: 604800
+        key_announcement_lead_time:
+          type: integer
+          format: int64
+          nullable: true
+          description: >
+            Fixed duration (in seconds) how far in advance a new key is published
+            in the JWKS before it becomes the active signing key. If set, this
+            takes precedence over the default but is overridden by
+            key_announcement_lead_time_ec_multiplier if that is also set.
+            Must be at least the entity configuration lifetime; if shorter, the
+            EC lifetime is used as a minimum and a warning is logged.
+          example: 86400
+        key_announcement_lead_time_ec_multiplier:
+          type: number
+          format: float
+          nullable: true
+          description: >
+            Multiplier for the entity configuration lifetime to compute the key
+            announcement lead time. If set and greater than 0, this takes
+            precedence over key_announcement_lead_time. For example, 5 means the
+            new key is published 5 EC lifetimes before it becomes active.
+            The result is clamped to a minimum of the EC lifetime.
+          example: 5
     
     Jwk:
       required:

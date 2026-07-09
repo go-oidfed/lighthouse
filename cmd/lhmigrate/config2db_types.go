@@ -20,9 +20,11 @@ type migrationSigningConf struct {
 	RSAKeyLen int    `yaml:"rsa_key_len"`
 
 	KeyRotation struct {
-		Enabled  bool                    `yaml:"enabled"`
-		Interval duration.DurationOption `yaml:"interval"`
-		Overlap  duration.DurationOption `yaml:"overlap"`
+		Enabled                             bool                    `yaml:"enabled"`
+		Interval                            duration.DurationOption `yaml:"interval"`
+		Overlap                             duration.DurationOption `yaml:"overlap"`
+		KeyAnnouncementLeadTime             duration.DurationOption `yaml:"key_announcement_lead_time"`
+		KeyAnnouncementLeadTimeECMultiplier float64                 `yaml:"key_announcement_lead_time_ec_multiplier"`
 	} `yaml:"key_rotation"`
 
 	// Legacy format (automatic_key_rollover)

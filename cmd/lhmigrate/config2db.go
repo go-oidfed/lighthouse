@@ -447,6 +447,8 @@ func (m *configMigrator) migrateKeyRotation() migrationResult {
 		rotationConfig.Enabled = m.config.Signing.KeyRotation.Enabled
 		rotationConfig.Interval = m.config.Signing.KeyRotation.Interval
 		rotationConfig.Overlap = m.config.Signing.KeyRotation.Overlap
+		rotationConfig.KeyAnnouncementLeadTime = m.config.Signing.KeyRotation.KeyAnnouncementLeadTime
+		rotationConfig.KeyAnnouncementLeadTimeECMultiplier = m.config.Signing.KeyRotation.KeyAnnouncementLeadTimeECMultiplier
 		hasConfig = true
 	} else if m.config.Signing.AutomaticKeyRollover.Interval.Duration() > 0 {
 		// Legacy format

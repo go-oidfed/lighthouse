@@ -350,6 +350,12 @@ func (h *kmsHandlers) patchRotation(c *fiber.Ctx) error {
 	if v, ok := patch["overlap"].(float64); ok {
 		current.Overlap = duration.DurationOption(time.Duration(v) * time.Second)
 	}
+	if v, ok := patch["key_announcement_lead_time"].(float64); ok {
+		current.KeyAnnouncementLeadTime = duration.DurationOption(time.Duration(v) * time.Second)
+	}
+	if v, ok := patch["key_announcement_lead_time_ec_multiplier"].(float64); ok {
+		current.KeyAnnouncementLeadTimeECMultiplier = v
+	}
 	if err = storage.SetKeyRotation(h.kvStorage, current); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
