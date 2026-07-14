@@ -82,16 +82,17 @@ func EntityCheckerFromEntityCheckerConfig(c EntityCheckerConfig) (
 }
 
 // EntityCheckerFromJSONConfig creates an EntityChecker from a JSON-style config
-// (using map[string]any instead of yaml.Node). This is used when loading
-// config from database.
-func EntityCheckerFromJSONConfig(checkerType string, config map[string]any) (EntityChecker, error) {
+// (using any instead of yaml.Node). This is used when loading config from the
+// database. The config can be a map[string]any (for simple checkers like
+// trust_mark) or a []any (for composite checkers like multiple_or/multiple_and).
+func EntityCheckerFromJSONConfig(checkerType string, config any) (EntityChecker, error) {
 	checkerConstructor := entityCheckerRegistry[checkerType]
 	if checkerConstructor == nil {
 		return nil, errors.Errorf("unknown entity check type: %s", checkerType)
 	}
 	checker := checkerConstructor()
 
-	// Convert map to yaml.Node by marshaling and unmarshaling
+	// Convert to yaml.Node by marshaling and unmarshaling
 	if config != nil {
 		yamlBytes, err := yaml.Marshal(config)
 		if err != nil {
@@ -227,10 +228,10 @@ func (c *MultipleEntityCheckerAnd) UnmarshalYAML(node *yaml.Node) error {
 // valid trust mark. The trust mark can be checked with a specific issuer or
 // through the federation
 type TrustMarkEntityChecker struct {
-	TrustMarkType       string                    `yaml:"trust_mark_type"`
-	TrustAnchors        oidfed.TrustAnchors       `yaml:"trust_anchors"`
-	TrustMarkIssuerJWKS jwx.JWKS                  `yaml:"trust_mark_issuer_jwks"`
-	TrustMarkOwnerSpec  oidfed.TrustMarkOwnerSpec `yaml:"trust_mark_owner"`
+	TrustMarkType       string                    `yaml:"trust_mark_type" json:"trust_mark_type"`
+	TrustAnchorIDs      []string                  `yaml:"trust_anchors" json:"trust_anchors"`
+	TrustMarkIssuerJWKS jwx.JWKS                  `yaml:"trust_mark_issuer_jwks" json:"trust_mark_issuer_jwks"`
+	TrustMarkOwnerSpec  oidfed.TrustMarkOwnerSpec `yaml:"trust_mark_owner" json:"trust_mark_owner"`
 }
 
 // Check implements the EntityChecker interface
@@ -258,8 +259,8 @@ func (c TrustMarkEntityChecker) Check(
 			return true, 0, nil
 		}
 	} else {
-		for _, ta := range c.TrustAnchors {
-			taConfig, err := oidfed.GetEntityConfiguration(ta.EntityID)
+		for _, taID := range c.TrustAnchorIDs {
+			taConfig, err := oidfed.GetEntityConfiguration(taID)
 			if err != nil {
 				continue
 			}
@@ -294,8 +295,7 @@ func (c *TrustMarkEntityChecker) UnmarshalYAML(node *yaml.Node) error {
 // TrustPathEntityChecker checks that the entity has a
 // valid trust path to a trust anchor
 type TrustPathEntityChecker struct {
-	TrustAnchors                oidfed.TrustAnchors `yaml:"trust_anchors"`
-	isAlreadyTrustAnchorChecker EntityIDEntityChecker
+	TrustAnchorIDs []string `yaml:"trust_anchors" json:"trust_anchors"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler and EntityChecker interface
@@ -307,7 +307,6 @@ func (c *TrustPathEntityChecker) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	*c = TrustPathEntityChecker(alias)
-	c.isAlreadyTrustAnchorChecker = EntityIDEntityChecker{AllowedIDs: c.TrustAnchors.EntityIDs()}
 	return nil
 }
 
@@ -316,14 +315,15 @@ func (c TrustPathEntityChecker) Check(
 	entityConfiguration *oidfed.EntityStatement,
 	entityTypes []string,
 ) (bool, int, *oidfed.Error) {
-	if ok, _, _ := c.isAlreadyTrustAnchorChecker.Check(entityConfiguration, entityTypes); ok {
+	idChecker := EntityIDEntityChecker{AllowedIDs: c.TrustAnchorIDs}
+	if ok, _, _ := idChecker.Check(entityConfiguration, entityTypes); ok {
 		return true, 0, nil
 	}
 
 	confirmedValid, _ := oidfed.DefaultMetadataResolver.ResolvePossible(
 		apimodel.ResolveRequest{
 			Subject:     entityConfiguration.Subject,
-			TrustAnchor: c.TrustAnchors.EntityIDs(),
+			TrustAnchor: c.TrustAnchorIDs,
 		},
 	)
 	if !confirmedValid {

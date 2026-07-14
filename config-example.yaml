@@ -102,6 +102,11 @@ storage:
   # Enable database query logging (for debugging)
   # debug: false
   
+  # Endpoint authentication JTI storage
+  # endpoint_auth:
+  #   jti_backend: cache  # "cache" or "db"
+  #   jti_cleanup_interval: 1h  # DB backend only
+  
   # MySQL example:
   # driver: mysql
   # dsn: "lighthouse:password@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&parseTime=True"
@@ -139,86 +144,6 @@ api:
       parallelism: 4
       key_len: 64
       salt_len: 32
-
-# =============================================================================
-# Federation Endpoints
-# =============================================================================
-endpoints:
-  # Fetch endpoint - retrieve subordinate statements
-  fetch:
-    path: "/fetch"
-  
-  # List endpoint - list subordinate entity IDs
-  list:
-    path: "/list"
-  
-  # Resolve endpoint - resolve trust chains
-  resolve:
-    path: "/resolve"
-    # Restrict which trust anchors can be used
-    # allowed_trust_anchors:
-    #   - "https://ta.example.org"
-    # Or use the same trust anchors as entity_collection endpoint
-    # use_entity_collection_allowed_trust_anchors: false
-    # Grace period for expiring entity statements
-    # grace_period: 1h
-    # time_elapsed_grace_factor: 0.5
-    # Proactive resolver: pre-resolve entities for faster responses
-    # proactive_resolver:
-    #   enabled: false
-    #   concurrency_limit: 64
-    #   queue_size: 10000
-    #   response_storage:
-    #     dir: ""
-    #     store_json: false
-    #     store_jwt: true
-  
-  # Historical keys endpoint - federation_historical_keys_endpoint
-  historical_keys:
-    path: "/historical-keys"
-  
-  # Trust mark endpoint - issue trust marks
-  trust_mark:
-    path: "/trustmark"
-    # Trust mark specs are managed via Admin API:
-    #   POST /api/v1/admin/trust-marks/issuance-spec
-  
-  # Trust mark status endpoint
-  trust_mark_status:
-    path: "/trustmark/status"
-  
-  # Trust mark list endpoint
-  trust_mark_list:
-    path: "/trustmark/list"
-  
-  # Entity collection endpoint
-  entity_collection:
-    path: "/entity-collection"
-    allowed_trust_anchors:
-      - "https://ta.example.org"
-  #   interval: 8h
-  #   concurrency_limit: 64
-  #   pagination_limit: 100
-  
-  # Enrollment endpoint (optional) - automatic subordinate registration
-  # enroll:
-  #   path: "/enroll"
-  #   checker:
-  #     type: multiple_or
-  #     config:
-  #       - type: trust_mark
-  #         config:
-  #           trust_mark_type: "https://federation.example.com/trustmarks/member"
-  #           trust_anchors:
-  #             - entity_id: "https://ta.example.org"
-  
-  # Enrollment request endpoint (optional) - manual enrollment requests
-  # enroll_request:
-  #   path: "/enroll-request"
-  
-  # Trust mark request endpoint (optional) - request trust marks
-  # trust_mark_request:
-  #   path: "/trustmark-request"
 
 # =============================================================================
 # Statistics Collection (Optional)

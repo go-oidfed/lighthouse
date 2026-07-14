@@ -80,6 +80,46 @@ Configure trust mark issuance for your federation.
 - **Issuance Specifications** - Define issuance parameters for each trust mark type
 - **Subjects** - Manage which entities are entitled to receive specific trust marks
 
+### Trust Anchors
+
+Manage the [Trust Anchor Repository](trust_anchors.md) — the single source of
+truth for all trust anchors and their JWKS.
+
+- **CRUD** - Create, read, update, and delete trust anchors
+- **JWKS Refreshing** - Enable or disable automatic JWKS refreshing per trust anchor
+- **Polling Interval** - Configure how often each trust anchor's entity configuration is polled for key changes
+
+Endpoints:
+
+| Operation | Method | Path |
+|-----------|--------|------|
+| List all trust anchors | `GET` | `/api/v1/admin/trust-anchors` |
+| Get a trust anchor | `GET` | `/api/v1/admin/trust-anchors/{entityID}` |
+| Create a trust anchor | `POST` | `/api/v1/admin/trust-anchors` |
+| Update a trust anchor | `PUT` | `/api/v1/admin/trust-anchors/{entityID}` |
+| Delete a trust anchor | `DELETE` | `/api/v1/admin/trust-anchors/{entityID}` |
+
+### Federation Endpoints
+
+Manage federation endpoint paths, URLs, authentication, and type-specific
+configuration at runtime. See [Endpoints](endpoints.md) for details.
+
+- **CRUD** - Create, read, update, and delete federation endpoints by type
+- **Authentication** - Enable/disable `private_key_jwt` auth and assign trust anchors
+- **Type-Specific Config** - Configure resolve settings, entity collection, enroll checkers, etc.
+- **Dynamic Reload** - Changes take effect immediately without restart
+
+Endpoints:
+
+| Operation | Method | Path |
+|-----------|--------|------|
+| List all endpoints | `GET` | `/api/v1/admin/federation-endpoints` |
+| Get an endpoint by type | `GET` | `/api/v1/admin/federation-endpoints/{type}` |
+| Create an endpoint | `POST` | `/api/v1/admin/federation-endpoints` |
+| Update an endpoint | `PUT` | `/api/v1/admin/federation-endpoints/{type}` |
+| Delete an endpoint | `DELETE` | `/api/v1/admin/federation-endpoints/{type}` |
+| Set auth trust anchors | `PUT` | `/api/v1/admin/federation-endpoints/{type}/auth-trust-anchors` |
+
 ### Users
 
 Manage admin users for API access. This functionality is available at a separate Swagger UI endpoint (`/api/v1/admin/docs/users`) when user management is enabled.

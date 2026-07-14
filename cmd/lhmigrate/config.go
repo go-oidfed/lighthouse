@@ -222,6 +222,9 @@ func (t *configTransformer) transform() (string, error) {
 	// Move entity_id from federation_data to top level
 	t.moveEntityIDToTopLevel(&root)
 
+	// Move JTI settings from endpoints.auth to storage.endpoint_auth
+	t.moveJTIToStorage(&root)
+
 	// Marshal back to YAML
 	var buf strings.Builder
 	encoder := yaml.NewEncoder(&buf)
@@ -335,6 +338,160 @@ func (t *configTransformer) moveEntityIDToTopLevel(root *yaml.Node) {
 		newContent = append(newContent, keyNode, valueNode)
 		newContent = append(newContent, docContent.Content[insertIndex:]...)
 		docContent.Content = newContent
+	}
+}
+
+// moveJTIToStorage moves jti_backend and jti_cleanup_interval from
+// endpoints.auth to storage.endpoint_auth. If endpoints.auth has no remaining
+// fields after the move, it is removed. If endpoints has no remaining children,
+// it is also removed.
+func (t *configTransformer) moveJTIToStorage(root *yaml.Node) {
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
+		return
+	}
+	docContent := root.Content[0]
+	if docContent.Kind != yaml.MappingNode {
+		return
+	}
+
+	// Find the endpoints and storage nodes at top level.
+	var endpointsNode, storageNode *yaml.Node
+	endpointsIndex := -1
+	for i := 0; i < len(docContent.Content); i += 2 {
+		if i+1 >= len(docContent.Content) {
+			break
+		}
+		switch docContent.Content[i].Value {
+		case "endpoints":
+			endpointsNode = docContent.Content[i+1]
+			endpointsIndex = i
+		case "storage":
+			storageNode = docContent.Content[i+1]
+		}
+	}
+	if endpointsNode == nil || endpointsNode.Kind != yaml.MappingNode {
+		return
+	}
+
+	// Find endpoints.auth
+	var authNode *yaml.Node
+	authIndex := -1
+	for i := 0; i < len(endpointsNode.Content); i += 2 {
+		if i+1 >= len(endpointsNode.Content) {
+			break
+		}
+		if endpointsNode.Content[i].Value == "auth" {
+			authNode = endpointsNode.Content[i+1]
+			authIndex = i
+			break
+		}
+	}
+	if authNode == nil || authNode.Kind != yaml.MappingNode {
+		return
+	}
+
+	// Extract jti_backend and jti_cleanup_interval from auth.
+	var jtiFields [2]*yaml.Node // [key, value] pairs
+	jtiFieldCount := 0
+	for i := 0; i < len(authNode.Content); i += 2 {
+		if i+1 >= len(authNode.Content) {
+			break
+		}
+		key := authNode.Content[i].Value
+		if key == "jti_backend" || key == "jti_cleanup_interval" {
+			jtiFields[jtiFieldCount*2] = authNode.Content[i]
+			jtiFields[jtiFieldCount*2+1] = authNode.Content[i+1]
+			jtiFieldCount++
+		}
+	}
+	if jtiFieldCount == 0 {
+		return
+	}
+
+	// Remove the JTI fields from endpoints.auth.
+	newAuthContent := make([]*yaml.Node, 0, len(authNode.Content)-jtiFieldCount*2)
+	for i := 0; i < len(authNode.Content); i += 2 {
+		if i+1 >= len(authNode.Content) {
+			break
+		}
+		key := authNode.Content[i].Value
+		if key != "jti_backend" && key != "jti_cleanup_interval" {
+			newAuthContent = append(newAuthContent, authNode.Content[i], authNode.Content[i+1])
+		}
+	}
+	authNode.Content = newAuthContent
+
+	// If auth is now empty, remove it from endpoints.
+	if len(authNode.Content) == 0 {
+		endpointsNode.Content = append(
+			endpointsNode.Content[:authIndex],
+			endpointsNode.Content[authIndex+2:]...,
+		)
+	}
+
+	// If endpoints is now empty, remove it from the document.
+	if len(endpointsNode.Content) == 0 {
+		docContent.Content = append(
+			docContent.Content[:endpointsIndex],
+			docContent.Content[endpointsIndex+2:]...,
+		)
+	}
+
+	// Create or find storage.endpoint_auth and add the JTI fields.
+	if storageNode == nil {
+		// Create a new storage mapping node.
+		storageNode = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "storage"}
+		docContent.Content = append(docContent.Content, keyNode, storageNode)
+	}
+
+	// Find or create endpoint_auth in storage.
+	var endpointAuthNode *yaml.Node
+	for i := 0; i < len(storageNode.Content); i += 2 {
+		if i+1 >= len(storageNode.Content) {
+			break
+		}
+		if storageNode.Content[i].Value == "endpoint_auth" {
+			endpointAuthNode = storageNode.Content[i+1]
+			break
+		}
+	}
+	if endpointAuthNode == nil {
+		endpointAuthNode = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		keyNode := &yaml.Node{
+			Kind:        yaml.ScalarNode,
+			Tag:         "!!str",
+			Value:       "endpoint_auth",
+			HeadComment: "# Endpoint authentication JTI storage (moved from endpoints.auth)",
+		}
+		storageNode.Content = append(storageNode.Content, keyNode, endpointAuthNode)
+	}
+
+	// Add the JTI fields to endpoint_auth.
+	for j := 0; j < jtiFieldCount; j++ {
+		key := jtiFields[j*2]
+		val := jtiFields[j*2+1]
+		if key == nil {
+			continue
+		}
+		// Check if this field already exists in endpoint_auth.
+		alreadyExists := false
+		for i := 0; i < len(endpointAuthNode.Content); i += 2 {
+			if i+1 >= len(endpointAuthNode.Content) {
+				break
+			}
+			if endpointAuthNode.Content[i].Value == key.Value {
+				alreadyExists = true
+				break
+			}
+		}
+		if !alreadyExists {
+			endpointAuthNode.Content = append(endpointAuthNode.Content, key, val)
+		}
+	}
+
+	if t.verbose {
+		log.Info("Moved JTI settings from endpoints.auth to storage.endpoint_auth")
 	}
 }
 

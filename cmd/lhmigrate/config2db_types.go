@@ -3,6 +3,7 @@ package main
 import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/zachmann/go-utils/duration"
+	"gopkg.in/yaml.v3"
 )
 
 // migrationConfig is a config struct that can parse both legacy and current config formats
@@ -37,6 +38,7 @@ type migrationSigningConf struct {
 // migrationFederationConf holds federation config values that should be migrated to DB
 type migrationFederationConf struct {
 	AuthorityHints               []string                        `yaml:"authority_hints"`
+	TrustAnchors                 []migrationTrustAnchorConf      `yaml:"trust_anchors"`
 	Constraints                  *oidfed.ConstraintSpecification `yaml:"constraints"`
 	MetadataPolicyCrit           []oidfed.PolicyOperatorName     `yaml:"metadata_policy_crit"`
 	MetadataPolicyFile           string                          `yaml:"metadata_policy_file"`
@@ -48,6 +50,15 @@ type migrationFederationConf struct {
 	TrustMarks       []migrationTrustMarkConfig               `yaml:"trust_marks"`
 	TrustMarkIssuers oidfed.AllowedTrustMarkIssuers           `yaml:"trust_mark_issuers"`
 	TrustMarkOwners  map[string]migrationTrustMarkOwnerConfig `yaml:"trust_mark_owners"`
+}
+
+// migrationTrustAnchorConf holds a trust anchor from the old config file.
+type migrationTrustAnchorConf struct {
+	EntityID         string                  `yaml:"entity_id"`
+	JWKSFile         string                  `yaml:"jwks_file"`
+	JWKS             any                     `yaml:"jwks"`
+	EnableJWKSUpdate bool                    `yaml:"enable_jwks_update"`
+	KeyPollInterval  duration.DurationOption `yaml:"key_poll_interval"`
 }
 
 // migrationTrustMarkConfig holds entity configuration trust mark config for migration
@@ -127,20 +138,99 @@ func (m *migrationFederationMetadataConf) isEmpty() bool {
 		len(m.Extra) == 0
 }
 
-// migrationEndpointsConf holds endpoint config values that should be migrated to DB
+// migrationEndpointsConf holds endpoint config values that should be migrated to DB.
+// This parses the old config file format with all per-endpoint settings.
 type migrationEndpointsConf struct {
-	Fetch     migrationFetchEndpointConf     `yaml:"fetch"`
-	TrustMark migrationTrustMarkEndpointConf `yaml:"trust_mark"`
+	Fetch            migrationFetchEndpointConf      `yaml:"fetch"`
+	List             migrationSimpleEndpointConf     `yaml:"list"`
+	Resolve          migrationResolveEndpointConf    `yaml:"resolve"`
+	TrustMarkStatus  migrationSimpleEndpointConf     `yaml:"trust_mark_status"`
+	TrustMarkList    migrationSimpleEndpointConf     `yaml:"trust_mark_list"`
+	TrustMark        migrationTrustMarkEndpointConf  `yaml:"trust_mark"`
+	HistoricalKeys   migrationSimpleEndpointConf     `yaml:"historical_keys"`
+	Enroll           migrationEnrollEndpointConf     `yaml:"enroll"`
+	EnrollRequest    migrationSimpleEndpointConf     `yaml:"enroll_request"`
+	TrustMarkRequest migrationSimpleEndpointConf     `yaml:"trust_mark_request"`
+	EntityCollection migrationCollectionEndpointConf `yaml:"entity_collection"`
+	Auth             migrationAuthConf               `yaml:"auth"`
+}
+
+// migrationSimpleEndpointConf holds path/url/auth for a simple endpoint.
+type migrationSimpleEndpointConf struct {
+	Path             string   `yaml:"path"`
+	URL              string   `yaml:"url"`
+	AuthEnabled      bool     `yaml:"auth_enabled"`
+	AuthTrustAnchors []string `yaml:"auth_trust_anchors"`
+}
+
+// migrationResolveEndpointConf holds resolve endpoint config.
+type migrationResolveEndpointConf struct {
+	Path                                   string                         `yaml:"path"`
+	URL                                    string                         `yaml:"url"`
+	AuthEnabled                            bool                           `yaml:"auth_enabled"`
+	AuthTrustAnchors                       []string                       `yaml:"auth_trust_anchors"`
+	AllowedTrustAnchors                    []string                       `yaml:"allowed_trust_anchors"`
+	UseEntityCollectionAllowedTrustAnchors bool                           `yaml:"use_entity_collection_allowed_trust_anchors"`
+	GracePeriod                            duration.DurationOption        `yaml:"grace_period"`
+	TimeElapsedGraceFactor                 float64                        `yaml:"time_elapsed_grace_factor"`
+	ProactiveResolver                      migrationProactiveResolverConf `yaml:"proactive_resolver"`
+}
+
+// migrationProactiveResolverConf holds proactive resolver config.
+type migrationProactiveResolverConf struct {
+	Enabled          bool `yaml:"enabled"`
+	ConcurrencyLimit int  `yaml:"concurrency_limit"`
+	QueueSize        int  `yaml:"queue_size"`
+	ResponseStorage  struct {
+		Dir       string `yaml:"dir"`
+		StoreJSON bool   `yaml:"store_json"`
+		StoreJWT  bool   `yaml:"store_jwt"`
+	} `yaml:"response_storage"`
+}
+
+// migrationEnrollEndpointConf holds enroll endpoint config with entity checker.
+type migrationEnrollEndpointConf struct {
+	Path             string    `yaml:"path"`
+	URL              string    `yaml:"url"`
+	AuthEnabled      bool      `yaml:"auth_enabled"`
+	AuthTrustAnchors []string  `yaml:"auth_trust_anchors"`
+	Checker          yaml.Node `yaml:"checker"`
+}
+
+// migrationCollectionEndpointConf holds entity collection endpoint config.
+type migrationCollectionEndpointConf struct {
+	Path                string                  `yaml:"path"`
+	URL                 string                  `yaml:"url"`
+	AuthEnabled         bool                    `yaml:"auth_enabled"`
+	AuthTrustAnchors    []string                `yaml:"auth_trust_anchors"`
+	AllowedTrustAnchors []string                `yaml:"allowed_trust_anchors"`
+	Interval            duration.DurationOption `yaml:"interval"`
+	ConcurrencyLimit    int                     `yaml:"concurrency_limit"`
+	PaginationLimit     int                     `yaml:"pagination_limit"`
+}
+
+// migrationAuthConf holds global endpoint auth config.
+type migrationAuthConf struct {
+	AllRequireAuth bool                       `yaml:"all_require_auth"`
+	TrustAnchors   []migrationTrustAnchorConf `yaml:"trust_anchors"`
 }
 
 // migrationFetchEndpointConf holds fetch endpoint config
 type migrationFetchEndpointConf struct {
+	Path              string                  `yaml:"path"`
+	URL               string                  `yaml:"url"`
+	AuthEnabled       bool                    `yaml:"auth_enabled"`
+	AuthTrustAnchors  []string                `yaml:"auth_trust_anchors"`
 	StatementLifetime duration.DurationOption `yaml:"statement_lifetime"`
 }
 
 // migrationTrustMarkEndpointConf holds trust mark endpoint config
 type migrationTrustMarkEndpointConf struct {
-	TrustMarkSpecs []migrationTrustMarkSpecConf `yaml:"trust_mark_specs"`
+	Path             string                       `yaml:"path"`
+	URL              string                       `yaml:"url"`
+	AuthEnabled      bool                         `yaml:"auth_enabled"`
+	AuthTrustAnchors []string                     `yaml:"auth_trust_anchors"`
+	TrustMarkSpecs   []migrationTrustMarkSpecConf `yaml:"trust_mark_specs"`
 }
 
 // migrationTrustMarkSpecConf holds trust mark spec config for migration
@@ -183,6 +273,8 @@ const (
 	sectionTrustMarkIssuers      migrationSection = "trust_mark_issuers"
 	sectionTrustMarkOwners       migrationSection = "trust_mark_owners"
 	sectionExtraEntityConfigData migrationSection = "extra_entity_config"
+	sectionTrustAnchors          migrationSection = "trust_anchors"
+	sectionEndpoints             migrationSection = "endpoints"
 )
 
 // allSections returns all available migration sections
@@ -203,6 +295,8 @@ func allSections() []migrationSection {
 		sectionTrustMarks,
 		sectionTrustMarkIssuers,
 		sectionTrustMarkOwners,
+		sectionTrustAnchors,
+		sectionEndpoints,
 	}
 }
 

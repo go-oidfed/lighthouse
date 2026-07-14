@@ -13,20 +13,29 @@ import (
 
 const oauthClientAssertionJWTBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
+// TAResolver resolves trust anchor entity IDs to oidfed.TrustAnchors at
+// request time. This allows JWKS updates to propagate live without restarting
+// the middleware.
+type TAResolver func(entityIDs []string) oidfed.TrustAnchors
+
 // PrivateKeyJWTAuth implements private_key_jwt authentication middleware
 type PrivateKeyJWTAuth struct {
-	entityID     string
-	fedEntity    oidfed.FederationEntity
-	trustAnchors oidfed.TrustAnchors
-	jtiStorage   model.JTIStorageBackend
-	logger       *log.Entry
+	entityID       string
+	fedEntity      oidfed.FederationEntity
+	trustAnchorIDs []string
+	taResolver     TAResolver
+	jtiStorage     model.JTIStorageBackend
+	logger         *log.Entry
 }
 
-// NewPrivateKeyJWTAuth creates a new private_key_jwt authentication middleware
+// NewPrivateKeyJWTAuth creates a new private_key_jwt authentication middleware.
+// The trustAnchorIDs are resolved to oidfed.TrustAnchors at request time via
+// taResolver, so JWKS updates propagate live.
 func NewPrivateKeyJWTAuth(
 	entityID string,
 	fedEntity oidfed.FederationEntity,
-	trustAnchors oidfed.TrustAnchors,
+	trustAnchorIDs []string,
+	taResolver TAResolver,
 	jtiStorage model.JTIStorageBackend,
 ) (*PrivateKeyJWTAuth, error) {
 	if entityID == "" {
@@ -35,18 +44,22 @@ func NewPrivateKeyJWTAuth(
 	if fedEntity == nil {
 		return nil, ErrInvalidConfig("federation entity is required")
 	}
-	if len(trustAnchors) == 0 {
+	if len(trustAnchorIDs) == 0 {
 		return nil, ErrInvalidConfig("at least one trust anchor is required")
+	}
+	if taResolver == nil {
+		return nil, ErrInvalidConfig("trust anchor resolver is required")
 	}
 	if jtiStorage == nil {
 		return nil, ErrInvalidConfig("JTI storage is required")
 	}
 
 	return &PrivateKeyJWTAuth{
-		entityID:     entityID,
-		fedEntity:    fedEntity,
-		trustAnchors: trustAnchors,
-		jtiStorage:   jtiStorage,
+		entityID:       entityID,
+		fedEntity:      fedEntity,
+		trustAnchorIDs: trustAnchorIDs,
+		taResolver:     taResolver,
+		jtiStorage:     jtiStorage,
 		logger: log.WithFields(
 			log.Fields{
 				"component": "auth_private_key_jwt",
@@ -236,9 +249,14 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 
 // resolveClientTrustChain resolves the client's trust chain and returns the leaf entity statement
 func (a *PrivateKeyJWTAuth) resolveClientTrustChain(clientEntityID string) (*oidfed.EntityStatement, error) {
+	// Resolve trust anchors live at request time so JWKS updates propagate.
+	trustAnchors := a.taResolver(a.trustAnchorIDs)
+	if len(trustAnchors) == 0 {
+		return nil, ErrInvalidClient("no resolvable trust anchors configured")
+	}
 	// Create trust resolver with configured trust anchors
 	resolver := oidfed.TrustResolver{
-		TrustAnchors:   a.trustAnchors,
+		TrustAnchors:   trustAnchors,
 		StartingEntity: clientEntityID,
 		Types:          nil, // Accept any entity type
 	}

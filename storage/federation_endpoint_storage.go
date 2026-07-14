@@ -161,14 +161,12 @@ func (s *FederationEndpointStorage) Update(t model.FederationEndpointType, req m
 }
 
 // Delete deletes a federation endpoint by type.
+// Join table rows are preserved on soft delete; they are cleaned up
+// automatically by FK ON DELETE CASCADE on hard delete.
 func (s *FederationEndpointStorage) Delete(t model.FederationEndpointType) error {
 	item, err := s.findByType(t)
 	if err != nil {
 		return err
-	}
-	// Clear association before delete.
-	if err := s.db.Model(item).Association("AuthTrustAnchors").Clear(); err != nil {
-		return errors.Wrap(err, "federation_endpoints: clear auth trust anchors failed")
 	}
 	if err := s.db.Delete(item).Error; err != nil {
 		return errors.Wrap(err, "federation_endpoints: delete failed")

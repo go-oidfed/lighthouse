@@ -159,6 +159,18 @@ func (r *TrustAnchorRepo) Remove(entityID string) {
 	delete(r.anchors, entityID)
 }
 
+// AddOrUpdate loads a TA from the store by entity_id and adds or updates it in
+// the in-memory repo. This is used by the admin API after a DB mutation.
+func (r *TrustAnchorRepo) AddOrUpdate(entityID string) {
+	item, err := r.store.Get(entityID)
+	if err != nil {
+		// Not found or error — remove from repo if it was there.
+		r.Remove(entityID)
+		return
+	}
+	r.Add(item)
+}
+
 // Has reports whether an entity is in the repository.
 func (r *TrustAnchorRepo) Has(entityID string) bool {
 	r.mu.RLock()

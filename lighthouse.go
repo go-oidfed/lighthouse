@@ -30,6 +30,7 @@ import (
 	"github.com/go-oidfed/lighthouse/internal/stats"
 	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/internal/version"
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -72,10 +73,11 @@ type EndpointConf struct {
 	// When global endpoints.auth.all_require_auth is true, this is forced on.
 	// Env: LH_ENDPOINTS_<ENDPOINT>_AUTH_ENABLED
 	AuthEnabled bool `yaml:"auth_enabled" envconfig:"AUTH_ENABLED"`
-	// AuthTrustAnchors is the list of trust anchors for endpoint authentication.
+	// AuthTrustAnchors is the list of trust anchor entity IDs for endpoint authentication.
+	// These are resolved live from the TrustAnchorRepo at request time.
 	// If empty when auth is enabled, falls back to global endpoints.auth.trust_anchors.
 	// Env: LH_ENDPOINTS_<ENDPOINT>_AUTH_TRUST_ANCHORS (comma-separated)
-	AuthTrustAnchors oidfed.TrustAnchors `yaml:"auth_trust_anchors" envconfig:"AUTH_TRUST_ANCHORS"`
+	AuthTrustAnchors []string `yaml:"auth_trust_anchors" envconfig:"AUTH_TRUST_ANCHORS"`
 }
 
 // IsSet returns a bool indicating if this endpoint was configured or not
@@ -110,6 +112,8 @@ type LightHouse struct {
 	trustMarkConfigProvider *storage.TrustMarkConfigProvider
 	trustAnchorRepo         *TrustAnchorRepo
 	taJWKSRefresher         *oidfed.TAJWKSRefresher
+	endpointRegistry        *EndpointRegistry
+	backgroundStops         []func()
 	jtiCleanupStop          func()
 }
 
@@ -180,10 +184,18 @@ func NewLightHouse(
 
 	entity.FederationEntity = buildDynamicFederationEntity(entity, entityID, storages)
 
+	entity.endpointRegistry = NewEndpointRegistry()
+
 	registerEntityConfigurationEndpoint(server, entity)
 
+	// Register the catch-all dispatcher for federation endpoints.
+	// Specific routes (/.well-known/openid-federation, /api/v1/admin/*) take
+	// precedence in Fiber's radix tree; all other paths are dispatched via
+	// the endpoint registry.
+	server.All("/*", entity.dispatch)
+
 	adminAPIServer, err := initAdminAPI(
-		admin, serverConf, server, entityID, storages,
+		admin, serverConf, server, entity, entityID, storages,
 		entity.FederationEntity, keyManagement, trustMarkConfigProvider,
 	)
 	if err != nil {
@@ -384,6 +396,7 @@ func initAdminAPI(
 	admin AdminAPIOptions,
 	serverConf ServerConf,
 	server *fiber.App,
+	entity *LightHouse,
 	entityID string,
 	storages model.Backends,
 	fedEntity oidfed.FederationEntity,
@@ -424,6 +437,7 @@ func initAdminAPI(
 		adminGroup, entityID, storages,
 		fedEntity,
 		keyManagement,
+		entity,
 		&adminapi.Options{
 			UsersEnabled:               admin.UsersEnabled,
 			Port:                       admin.Port,
@@ -475,6 +489,35 @@ func (fed *LightHouse) TAJWKSRefresher() *oidfed.TAJWKSRefresher {
 // SetTAJWKSRefresher sets the TA JWKS refresher.
 func (fed *LightHouse) SetTAJWKSRefresher(r *oidfed.TAJWKSRefresher) {
 	fed.taJWKSRefresher = r
+}
+
+// SyncTrustAnchor reloads a TA from the database and updates the in-memory
+// repository. Called by the admin API after a DB mutation on a trust anchor.
+func (fed *LightHouse) SyncTrustAnchor(entityID string) {
+	if fed.trustAnchorRepo != nil {
+		fed.trustAnchorRepo.AddOrUpdate(entityID)
+	}
+}
+
+// RemoveTrustAnchor removes a TA from the in-memory repository.
+// Called by the admin API after a trust anchor is deleted.
+func (fed *LightHouse) RemoveTrustAnchor(entityID string) {
+	if fed.trustAnchorRepo != nil {
+		fed.trustAnchorRepo.Remove(entityID)
+	}
+}
+
+// TAResolver returns a middleware.TAResolver that resolves trust anchor entity
+// IDs to oidfed.TrustAnchors via the in-memory repo. If the repo is nil, falls
+// back to creating TrustAnchors from entity IDs without JWKS (suitable for
+// trust-chain resolution that fetches JWKS itself).
+func (fed *LightHouse) TAResolver() middleware.TAResolver {
+	return func(entityIDs []string) oidfed.TrustAnchors {
+		if fed.trustAnchorRepo != nil {
+			return fed.trustAnchorRepo.Resolve(entityIDs...)
+		}
+		return oidfed.NewTrustAnchorsFromEntityIDs(entityIDs...)
+	}
 }
 
 //go:embed banner.txt
@@ -556,6 +599,9 @@ func (fed *LightHouse) Start() {
 
 // Stop gracefully shuts down the LightHouse server and its components.
 func (fed *LightHouse) Stop() error {
+	// Stop background services
+	fed.stopBackgroundServices()
+
 	// Stop TA JWKS refresher if running
 	if fed.taJWKSRefresher != nil {
 		fed.taJWKSRefresher.Stop()

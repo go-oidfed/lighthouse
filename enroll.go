@@ -128,17 +128,18 @@ func (fed *LightHouse) AddEnrollEndpoint(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for enroll endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(model.EndpointTypeEnroll, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
 		fed.fedMetadata.Extra["federation_enroll_endpoint_auth_methods"] = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeEnroll, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil

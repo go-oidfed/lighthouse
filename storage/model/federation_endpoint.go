@@ -47,6 +47,20 @@ func IsValidFederationEndpointType(t FederationEndpointType) bool {
 	return false
 }
 
+// FederationEndpointAuthTA is the explicit join table for the many-to-many
+// relation between FederationEndpoint and TrustAnchor. It defines foreign key
+// constraints with ON UPDATE CASCADE and ON DELETE CASCADE so that hard
+// deletes automatically clean up join rows.
+type FederationEndpointAuthTA struct {
+	FederationEndpointID uint `gorm:"primaryKey;foreignKey:FederationEndpointID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	TrustAnchorID        uint `gorm:"primaryKey;foreignKey:TrustAnchorID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+}
+
+// TableName overrides the default GORM table name to match the many2many tag.
+func (FederationEndpointAuthTA) TableName() string {
+	return "federation_endpoint_auth_trust_anchors"
+}
+
 // FederationEndpoint represents a federation endpoint managed in the database.
 // Path and URL are nullable: a nil Path means the endpoint is disabled (no
 // route is served and the corresponding federation metadata field is omitted).

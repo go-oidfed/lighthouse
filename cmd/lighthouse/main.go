@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"strings"
 	"time"
 
 	"github.com/go-oidfed/lib/cache"
@@ -35,7 +34,7 @@ func main() {
 		log.WithError(err).Fatal("failed to initialize cache")
 	}
 
-	backs, err := initStorage(&c.Storage, c.API.Admin.Argon2idParams, c.Endpoints.Auth.JTIBackend)
+	backs, err := initStorage(&c.Storage, c.API.Admin.Argon2idParams)
 	if err != nil {
 		log.WithError(err).Fatal("failed to initialize storage")
 	}
@@ -59,24 +58,23 @@ func main() {
 
 	log.Info("Initialized Entity")
 
-	// Build the trust anchor repository and start the JWKS refresher.
-	// Only in the parent process (prefork children resolve TA JWKS from DB per request).
+	// Build the trust anchor repository in all processes (read-only cache).
+	// The JWKS refresher is started only in the parent process.
+	if err := setupTrustAnchorRepo(lh, &backs); err != nil {
+		log.WithError(err).Fatal("failed to setup trust anchor repository")
+	}
 	if !fiber.IsChild() {
-		if err := setupTrustAnchorRepoAndRefresher(lh, &backs); err != nil {
-			log.WithError(err).Fatal("failed to setup trust anchor repository / refresher")
+		if err := startTAJWKSRefresher(lh, &backs); err != nil {
+			log.WithError(err).Fatal("failed to start TA JWKS refresher")
 		}
 	}
 
-	proactiveResolver, err := registerEndpoints(lh, &c, &backs)
-	if err != nil {
-		log.WithError(err).Fatal("failed to register endpoints")
+	// Load federation endpoints from the database.
+	if err := lh.LoadEndpointsFromDB(); err != nil {
+		log.WithError(err).Fatal("failed to load endpoints from DB")
 	}
 
 	log.Info("Added Endpoints")
-
-	if err = startBackgroundServices(proactiveResolver, &c); err != nil {
-		log.WithError(err).Fatal("failed to start background services")
-	}
 
 	lh.Start()
 }
@@ -109,7 +107,7 @@ func initCache(caching *config.CachingConf) error {
 }
 
 func initStorage(
-	storageConf *config.StorageConf, usersHash storage.Argon2idParams, jtiBackend storage.JTIStorageType,
+	storageConf *config.StorageConf, usersHash storage.Argon2idParams,
 ) (model.Backends, error) {
 	cfg := storage.Config{
 		Driver:         storageConf.Driver,
@@ -117,7 +115,7 @@ func initStorage(
 		DataDir:        storageConf.DataDir,
 		Debug:          storageConf.Debug,
 		UsersHash:      usersHash,
-		JTIStorageType: jtiBackend,
+		JTIStorageType: storageConf.EndpointAuth.JTIBackend,
 	}
 	return storage.LoadStorageBackends(cfg)
 }
@@ -165,8 +163,8 @@ func initLighthouse(c *config.Config, backs model.Backends, statsConfig stats.Co
 	}
 
 	// Start JTI cleanup goroutine if using DB backend
-	if c.Endpoints.Auth.JTIBackend == storage.JTIStorageDB {
-		lh.SetJTICleanupStop(startJTICleanup(backs.JTI, c.Endpoints.Auth.JTICleanupInterval.Duration()))
+	if c.Storage.EndpointAuth.JTIBackend == storage.JTIStorageDB {
+		lh.SetJTICleanupStop(startJTICleanup(backs.JTI, c.Storage.EndpointAuth.JTICleanupInterval.Duration()))
 	}
 
 	lh.LogoBanner = c.Logging.Banner.Logo
@@ -188,10 +186,9 @@ func setupTrustMarkIssuer(lh *lighthouse.LightHouse, entityID string, backs *mod
 	}
 }
 
-// setupTrustAnchorRepoAndRefresher builds the trust anchor repository from the
-// database and starts the TA JWKS refresher. Must only be called in the parent
-// process (prefork children resolve TA JWKS from the DB per request).
-func setupTrustAnchorRepoAndRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
+// setupTrustAnchorRepo builds the trust anchor repository from the database.
+// Called in all processes (read-only cache).
+func setupTrustAnchorRepo(lh *lighthouse.LightHouse, backs *model.Backends) error {
 	if backs.TrustAnchors == nil {
 		log.Warn("Trust anchor storage not available; skipping TA repository setup")
 		return nil
@@ -202,184 +199,23 @@ func setupTrustAnchorRepoAndRefresher(lh *lighthouse.LightHouse, backs *model.Ba
 	}
 	log.WithField("count", repo.Count()).Info("Loaded trust anchor repository")
 	lh.SetTrustAnchorRepo(repo)
+	return nil
+}
 
-	if repo.Count() == 0 || len(repo.AllWithJWKSUpdate()) == 0 {
+// startTAJWKSRefresher starts the TA JWKS refresher. Must only be called in
+// the parent process (prefork children don't run the refresher).
+func startTAJWKSRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
+	repo := lh.TrustAnchorRepo()
+	if repo == nil || len(repo.AllWithJWKSUpdate()) == 0 {
 		log.Debug("No trust anchors with enable_jwks_update=true; skipping refresher")
 		return nil
 	}
-
 	dbJWKStorage := storage.NewDBJWKStorage(storage.NewTrustAnchorStorage(backs.DB))
 	refresher, err := lighthouse.SetupTAJWKSRefresher(repo, dbJWKStorage)
 	if err != nil {
 		return errors.Wrap(err, "failed to start TA JWKS refresher")
 	}
 	lh.SetTAJWKSRefresher(refresher)
-	return nil
-}
-
-func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model.Backends) (
-	*oidfed.ProactiveResolver, error,
-) {
-	var proactiveResolver *oidfed.ProactiveResolver
-
-	if endpoint := c.Endpoints.FetchEndpoint; endpoint.IsSet() {
-		if err := lh.AddFetchEndpoint(endpoint, backs.Subordinates); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.ListEndpoint; endpoint.IsSet() {
-		if err := lh.AddSubordinateListingEndpoint(endpoint, backs.Subordinates, backs.TrustMarks); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.ResolveEndpoint; endpoint.IsSet() {
-		if endpoint.ProactiveResolver.Enabled {
-			proactiveResolver = &oidfed.ProactiveResolver{
-				EntityID: c.EntityID,
-				Store: oidfed.ResolveStore{
-					BaseDir:   endpoint.ProactiveResolver.ResponseStorage.Dir,
-					StoreJWT:  endpoint.ProactiveResolver.ResponseStorage.StoreJWT,
-					StoreJSON: endpoint.ProactiveResolver.ResponseStorage.StoreJSON,
-				},
-				Signer:      lh.ResolveResponseSigner(),
-				RefreshLead: endpoint.GracePeriod.Duration(),
-				Concurrency: endpoint.ProactiveResolver.ConcurrencyLimit,
-				QueueSize:   endpoint.ProactiveResolver.QueueSize,
-			}
-		}
-		if err := lh.AddResolveEndpoint(
-			endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver,
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
-		if err := lh.AddTrustMarkStatusEndpoint(
-			endpoint, lighthouse.TrustMarkStatusConfig{
-				InstanceStore: backs.TrustMarkInstances,
-			},
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkedEntitiesListingEndpoint; endpoint.IsSet() {
-		if err := lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarkInstances); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkEndpoint; endpoint.IsSet() {
-		eligibilityCache := lighthouse.NewEligibilityCache()
-		stopEligibilityCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
-		defer stopEligibilityCacheCleanup()
-
-		issuedTrustMarkCache := lighthouse.NewIssuedTrustMarkCache()
-		stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
-		defer stopIssuedCacheCleanup()
-
-		if err := lh.AddTrustMarkEndpointWithConfig(
-			endpoint, lighthouse.TrustMarkEndpointConfig{
-				Store:                backs.TrustMarks,
-				SpecStore:            backs.TrustMarkSpecs,
-				InstanceStore:        backs.TrustMarkInstances,
-				Cache:                eligibilityCache,
-				IssuedTrustMarkCache: issuedTrustMarkCache,
-			},
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {
-		if err := lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.HistoricalKeysEndpoint; endpoint.IsSet() {
-		if err := lh.AddHistoricalKeysEndpoint(endpoint); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.EnrollmentEndpoint; endpoint.IsSet() {
-		var checker lighthouse.EntityChecker
-		if checkerConfig := endpoint.CheckerConfig; checkerConfig.Type != "" {
-			var err error
-			checker, err = lighthouse.EntityCheckerFromEntityCheckerConfig(checkerConfig)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if err := lh.AddEnrollEndpoint(endpoint.EndpointConf, backs.Subordinates, checker); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.EnrollmentRequestEndpoint; endpoint.IsSet() {
-		if err := lh.AddEnrollRequestEndpoint(endpoint, backs.Subordinates); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() {
-		var collector oidfed.EntityCollector = &oidfed.SimpleEntityCollector{}
-		if endpoint.Interval.Duration() != 0 {
-			pec := &oidfed.PeriodicEntityCollector{
-				TrustAnchors: endpoint.AllowedTrustAnchors,
-				Interval:     endpoint.Interval.Duration(),
-				Concurrency:  endpoint.ConcurrencyLimit,
-			}
-			if endpoint.PaginationLimit > 0 {
-				pec.SortEntitiesComparisonFunc = func(a, b *oidfed.CollectedEntity) int {
-					return strings.Compare(a.EntityID, b.EntityID)
-				}
-				pec.PagingLimit = endpoint.PaginationLimit
-			}
-			if proactiveResolver != nil {
-				pec.Handler = proactiveResolver
-			}
-			collector = pec
-		}
-		if err := lh.AddEntityCollectionEndpoint(
-			endpoint.EndpointConf, collector, endpoint.AllowedTrustAnchors, endpoint.PaginationLimit > 0,
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	return proactiveResolver, nil
-}
-
-func startBackgroundServices(proactiveResolver *oidfed.ProactiveResolver, c *config.Config) error {
-	if proactiveResolver != nil && !fiber.IsChild() {
-		proactiveResolver.Start()
-	}
-
-	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() && endpoint.Interval.Duration() != 0 {
-		pec := &oidfed.PeriodicEntityCollector{
-			TrustAnchors: endpoint.AllowedTrustAnchors,
-			Interval:     endpoint.Interval.Duration(),
-			Concurrency:  endpoint.ConcurrencyLimit,
-		}
-		if endpoint.PaginationLimit > 0 {
-			pec.SortEntitiesComparisonFunc = func(a, b *oidfed.CollectedEntity) int {
-				return strings.Compare(a.EntityID, b.EntityID)
-			}
-			pec.PagingLimit = endpoint.PaginationLimit
-		}
-		if proactiveResolver != nil {
-			pec.Handler = proactiveResolver
-		}
-		if !fiber.IsChild() {
-			pec.Start()
-		}
-	}
-
 	return nil
 }
 

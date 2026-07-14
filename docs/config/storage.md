@@ -143,6 +143,52 @@ The `debug` option enables debug logging for database operations. This is useful
         debug: true
     ```
 
+## `endpoint_auth`
+
+The `endpoint_auth` section configures JTI (JWT ID) storage for endpoint
+authentication replay prevention.
+
+??? file "config.yaml"
+
+    ```yaml
+    storage:
+        driver: sqlite
+        data_dir: /var/lib/lighthouse
+        endpoint_auth:
+            jti_backend: cache
+            jti_cleanup_interval: 1h
+    ```
+
+### `jti_backend`
+
+<span class="badge badge-purple" title="Value Type">enum</span>
+<span class="badge badge-blue" title="Default Value">`"cache"`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_ENDPOINT_AUTH_JTI_BACKEND`</span>
+
+Specifies the backend used for JWT ID (JTI) replay prevention storage. Valid values:
+
+- `"cache"` — Uses the configured cache backend (Redis or in-memory). JTIs expire
+  automatically based on their TTL. No cleanup required.
+- `"db"` — Uses the database table `jtis_used`. Requires periodic cleanup via
+  [`jti_cleanup_interval`](#jti_cleanup_interval).
+
+The JTI storage prevents replay attacks by ensuring each client assertion JWT can only
+be used once.
+
+### `jti_cleanup_interval`
+
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-blue" title="Default Value">`1h`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_ENDPOINT_AUTH_JTI_CLEANUP_INTERVAL`</span>
+
+How often to clean up expired JTIs from the database. Only applicable when
+[`jti_backend`](#jti_backend) is set to `"db"`.
+
+The cleanup runs as a background goroutine and removes JTIs whose expiration time
+has passed.
+
 ## Complete Examples
 
 ??? file "SQLite (Recommended for development)"

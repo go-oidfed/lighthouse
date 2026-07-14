@@ -4194,8 +4194,224 @@ paths:
           $ref: '#/components/schemas/MetadataPolicyOperatorName'
         in: path
         required: true
+  /api/v1/admin/trust-anchors:
+    summary: Manage the trust anchor repository.
+    description: List and create trust anchors.
+    get:
+      tags:
+        - Trust Anchors
+      responses:
+        '200':
+          description: List of trust anchors.
+      operationId: listTrustAnchors
+      summary: List trust anchors
+    post:
+      tags:
+        - Trust Anchors
+      responses:
+        '201':
+          description: Trust anchor created.
+        '409':
+          description: Trust anchor already exists.
+      operationId: createTrustAnchor
+      summary: Create a trust anchor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustAnchor'
+  /api/v1/admin/trust-anchors/{entityID}:
+    summary: Manage a single trust anchor.
+    description: Get, update, or delete a trust anchor by entity ID.
+    get:
+      tags:
+        - Trust Anchors
+      responses:
+        '200':
+          description: Trust anchor details.
+        '404':
+          description: Trust anchor not found.
+      operationId: getTrustAnchor
+      summary: Get a trust anchor
+    put:
+      tags:
+        - Trust Anchors
+      responses:
+        '200':
+          description: Trust anchor updated.
+        '404':
+          description: Trust anchor not found.
+      operationId: updateTrustAnchor
+      summary: Update a trust anchor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustAnchor'
+    delete:
+      tags:
+        - Trust Anchors
+      responses:
+        '204':
+          description: Trust anchor deleted.
+        '404':
+          description: Trust anchor not found.
+      operationId: deleteTrustAnchor
+      summary: Delete a trust anchor
+    parameters:
+      - name: entityID
+        description: The entity ID of the trust anchor.
+        schema:
+          type: string
+        in: path
+        required: true
+  /api/v1/admin/federation-endpoints:
+    summary: Manage federation endpoints.
+    description: List and create federation endpoint configurations.
+    get:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: List of federation endpoints.
+      operationId: listFederationEndpoints
+      summary: List federation endpoints
+    post:
+      tags:
+        - Federation Endpoints
+      responses:
+        '201':
+          description: Federation endpoint created.
+        '409':
+          description: Federation endpoint already exists.
+      operationId: createFederationEndpoint
+      summary: Create a federation endpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFederationEndpoint'
+  /api/v1/admin/federation-endpoints/{type}:
+    summary: Manage a single federation endpoint by type.
+    description: Get, update, or delete a federation endpoint by type.
+    get:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: Federation endpoint details.
+        '404':
+          description: Federation endpoint not found.
+      operationId: getFederationEndpoint
+      summary: Get a federation endpoint
+    put:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: Federation endpoint updated.
+        '404':
+          description: Federation endpoint not found.
+      operationId: updateFederationEndpoint
+      summary: Update a federation endpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFederationEndpoint'
+    delete:
+      tags:
+        - Federation Endpoints
+      responses:
+        '204':
+          description: Federation endpoint deleted.
+        '404':
+          description: Federation endpoint not found.
+      operationId: deleteFederationEndpoint
+      summary: Delete a federation endpoint
+    parameters:
+      - name: type
+        description: The endpoint type (fetch, list, resolve, trust_mark, etc.).
+        schema:
+          type: string
+        in: path
+        required: true
+  /api/v1/admin/federation-endpoints/{type}/auth-trust-anchors:
+    summary: Set auth trust anchors for an endpoint.
+    description: Replace the trust anchors used for endpoint authentication.
+    put:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: Auth trust anchors updated.
+        '404':
+          description: Federation endpoint or trust anchor not found.
+      operationId: setFederationEndpointAuthTrustAnchors
+      summary: Set auth trust anchors for a federation endpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: integer
+    parameters:
+      - name: type
+        description: The endpoint type.
+        schema:
+          type: string
+        in: path
+        required: true
 components:
   schemas:
+    AddTrustAnchor:
+      description: Request payload to create/update a trust anchor.
+      type: object
+      required:
+        - entity_id
+      properties:
+        entity_id:
+          type: string
+          description: The entity ID of the trust anchor.
+        jwks:
+          type: object
+          description: Optional initial JWKS for the trust anchor.
+        enable_jwks_update:
+          type: boolean
+          description: Enable automatic JWKS refreshing for this trust anchor.
+          default: false
+        key_poll_interval:
+          type: integer
+          description: Polling interval in seconds (0 = derive from EC expiration).
+          default: 0
+    AddFederationEndpoint:
+      description: Request payload to create/update a federation endpoint.
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: Endpoint type (fetch, list, resolve, trust_mark, trust_mark_status, trust_mark_listing, historical_keys, enroll, enroll_request, trust_mark_request, entity_collection).
+        path:
+          type: string
+          description: Internal path for the endpoint (nullable; null = disabled).
+        url:
+          type: string
+          description: External URL for the endpoint (nullable; auto-derived from path if null).
+        auth_enabled:
+          type: boolean
+          description: Enable private_key_jwt authentication for this endpoint.
+          default: false
+        config:
+          type: string
+          description: JSON blob with type-specific configuration.
+        auth_trust_anchor_ids:
+          type: array
+          items:
+            type: integer
+          description: Trust anchor IDs used for endpoint authentication.
     PublicKeyEntry:
       description: A public key entry managed by the API.
       type: object
@@ -5923,3 +6139,7 @@ tags:
     description: Manage trust marks in the federation.
   - name: Trust Mark Issuance
     description: Manage issuance of trust marks.
+  - name: Trust Anchors
+    description: Manage the trust anchor repository and JWKS refreshing.
+  - name: Federation Endpoints
+    description: Manage federation endpoint paths and configuration.

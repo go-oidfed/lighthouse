@@ -36,7 +36,7 @@ type Options struct {
 // Register mounts all admin API routes under the provided group.
 func Register(
 	r fiber.Router, serverURL string, storages model.Backends, fedEntity oidfed.FederationEntity,
-	keyManagement KeyManagement, opts *Options,
+	keyManagement KeyManagement, ctrl LighthouseController, opts *Options,
 ) error {
 	// If an admin port is provided in options, adapt the serverURL to include/override the port
 	if opts != nil && opts.Port > 0 {
@@ -150,6 +150,10 @@ func Register(
 	registerTrustMarkOwners(r, storages.TrustMarkOwners, storages.TrustMarkTypes)
 	registerTrustMarkIssuers(r, storages.TrustMarkIssuers, storages.TrustMarkTypes)
 	registerTrustMarkIssuance(r, storages.TrustMarkSpecs)
+	// Trust Anchors (TA repository management)
+	registerTrustAnchors(r, storages.TrustAnchors, ctrl)
+	// Federation Endpoints (dynamic endpoint management)
+	registerFederationEndpoints(r, storages.FederationEndpoints, ctrl)
 	// Users management
 	if opts == nil || opts.UsersEnabled {
 		registerUsers(r, storages.Users)

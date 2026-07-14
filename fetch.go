@@ -55,17 +55,18 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for fetch endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(model.EndpointTypeFetch, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
 		fed.fedMetadata.FederationFetchEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeFetch, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil

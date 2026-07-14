@@ -5,7 +5,7 @@ arrange:
   - storage.md
   - cache.md
   - signing.md
-  - endpoints.md
-  - federation_data.md
   - api.md
   - stats.md
+  - federation_data.md
+  - endpoints.md

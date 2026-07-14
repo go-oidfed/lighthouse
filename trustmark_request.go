@@ -91,20 +91,21 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for trust mark request endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(model.EndpointTypeTrustMarkRequest, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
 		if fed.fedMetadata.Extra == nil {
 			fed.fedMetadata.Extra = make(map[string]interface{})
 		}
 		fed.fedMetadata.Extra["federation_trust_mark_request_endpoint_auth_methods"] = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeTrustMarkRequest, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil

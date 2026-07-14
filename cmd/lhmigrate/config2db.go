@@ -86,6 +86,8 @@ func config2dbCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "  trust_marks        - Entity configuration trust marks (federation_data.trust_marks)\n")
 		fmt.Fprintf(os.Stderr, "  trust_mark_issuers - Trust mark issuers (federation_data.trust_mark_issuers)\n")
 		fmt.Fprintf(os.Stderr, "  trust_mark_owners  - Trust mark owners (federation_data.trust_mark_owners)\n")
+		fmt.Fprintf(os.Stderr, "  trust_anchors      - Trust anchors (federation_data.trust_anchors + endpoints auth TAs)\n")
+		fmt.Fprintf(os.Stderr, "  endpoints          - Federation endpoint paths/config (endpoints.*)\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  # Migrate all config values to SQLite\n")
 		fmt.Fprintf(os.Stderr, "  lhmigrate config2db --config=config.yaml --db-dir=/data/lighthouse\n\n")
@@ -344,6 +346,12 @@ func (m *configMigrator) migrate() []migrationResult {
 	}
 	if m.shouldMigrate(sectionTrustMarkOwners) {
 		results = append(results, m.migrateTrustMarkOwners()...)
+	}
+	if m.shouldMigrate(sectionTrustAnchors) {
+		results = append(results, m.migrateTrustAnchors()...)
+	}
+	if m.shouldMigrate(sectionEndpoints) {
+		results = append(results, m.migrateEndpoints()...)
 	}
 
 	return results
@@ -1552,6 +1560,9 @@ func removeFederationDataFields(node *yaml.Node, sections map[migrationSection]b
 	if sections[sectionExtraEntityConfigData] {
 		fieldsToRemove["extra_entity_configuration_data"] = true
 	}
+	if sections[sectionTrustAnchors] {
+		fieldsToRemove["trust_anchors"] = true
+	}
 
 	removeFieldsFromMapping(node, fieldsToRemove)
 }
@@ -1575,9 +1586,44 @@ func removeEndpointsFields(node *yaml.Node, sections map[migrationSection]bool) 
 			if sections[sectionStatementLifetime] && valueNode.Kind == yaml.MappingNode {
 				removeFieldsFromMapping(valueNode, map[string]bool{"statement_lifetime": true})
 			}
+			if sections[sectionEndpoints] && valueNode.Kind == yaml.MappingNode {
+				removeFieldsFromMapping(valueNode, map[string]bool{
+					"path": true, "url": true, "auth_enabled": true, "auth_trust_anchors": true,
+				})
+			}
 		case "trust_mark":
 			if sections[sectionTrustMarkSpecs] && valueNode.Kind == yaml.MappingNode {
 				removeFieldsFromMapping(valueNode, map[string]bool{"trust_mark_specs": true})
+			}
+			if sections[sectionEndpoints] && valueNode.Kind == yaml.MappingNode {
+				removeFieldsFromMapping(valueNode, map[string]bool{
+					"path": true, "url": true, "auth_enabled": true, "auth_trust_anchors": true,
+				})
+			}
+		case "list", "resolve", "trust_mark_status", "trust_mark_list",
+			"historical_keys", "enroll", "enroll_request", "trust_mark_request", "entity_collection":
+			if sections[sectionEndpoints] && valueNode.Kind == yaml.MappingNode {
+				// For these endpoints, remove all fields except those still
+				// managed by config (none currently, but keep this extensible).
+				// We remove path, url, auth_enabled, auth_trust_anchors, and
+				// type-specific fields.
+				removeFieldsFromMapping(valueNode, map[string]bool{
+					"path": true, "url": true, "auth_enabled": true, "auth_trust_anchors": true,
+					"allowed_trust_anchors": true, "use_entity_collection_allowed_trust_anchors": true,
+					"grace_period": true, "time_elapsed_grace_factor": true,
+					"proactive_resolver": true,
+					"interval":           true, "concurrency_limit": true, "pagination_limit": true,
+					"checker": true,
+				})
+			}
+		case "auth":
+			if sections[sectionEndpoints] && valueNode.Kind == yaml.MappingNode {
+				removeFieldsFromMapping(valueNode, map[string]bool{
+					"all_require_auth": true, "trust_anchors": true,
+				})
+			}
+			if sections[sectionTrustAnchors] && valueNode.Kind == yaml.MappingNode {
+				removeFieldsFromMapping(valueNode, map[string]bool{"trust_anchors": true})
 			}
 		}
 	}
