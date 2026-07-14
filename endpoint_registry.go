@@ -40,10 +40,6 @@ type legacyEntry struct {
 // The legacy map keeps old endpoint paths served for one entity configuration
 // lifetime after a path change or deletion, so clients holding a cached entity
 // configuration that still references the old path can continue to use it.
-//
-// In non-prefork mode (and the prefork parent), this is the authoritative
-// dispatch table. In prefork child processes, the dispatcher reads from the
-// database per request instead (see dispatchChild).
 type EndpointRegistry struct {
 	mu     sync.RWMutex
 	byPath map[string]*registeredEndpoint
@@ -403,10 +399,8 @@ func (fed *LightHouse) LoadEndpointsFromDB() error {
 		loaded++
 	}
 
-	// Start background services for the loaded endpoints (parent only).
-	if !fiber.IsChild() {
-		fed.startBackgroundServicesForEndpoints()
-	}
+	// Start background services for the loaded endpoints.
+	fed.startBackgroundServicesForEndpoints()
 
 	log.WithField("count", loaded).Info("Loaded federation endpoints from DB")
 	return nil
@@ -462,10 +456,8 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 				Concurrency: cfg.ProactiveResolver.ConcurrencyLimit,
 				QueueSize:   cfg.ProactiveResolver.QueueSize,
 			}
-			if !fiber.IsChild() {
-				proactiveResolver.Start()
-				fed.backgroundStops = append(fed.backgroundStops, proactiveResolver.Stop)
-			}
+			proactiveResolver.Start()
+			fed.backgroundStops = append(fed.backgroundStops, proactiveResolver.Stop)
 		}
 		return fed.AddResolveEndpoint(endpointConf, allowedTAs, proactiveResolver)
 

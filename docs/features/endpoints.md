@@ -125,8 +125,8 @@ trust anchor objects with JWKS). They are resolved live from the
 ```
 
 When `interval_seconds` is set (> 0), a background periodic entity collector is
-started (parent process only in prefork mode). Changes via the Admin API stop
-and restart the collector with the new settings.
+started. Changes via the Admin API stop and restart the collector with the new
+settings.
 
 ## Dynamic Dispatch
 

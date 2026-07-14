@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/go-oidfed/lib/cache"
-	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
@@ -39,8 +38,6 @@ func main() {
 		log.WithError(err).Fatal("failed to initialize storage")
 	}
 
-	logStorageWarnings(c.Server, &c.Storage, &c.Caching)
-
 	statsOpts := c.Stats.ToAPIConfig()
 
 	if c.Stats.Enabled {
@@ -58,19 +55,17 @@ func main() {
 
 	log.Info("Initialized Entity")
 
-	// Build the trust anchor repository in all processes (read-only cache).
-	// The JWKS refresher is started only in the parent process.
-	if err := setupTrustAnchorRepo(lh, &backs); err != nil {
+	// Build the trust anchor repository.
+	// The JWKS refresher is started after the repo is loaded.
+	if err = setupTrustAnchorRepo(lh, &backs); err != nil {
 		log.WithError(err).Fatal("failed to setup trust anchor repository")
 	}
-	if !fiber.IsChild() {
-		if err := startTAJWKSRefresher(lh, &backs); err != nil {
-			log.WithError(err).Fatal("failed to start TA JWKS refresher")
-		}
+	if err = startTAJWKSRefresher(lh, &backs); err != nil {
+		log.WithError(err).Fatal("failed to start TA JWKS refresher")
 	}
 
 	// Load federation endpoints from the database.
-	if err := lh.LoadEndpointsFromDB(); err != nil {
+	if err = lh.LoadEndpointsFromDB(); err != nil {
 		log.WithError(err).Fatal("failed to load endpoints from DB")
 	}
 
@@ -118,23 +113,6 @@ func initStorage(
 		JTIStorageType: storageConf.EndpointAuth.JTIBackend,
 	}
 	return storage.LoadStorageBackends(cfg)
-}
-
-func logStorageWarnings(server lighthouse.ServerConf, storageConf *config.StorageConf, caching *config.CachingConf) {
-	if server.Prefork && storageConf.Driver == "sqlite" {
-		log.Warn(
-			"Using SQLite with prefork enabled may cause write conflicts. " +
-				"Consider using MySQL or PostgreSQL for production deployments with prefork.",
-		)
-	}
-
-	if server.Prefork && caching.RedisAddr == "" && !caching.Disabled {
-		log.Warn(
-			"Prefork is enabled without Redis cache. In-memory caches will be process-local " +
-				"and may lead to inconsistencies. It is strongly recommended to configure Redis " +
-				"for caching when using prefork mode.",
-		)
-	}
 }
 
 func initLighthouse(c *config.Config, backs model.Backends, statsConfig stats.Config) (
@@ -202,8 +180,7 @@ func setupTrustAnchorRepo(lh *lighthouse.LightHouse, backs *model.Backends) erro
 	return nil
 }
 
-// startTAJWKSRefresher starts the TA JWKS refresher. Must only be called in
-// the parent process (prefork children don't run the refresher).
+// startTAJWKSRefresher starts the TA JWKS refresher.
 func startTAJWKSRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
 	repo := lh.TrustAnchorRepo()
 	if repo == nil || len(repo.AllWithJWKSUpdate()) == 0 {

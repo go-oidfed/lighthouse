@@ -22,10 +22,6 @@ import (
 // allowed-trust-anchor lists, ...) resolve TAs by entity_id through this repo
 // so that JWKS refreshed by the TAJWKSRefresher propagate live to every usage
 // without restart.
-//
-// The repo is only used in non-prefork mode (and in the prefork parent
-// process). In prefork child processes, TA JWKS is resolved from the database
-// per request (see Phase 4 dispatch).
 type TrustAnchorRepo struct {
 	mu      sync.RWMutex
 	anchors map[string]*oidfed.TrustAnchor
@@ -195,10 +191,6 @@ func (r *TrustAnchorRepo) Store() model.TrustAnchorStore {
 // repository. It creates a DBJWKStorage, collects all TAs with
 // EnableJWKSUpdate=true from the repo, constructs a TAJWKSRefresher, and starts
 // it. The returned refresher must be stopped on shutdown.
-//
-// This is intended to run only in the parent process (non-prefork, or the
-// prefork parent). In prefork child processes, TA JWKS is resolved from the DB
-// per request instead.
 func SetupTAJWKSRefresher(repo *TrustAnchorRepo, jwkStorage oidfed.JWKStorage) (
 	*oidfed.TAJWKSRefresher, error,
 ) {

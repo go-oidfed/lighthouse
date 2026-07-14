@@ -97,15 +97,3 @@ entity ID.
 If a poll fails (network error, signature verification failure, etc.),
 LightHouse retries with exponential backoff (starting at 1 second, capped at 5
 minutes). The backoff resets to 1 second on the next successful poll.
-
-## Prefork Behavior
-
-When running in prefork mode (multiple worker processes):
-
-- The **TA JWKS refresher** runs only in the parent process to avoid duplicate
-  polling and DB write contention.
-- In **child processes**, the in-memory repository is loaded from the database at
-  startup. TA JWKS is resolved from the database per request (with a short TTL
-  cache to bound DB load).
-- Changes via the Admin API (parent process) update the database; child processes
-  pick up changes on their next DB read.

@@ -239,9 +239,6 @@ func initFiberServer(serverConf ServerConf) (*fiber.App, error) {
 		FiberServerConfig.EnableTrustedProxyCheck = true
 		FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	}
-	if serverConf.Prefork {
-		FiberServerConfig.Prefork = true
-	}
 
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
@@ -540,17 +537,15 @@ func (fed *LightHouse) Start() {
 	fed.banner()
 
 	// Start stats collector if enabled
-	// In prefork mode, only start in parent process to avoid duplicate stats
-	if fed.statsCollector != nil && !fiber.IsChild() {
+	if fed.statsCollector != nil {
 		fed.statsCollector.Start()
 	}
 
 	conf := fed.serverConf
 	adminTLS := fed.adminAPIServer != nil && fed.adminAPIServer != fed.server && fed.serverConf.AdminTLS.Enabled
 
-	// Admin API server should only run in parent process when prefork is enabled
-	// to avoid multiple processes binding to the same admin port
-	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server && !fiber.IsChild() {
+	// Admin API server
+	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
 		if adminTLS {
 			log.WithField("port", conf.AdminAPIPort).Info("starting admin api server with TLS")
 			go func() {
@@ -575,7 +570,7 @@ func (fed *LightHouse) Start() {
 		return
 	}
 	// TLS enabled
-	if conf.TLS.RedirectHTTP && !fiber.IsChild() {
+	if conf.TLS.RedirectHTTP {
 		// HTTP redirect server only needs to run in one process
 		httpServer := fiber.New(FiberServerConfig)
 		httpServer.All(
