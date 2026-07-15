@@ -3,12 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/go-oidfed/lib/jwx"
-	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
-
+	"github.com/go-oidfed/lighthouse/internal/migration"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -20,7 +16,7 @@ func (m *configMigrator) migrateTrustAnchors() []migrationResult {
 	var results []migrationResult
 
 	type taEntry struct {
-		conf     migrationTrustAnchorConf
+		conf     migration.TrustAnchorConf
 		location string
 	}
 	allTAs := make(map[string]*taEntry)
@@ -53,7 +49,7 @@ func (m *configMigrator) migrateTrustAnchors() []migrationResult {
 			}
 			if _, exists := allTAs[entityID]; !exists {
 				allTAs[entityID] = &taEntry{
-					conf:     migrationTrustAnchorConf{EntityID: entityID},
+					conf:     migration.TrustAnchorConf{EntityID: entityID},
 					location: location,
 				}
 			}
@@ -77,7 +73,7 @@ func (m *configMigrator) migrateTrustAnchors() []migrationResult {
 
 	// 5. Checker trust_anchors (entity IDs only)
 	if m.config.Endpoints.Enroll.Checker.Kind != 0 {
-		taIDs := extractCheckerTrustAnchorIDs(&m.config.Endpoints.Enroll.Checker)
+		taIDs := migration.ExtractCheckerTrustAnchorIDs(&m.config.Endpoints.Enroll.Checker)
 		collectAuthTAs(taIDs, "endpoints.enroll.checker.trust_anchors")
 	}
 
@@ -125,26 +121,18 @@ func (m *configMigrator) migrateTrustAnchors() []migrationResult {
 
 		var jwks *model.JWKS
 		if entry.conf.JWKSFile != "" {
-			jwksData, err := os.ReadFile(entry.conf.JWKSFile)
+			jwks, err = migration.ParseJWKSFile(entry.conf.JWKSFile)
 			if err != nil {
-				result.err = fmt.Errorf("failed to read jwks_file %q: %w", entry.conf.JWKSFile, err)
-				results = append(results, result)
-				continue
-			}
-			var parsed jwx.JWKS
-			if err := parsed.UnmarshalJSON(jwksData); err != nil {
 				result.err = fmt.Errorf("failed to parse jwks_file %q: %w", entry.conf.JWKSFile, err)
 				results = append(results, result)
 				continue
 			}
-			jwks = &model.JWKS{Keys: parsed}
 		} else if entry.conf.JWKS != nil {
-			jwksBytes, err := json.Marshal(entry.conf.JWKS)
-			if err == nil {
-				var parsed jwx.JWKS
-				if err := parsed.UnmarshalJSON(jwksBytes); err == nil && parsed.Set != nil {
-					jwks = &model.JWKS{Keys: parsed}
-				}
+			jwks, err = migration.ParseJWKSFromAny(entry.conf.JWKS)
+			if err != nil {
+				result.err = fmt.Errorf("failed to parse inline jwks: %w", err)
+				results = append(results, result)
+				continue
 			}
 		}
 
@@ -243,8 +231,8 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		}
 		return model.AddFederationEndpoint{
 			Type:             epType,
-			Path:             strPtrOrNil(path),
-			URL:              strPtrOrNil(url),
+			Path:             migration.StrPtrOrNil(path),
+			URL:              migration.StrPtrOrNil(url),
 			AuthEnabled:      authEnabled,
 			AuthTrustAnchors: taIDs,
 		}, nil
@@ -296,12 +284,12 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 				section: sectionEndpoints, details: string(model.EndpointTypeResolve), err: err,
 			})
 		} else {
-			cfg := resolveDBConfigJSON{
+			cfg := migration.ResolveDBConfigJSON{
 				AllowedTrustAnchors:                    m.config.Endpoints.Resolve.AllowedTrustAnchors,
 				UseEntityCollectionAllowedTrustAnchors: m.config.Endpoints.Resolve.UseEntityCollectionAllowedTrustAnchors,
 				GracePeriodSeconds:                     int64(m.config.Endpoints.Resolve.GracePeriod.Duration().Seconds()),
 				TimeElapsedGraceFactor:                 m.config.Endpoints.Resolve.TimeElapsedGraceFactor,
-				ProactiveResolver: &proactiveResolverDBConfigJSON{
+				ProactiveResolver: &migration.ProactiveResolverDBConfigJSON{
 					Enabled:                  m.config.Endpoints.Resolve.ProactiveResolver.Enabled,
 					ConcurrencyLimit:         m.config.Endpoints.Resolve.ProactiveResolver.ConcurrencyLimit,
 					QueueSize:                m.config.Endpoints.Resolve.ProactiveResolver.QueueSize,
@@ -313,8 +301,8 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 			cfgJSON, _ := json.Marshal(cfg)
 			req := model.AddFederationEndpoint{
 				Type:             model.EndpointTypeResolve,
-				Path:             strPtrOrNil(m.config.Endpoints.Resolve.Path),
-				URL:              strPtrOrNil(m.config.Endpoints.Resolve.URL),
+				Path:             migration.StrPtrOrNil(m.config.Endpoints.Resolve.Path),
+				URL:              migration.StrPtrOrNil(m.config.Endpoints.Resolve.URL),
 				AuthEnabled:      authEnabled,
 				AuthTrustAnchors: taIDs,
 				Config:           string(cfgJSON),
@@ -362,10 +350,10 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 				section: sectionEndpoints, details: string(model.EndpointTypeEnroll), err: err,
 			})
 		} else {
-			checkerType, checkerConfig := convertCheckerConfig(&m.config.Endpoints.Enroll.Checker)
+			checkerType, checkerConfig := migration.ConvertCheckerConfig(&m.config.Endpoints.Enroll.Checker)
 			cfgJSON := ""
 			if checkerType != "" {
-				cfg := enrollDBConfigJSON{
+				cfg := migration.EnrollDBConfigJSON{
 					CheckerType:   checkerType,
 					CheckerConfig: checkerConfig,
 				}
@@ -374,8 +362,8 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 			}
 			req := model.AddFederationEndpoint{
 				Type:             model.EndpointTypeEnroll,
-				Path:             strPtrOrNil(m.config.Endpoints.Enroll.Path),
-				URL:              strPtrOrNil(m.config.Endpoints.Enroll.URL),
+				Path:             migration.StrPtrOrNil(m.config.Endpoints.Enroll.Path),
+				URL:              migration.StrPtrOrNil(m.config.Endpoints.Enroll.URL),
 				AuthEnabled:      authEnabled,
 				AuthTrustAnchors: taIDs,
 				Config:           cfgJSON,
@@ -397,7 +385,7 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 				section: sectionEndpoints, details: string(model.EndpointTypeEntityCollection), err: err,
 			})
 		} else {
-			cfg := collectionDBConfigJSON{
+			cfg := migration.CollectionDBConfigJSON{
 				AllowedTrustAnchors: m.config.Endpoints.EntityCollection.AllowedTrustAnchors,
 				IntervalSeconds:     int64(m.config.Endpoints.EntityCollection.Interval.Duration().Seconds()),
 				ConcurrencyLimit:    m.config.Endpoints.EntityCollection.ConcurrencyLimit,
@@ -406,8 +394,8 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 			cfgJSON, _ := json.Marshal(cfg)
 			req := model.AddFederationEndpoint{
 				Type:             model.EndpointTypeEntityCollection,
-				Path:             strPtrOrNil(m.config.Endpoints.EntityCollection.Path),
-				URL:              strPtrOrNil(m.config.Endpoints.EntityCollection.URL),
+				Path:             migration.StrPtrOrNil(m.config.Endpoints.EntityCollection.Path),
+				URL:              migration.StrPtrOrNil(m.config.Endpoints.EntityCollection.URL),
 				AuthEnabled:      authEnabled,
 				AuthTrustAnchors: taIDs,
 				Config:           string(cfgJSON),
@@ -425,162 +413,4 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 	}
 
 	return results
-}
-
-// JSON config structs for DB endpoint config column.
-
-type resolveDBConfigJSON struct {
-	AllowedTrustAnchors                    []string                       `json:"allowed_trust_anchors,omitempty"`
-	UseEntityCollectionAllowedTrustAnchors bool                           `json:"use_entity_collection_allowed_trust_anchors,omitempty"`
-	GracePeriodSeconds                     int64                          `json:"grace_period_seconds,omitempty"`
-	TimeElapsedGraceFactor                 float64                        `json:"time_elapsed_grace_factor,omitempty"`
-	ProactiveResolver                      *proactiveResolverDBConfigJSON `json:"proactive_resolver,omitempty"`
-}
-
-type proactiveResolverDBConfigJSON struct {
-	Enabled                  bool   `json:"enabled"`
-	ConcurrencyLimit         int    `json:"concurrency_limit,omitempty"`
-	QueueSize                int    `json:"queue_size,omitempty"`
-	ResponseStorageDir       string `json:"response_storage_dir,omitempty"`
-	ResponseStorageStoreJSON bool   `json:"response_storage_store_json,omitempty"`
-	ResponseStorageStoreJWT  bool   `json:"response_storage_store_jwt,omitempty"`
-}
-
-type enrollDBConfigJSON struct {
-	CheckerType   string `json:"checker_type,omitempty"`
-	CheckerConfig any    `json:"checker_config,omitempty"`
-}
-
-type collectionDBConfigJSON struct {
-	AllowedTrustAnchors []string `json:"allowed_trust_anchors,omitempty"`
-	IntervalSeconds     int64    `json:"interval_seconds,omitempty"`
-	ConcurrencyLimit    int      `json:"concurrency_limit,omitempty"`
-	PaginationLimit     int      `json:"pagination_limit,omitempty"`
-}
-
-// strPtrOrNil returns a *string for a non-empty s, or nil for empty.
-func strPtrOrNil(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-// extractCheckerTrustAnchorIDs walks a checker config YAML node and extracts
-// all trust_anchor entity IDs found in trust_anchors fields.
-func extractCheckerTrustAnchorIDs(node *yaml.Node) []string {
-	var ids []string
-	if node == nil || node.Kind == 0 {
-		return ids
-	}
-	walkYAMLForKey(node, "trust_anchors", func(n *yaml.Node) {
-		if n.Kind == yaml.SequenceNode {
-			for _, item := range n.Content {
-				if item.Kind == yaml.ScalarNode {
-					ids = append(ids, item.Value)
-				} else if item.Kind == yaml.MappingNode {
-					for i := 0; i < len(item.Content); i += 2 {
-						if item.Content[i].Value == "entity_id" {
-							ids = append(ids, item.Content[i+1].Value)
-							break
-						}
-					}
-				}
-			}
-		}
-	})
-	return ids
-}
-
-// walkYAMLForKey recursively walks a YAML node tree and calls fn for each
-// value node whose key matches the given key name.
-func walkYAMLForKey(node *yaml.Node, key string, fn func(*yaml.Node)) {
-	if node == nil {
-		return
-	}
-	switch node.Kind {
-	case yaml.DocumentNode:
-		for _, c := range node.Content {
-			walkYAMLForKey(c, key, fn)
-		}
-	case yaml.MappingNode:
-		for i := 0; i < len(node.Content); i += 2 {
-			if node.Content[i].Value == key {
-				fn(node.Content[i+1])
-			}
-			walkYAMLForKey(node.Content[i+1], key, fn)
-		}
-	case yaml.SequenceNode:
-		for _, c := range node.Content {
-			walkYAMLForKey(c, key, fn)
-		}
-	}
-}
-
-// convertCheckerConfig converts a checker config YAML node to a (type, config)
-// pair suitable for JSON storage, transforming any trust_anchors from inline
-// TrustAnchor objects to []string entity-id references.
-//
-// The config can be a map[string]any (for simple checkers like trust_mark) or
-// a []any (for composite checkers like multiple_or/multiple_and whose config
-// is a list of sub-checker configs).
-func convertCheckerConfig(node *yaml.Node) (string, any) {
-	if node == nil || node.Kind == 0 {
-		return "", nil
-	}
-
-	var raw map[string]any
-	if err := node.Decode(&raw); err != nil {
-		log.WithError(err).Warn("failed to decode checker config for migration")
-		return "", nil
-	}
-
-	checkerType, _ := raw["type"].(string)
-	delete(raw, "type")
-
-	// The "config" field can be a map (simple checkers) or a list
-	// (composite checkers like multiple_or/multiple_and).
-	var configVal any
-	if c, ok := raw["config"]; ok {
-		configVal = c
-	}
-
-	// Transform trust_anchors in place, handling both maps and lists.
-	transformTrustAnchorsInValue(configVal)
-
-	return checkerType, configVal
-}
-
-// transformTrustAnchorsInValue recursively walks a value (map, list, or
-// scalar) and converts any "trust_anchors" field from
-// []map[string]any (with entity_id) to []string.
-func transformTrustAnchorsInValue(v any) {
-	switch val := v.(type) {
-	case map[string]any:
-		for k, item := range val {
-			if k == "trust_anchors" {
-				if arr, ok := item.([]any); ok {
-					var ids []string
-					for _, entry := range arr {
-						if s, ok := entry.(string); ok {
-							ids = append(ids, s)
-						} else if mp, ok := entry.(map[string]any); ok {
-							if eid, ok := mp["entity_id"].(string); ok {
-								ids = append(ids, eid)
-							}
-						}
-					}
-					if len(ids) > 0 {
-						val[k] = ids
-					}
-				}
-				continue
-			}
-			transformTrustAnchorsInValue(item)
-		}
-	case []any:
-		for _, item := range val {
-			transformTrustAnchorsInValue(item)
-		}
-	}
 }

@@ -77,7 +77,6 @@ export LH_SERVER_TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 Duration values accept Go duration strings:
 
 ```bash
-export LH_FEDERATION_DATA_CONFIGURATION_LIFETIME="24h"
 export LH_CACHE_MAX_LIFETIME="6h"
 ```
 
@@ -85,13 +84,8 @@ export LH_CACHE_MAX_LIFETIME="6h"
 
 Some complex configuration options can only be set via YAML (not environment variables):
 
-- `federation_data.trust_anchors` - Complex JWK sets
-- `federation_data.trust_marks` - Complex trust mark configurations
-- `federation_data.trust_mark_issuers` - Map of trust mark issuers
-- `federation_data.trust_mark_owners` - Map of trust mark owners
-- `federation_data.constraints` - Constraint specifications
-- `endpoints.enroll.checker` - Entity checker configurations
-- `endpoints.trust_mark.trust_mark_specs` - Deprecated, use Admin API
+- `signing.filesystem` - Filesystem KMS configuration
+- `signing.pkcs11` - PKCS#11 HSM configuration
 
 ### Example: Docker/Kubernetes Deployment
 
@@ -130,17 +124,6 @@ The following is an example `config.yaml` file:
         filesystem:
             key_dir: "/keys"
 
-    federation_data:
-        authority_hints:
-            - "https://trust-anchor.spid-cie.fedservice.lh/"
-        metadata_policy_file: "/metadata-policy.json"
-        trust_anchors:
-            - entity_id: "https://ta.example.org"
-        trust_marks:
-            - trust_mark_type: "https://go-ia.federservice.lh/tm/federation-member"
-              trust_mark_issuer: "https://go-ia.fedservice.lh"
-              refresh: true
-
     storage:
         driver: sqlite
         data_dir: "/data"
@@ -149,44 +132,16 @@ The following is an example `config.yaml` file:
         admin:
             enabled: true
             users_enabled: true
-
-    endpoints:
-        fetch:
-            path: "/fetch"
-        list:
-            path: "/list"
-        resolve:
-            path: "/resolve"
-        entity_collection:
-            path: "/entity-collection"
-            allowed_trust_anchors:
-                - https://ta.example.org
-            interval: 8h
-        trust_mark:
-            path: "/trustmark"
-            # trust_mark_specs is deprecated - use Admin API to manage trust mark specs
-            # See: POST /admin/api/v1/trustmark-specs
-        trust_mark_status:
-            path: "/trustmark/status"
-        trust_mark_list:
-            path: "/trustmark/list"
-        enroll:
-            path: "/enroll"
-            checker:
-                type: multiple_or
-                config:
-                    - type: trust_mark
-                      config:
-                          trust_mark_type: https://tm.example.org
-                          trust_anchors:
-                              - entity_id: https://ta.example.org
-                    - type: trust_mark
-                      config:
-                          trust_mark_type: https://tm.example.com
-                          trust_anchors:
-                              - entity_id: https://example.com
-                              - entity_id: https://foo.bar.com
     ```
+
+!!! info "DB-Managed Configuration"
+
+    Federation endpoints, trust anchors, metadata, authority hints, trust marks,
+    signing algorithm, key rotation, and other runtime options are stored in the
+    database. Use [`lhsetup`](../deployment/lhsetup.md) for interactive setup,
+    [`lhmigrate config2db`](../migration/0.22.md) for non-interactive migration
+    from a config file, or the [Admin API](../features/admin_api.md) for runtime
+    management.
 
 ## `entity_id`
 <span class="badge badge-purple" title="Value Type">URI</span>

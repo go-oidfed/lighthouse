@@ -100,24 +100,10 @@ This guide covers deploying LightHouse using Docker with a Caddy reverse proxy.
           admin:
             enabled: true
             users_enabled: true
-
-        # Federation endpoints
-        endpoints:
-          fetch:
-            path: "/fetch"
-          list:
-            path: "/list"
-          resolve:
-            path: "/resolve"
-          trust_mark:
-            path: "/trustmark"
-          trust_mark_status:
-            path: "/trustmark/status"
-          trust_mark_list:
-            path: "/trustmark/list"
-          historical_keys:
-            path: "/historical-keys"
         ```
+
+        Federation endpoints, trust anchors, metadata, and other
+        DB-managed options are configured with `lhsetup` or the Admin API.
 
         For more configuration options, see [Configuration](../config/index.md).
 
@@ -236,23 +222,6 @@ This guide covers deploying LightHouse using Docker with a Caddy reverse proxy.
             # Separate port for admin API (optional)
             # port: 7673
 
-        # Federation endpoints
-        endpoints:
-          fetch:
-            path: "/fetch"
-          list:
-            path: "/list"
-          resolve:
-            path: "/resolve"
-          trust_mark:
-            path: "/trustmark"
-          trust_mark_status:
-            path: "/trustmark/status"
-          trust_mark_list:
-            path: "/trustmark/list"
-          historical_keys:
-            path: "/historical-keys"
-
         # Statistics (optional, recommended for production)
         stats:
           enabled: true
@@ -260,6 +229,9 @@ This guide covers deploying LightHouse using Docker with a Caddy reverse proxy.
             detailed_days: 90
             aggregated_days: 365
         ```
+
+        Federation endpoints, trust anchors, metadata, and other
+        DB-managed options are configured with `lhsetup` or the Admin API.
 
         For more configuration options, see [Configuration](../config/index.md).
 
@@ -278,9 +250,32 @@ This guide covers deploying LightHouse using Docker with a Caddy reverse proxy.
 ## Initial Setup
 
 After starting the containers with `docker compose up -d`, configure your 
-federation entity using the Admin API.
+federation entity using `lhsetup` or the Admin API.
 
-### 1. Create an Admin User
+### Option A: Interactive Setup with lhsetup (Recommended)
+
+Run the interactive setup wizard inside the container:
+
+```bash
+# View current configuration (all defaults on a fresh database)
+docker exec -it lighthouse /lhsetup show
+
+# Run the interactive setup wizard
+docker exec -it lighthouse /lhsetup
+```
+
+The wizard will prompt you for all DB-managed configuration: federation
+endpoints, trust anchors, signing options, metadata, authority hints, trust
+marks, and more. Press Enter to keep the current value at each prompt.
+
+See the [lhsetup documentation](lhsetup.md) for details on available sections
+and flags.
+
+### Option B: Admin API
+
+Alternatively, configure your entity via HTTP requests:
+
+#### 1. Create an Admin User
 
 ```bash
 # Via API (basic auth disabled initially if no users exist)
@@ -292,7 +287,7 @@ curl -X POST https://lighthouse.example.com/api/v1/admin/users \
 !!! note "Authentication Behavior"
     When no users exist, the Admin API does not require authentication. This allows you to create the first admin user. Once at least one user exists, all API requests require HTTP Basic Authentication.
 
-### 2. Configure Federation Metadata
+#### 2. Configure Federation Metadata
 
 ```bash
 curl -X PUT https://lighthouse.example.com/api/v1/admin/entity-configuration/metadata/federation_entity \
@@ -305,7 +300,7 @@ curl -X PUT https://lighthouse.example.com/api/v1/admin/entity-configuration/met
   }'
 ```
 
-### 3. Set Authority Hints (if not a Trust Anchor)
+#### 3. Set Authority Hints (if not a Trust Anchor)
 
 ```bash
 curl -X POST https://lighthouse.example.com/api/v1/admin/entity-configuration/authority-hints \
@@ -314,7 +309,7 @@ curl -X POST https://lighthouse.example.com/api/v1/admin/entity-configuration/au
   -d '{"entity_id": "https://trust-anchor.example.org"}'
 ```
 
-### 4. Configure Trust Mark Issuance (optional)
+#### 4. Configure Trust Mark Issuance (optional)
 
 ```bash
 curl -X POST https://lighthouse.example.com/api/v1/admin/trust-marks/issuance-spec \
@@ -343,6 +338,7 @@ curl https://lighthouse.example.com/api/v1/admin/entity-configuration \
 ## Next Steps
 
 - [Configuration Reference](../config/index.md) - Full configuration options
+- [Interactive Setup](lhsetup.md) - Bootstrap DB-managed config with `lhsetup`
 - [Admin API](../features/admin_api.md) - Manage your federation via REST API
 - [CLI Tool](lhcli.md) - Command-line management with `lhcli`
 - [Migration Guide](../migration/index.md) - Upgrading from older versions
