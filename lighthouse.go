@@ -19,7 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/rs/zerolog/log"
@@ -243,7 +243,7 @@ func initFiberServer(serverConf ServerConf) (*fiber.App, error) {
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
 	server.Use(compress.New())
-	server.Use(logger.New())
+	server.Use(fiberlogger.New(fiberlogger.Config{Output: serverConf.AccessLogWriter}))
 	server.Use(requestid.New())
 
 	if serverConf.CORS.Enabled {
@@ -412,7 +412,7 @@ func initAdminAPI(
 		adminAPIServer = fiber.New(FiberServerConfig)
 		adminAPIServer.Use(recover.New())
 		adminAPIServer.Use(compress.New())
-		adminAPIServer.Use(logger.New())
+		adminAPIServer.Use(fiberlogger.New(fiberlogger.Config{Output: serverConf.AccessLogWriter}))
 		adminAPIServer.Use(requestid.New())
 
 		if admin.CORS.Enabled {

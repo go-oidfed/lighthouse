@@ -119,6 +119,7 @@ func initLighthouse(c *config.Config, backs model.Backends, statsConfig stats.Co
 	*lighthouse.LightHouse, error,
 ) {
 	c.Server.AdminTLS = c.API.Admin.TLS
+	c.Server.AccessLogWriter = logger.AccessLogger()
 
 	lh, err := lighthouse.NewLightHouse(
 		c.Server,

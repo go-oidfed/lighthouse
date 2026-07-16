@@ -45,6 +45,17 @@ func MustUpdateAccessLogger() {
 	accessLogger.SetOutput(mustGetAccessLogger())
 }
 
+// AccessLogger returns the shared access log writer. Both the main server and
+// the admin API server should use this as the output for their fiber logger
+// middleware so that MustUpdateAccessLogger swaps the underlying writer for
+// both at once.
+func AccessLogger() io.Writer {
+	if accessLogger == nil {
+		return io.Discard
+	}
+	return accessLogger
+}
+
 func mustGetAccessLogger() io.Writer {
 	return mustGetLogWriter(config.Get().Logging.Access, "access.log")
 }
@@ -95,6 +106,7 @@ func parseLogLevel() zerolog.Level {
 // Init initializes the logger
 func Init() {
 	SetOutput()
+	MustGetAccessLogger()
 	if DebugEnabled() {
 		oidfed.EnableDebugLogging()
 	}

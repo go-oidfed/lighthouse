@@ -1,5 +1,7 @@
 package lighthouse
 
+import "io"
+
 // ServerConf holds the server configuration.
 //
 // Environment variables (accent prefix LH_SERVER_):
@@ -36,6 +38,10 @@ type ServerConf struct {
 	// CORS holds CORS middleware configuration for the main server.
 	// Env prefix: LH_SERVER_CORS_
 	CORS CORSConf `yaml:"cors" envconfig:"CORS"`
+	// AccessLogWriter is the io.Writer used for HTTP access logs (fiber
+	// logger middleware). Set internally by the application entry point from
+	// the logging configuration; not configurable via YAML or env.
+	AccessLogWriter io.Writer `yaml:"-" envconfig:"-"`
 	// Secure bool    `yaml:"-"`
 	// Basepath       string       `yaml:"-"`
 }
