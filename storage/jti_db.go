@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -64,7 +64,7 @@ func (s *JTIDBStorage) Cleanup() error {
 		return errors.Wrap(result.Error, "failed to cleanup expired JTIs")
 	}
 	if result.RowsAffected > 0 {
-		log.Debugf("Cleaned up %d expired JTIs", result.RowsAffected)
+		log.Debug().Int64("cleaned", result.RowsAffected).Msg("Cleaned up expired JTIs")
 	}
 	return nil
 }

@@ -4,11 +4,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/writer"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 )
@@ -73,7 +74,7 @@ func mustGetLogWriter(logConf config.LoggerConf, logfileName string) io.Writer {
 	}
 	switch len(loggers) {
 	case 0:
-		return nullWriter{}
+		return io.Discard
 	case 1:
 		return loggers[0]
 	default:
@@ -81,28 +82,18 @@ func mustGetLogWriter(logConf config.LoggerConf, logfileName string) io.Writer {
 	}
 }
 
-func parseLogLevel() log.Level {
-	logLevel := config.Get().Logging.Internal.Level
-	level, err := log.ParseLevel(logLevel)
+func parseLogLevel() zerolog.Level {
+	logLevel := strings.ToLower(config.Get().Logging.Internal.Level)
+	level, err := zerolog.ParseLevel(logLevel)
 	if err != nil {
-		log.WithField("level", logLevel).WithError(err).Error("Unknown log level")
-		return log.InfoLevel
+		log.Error().Str("level", logLevel).Err(err).Msg("Unknown log level")
+		return zerolog.InfoLevel
 	}
 	return level
 }
 
 // Init initializes the logger
 func Init() {
-	log.SetLevel(log.TraceLevel) // This is not the log level for logs, this just asserts that hooks with all levels can
-	// be triggered
-
-	log.SetFormatter(
-		&log.TextFormatter{
-			DisableColors: true,
-			ForceQuote:    true,
-			FullTimestamp: true,
-		},
-	)
 	SetOutput()
 	if DebugEnabled() {
 		oidfed.EnableDebugLogging()
@@ -112,25 +103,32 @@ func Init() {
 // SetOutput sets the logging output
 func SetOutput() {
 	logLevel := parseLogLevel()
-	log.SetReportCaller(log.DebugLevel <= logLevel)
-	log.StandardLogger().Hooks = make(log.LevelHooks)
-	log.AddHook(
-		&writer.Hook{
-			Writer:    mustGetLogWriter(config.Get().Logging.Internal.LoggerConf, "lighthouse.log"),
-			LogLevels: minLogLevelToLevels(logLevel),
-		},
-	)
-	log.SetOutput(io.Discard)
+	zerolog.SetGlobalLevel(logLevel)
+
+	writer := mustGetLogWriter(config.Get().Logging.Internal.LoggerConf, "lighthouse.log")
+
+	// Build the logger with the configured output format.
+	var logger zerolog.Logger
+	ctx := log.With().Timestamp()
+	if logLevel <= zerolog.DebugLevel {
+		ctx = ctx.Caller()
+	}
+	switch strings.ToLower(config.Get().Logging.Internal.Format) {
+	case "json", "":
+		logger = ctx.Logger().Output(writer)
+	default:
+		logger = ctx.Logger().Output(zerolog.ConsoleWriter{
+			Out:        writer,
+			TimeFormat: zerolog.TimeFieldFormat,
+		})
+	}
+	log.Logger = logger
+
+	// Wire the lib's logger to the same output and level.
+	oidfed.SetLogOutput(writer)
+	oidfed.SetLogLevel(logLevel)
 }
 
 func DebugEnabled() bool {
-	logLevel := parseLogLevel()
-	return log.DebugLevel <= logLevel
-}
-
-func minLogLevelToLevels(minLevel log.Level) (levels []log.Level) {
-	for l := log.PanicLevel; l <= minLevel; l++ {
-		levels = append(levels, l)
-	}
-	return
+	return parseLogLevel() <= zerolog.DebugLevel
 }

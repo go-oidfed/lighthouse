@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/go-oidfed/lib/jwx"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -115,7 +115,7 @@ func ConvertCheckerConfig(node *yaml.Node) (string, any) {
 
 	var raw map[string]any
 	if err := node.Decode(&raw); err != nil {
-		log.WithError(err).Warn("failed to decode checker config for migration")
+		log.Warn().Err(err).Msg("failed to decode checker config for migration")
 		return "", nil
 	}
 

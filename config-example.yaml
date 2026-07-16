@@ -191,10 +191,7 @@ api:
 #   #   level: INFO    # DEBUG, INFO, WARN, ERROR
 #   #   dir: ""        # Directory for log files (empty = no file logging)
 #   #   stderr: false  # Also log to stderr
-#   #   # Smart logging: buffer logs and write on error
-#   #   smart:
-#   #     enabled: false
-#   #     dir: ""
+#   #   format: console  # console | json
 #   
 #   # Access logging
 #   # access:

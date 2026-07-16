@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/fileutils"
 	"gopkg.in/yaml.v3"
 )
@@ -116,7 +116,7 @@ func cleanMappingNode(node *yaml.Node, path string, removed *[]string, verbose b
 			// Value is empty, remove this key-value pair
 			*removed = append(*removed, keyPath)
 			if verbose {
-				log.WithField("path", keyPath).Debug("Removing empty value")
+				log.Debug().Str("path", keyPath).Msg("Removing empty value")
 			}
 		} else {
 			// Keep this key-value pair
@@ -149,7 +149,7 @@ func cleanSequenceNode(node *yaml.Node, path string, removed *[]string, verbose 
 			// Element is empty, remove it
 			*removed = append(*removed, childPath)
 			if verbose {
-				log.WithField("path", childPath).Debug("Removing empty array element")
+				log.Debug().Str("path", childPath).Msg("Removing empty array element")
 			}
 		} else {
 			// Keep this element

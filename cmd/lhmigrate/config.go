@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/fileutils"
 	"gopkg.in/yaml.v3"
 )
@@ -115,7 +116,7 @@ func runConfigMigration(args []string) int {
 	}
 
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	if source == "" {
@@ -165,7 +166,7 @@ func runConfigMigration(args []string) int {
 	// Load and transform
 	result, err := transformer.transform()
 	if err != nil {
-		log.WithError(err).Error("Config transformation failed")
+		log.Error().Err(err).Msg("Config transformation failed")
 		return 1
 	}
 
@@ -177,10 +178,10 @@ func runConfigMigration(args []string) int {
 
 	if dest != "" && !dryRun {
 		if err := os.WriteFile(dest, []byte(result), 0644); err != nil {
-			log.WithError(err).Error("Failed to write output file")
+			log.Error().Err(err).Msg("Failed to write output file")
 			return 1
 		}
-		log.WithField("path", dest).Info("Config file written")
+		log.Info().Str("path", dest).Msg("Config file written")
 	} else {
 		fmt.Println(result)
 	}
@@ -197,7 +198,7 @@ func runConfigMigration(args []string) int {
 	}
 
 	if !dryRun {
-		log.Info("Config transformation completed successfully")
+		log.Info().Msg("Config transformation completed successfully")
 	}
 	return 0
 }
@@ -288,7 +289,7 @@ func (t *configTransformer) moveEntityIDToTopLevel(root *yaml.Node) {
 					entityIDValue = subValueNode.Value
 					entityIDIndex = j
 					if t.verbose {
-						log.WithField("entity_id", entityIDValue).Info("Found entity_id in federation_data, moving to top level")
+						log.Info().Str("entity_id", entityIDValue).Msg("Found entity_id in federation_data, moving to top level")
 					}
 					break
 				}
@@ -491,7 +492,7 @@ func (t *configTransformer) moveJTIToStorage(root *yaml.Node) {
 	}
 
 	if t.verbose {
-		log.Info("Moved JTI settings from endpoints.auth to storage.endpoint_auth")
+		log.Info().Msg("Moved JTI settings from endpoints.auth to storage.endpoint_auth")
 	}
 }
 
@@ -617,10 +618,10 @@ func (t *configTransformer) transformStorageNode(node *yaml.Node) {
 			valueNode.Value = targetDriver
 			keyNode.LineComment = fmt.Sprintf("Changed from 'backend: %s' - legacy backends no longer supported", oldValue)
 			if t.verbose {
-				log.WithFields(log.Fields{
-					"old": "backend: " + oldValue,
-					"new": "driver: " + targetDriver,
-				}).Info("Transformed storage backend")
+				log.Info().
+					Str("old", "backend: "+oldValue).
+					Str("new", "driver: "+targetDriver).
+					Msg("Transformed storage backend")
 			}
 		}
 	} else {
@@ -632,10 +633,10 @@ func (t *configTransformer) transformStorageNode(node *yaml.Node) {
 				oldValue := valueNode.Value
 				valueNode.Value = targetDriver
 				if t.verbose {
-					log.WithFields(log.Fields{
-						"old": oldValue,
-						"new": targetDriver,
-					}).Info("Updated storage driver")
+					log.Info().
+						Str("old", oldValue).
+						Str("new", targetDriver).
+						Msg("Updated storage driver")
 				}
 			}
 		} else {
@@ -644,7 +645,7 @@ func (t *configTransformer) transformStorageNode(node *yaml.Node) {
 			valueNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: targetDriver}
 			node.Content = append([]*yaml.Node{keyNode, valueNode}, node.Content...)
 			if t.verbose {
-				log.WithField("driver", targetDriver).Info("Added storage driver")
+				log.Info().Str("driver", targetDriver).Msg("Added storage driver")
 			}
 		}
 	}
@@ -654,13 +655,13 @@ func (t *configTransformer) transformStorageNode(node *yaml.Node) {
 		if t.dbDSN != "" {
 			setField("dsn", t.dbDSN, "driver")
 			if t.verbose {
-				log.WithField("dsn", t.dbDSN).Info("Set storage DSN")
+				log.Info().Str("dsn", t.dbDSN).Msg("Set storage DSN")
 			}
 		}
 		// Remove data_dir if present (not needed for mysql/postgres)
 		if removeField("data_dir") {
 			if t.verbose {
-				log.Info("Removed data_dir (not needed for mysql/postgres)")
+				log.Info().Msg("Removed data_dir (not needed for mysql/postgres)")
 			}
 		}
 	} else {
@@ -668,13 +669,13 @@ func (t *configTransformer) transformStorageNode(node *yaml.Node) {
 		if t.dbDir != "" {
 			setField("data_dir", t.dbDir, "driver")
 			if t.verbose {
-				log.WithField("data_dir", t.dbDir).Info("Set storage data_dir")
+				log.Info().Str("data_dir", t.dbDir).Msg("Set storage data_dir")
 			}
 		}
 		// Remove dsn if present (not needed for sqlite)
 		if removeField("dsn") {
 			if t.verbose {
-				log.Info("Removed dsn (not needed for sqlite)")
+				log.Info().Msg("Removed dsn (not needed for sqlite)")
 			}
 		}
 	}
@@ -710,10 +711,10 @@ func (t *configTransformer) transformSigningNode(node *yaml.Node) {
 		// Check for rename
 		if newName, ok := fieldsToRename[keyNode.Value]; ok {
 			if t.verbose {
-				log.WithFields(log.Fields{
-					"old": keyNode.Value,
-					"new": newName,
-				}).Info("Renamed signing field")
+				log.Info().
+					Str("old", keyNode.Value).
+					Str("new", newName).
+					Msg("Renamed signing field")
 			}
 			keyNode.Value = newName
 			keyNode.LineComment = "Renamed from 'automatic_key_rollover'"
@@ -726,7 +727,7 @@ func (t *configTransformer) transformSigningNode(node *yaml.Node) {
 			// Add comment indicating it's now in database
 			keyNode.HeadComment = fmt.Sprintf("# DEPRECATED: '%s' is now managed in the database.\n# Use 'lhmigrate config2db' to migrate this value, or the Admin API.", keyNode.Value)
 			if t.verbose {
-				log.WithField("field", keyNode.Value).Info("Marked signing field as deprecated (moved to database)")
+				log.Info().Str("field", keyNode.Value).Msg("Marked signing field as deprecated (moved to database)")
 			}
 		}
 	}
@@ -794,7 +795,7 @@ func (t *configTransformer) moveSigningFieldsToFilesystem(node *yaml.Node) {
 		node.Content = append(node.Content[:f.index], node.Content[f.index+2:]...)
 
 		if t.verbose {
-			log.WithField("field", f.key.Value).Info("Moved signing field to filesystem subsection")
+			log.Info().Str("field", f.key.Value).Msg("Moved signing field to filesystem subsection")
 		}
 	}
 
@@ -815,7 +816,7 @@ func (t *configTransformer) moveSigningFieldsToFilesystem(node *yaml.Node) {
 		node.Content = append([]*yaml.Node{kmsKeyNode, kmsValueNode}, node.Content...)
 
 		if t.verbose {
-			log.Info("Added kms: filesystem to signing section")
+			log.Info().Msg("Added kms: filesystem to signing section")
 		}
 	}
 }
@@ -846,7 +847,7 @@ func (t *configTransformer) transformFederationNode(node *yaml.Node) {
 		if fieldsToComment[keyNode.Value] {
 			keyNode.HeadComment = fmt.Sprintf("# DEPRECATED: '%s' is now managed in the database.\n# Use 'lhmigrate config2db' to migrate this value, or the Admin API.", keyNode.Value)
 			if t.verbose {
-				log.WithField("field", keyNode.Value).Info("Marked federation_data field as deprecated (moved to database)")
+				log.Info().Str("field", keyNode.Value).Msg("Marked federation_data field as deprecated (moved to database)")
 			}
 		}
 	}
@@ -886,7 +887,7 @@ func (t *configTransformer) transformTrustMarkEndpointNode(node *yaml.Node) {
 		if keyNode.Value == "trust_mark_specs" {
 			keyNode.HeadComment = "# DEPRECATED: 'trust_mark_specs' is now managed in the database.\n# Use 'lhmigrate config2db' to migrate these values, or the Admin API."
 			if t.verbose {
-				log.WithField("field", "trust_mark_specs").Info("Marked trust_mark_specs as deprecated (moved to database)")
+				log.Info().Str("field", "trust_mark_specs").Msg("Marked trust_mark_specs as deprecated (moved to database)")
 			}
 		}
 	}

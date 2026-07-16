@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -125,13 +126,13 @@ func (m *dbMigrator) loadLegacySubordinates() ([]legacySubordinateInfo, error) {
 
 // migrateSubordinates migrates subordinate data from legacy storage
 func (m *dbMigrator) migrateSubordinates() error {
-	log.Info("Migrating subordinates...")
+	log.Info().Msg("Migrating subordinates...")
 
 	legacyInfos, err := m.loadLegacySubordinates()
 	if err != nil {
 		// Check if file doesn't exist - that's OK, just skip
 		if os.IsNotExist(err) {
-			log.Info("No subordinates file found, skipping")
+			log.Info().Msg("No subordinates file found, skipping")
 			m.results = append(m.results, dbMigrationResult{
 				section: dbSectionSubordinates,
 				action:  "skipped",
@@ -142,17 +143,17 @@ func (m *dbMigrator) migrateSubordinates() error {
 		return err
 	}
 
-	log.WithField("count", len(legacyInfos)).Info("Found legacy subordinates")
+	log.Info().Int("count", len(legacyInfos)).Msg("Found legacy subordinates")
 
 	for _, legacy := range legacyInfos {
 		result := m.migrateOneSubordinate(legacy)
 		m.results = append(m.results, result)
 
 		if m.verbose && result.err == nil {
-			log.WithFields(log.Fields{
-				"entity_id": result.entityID,
-				"action":    result.action,
-			}).Debug("Processed subordinate")
+			log.Debug().
+				Str("entity_id", result.entityID).
+				Str("action", result.action).
+				Msg("Processed subordinate")
 		}
 	}
 
@@ -194,7 +195,7 @@ func (m *dbMigrator) migrateOneSubordinate(legacy legacySubordinateInfo) dbMigra
 
 	// Warn about MetadataPolicyCrit if set (no longer per-subordinate)
 	if len(legacy.MetadataPolicyCrit) > 0 {
-		log.WithField("entity_id", legacy.EntityID).Warn(
+		log.Warn().Str("entity_id", legacy.EntityID).Msg(
 			"MetadataPolicyCrit is no longer per-subordinate; consider migrating to global setting via config2db",
 		)
 	}
@@ -244,7 +245,7 @@ func transformSubordinate(legacy legacySubordinateInfo) model.ExtendedSubordinat
 
 // migrateTrustMarkedEntities migrates trust marked entities from legacy storage
 func (m *dbMigrator) migrateTrustMarkedEntities() error {
-	log.Info("Migrating trust marked entities...")
+	log.Info().Msg("Migrating trust marked entities...")
 
 	var tmeStorage model.TrustMarkedEntitiesStorageBackend
 	switch m.sourceType {
@@ -263,7 +264,7 @@ func (m *dbMigrator) migrateTrustMarkedEntities() error {
 
 	if err := tmeStorage.Load(); err != nil {
 		if os.IsNotExist(err) {
-			log.Info("No trust marked entities file found, skipping")
+			log.Info().Msg("No trust marked entities file found, skipping")
 			m.results = append(m.results, dbMigrationResult{
 				section: dbSectionTrustMarkedEntities,
 				action:  "skipped",
@@ -281,7 +282,7 @@ func (m *dbMigrator) migrateTrustMarkedEntities() error {
 	}
 
 	if len(specs) == 0 {
-		log.Warn("No trust mark specs found in database. Trust marked entities require specs to be migrated first (use config2db).")
+		log.Warn().Msg("No trust mark specs found in database. Trust marked entities require specs to be migrated first (use config2db).")
 		m.results = append(m.results, dbMigrationResult{
 			section: dbSectionTrustMarkedEntities,
 			action:  "skipped",
@@ -295,7 +296,7 @@ func (m *dbMigrator) migrateTrustMarkedEntities() error {
 		// Get active entities for this trust mark type
 		activeEntities, err := tmeStorage.Active(spec.TrustMarkType)
 		if err != nil {
-			log.WithError(err).WithField("trust_mark_type", spec.TrustMarkType).Warn("Failed to get active entities")
+			log.Warn().Err(err).Str("trust_mark_type", spec.TrustMarkType).Msg("Failed to get active entities")
 			continue
 		}
 		for _, entityID := range activeEntities {
@@ -306,7 +307,7 @@ func (m *dbMigrator) migrateTrustMarkedEntities() error {
 		// Get blocked entities
 		blockedEntities, err := tmeStorage.Blocked(spec.TrustMarkType)
 		if err != nil {
-			log.WithError(err).WithField("trust_mark_type", spec.TrustMarkType).Warn("Failed to get blocked entities")
+			log.Warn().Err(err).Str("trust_mark_type", spec.TrustMarkType).Msg("Failed to get blocked entities")
 			continue
 		}
 		for _, entityID := range blockedEntities {
@@ -317,7 +318,7 @@ func (m *dbMigrator) migrateTrustMarkedEntities() error {
 		// Get pending entities
 		pendingEntities, err := tmeStorage.Pending(spec.TrustMarkType)
 		if err != nil {
-			log.WithError(err).WithField("trust_mark_type", spec.TrustMarkType).Warn("Failed to get pending entities")
+			log.Warn().Err(err).Str("trust_mark_type", spec.TrustMarkType).Msg("Failed to get pending entities")
 			continue
 		}
 		for _, entityID := range pendingEntities {
@@ -519,7 +520,7 @@ func runDBMigration(args []string) int {
 	}
 
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	// Validate required flags
@@ -583,7 +584,7 @@ func runDBMigration(args []string) int {
 	}
 
 	if dryRun {
-		log.Info("DRY RUN - no changes will be made")
+		log.Info().Msg("DRY RUN - no changes will be made")
 	}
 
 	// Connect to destination database
@@ -596,10 +597,10 @@ func runDBMigration(args []string) int {
 
 	backends, err := storage.LoadStorageBackends(cfg)
 	if err != nil {
-		log.WithError(err).Error("failed to connect to destination database")
+		log.Error().Err(err).Msg("failed to connect to destination database")
 		return 1
 	}
-	log.Info("Connected to destination database")
+	log.Info().Msg("Connected to destination database")
 
 	// Create migrator and run
 	migrator := &dbMigrator{
@@ -613,7 +614,7 @@ func runDBMigration(args []string) int {
 	}
 
 	if err := migrator.migrate(); err != nil {
-		log.WithError(err).Error("Migration failed")
+		log.Error().Err(err).Msg("Migration failed")
 		return 1
 	}
 
@@ -633,6 +634,6 @@ func runDBMigration(args []string) int {
 		return 1
 	}
 
-	log.Info("Database migration completed successfully")
+	log.Info().Msg("Database migration completed successfully")
 	return 0
 }

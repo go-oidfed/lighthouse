@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // Flusher handles periodic flushing of the ring buffer to the database.
@@ -47,17 +47,17 @@ func (f *Flusher) Run(ctx context.Context) error {
 	ticker := time.NewTicker(f.interval)
 	defer ticker.Stop()
 
-	log.WithFields(log.Fields{
-		"interval":  f.interval,
-		"threshold": f.buffer.threshold,
-		"capacity":  f.buffer.capacity,
-	}).Info("stats flusher started")
+	log.Info().
+		Dur("interval", f.interval).
+		Float64("threshold", f.buffer.threshold).
+		Int("capacity", f.buffer.capacity).
+		Msg("stats flusher started")
 
 	for {
 		select {
 		case <-ctx.Done():
 			// Final flush before exit
-			log.Info("stats flusher shutting down, performing final flush")
+			log.Info().Msg("stats flusher shutting down, performing final flush")
 			f.flush()
 			return ctx.Err()
 
@@ -84,10 +84,10 @@ func (f *Flusher) flush() {
 
 	if err != nil {
 		f.totalDropped += int64(len(entries))
-		log.WithError(err).WithFields(log.Fields{
-			"count":    len(entries),
-			"duration": duration,
-		}).Error("failed to flush stats to database, entries dropped")
+		log.Error().Err(err).
+			Int("count", len(entries)).
+			Dur("duration", duration).
+			Msg("failed to flush stats to database, entries dropped")
 		return
 	}
 
@@ -95,10 +95,10 @@ func (f *Flusher) flush() {
 	f.lastFlushTime = time.Now()
 	f.lastFlushSize = len(entries)
 
-	log.WithFields(log.Fields{
-		"count":    len(entries),
-		"duration": duration,
-	}).Debug("stats flushed to database")
+	log.Debug().
+		Int("count", len(entries)).
+		Dur("duration", duration).
+		Msg("stats flushed to database")
 }
 
 // Stats returns flusher statistics.

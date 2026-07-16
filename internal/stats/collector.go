@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/gofiber/fiber/v2"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/api/stats"
 )
@@ -40,10 +40,10 @@ func NewCollector(cfg stats.Config, storage StorageBackend) (*Collector, error) 
 		var err error
 		geoIP, err = NewGeoIPLookup(cfg.GeoIPDBPath)
 		if err != nil {
-			log.WithError(err).Warn("failed to initialize GeoIP lookup, country detection disabled")
+			log.Warn().Err(err).Msg("failed to initialize GeoIP lookup, country detection disabled")
 			geoIP = NoOpGeoIPLookup{}
 		} else {
-			log.WithField("path", cfg.GeoIPDBPath).Info("GeoIP lookup initialized")
+			log.Info().Str("path", cfg.GeoIPDBPath).Msg("GeoIP lookup initialized")
 		}
 	}
 
@@ -97,11 +97,11 @@ func (c *Collector) Start() {
 	go func() {
 		defer c.wg.Done()
 		if err := c.flusher.Run(c.ctx); err != nil && err != context.Canceled {
-			log.WithError(err).Error("stats flusher exited with error")
+			log.Error().Err(err).Msg("stats flusher exited with error")
 		}
 	}()
 
-	log.Info("stats collector started")
+	log.Info().Msg("stats collector started")
 }
 
 // Stop gracefully shuts down the collector.
@@ -111,18 +111,18 @@ func (c *Collector) Stop() error {
 		return nil
 	}
 
-	log.Info("stopping stats collector")
+	log.Info().Msg("stopping stats collector")
 	c.cancel()
 	c.wg.Wait()
 
 	// Close GeoIP database if applicable
 	if closer, ok := c.geoIP.(interface{ Close() error }); ok {
 		if err := closer.Close(); err != nil {
-			log.WithError(err).Warn("failed to close GeoIP database")
+			log.Warn().Err(err).Msg("failed to close GeoIP database")
 		}
 	}
 
-	log.Info("stats collector stopped")
+	log.Info().Msg("stats collector stopped")
 	return nil
 }
 

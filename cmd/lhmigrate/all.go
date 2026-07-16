@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // allStep represents a migration step in the all command
@@ -208,7 +209,7 @@ func allCmd(args []string) int {
 	}
 
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	// Parse skip steps
@@ -294,7 +295,7 @@ func (o *allOrchestrator) run() int {
 	currentStep := 0
 	for _, step := range steps {
 		if !o.shouldRun(step) {
-			log.WithField("step", string(step)).Debug("Skipping step")
+			log.Debug().Str("step", string(step)).Msg("Skipping step")
 			continue
 		}
 
@@ -331,7 +332,7 @@ func (o *allOrchestrator) run() int {
 // runConfigStep runs the config transformation step
 func (o *allOrchestrator) runConfigStep() int {
 	if o.configFile == "" {
-		log.Warn("No config file specified, skipping config transformation")
+		log.Warn().Msg("No config file specified, skipping config transformation")
 		return 0
 	}
 
@@ -363,14 +364,14 @@ func (o *allOrchestrator) runConfigStep() int {
 		args = append(args, "-v")
 	}
 
-	log.WithField("args", args).Debug("Running config step")
+	log.Debug().Strs("args", args).Msg("Running config step")
 	return runConfigMigration(args)
 }
 
 // runKeysPublicStep runs the public keys migration step
 func (o *allOrchestrator) runKeysPublicStep() int {
 	if o.keysSource == "" {
-		log.Warn("No keys source directory specified (--keys-source), skipping public keys migration")
+		log.Warn().Msg("No keys source directory specified (--keys-source), skipping public keys migration")
 		return 0
 	}
 
@@ -404,22 +405,22 @@ func (o *allOrchestrator) runKeysPublicStep() int {
 		args = append(args, "-v")
 	}
 
-	log.WithField("args", args).Debug("Running keys public step")
+	log.Debug().Strs("args", args).Msg("Running keys public step")
 	return publicCmd(args)
 }
 
 // runKeysKMSStep runs the KMS migration step
 func (o *allOrchestrator) runKeysKMSStep() int {
 	if o.keysSource == "" {
-		log.Warn("No keys source directory specified (--keys-source), skipping KMS migration")
+		log.Warn().Msg("No keys source directory specified (--keys-source), skipping KMS migration")
 		return 0
 	}
 	if o.algsStr == "" {
-		log.Warn("No algorithms specified (--algs), skipping KMS migration")
+		log.Warn().Msg("No algorithms specified (--algs), skipping KMS migration")
 		return 0
 	}
 	if o.pksType == "" {
-		log.Warn("No public key storage type specified (--pks-type), skipping KMS migration")
+		log.Warn().Msg("No public key storage type specified (--pks-type), skipping KMS migration")
 		return 0
 	}
 
@@ -464,7 +465,7 @@ func (o *allOrchestrator) runKeysKMSStep() int {
 		args = append(args, "-v")
 	}
 
-	log.WithField("args", args).Debug("Running keys kms step")
+	log.Debug().Strs("args", args).Msg("Running keys kms step")
 	return kmsCmd(args)
 }
 
@@ -476,7 +477,7 @@ func (o *allOrchestrator) runConfig2DBStep() int {
 		configPath = o.configFile
 	}
 	if configPath == "" {
-		log.Warn("No config file specified, skipping config2db migration")
+		log.Warn().Msg("No config file specified, skipping config2db migration")
 		return 0
 	}
 
@@ -510,18 +511,18 @@ func (o *allOrchestrator) runConfig2DBStep() int {
 		args = append(args, "-v")
 	}
 
-	log.WithField("args", args).Debug("Running config2db step")
+	log.Debug().Strs("args", args).Msg("Running config2db step")
 	return config2dbCmd(args)
 }
 
 // runDBStep runs the database migration step
 func (o *allOrchestrator) runDBStep() int {
 	if o.dataSource == "" {
-		log.Warn("No data source directory specified (--data-source), skipping database migration")
+		log.Warn().Msg("No data source directory specified (--data-source), skipping database migration")
 		return 0
 	}
 	if o.sourceType == "" {
-		log.Warn("No source type specified (--source-type), skipping database migration")
+		log.Warn().Msg("No source type specified (--source-type), skipping database migration")
 		return 0
 	}
 
@@ -564,7 +565,7 @@ func (o *allOrchestrator) runDBStep() int {
 		args = append(args, "-v")
 	}
 
-	log.WithField("args", args).Debug("Running db step")
+	log.Debug().Strs("args", args).Msg("Running db step")
 	return runDBMigration(args)
 }
 
@@ -576,7 +577,7 @@ func (o *allOrchestrator) runConfigCleanupStep() int {
 		configPath = o.configFile
 	}
 	if configPath == "" {
-		log.Warn("No config file specified, skipping config cleanup")
+		log.Warn().Msg("No config file specified, skipping config cleanup")
 		return 0
 	}
 
@@ -587,7 +588,7 @@ func (o *allOrchestrator) runConfigCleanupStep() int {
 
 	fmt.Println("Cleaning up empty values from config file:", configPath)
 	if err := cleanupConfigFile(configPath, o.verbose); err != nil {
-		log.WithError(err).Error("Config cleanup failed")
+		log.Error().Err(err).Msg("Config cleanup failed")
 		return 1
 	}
 

@@ -6,7 +6,7 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.4
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.10.13-0.20260709112443-e891972ac43c
+	github.com/go-oidfed/lib v0.10.13-0.20260714071359-15b20e6a62ee
 	github.com/gofiber/fiber/v2 v2.52.14
 	github.com/google/uuid v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -14,7 +14,7 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.21.0
-	github.com/sirupsen/logrus v1.9.4
+	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
@@ -73,6 +73,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/scylladb/go-set v1.0.3-0.20200225121959-cc7b2070d91e // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

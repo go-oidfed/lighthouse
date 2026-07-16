@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse/storage"
@@ -111,6 +111,6 @@ func LoadStorageBackends(c StorageConf) (model.Backends, error) {
 	if err != nil {
 		return model.Backends{}, err
 	}
-	log.Info("Loaded storage backend")
+	log.Info().Msg("Loaded storage backend")
 	return backs, nil
 }

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/duration"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -67,7 +67,7 @@ func (r *TrustAnchorRepo) Load() error {
 			delete(r.anchors, id)
 		}
 	}
-	log.WithField("count", len(r.anchors)).Debug("TrustAnchorRepo loaded")
+	log.Debug().Int("count", len(r.anchors)).Msg("TrustAnchorRepo loaded")
 	return nil
 }
 
@@ -202,6 +202,6 @@ func SetupTAJWKSRefresher(repo *TrustAnchorRepo, jwkStorage oidfed.JWKStorage) (
 	if err := refresher.Start(); err != nil {
 		return nil, errors.Wrap(err, "failed to start TA JWKS refresher")
 	}
-	log.WithField("count", len(tas)).Info("TA JWKS refresher started")
+	log.Info().Int("count", len(tas)).Msg("TA JWKS refresher started")
 	return refresher, nil
 }

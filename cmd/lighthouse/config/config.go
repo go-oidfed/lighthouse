@@ -6,7 +6,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/fileutils"
 	"gopkg.in/yaml.v3"
 
@@ -25,7 +25,7 @@ import (
 // Environment variables (with prefix LH_):
 //   - LH_ENTITY_ID: Entity identifier URL
 //   - LH_SERVER_*: Server configuration (see ServerConf)
-//   - LH_LOGGING_*: Logging configuration (see loggingConf)
+//   - LH_LOGGING_*: Logging configuration (see loggingConf internal + banner)
 //   - LH_STORAGE_*: Storage configuration (see StorageConf)
 //   - LH_CACHE_*: Caching configuration (see CachingConf)
 //   - LH_SIGNING_*: Signing configuration (see SigningConf)
@@ -173,6 +173,6 @@ func Load(filename string) error {
 // This should only be called from main() or init() functions.
 func MustLoad(filename string) {
 	if err := Load(filename); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 }

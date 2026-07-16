@@ -6,7 +6,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -155,7 +155,7 @@ func (h *federationEndpointsHandlers) reloadEndpoints() {
 		return
 	}
 	if err := h.controller.ReloadEndpointsFromDB(); err != nil {
-		log.WithError(err).Error("failed to reload endpoints from DB after admin API mutation")
+		log.Error().Err(err).Msg("failed to reload endpoints from DB after admin API mutation")
 	}
 }
 

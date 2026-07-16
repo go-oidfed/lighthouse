@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -77,7 +77,7 @@ func NewStorage(config Config) (*Storage, error) {
 	// This is idempotent — if the constraints already have CASCADE, the
 	// ALTER TABLE is a no-op or errors silently.
 	if err = ensureJoinTableCascadeConstraints(db); err != nil {
-		log.WithError(err).Warn("failed to set cascade constraints on join table; cleanup will rely on application code")
+		log.Warn().Err(err).Msg("failed to set cascade constraints on join table; cleanup will rely on application code")
 	}
 
 	// Fill user hash params with defaults if zero values
@@ -1407,20 +1407,20 @@ func (s *TrustMarkSpecStorage) revokeInstancesForSubject(subjectID uint, entityI
 		})
 
 	if result.Error != nil {
-		log.WithError(result.Error).WithFields(log.Fields{
-			"subject_id": subjectID,
-			"entity_id":  entityID,
-			"spec_ident": specIdent,
-		}).Error("failed to revoke trust mark instances for subject")
+		log.Error().Err(result.Error).
+			Uint("subject_id", subjectID).
+			Str("entity_id", entityID).
+			Str("spec_ident", specIdent).
+			Msg("failed to revoke trust mark instances for subject")
 		return
 	}
 
 	if result.RowsAffected > 0 {
-		log.WithFields(log.Fields{
-			"subject_id":    subjectID,
-			"entity_id":     entityID,
-			"spec_ident":    specIdent,
-			"revoked_count": result.RowsAffected,
-		}).Info("automatically revoked trust mark instances due to subject status change")
+		log.Info().
+			Uint("subject_id", subjectID).
+			Str("entity_id", entityID).
+			Str("spec_ident", specIdent).
+			Int64("revoked_count", result.RowsAffected).
+			Msg("automatically revoked trust mark instances due to subject status change")
 	}
 }

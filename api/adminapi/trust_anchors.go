@@ -6,7 +6,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -136,8 +136,8 @@ func (h *trustAnchorsHandlers) syncRefresher(entityID string) {
 	// Load the (possibly updated) TA from the store and add it to the refresher.
 	ta, err := h.store.Get(entityID)
 	if err != nil {
-		log.WithError(err).WithField("entity_id", entityID).
-			Warn("failed to load TA for refresher sync")
+		log.Warn().Err(err).Str("entity_id", entityID).
+			Msg("failed to load TA for refresher sync")
 		return
 	}
 	if !ta.EnableJWKSUpdate {
@@ -155,8 +155,8 @@ func (h *trustAnchorsHandlers) syncRefresher(entityID string) {
 		oidfedTA.SetJWKS(ta.JWKS.Keys)
 	}
 	if err := r.Update(oidfedTA); err != nil {
-		log.WithError(err).WithField("entity_id", entityID).
-			Warn("failed to add/update TA in refresher")
+		log.Warn().Err(err).Str("entity_id", entityID).
+			Msg("failed to add/update TA in refresher")
 	}
 }
 

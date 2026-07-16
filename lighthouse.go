@@ -22,7 +22,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
 	apistats "github.com/go-oidfed/lighthouse/api/stats"
@@ -248,7 +248,7 @@ func initFiberServer(serverConf ServerConf) (*fiber.App, error) {
 
 	if serverConf.CORS.Enabled {
 		server.Use(cors.New(corsConfigFromConf(serverConf.CORS)))
-		log.Info("CORS enabled for main server")
+		log.Info().Msg("CORS enabled for main server")
 	}
 
 	return server, nil
@@ -263,7 +263,7 @@ func initStatsCollector(statsConfig apistats.Config, storages model.Backends, se
 
 	collector, err := stats.NewCollector(statsConfig, storages.Stats)
 	if err != nil {
-		log.WithError(err).Warn("failed to initialize stats collector, statistics disabled")
+		log.Warn().Err(err).Msg("failed to initialize stats collector, statistics disabled")
 		return nil, nil
 	}
 
@@ -381,7 +381,7 @@ func registerEntityConfigurationEndpoint(server *fiber.App, entity *LightHouse) 
 				internal.CacheKeyEntityConfiguration, jwt,
 				min(MaximumEntityConfigurationCachePeriod, time.Until(ec.ExpiresAt.Time.Add(-1*time.Minute))),
 			); cacheErr != nil {
-				log.WithError(cacheErr).Error("failed to cache entity configuration")
+				log.Error().Err(cacheErr).Msg("failed to cache entity configuration")
 			}
 			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 			return ctx.Send(jwt)
@@ -417,7 +417,7 @@ func initAdminAPI(
 
 		if admin.CORS.Enabled {
 			adminAPIServer.Use(cors.New(corsConfigFromConf(admin.CORS)))
-			log.Info("CORS enabled for admin API server")
+			log.Info().Msg("CORS enabled for admin API server")
 		}
 	} else {
 		adminAPIServer = server
@@ -427,7 +427,7 @@ func initAdminAPI(
 
 	if admin.CORS.Enabled && adminAPIServer == server && !serverConf.CORS.Enabled {
 		adminGroup.Use(cors.New(corsConfigFromConf(admin.CORS)))
-		log.Info("CORS enabled for admin API routes on main server")
+		log.Info().Msg("CORS enabled for admin API routes on main server")
 	}
 
 	err := adminapi.Register(
@@ -529,7 +529,7 @@ func (fed *LightHouse) banner() {
 	if fed.VersionBanner {
 		fmt.Println(version.Banner(bannerWidth))
 	} else {
-		log.WithField("version", version.VERSION).Info("Starting lighthouse")
+		log.Info().Str("version", version.VERSION).Msg("Starting lighthouse")
 	}
 }
 
@@ -547,26 +547,32 @@ func (fed *LightHouse) Start() {
 	// Admin API server
 	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
 		if adminTLS {
-			log.WithField("port", conf.AdminAPIPort).Info("starting admin api server with TLS")
+			log.Info().Int("port", conf.AdminAPIPort).Msg("starting admin api server with TLS")
 			go func() {
-				log.WithError(
-					fed.adminAPIServer.ListenTLS(
-						fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
-						fed.serverConf.AdminTLS.Cert,
-						fed.serverConf.AdminTLS.Key,
-					),
-				).Fatal()
+				if err := fed.adminAPIServer.ListenTLS(
+					fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
+					fed.serverConf.AdminTLS.Cert,
+					fed.serverConf.AdminTLS.Key,
+				); err != nil {
+					log.Fatal().Err(err).Send()
+				}
 			}()
 		} else {
-			log.WithField("port", conf.AdminAPIPort).Info("starting admin api server")
+			log.Info().Int("port", conf.AdminAPIPort).Msg("starting admin api server")
 			go func() {
-				log.WithError(fed.adminAPIServer.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort))).Fatal()
+				if err := fed.adminAPIServer.Listen(
+					fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
+				); err != nil {
+					log.Fatal().Err(err).Send()
+				}
 			}()
 		}
 	}
 	if !conf.TLS.Enabled {
-		log.WithField("port", conf.Port).Info("TLS is disabled starting http server")
-		log.WithError(fed.server.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.Port))).Fatal()
+		log.Info().Int("port", conf.Port).Msg("TLS is disabled starting http server")
+		if err := fed.server.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.Port)); err != nil {
+			log.Fatal().Err(err).Send()
+		}
 		return
 	}
 	// TLS enabled
@@ -582,14 +588,18 @@ func (fed *LightHouse) Start() {
 				)
 			},
 		)
-		log.Info("TLS and http redirect enabled, starting redirect server on port 80")
+		log.Info().Msg("TLS and http redirect enabled, starting redirect server on port 80")
 		go func() {
-			log.WithError(httpServer.Listen(conf.IPListen + ":80")).Fatal()
+			if err := httpServer.Listen(conf.IPListen + ":80"); err != nil {
+				log.Fatal().Err(err).Send()
+			}
 		}()
 	}
 	time.Sleep(time.Millisecond) // This is just for a more pretty output with the tls header printed after the http one
-	log.Info("TLS enabled, starting https server on port 443")
-	log.WithError(fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key)).Fatal()
+	log.Info().Msg("TLS enabled, starting https server on port 443")
+	if err := fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key); err != nil {
+		log.Fatal().Err(err).Send()
+	}
 }
 
 // Stop gracefully shuts down the LightHouse server and its components.
@@ -610,7 +620,7 @@ func (fed *LightHouse) Stop() error {
 	// Stop stats collector if running
 	if fed.statsCollector != nil {
 		if err := fed.statsCollector.Stop(); err != nil {
-			log.WithError(err).Warn("error stopping stats collector")
+			log.Warn().Err(err).Msg("error stopping stats collector")
 		}
 	}
 
@@ -633,7 +643,7 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 	now := time.Now()
 	lifetime, err := storage.GetSubordinateStatementLifetime(fed.storages.KV)
 	if err != nil {
-		log.WithError(err).Warn("failed to get subordinate statement lifetime, using default")
+		log.Warn().Err(err).Msg("failed to get subordinate statement lifetime, using default")
 		lifetime = storage.DefaultSubordinateStatementLifetime
 	}
 
@@ -656,7 +666,7 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 		model.KeyValueKeyMetadataPolicyCrit,
 		&configuredCritOperators,
 	); err != nil {
-		log.WithError(err).Warn("failed to get metadata policy crit from KV store")
+		log.Warn().Err(err).Msg("failed to get metadata policy crit from KV store")
 	}
 
 	// Filter to only include operators actually used in the metadata policy

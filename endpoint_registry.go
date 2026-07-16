@@ -10,7 +10,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
 	"github.com/gofiber/fiber/v2"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/storage"
@@ -268,7 +268,7 @@ func (fed *LightHouse) startBackgroundServicesForEndpoints() {
 	}
 	endpoints, err := fed.storages.FederationEndpoints.List()
 	if err != nil {
-		log.WithError(err).Error("failed to list endpoints for background services")
+		log.Error().Err(err).Msg("failed to list endpoints for background services")
 		return
 	}
 	for _, ep := range endpoints {
@@ -279,8 +279,8 @@ func (fed *LightHouse) startBackgroundServicesForEndpoints() {
 			var cfg collectionDBConfig
 			if ep.Config != "" {
 				if err := json.Unmarshal([]byte(ep.Config), &cfg); err != nil {
-					log.WithError(err).WithField("type", ep.Type).
-						Error("failed to parse entity_collection config for background service")
+					log.Error().Err(err).Str("type", string(ep.Type)).
+						Msg("failed to parse entity_collection config for background service")
 					continue
 				}
 			}
@@ -298,7 +298,7 @@ func (fed *LightHouse) startBackgroundServicesForEndpoints() {
 				}
 				pec.Start()
 				fed.backgroundStops = append(fed.backgroundStops, pec.Stop)
-				log.WithField("interval", pec.Interval).Info("Started periodic entity collector")
+				log.Info().Dur("interval", pec.Interval).Msg("Started periodic entity collector")
 			}
 		}
 	}
@@ -392,8 +392,8 @@ func (fed *LightHouse) LoadEndpointsFromDB() error {
 			continue
 		}
 		if err := fed.loadEndpointFromDB(&ep); err != nil {
-			log.WithError(err).WithField("type", ep.Type).
-				Error("failed to load endpoint from DB")
+			log.Error().Err(err).Str("type", string(ep.Type)).
+				Msg("failed to load endpoint from DB")
 			continue
 		}
 		loaded++
@@ -402,7 +402,7 @@ func (fed *LightHouse) LoadEndpointsFromDB() error {
 	// Start background services for the loaded endpoints.
 	fed.startBackgroundServicesForEndpoints()
 
-	log.WithField("count", loaded).Info("Loaded federation endpoints from DB")
+	log.Info().Int("count", loaded).Msg("Loaded federation endpoints from DB")
 	return nil
 }
 
@@ -430,7 +430,7 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 			// Dynamically look up the entity collection endpoint's allowed TAs.
 			collectionTAs, err := fed.resolveCollectionAllowedTAs()
 			if err != nil {
-				log.WithError(err).Warn("failed to resolve collection allowed TAs for resolve endpoint")
+				log.Warn().Err(err).Msg("failed to resolve collection allowed TAs for resolve endpoint")
 			} else if len(collectionTAs) > 0 {
 				allowedTAs = collectionTAs
 			}

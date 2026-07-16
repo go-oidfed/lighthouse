@@ -6,7 +6,8 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v3/jwt"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -25,7 +26,7 @@ type PrivateKeyJWTAuth struct {
 	trustAnchorIDs []string
 	taResolver     TAResolver
 	jtiStorage     model.JTIStorageBackend
-	logger         *log.Entry
+	logger         zerolog.Logger
 }
 
 // NewPrivateKeyJWTAuth creates a new private_key_jwt authentication middleware.
@@ -60,12 +61,10 @@ func NewPrivateKeyJWTAuth(
 		trustAnchorIDs: trustAnchorIDs,
 		taResolver:     taResolver,
 		jtiStorage:     jtiStorage,
-		logger: log.WithFields(
-			log.Fields{
-				"component": "auth_private_key_jwt",
-				"entity_id": entityID,
-			},
-		),
+		logger: log.With().
+			Str("component", "auth_private_key_jwt").
+			Str("entity_id", entityID).
+			Logger(),
 	}, nil
 }
 
@@ -80,7 +79,7 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 
 		// Validate client_assertion_type
 		if assertionType != oauthClientAssertionJWTBearer {
-			a.logger.WithField("assertion_type", assertionType).Debug("missing or invalid client_assertion_type")
+			a.logger.Debug().Str("assertion_type", assertionType).Msg("missing or invalid client_assertion_type")
 			return ctx.Status(fiber.StatusBadRequest).JSON(
 				oidfed.ErrorInvalidRequest("missing or invalid client_assertion_type, expected: " + oauthClientAssertionJWTBearer),
 			)
@@ -88,7 +87,7 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 
 		// Validate client_assertion is present
 		if clientAssertion == "" {
-			a.logger.Debug("missing client_assertion parameter")
+			a.logger.Debug().Msg("missing client_assertion parameter")
 			return ctx.Status(fiber.StatusBadRequest).JSON(
 				oidfed.ErrorInvalidRequest("missing client_assertion parameter"),
 			)
@@ -108,7 +107,7 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 				)
 			}
 			// For non-AuthError, return server error
-			a.logger.WithError(err).Error("unexpected authentication error")
+			a.logger.Error().Err(err).Msg("unexpected authentication error")
 			return ctx.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("authentication failed"))
 		}
 
@@ -117,12 +116,10 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 		ctx.Locals("client_entity_statement", entityStatement)
 		ctx.Locals("auth_method", "private_key_jwt")
 
-		a.logger.WithFields(
-			log.Fields{
-				"client_entity_id": clientEntityID,
-				"duration_ms":      time.Since(startTime).Milliseconds(),
-			},
-		).Debug("successful private_key_jwt authentication")
+		a.logger.Debug().
+			Str("client_entity_id", clientEntityID).
+			Int64("duration_ms", time.Since(startTime).Milliseconds()).
+			Msg("successful private_key_jwt authentication")
 
 		return ctx.Next()
 	}
@@ -241,7 +238,7 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 	// Store JTI to prevent replay
 	// Use the assertion expiration time
 	if err = a.jtiStorage.Store(jti, exp); err != nil {
-		a.logger.WithError(err).WithField("jti", jti).Error("failed to store JTI")
+		a.logger.Error().Err(err).Str("jti", jti).Msg("failed to store JTI")
 	}
 
 	return iss, clientEntityStmt, nil

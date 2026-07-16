@@ -11,7 +11,8 @@ import (
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/fileutils"
 	"gopkg.in/yaml.v3"
 
@@ -104,7 +105,7 @@ func config2dbCmd(args []string) int {
 	}
 
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	// Validate required flags
@@ -146,14 +147,14 @@ func config2dbCmd(args []string) int {
 	// Load config file
 	config, err := loadMigrationConfig(configFile)
 	if err != nil {
-		log.WithError(err).Error("failed to load config file")
+		log.Error().Err(err).Msg("failed to load config file")
 		return 1
 	}
 
 	// Validate config if requested
 	if validate {
 		if err = validateMigrationConfig(config, sections); err != nil {
-			log.WithError(err).Error("config validation failed")
+			log.Error().Err(err).Msg("config validation failed")
 			return 1
 		}
 	}
@@ -171,7 +172,7 @@ func config2dbCmd(args []string) int {
 	}
 
 	if dryRun {
-		log.Info("DRY RUN - no changes will be made")
+		log.Info().Msg("DRY RUN - no changes will be made")
 	}
 
 	cfg := storage.Config{
@@ -183,10 +184,10 @@ func config2dbCmd(args []string) int {
 
 	backs, err := storage.LoadStorageBackends(cfg)
 	if err != nil {
-		log.WithError(err).Error("failed to connect to database")
+		log.Error().Err(err).Msg("failed to connect to database")
 		return 1
 	}
-	log.Info("Connected to database")
+	log.Info().Msg("Connected to database")
 
 	// Run migrations
 	migrator := &configMigrator{
@@ -220,15 +221,15 @@ func config2dbCmd(args []string) int {
 		migratedSections := getSuccessfullyMigratedSections(results)
 		if len(migratedSections) > 0 {
 			if err := removeMigratedOptionsFromConfig(configFile, migratedSections); err != nil {
-				log.WithError(err).Error("failed to update config file")
+				log.Error().Err(err).Msg("failed to update config file")
 				return 1
 			}
-			log.WithField("sections", len(migratedSections)).Info("Removed migrated options from config file")
+			log.Info().Int("sections", len(migratedSections)).Msg("Removed migrated options from config file")
 		}
 	} else if updateConfig && dryRun {
 		migratedSections := getSuccessfullyMigratedSections(results)
 		if len(migratedSections) > 0 {
-			log.WithField("sections", len(migratedSections)).Info("Would remove migrated options from config file (dry-run)")
+			log.Info().Int("sections", len(migratedSections)).Msg("Would remove migrated options from config file (dry-run)")
 		}
 	}
 

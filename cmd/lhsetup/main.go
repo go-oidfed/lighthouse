@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
@@ -110,11 +110,11 @@ func loadBackends() error {
 		if err := config.Load(configFile); err != nil {
 			return errors.Wrap(err, "failed to load config file")
 		}
-		log.Info("Loaded config file")
+		log.Info().Msg("Loaded config file")
 		c := config.Get()
 		// Parse the same config file with migration types for prepopulation
 		if mc, err := loadMigrationConfig(configFile); err != nil {
-			log.WithError(err).Warn("failed to parse config file for prepopulation")
+			log.Warn().Err(err).Msg("failed to parse config file for prepopulation")
 		} else {
 			migrationCfg = mc
 		}
@@ -166,7 +166,7 @@ func loadBackends() error {
 			backends = b
 		}
 	}
-	log.Info("Connected to database")
+	log.Info().Msg("Connected to database")
 	return nil
 }
 
@@ -174,7 +174,7 @@ func applyDBOverrides(c *config.StorageConf) {
 	if dbType != "" {
 		d, err := storage.ParseDriverType(strings.ToLower(dbType))
 		if err != nil {
-			log.WithError(err).Fatal("invalid --db-type")
+			log.Fatal().Err(err).Msg("invalid --db-type")
 		}
 		c.Driver = d
 	}

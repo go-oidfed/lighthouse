@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // AggregatorStorage is the interface for aggregation storage operations.
@@ -44,11 +44,11 @@ func (a *Aggregator) Run(ctx context.Context) error {
 	}
 	waitDuration := next2AM.Sub(now)
 
-	log.WithFields(log.Fields{
-		"next_run":             next2AM,
-		"detailed_retention":   a.detailedRetention,
-		"aggregated_retention": a.aggregatedRetention,
-	}).Info("stats aggregator started")
+	log.Info().
+		Time("next_run", next2AM).
+		Dur("detailed_retention", a.detailedRetention).
+		Dur("aggregated_retention", a.aggregatedRetention).
+		Msg("stats aggregator started")
 
 	// Wait until first run time
 	select {
@@ -76,7 +76,7 @@ func (a *Aggregator) Run(ctx context.Context) error {
 
 // runAggregation performs the daily aggregation and purge tasks.
 func (a *Aggregator) runAggregation() {
-	log.Info("starting daily stats aggregation")
+	log.Info().Msg("starting daily stats aggregation")
 	start := time.Now()
 
 	// Aggregate yesterday's data
@@ -84,9 +84,9 @@ func (a *Aggregator) runAggregation() {
 	yesterday = time.Date(yesterday.Year(), yesterday.Month(), yesterday.Day(), 0, 0, 0, 0, time.UTC)
 
 	if err := a.storage.AggregateDailyStats(yesterday); err != nil {
-		log.WithError(err).Error("failed to aggregate daily stats")
+		log.Error().Err(err).Msg("failed to aggregate daily stats")
 	} else {
-		log.WithField("date", yesterday.Format("2006-01-02")).Info("daily stats aggregated")
+		log.Info().Str("date", yesterday.Format("2006-01-02")).Msg("daily stats aggregated")
 		a.lastAggregation = yesterday
 	}
 
@@ -94,27 +94,21 @@ func (a *Aggregator) runAggregation() {
 	detailedCutoff := time.Now().UTC().Add(-a.detailedRetention)
 	purged, err := a.storage.PurgeDetailedLogs(detailedCutoff)
 	if err != nil {
-		log.WithError(err).Error("failed to purge detailed logs")
+		log.Error().Err(err).Msg("failed to purge detailed logs")
 	} else if purged > 0 {
-		log.WithFields(log.Fields{
-			"purged": purged,
-			"before": detailedCutoff,
-		}).Info("purged detailed logs")
+		log.Info().Int64("purged", purged).Time("before", detailedCutoff).Msg("purged detailed logs")
 	}
 
 	// Purge old aggregated stats
 	aggregatedCutoff := time.Now().UTC().Add(-a.aggregatedRetention)
 	purged, err = a.storage.PurgeAggregatedStats(aggregatedCutoff)
 	if err != nil {
-		log.WithError(err).Error("failed to purge aggregated stats")
+		log.Error().Err(err).Msg("failed to purge aggregated stats")
 	} else if purged > 0 {
-		log.WithFields(log.Fields{
-			"purged": purged,
-			"before": aggregatedCutoff,
-		}).Info("purged aggregated stats")
+		log.Info().Int64("purged", purged).Time("before", aggregatedCutoff).Msg("purged aggregated stats")
 	}
 
-	log.WithField("duration", time.Since(start)).Info("daily stats aggregation completed")
+	log.Info().Dur("duration", time.Since(start)).Msg("daily stats aggregation completed")
 }
 
 // RunOnce performs a single aggregation for the specified date.

@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	oidfed "github.com/go-oidfed/lib"
 
@@ -371,13 +371,11 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 
 		if err = config.InstanceStore.Create(instance); err != nil {
 			// Log the error but don't fail the request - the trust mark was issued successfully
-			log.WithError(err).WithFields(
-				log.Fields{
-					"jti":             jti,
-					"trust_mark_type": trustMarkType,
-					"subject":         sub,
-				},
-			).Warn("failed to persist issued trust mark instance")
+			log.Warn().Err(err).
+				Str("jti", jti).
+				Str("trust_mark_type", trustMarkType).
+				Str("subject", sub).
+				Msg("failed to persist issued trust mark instance")
 		}
 	}
 

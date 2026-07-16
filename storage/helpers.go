@@ -11,7 +11,7 @@ import (
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -190,7 +190,7 @@ func GetSigningAlg(kvStorage model.KeyValueStore) (jwa.SignatureAlgorithm, error
 		model.KeyValueScopeSigning,
 		model.KeyValueKeyAlg, algs[currentIndex:],
 	); err != nil {
-		log.WithError(err).Error("failed to remove expired signing algorithms")
+		log.Error().Err(err).Msg("failed to remove expired signing algorithms")
 	}
 	return a, nil
 }

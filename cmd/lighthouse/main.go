@@ -7,7 +7,7 @@ import (
 	"github.com/go-oidfed/lib/cache"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	oidfed "github.com/go-oidfed/lib"
 
@@ -26,50 +26,50 @@ func main() {
 	}
 	config.MustLoad(configFile)
 	logger.Init()
-	log.Info("Loaded Config")
+	log.Info().Msg("Loaded Config")
 	c := config.Get()
 
 	if err := initCache(&c.Caching); err != nil {
-		log.WithError(err).Fatal("failed to initialize cache")
+		log.Fatal().Err(err).Msg("failed to initialize cache")
 	}
 
 	backs, err := initStorage(&c.Storage, c.API.Admin.Argon2idParams)
 	if err != nil {
-		log.WithError(err).Fatal("failed to initialize storage")
+		log.Fatal().Err(err).Msg("failed to initialize storage")
 	}
 
 	statsOpts := c.Stats.ToAPIConfig()
 
 	if c.Stats.Enabled {
 		if err = storage.MigrateStatsFromBackends(backs); err != nil {
-			log.WithError(err).Warn("failed to migrate stats tables")
+			log.Warn().Err(err).Msg("failed to migrate stats tables")
 		}
 	}
 
 	lh, err := initLighthouse(&c, backs, statsOpts)
 	if err != nil {
-		log.WithError(err).Fatal("failed to initialize lighthouse")
+		log.Fatal().Err(err).Msg("failed to initialize lighthouse")
 	}
 
 	setupTrustMarkIssuer(lh, c.EntityID, &backs)
 
-	log.Info("Initialized Entity")
+	log.Info().Msg("Initialized Entity")
 
 	// Build the trust anchor repository.
 	// The JWKS refresher is started after the repo is loaded.
 	if err = setupTrustAnchorRepo(lh, &backs); err != nil {
-		log.WithError(err).Fatal("failed to setup trust anchor repository")
+		log.Fatal().Err(err).Msg("failed to setup trust anchor repository")
 	}
 	if err = startTAJWKSRefresher(lh, &backs); err != nil {
-		log.WithError(err).Fatal("failed to start TA JWKS refresher")
+		log.Fatal().Err(err).Msg("failed to start TA JWKS refresher")
 	}
 
 	// Load federation endpoints from the database.
 	if err = lh.LoadEndpointsFromDB(); err != nil {
-		log.WithError(err).Fatal("failed to load endpoints from DB")
+		log.Fatal().Err(err).Msg("failed to load endpoints from DB")
 	}
 
-	log.Info("Added Endpoints")
+	log.Info().Msg("Added Endpoints")
 
 	lh.Start()
 }
@@ -91,7 +91,7 @@ func initCache(caching *config.CachingConf) error {
 		); err != nil {
 			return err
 		}
-		log.Info("Loaded Redis Cache")
+		log.Info().Msg("Loaded Redis Cache")
 	}
 
 	if caching.MaxLifetime.Duration() != 0 {
@@ -160,7 +160,7 @@ func setupTrustMarkIssuer(lh *lighthouse.LightHouse, entityID string, backs *mod
 	if backs.TrustMarkSpecs != nil {
 		dbProvider := lighthouse.NewDBTrustMarkSpecProvider(backs.TrustMarkSpecs)
 		lh.TrustMarkIssuer.SetProvider(dbProvider)
-		log.Info("Configured DB-based TrustMarkSpecProvider")
+		log.Info().Msg("Configured DB-based TrustMarkSpecProvider")
 	}
 }
 
@@ -168,14 +168,14 @@ func setupTrustMarkIssuer(lh *lighthouse.LightHouse, entityID string, backs *mod
 // Called in all processes (read-only cache).
 func setupTrustAnchorRepo(lh *lighthouse.LightHouse, backs *model.Backends) error {
 	if backs.TrustAnchors == nil {
-		log.Warn("Trust anchor storage not available; skipping TA repository setup")
+		log.Warn().Msg("Trust anchor storage not available; skipping TA repository setup")
 		return nil
 	}
 	repo := lighthouse.NewTrustAnchorRepo(backs.TrustAnchors)
 	if err := repo.Load(); err != nil {
 		return errors.Wrap(err, "failed to load trust anchor repository")
 	}
-	log.WithField("count", repo.Count()).Info("Loaded trust anchor repository")
+	log.Info().Int("count", repo.Count()).Msg("Loaded trust anchor repository")
 	lh.SetTrustAnchorRepo(repo)
 	return nil
 }
@@ -184,7 +184,7 @@ func setupTrustAnchorRepo(lh *lighthouse.LightHouse, backs *model.Backends) erro
 func startTAJWKSRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
 	repo := lh.TrustAnchorRepo()
 	if repo == nil || len(repo.AllWithJWKSUpdate()) == 0 {
-		log.Debug("No trust anchors with enable_jwks_update=true; skipping refresher")
+		log.Debug().Msg("No trust anchors with enable_jwks_update=true; skipping refresher")
 		return nil
 	}
 	dbJWKStorage := storage.NewDBJWKStorage(storage.NewTrustAnchorStorage(backs.DB))
@@ -205,7 +205,7 @@ func startJTICleanup(jtiStorage model.JTIStorageBackend, interval time.Duration)
 			select {
 			case <-ticker.C:
 				if err := jtiStorage.Cleanup(); err != nil {
-					log.WithError(err).Warn("JTI cleanup failed")
+					log.Warn().Err(err).Msg("JTI cleanup failed")
 				}
 			case <-done:
 				ticker.Stop()

@@ -14,7 +14,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 
@@ -55,7 +56,7 @@ func pemToDBCmd(args []string) int {
 	}
 
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	if source == "" {
@@ -70,19 +71,17 @@ func pemToDBCmd(args []string) int {
 		return 2
 	}
 
-	log.WithFields(
-		log.Fields{
-			"source": source,
-			"type":   typeID,
-			"db":     dbType,
-			"dsn":    destDSN,
-		},
-	).Info("migrating PEM private keys to database")
+	log.Info().
+		Str("source", source).
+		Str("type", typeID).
+		Str("db", dbType).
+		Str("dsn", destDSN).
+		Msg("migrating PEM private keys to database")
 
 	// Initialize database connection
 	driver, err := storage.ParseDriverType(dbType)
 	if err != nil {
-		log.WithError(err).Error("invalid database type")
+		log.Error().Err(err).Msg("invalid database type")
 		return 1
 	}
 
@@ -93,14 +92,14 @@ func pemToDBCmd(args []string) int {
 	}
 	db, err := storage.Connect(cfg)
 	if err != nil {
-		log.WithError(err).Error("failed to initialize database")
+		log.Error().Err(err).Msg("failed to initialize database")
 		return 1
 	}
 
 	// Initialize DBPEMStorer and ensure table exists
 	pemStorer := storage.NewDBPEMStorer(db, typeID)
 	if err = pemStorer.Load(); err != nil {
-		log.WithError(err).Error("failed to initialize private_keys table")
+		log.Error().Err(err).Msg("failed to initialize private_keys table")
 		return 1
 	}
 
@@ -110,12 +109,12 @@ func pemToDBCmd(args []string) int {
 	// Scan source directory for PEM files
 	pemFiles, err := filepath.Glob(filepath.Join(source, "*.pem"))
 	if err != nil {
-		log.WithError(err).Error("failed to scan source directory")
+		log.Error().Err(err).Msg("failed to scan source directory")
 		return 1
 	}
 
 	if len(pemFiles) == 0 {
-		log.Warn("no PEM files found in source directory")
+		log.Warn().Msg("no PEM files found in source directory")
 	}
 
 	migrated := 0
@@ -125,52 +124,52 @@ func pemToDBCmd(args []string) int {
 
 		pemData, err := os.ReadFile(pemFile)
 		if err != nil {
-			log.WithError(err).WithField("file", pemFile).Warn("failed to read PEM file")
+			log.Warn().Err(err).Str("file", pemFile).Msg("failed to read PEM file")
 			continue
 		}
 
 		if err = pemStorer.WritePEM(kid, pemData); err != nil {
-			log.WithError(err).WithField("kid", kid).Error("failed to write PEM to database")
+			log.Error().Err(err).Str("kid", kid).Msg("failed to write PEM to database")
 			continue
 		}
 
-		log.WithField("kid", kid).Info("migrated private key")
+		log.Info().Str("kid", kid).Msg("migrated private key")
 		migrated++
 	}
 
 	// Migrate KMS state file if it exists
 	stateFile := filepath.Join(source, "kms_state.json")
 	if _, err = os.Stat(stateFile); err == nil {
-		log.Info("migrating KMS state file")
+		log.Info().Msg("migrating KMS state file")
 		stateData, err := os.ReadFile(stateFile)
 		if err != nil {
-			log.WithError(err).Error("failed to read KMS state file")
+			log.Error().Err(err).Msg("failed to read KMS state file")
 			return 1
 		}
 
 		var state kms.ScheduledState
 		if err = json.Unmarshal(stateData, &state); err != nil {
-			log.WithError(err).Error("failed to parse KMS state file")
+			log.Error().Err(err).Msg("failed to parse KMS state file")
 			return 1
 		}
 
 		stateStorer := storage.NewDBStateStorer(kvStorage, typeID)
 		if err = stateStorer.SaveScheduledState(state); err != nil {
-			log.WithError(err).Error("failed to save KMS state to database")
+			log.Error().Err(err).Msg("failed to save KMS state to database")
 			return 1
 		}
 
-		log.Info("migrated KMS state")
+		log.Info().Msg("migrated KMS state")
 	} else if !os.IsNotExist(err) {
-		log.WithError(err).Warn("error checking for KMS state file")
+		log.Warn().Err(err).Msg("error checking for KMS state file")
 	}
 
-	log.Infof("migration completed: %d private keys migrated", migrated)
-	log.Info("\nTo use the database-backed KMS, update your configuration:")
-	log.Info("  signing:")
-	log.Info("    kms: db")
-	log.Info("    pk_backend: db")
-	log.Info("    auto_generate_keys: true")
+	log.Info().Int("migrated", migrated).Msg("migration completed: private keys migrated")
+	log.Info().Msg("\nTo use the database-backed KMS, update your configuration:")
+	log.Info().Msg("  signing:")
+	log.Info().Msg("    kms: db")
+	log.Info().Msg("    pk_backend: db")
+	log.Info().Msg("    auto_generate_keys: true")
 
 	return 0
 }
