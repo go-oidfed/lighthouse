@@ -62,22 +62,19 @@ func NewStorage(config Config) (*Storage, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Configure explicit join table with FK constraints before auto-migrate.
+	// Configure the explicit join table model before auto-migrate so GORM
+	// uses FederationEndpointAuthTA (with its composite primary key) for the
+	// many2many relation. CASCADE FK constraints are declared via the
+	// constraint tag on the AuthTrustAnchors relationship field.
 	if err = db.SetupJoinTable(&model.FederationEndpoint{}, "AuthTrustAnchors", &model.FederationEndpointAuthTA{}); err != nil {
 		return nil, fmt.Errorf("failed to setup join table: %w", err)
 	}
 
-	// Auto migrate the schemas
+	// Auto migrate the schemas. CASCADE foreign keys on the join table are
+	// declared via the constraint tag on the AuthTrustAnchors relationship
+	// field, so GORM creates named constraints during migration.
 	if err = db.AutoMigrate(models...); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
-	}
-
-	// GORM AutoMigrate creates FKs with NO ACTION; recreate them with
-	// ON DELETE CASCADE so hard deletes clean up join rows automatically.
-	// This is idempotent — if the constraints already have CASCADE, the
-	// ALTER TABLE is a no-op or errors silently.
-	if err = ensureJoinTableCascadeConstraints(db); err != nil {
-		log.Warn().Err(err).Msg("failed to set cascade constraints on join table; cleanup will rely on application code")
 	}
 
 	// Fill user hash params with defaults if zero values
@@ -90,75 +87,6 @@ func NewStorage(config Config) (*Storage, error) {
 		db:         db,
 		userParams: params,
 	}, nil
-}
-
-// ensureJoinTableCascadeConstraints recreates the foreign key constraints on
-// the federation_endpoint_auth_trust_anchors join table with ON DELETE CASCADE.
-// GORM's AutoMigrate creates FKs with NO ACTION, so we need to replace them.
-// This is idempotent: if the constraints don't exist yet or already have CASCADE,
-// the errors are ignored.
-func ensureJoinTableCascadeConstraints(db *gorm.DB) error {
-	driver := db.Dialector.Name()
-	table := "federation_endpoint_auth_trust_anchors"
-
-	// SQLite prior to 3.26.0 doesn't support ALTER TABLE DROP CONSTRAINT.
-	// For SQLite, we need PRAGMA foreign_keys=ON and recreate the table.
-	// However, GORM's SQLite driver already handles FK definitions in the DDL
-	// when using the constraint tag. The issue is that AutoMigrate for
-	// many2many doesn't pick up the constraint tag from the join model.
-	// For SQLite, we use a simpler approach: enable foreign_keys pragma and
-	// recreate the table with the correct constraints.
-	switch driver {
-	case "sqlite":
-		// Enable foreign key enforcement.
-		_ = db.Exec("PRAGMA foreign_keys = ON").Error
-		// Recreate the table with CASCADE constraints.
-		// SQLite doesn't support ALTER TABLE ... DROP CONSTRAINT, so we
-		// use the "12-step" approach: rename, create new, copy, drop old.
-		// This is complex; instead we just drop and recreate the table
-		// since it's a join table with no independent data at migration time.
-		// But we only do this if the table exists and has no CASCADE.
-		var hasNoAction bool
-		rows, err := db.Raw("PRAGMA foreign_key_list(" + table + ")").Rows()
-		if err != nil {
-			return nil // table might not exist yet
-		}
-		for rows.Next() {
-			var id, seq int
-			var refTable, from, to, onDelete, onUpdate, match string
-			_ = rows.Scan(&id, &seq, &refTable, &from, &to, &onDelete, &onUpdate, &match)
-			if onDelete == "NO ACTION" {
-				hasNoAction = true
-			}
-		}
-		rows.Close()
-		if !hasNoAction {
-			return nil
-		}
-		// Drop and recreate with CASCADE.
-		_ = db.Exec("DROP TABLE IF EXISTS " + table).Error
-		return db.Exec(`CREATE TABLE ` + table + ` (
-			federation_endpoint_id integer NOT NULL,
-			trust_anchor_id integer NOT NULL,
-			PRIMARY KEY (federation_endpoint_id, trust_anchor_id),
-			FOREIGN KEY (federation_endpoint_id) REFERENCES federation_endpoints(id) ON UPDATE CASCADE ON DELETE CASCADE,
-			FOREIGN KEY (trust_anchor_id) REFERENCES trust_anchors(id) ON UPDATE CASCADE ON DELETE CASCADE
-		)`).Error
-
-	case "postgres":
-		_ = db.Exec("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS fk_federation_endpoint_auth_trust_anchors_federation_endpoint").Error
-		_ = db.Exec("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS fk_federation_endpoint_auth_trust_anchors_trust_anchor").Error
-		_ = db.Exec("ALTER TABLE " + table + " ADD CONSTRAINT fk_federation_endpoint_auth_trust_anchors_federation_endpoint FOREIGN KEY (federation_endpoint_id) REFERENCES federation_endpoints(id) ON UPDATE CASCADE ON DELETE CASCADE").Error
-		return db.Exec("ALTER TABLE " + table + " ADD CONSTRAINT fk_federation_endpoint_auth_trust_anchors_trust_anchor FOREIGN KEY (trust_anchor_id) REFERENCES trust_anchors(id) ON UPDATE CASCADE ON DELETE CASCADE").Error
-
-	case "mysql":
-		_ = db.Exec("ALTER TABLE " + table + " DROP FOREIGN KEY fk_federation_endpoint_auth_trust_anchors_federation_endpoint").Error
-		_ = db.Exec("ALTER TABLE " + table + " DROP FOREIGN KEY fk_federation_endpoint_auth_trust_anchors_trust_anchor").Error
-		_ = db.Exec("ALTER TABLE " + table + " ADD CONSTRAINT fk_federation_endpoint_auth_trust_anchors_federation_endpoint FOREIGN KEY (federation_endpoint_id) REFERENCES federation_endpoints(id) ON UPDATE CASCADE ON DELETE CASCADE").Error
-		return db.Exec("ALTER TABLE " + table + " ADD CONSTRAINT fk_federation_endpoint_auth_trust_anchors_trust_anchor FOREIGN KEY (trust_anchor_id) REFERENCES trust_anchors(id) ON UPDATE CASCADE ON DELETE CASCADE").Error
-	}
-
-	return nil
 }
 
 // MigrateStats migrates the stats-related tables.

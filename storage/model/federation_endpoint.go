@@ -48,12 +48,13 @@ func IsValidFederationEndpointType(t FederationEndpointType) bool {
 }
 
 // FederationEndpointAuthTA is the explicit join table for the many-to-many
-// relation between FederationEndpoint and TrustAnchor. It defines foreign key
-// constraints with ON UPDATE CASCADE and ON DELETE CASCADE so that hard
-// deletes automatically clean up join rows.
+// relation between FederationEndpoint and TrustAnchor. The CASCADE foreign key
+// constraints are declared via the constraint tag on the AuthTrustAnchors
+// relationship field on FederationEndpoint, so that GORM creates named
+// constraints that AutoMigrate can detect on subsequent boots.
 type FederationEndpointAuthTA struct {
-	FederationEndpointID uint `gorm:"primaryKey;foreignKey:FederationEndpointID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	TrustAnchorID        uint `gorm:"primaryKey;foreignKey:TrustAnchorID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	FederationEndpointID uint `gorm:"primaryKey"`
+	TrustAnchorID        uint `gorm:"primaryKey"`
 }
 
 // TableName overrides the default GORM table name to match the many2many tag.
@@ -82,7 +83,7 @@ type FederationEndpoint struct {
 	URL              *string                `gorm:"size:1024" json:"url,omitempty"`
 	AuthEnabled      bool                   `json:"auth_enabled"`
 	Config           string                 `gorm:"type:text" json:"config,omitempty"`
-	AuthTrustAnchors []TrustAnchor          `gorm:"many2many:federation_endpoint_auth_trust_anchors" json:"auth_trust_anchors,omitempty"`
+	AuthTrustAnchors []TrustAnchor          `gorm:"many2many:federation_endpoint_auth_trust_anchors;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"auth_trust_anchors,omitempty"`
 }
 
 // FederationEndpointStore is the storage interface for federation endpoints.
