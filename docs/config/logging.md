@@ -51,7 +51,8 @@ logging, i.e. logging related to what LightHouse does.
             dir: /var/log/lighthouse
             stderr: true
             level: info
-            format: console
+            stderr_format: console
+            dir_format: json
     ```
 
 ### `dir`
@@ -92,18 +93,32 @@ Valid values are:
 - `fatal`
 - `panic`
 
-### `format`
+### `stderr_format`
 <span class="badge badge-purple" title="Value Type">enum</span>
 <span class="badge badge-blue" title="Default Value">console</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
-<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_FORMAT`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_STDERR_FORMAT`</span>
 
-The `format` option selects the output format for internal logs.
+The `stderr_format` option selects the output format for logs written to
+stderr.
 
 Valid values are:
 
 - `console` — human-friendly, colored console output (default)
 - `json` — structured JSON output for machine parsing
+
+### `dir_format`
+<span class="badge badge-purple" title="Value Type">enum</span>
+<span class="badge badge-blue" title="Default Value">json</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_DIR_FORMAT`</span>
+
+The `dir_format` option selects the output format for logs written to file.
+
+Valid values are:
+
+- `json` — structured JSON output for machine parsing (default)
+- `console` — human-friendly console output (without ANSI color codes)
 
 ## `banner`
 <span class="badge badge-purple" title="Value Type">object</span>

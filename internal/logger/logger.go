@@ -69,12 +69,6 @@ func (w *exchangeableWriter) SetOutput(out io.Writer) {
 	w.Writer = out
 }
 
-type nullWriter struct{}
-
-func (nullWriter) Write([]byte) (n int, err error) {
-	return 0, nil
-}
-
 func mustGetLogWriter(logConf config.LoggerConf, logfileName string) io.Writer {
 	var loggers []io.Writer
 	if logConf.StdErr {
@@ -103,6 +97,22 @@ func parseLogLevel() zerolog.Level {
 	return level
 }
 
+// buildLogWriter wraps out with the appropriate zerolog writer for the given
+// format. "json" (or empty) passes raw JSON through; any other value produces
+// a zerolog.ConsoleWriter. noColor disables ANSI color codes (for file output).
+func buildLogWriter(out io.Writer, format string, noColor bool) io.Writer {
+	switch strings.ToLower(format) {
+	case "json", "":
+		return out
+	default: // "console"
+		return zerolog.ConsoleWriter{
+			Out:        out,
+			NoColor:    noColor,
+			TimeFormat: zerolog.TimeFieldFormat,
+		}
+	}
+}
+
 // Init initializes the logger
 func Init() {
 	SetOutput()
@@ -117,24 +127,32 @@ func SetOutput() {
 	logLevel := parseLogLevel()
 	zerolog.SetGlobalLevel(logLevel)
 
-	writer := mustGetLogWriter(config.Get().Logging.Internal.LoggerConf, "lighthouse.log")
+	conf := config.Get().Logging.Internal
 
-	// Build the logger with the configured output format.
-	var logger zerolog.Logger
+	var writers []io.Writer
+	if conf.StdErr {
+		writers = append(writers, buildLogWriter(os.Stderr, conf.StdErrFormat, false))
+	}
+	if conf.Dir != "" {
+		file := mustGetFile(filepath.Join(conf.Dir, "lighthouse.log"))
+		writers = append(writers, buildLogWriter(file, conf.DirFormat, true))
+	}
+
+	var writer io.Writer
+	switch len(writers) {
+	case 0:
+		writer = io.Discard
+	case 1:
+		writer = writers[0]
+	default:
+		writer = io.MultiWriter(writers...)
+	}
+
 	ctx := log.With().Timestamp()
 	if logLevel <= zerolog.DebugLevel {
 		ctx = ctx.Caller()
 	}
-	switch strings.ToLower(config.Get().Logging.Internal.Format) {
-	case "json", "":
-		logger = ctx.Logger().Output(writer)
-	default:
-		logger = ctx.Logger().Output(zerolog.ConsoleWriter{
-			Out:        writer,
-			TimeFormat: zerolog.TimeFieldFormat,
-		})
-	}
-	log.Logger = logger
+	log.Logger = ctx.Logger().Output(writer)
 
 	// Wire the lib's logger to the same output and level.
 	oidfed.SetLogOutput(writer)

@@ -191,7 +191,8 @@ api:
 #   #   level: INFO    # DEBUG, INFO, WARN, ERROR
 #   #   dir: ""        # Directory for log files (empty = no file logging)
 #   #   stderr: false  # Also log to stderr
-#   #   format: console  # console | json
+#   #   stderr_format: console  # console | json (format for stderr output)
+#   #   dir_format: json        # console | json (format for file output)
 #   
 #   # Access logging
 #   # access:

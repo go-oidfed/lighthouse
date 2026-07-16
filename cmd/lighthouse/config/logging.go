@@ -13,7 +13,8 @@ import (
 //   - LH_LOGGING_INTERNAL_DIR: Directory for internal logs
 //   - LH_LOGGING_INTERNAL_STDERR: Log internal to stderr
 //   - LH_LOGGING_INTERNAL_LEVEL: Log level (DEBUG, INFO, WARN, ERROR)
-//   - LH_LOGGING_INTERNAL_FORMAT: Output format (console, json)
+//   - LH_LOGGING_INTERNAL_STDERR_FORMAT: Format for stderr output (console, json)
+//   - LH_LOGGING_INTERNAL_DIR_FORMAT: Format for file output (console, json)
 //   - LH_LOGGING_BANNER_LOGO: Print logo on startup
 //   - LH_LOGGING_BANNER_VERSION: Print version on startup
 //
@@ -29,7 +30,8 @@ import (
 //	    dir: /var/log/lighthouse
 //	    stderr: false
 //	    level: INFO
-//	    format: console
+//	    stderr_format: console
+//	    dir_format: json
 //	  banner:
 //	    logo: true
 //	    version: true
@@ -68,25 +70,32 @@ type bannerConf struct {
 //   - LH_LOGGING_INTERNAL_DIR: Directory for internal logs
 //   - LH_LOGGING_INTERNAL_STDERR: Log to stderr
 //   - LH_LOGGING_INTERNAL_LEVEL: Log level (DEBUG, INFO, WARN, ERROR)
-//   - LH_LOGGING_INTERNAL_FORMAT: Output format (console, json)
+//   - LH_LOGGING_INTERNAL_STDERR_FORMAT: Format for stderr (console, json)
+//   - LH_LOGGING_INTERNAL_DIR_FORMAT: Format for file (console, json)
 type internalLoggerConf struct {
 	LoggerConf `yaml:",inline"`
 	// Level sets the verbosity for internal logs (e.g. DEBUG, INFO).
 	// Env: LH_LOGGING_INTERNAL_LEVEL or LH_LOG_LEVEL (shortcut)
 	Level string `yaml:"level" envconfig:"LEVEL"`
-	// Format selects the output format: "console" (human-friendly) or "json".
-	// Defaults to "console" when empty.
-	// Env: LH_LOGGING_INTERNAL_FORMAT
-	Format string `yaml:"format" envconfig:"FORMAT"`
+	// StdErrFormat selects the output format for stderr: "console"
+	// (human-friendly, colored) or "json" (structured JSON).
+	// Default: "console".
+	// Env: LH_LOGGING_INTERNAL_STDERR_FORMAT
+	StdErrFormat string `yaml:"stderr_format" envconfig:"STDERR_FORMAT"`
+	// DirFormat selects the output format for log files: "console"
+	// (human-friendly, no colors) or "json" (structured JSON).
+	// Default: "json".
+	// Env: LH_LOGGING_INTERNAL_DIR_FORMAT
+	DirFormat string `yaml:"dir_format" envconfig:"DIR_FORMAT"`
 }
 
 // LoggerConf holds configuration related to logging.
 type LoggerConf struct {
 	// Dir is the directory for log files.
-	// Env: LH_LOGGING_INTERNAL_DIR
+	// Env: LH_LOGGING_INTERNAL_DIR or LH_LOGGING_ACCESS_DIR
 	Dir string `yaml:"dir" envconfig:"DIR"`
 	// StdErr enables logging to stderr.
-	// Env: LH_LOGGING_INTERNAL_STDERR
+	// Env: LH_LOGGING_INTERNAL_STDERR or LH_LOGGING_ACCESS_STDERR
 	StdErr bool `yaml:"stderr" envconfig:"STDERR"`
 }
 
@@ -113,7 +122,8 @@ var defaultLoggingConf = loggingConf{
 		Version: true,
 	},
 	Internal: internalLoggerConf{
-		Level:  "INFO",
-		Format: "console",
+		Level:        "INFO",
+		StdErrFormat: "console",
+		DirFormat:    "json",
 	},
 }
