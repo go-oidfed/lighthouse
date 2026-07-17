@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 	"gorm.io/gorm"
 )
 

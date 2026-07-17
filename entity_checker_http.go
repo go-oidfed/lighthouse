@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
@@ -262,7 +262,8 @@ func (c *HTTPListJWTEntityChecker) fetchAndVerifyList() ([]string, error) {
 	}
 
 	var rawList any
-	if err := token.Get(listClaim, &rawList); err != nil {
+	rawList, err = jwt.Get[any](token, listClaim)
+	if err != nil {
 		return nil, errors.Errorf("claim '%s' not found in JWT", listClaim)
 	}
 

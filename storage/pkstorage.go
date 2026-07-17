@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/unixtime"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 )
@@ -121,8 +122,7 @@ func (D *DBPublicKeyStorage) GetValid() (out public.PublicKeyEntryList, err erro
 func (D *DBPublicKeyStorage) Add(entry public.PublicKeyEntry) error {
 	// Ensure KID is set
 	if entry.KID == "" && entry.Key.Key != nil {
-		var kid string
-		_ = entry.Key.Get("kid", &kid)
+		kid, _ := jwk.Get[string](entry.Key.Key, "kid")
 		entry.KID = kid
 	}
 	if entry.KID == "" {
@@ -253,8 +253,7 @@ func NewDBPublicKeyStorageFromStorage(
 	}
 	for _, e := range list {
 		if e.KID == "" && e.Key.Key != nil {
-			var kid string
-			_ = e.Key.Get("kid", &kid)
+			kid, _ := jwk.Get[string](e.Key.Key, "kid")
 			e.KID = kid
 		}
 		if e.KID == "" || e.Key.Key == nil {

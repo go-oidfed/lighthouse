@@ -5,7 +5,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -206,9 +206,9 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 		return "", nil, ErrInvalidGrant("client assertion has expired")
 	}
 
-	// Get jti from token claims using the proper jwx v3 API
-	var jti string
-	if err := token.Get("jti", &jti); err != nil || jti == "" {
+	// Get jti from token claims using the proper jwx v4 API
+	jti, err := jwt.Get[string](token, "jti")
+	if err != nil || jti == "" {
 		return "", nil, ErrInvalidRequest("missing or invalid 'jti' claim in client assertion")
 	}
 

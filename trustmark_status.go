@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/pkg/errors"
 
 	oidfed "github.com/go-oidfed/lib"

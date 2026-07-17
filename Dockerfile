@@ -1,9 +1,11 @@
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.26-bookworm AS builder
 WORKDIR /app
 
 
 COPY ./ ./
 RUN go mod download
+
+ENV GOEXPERIMENT=jsonv2
 
 RUN CGO_ENABLED=1 go build -o /lighthouse github.com/go-oidfed/lighthouse/cmd/lighthouse
 RUN go build -o /lhcli github.com/go-oidfed/lighthouse/cmd/lhcli
