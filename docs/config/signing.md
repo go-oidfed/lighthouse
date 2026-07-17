@@ -248,10 +248,33 @@ The signing algorithm to use.
 
 Supported values:
 
-- `ES256`, `ES384`, `ES512` (ECDSA)
-- `EdDSA` (Ed25519)
-- `RS256`, `RS384`, `RS512` (RSA PKCS#1)
-- `PS256`, `PS384`, `PS512` (RSA PSS)
+**ECDSA**
+
+- `ES256`, `ES384`, `ES512`
+
+**EdDSA (RFC 9864)**
+
+- `Ed25519` (curve-specific, recommended)
+- `Ed448`
+- `EdDSA` (deprecated polymorphic form; resolves to Ed25519 — prefer `Ed25519`)
+
+**secp256k1**
+
+- `ES256K`
+
+**RSA**
+
+- `RS256`, `RS384`, `RS512` (RSASSA-PKCS1-v1.5)
+- `PS256`, `PS384`, `PS512` (RSASSA-PSS)
+
+**ML-DSA (FIPS 204, post-quantum)**
+
+- `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87`
+
+**Composite (PQC-hybrid) signatures**
+
+- `ML-DSA-44-ES256`, `ML-DSA-65-ES256`, `ML-DSA-87-ES384` (ML-DSA + ECDSA)
+- `ML-DSA-44-Ed25519`, `ML-DSA-65-Ed25519`, `ML-DSA-87-Ed448` (ML-DSA + EdDSA)
 
 !!! warning "Deprecated - Database-managed"
     

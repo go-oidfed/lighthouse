@@ -154,17 +154,29 @@ New lifetime (e.g. 24h, 30m, 600s) [24h0m0s]: 48h
   Current: ES512
 Change? [y/n]: y
 Select signing algorithm:
-  1. ES512
+  1. ES512 (current)
   2. ES256
   3. ES384
-  4. EdDSA
-  5. PS512
-  6. PS256
-  7. PS384
-  8. RS512
-  9. RS384
-  10. RS256
-Select [1-10] (Enter to keep current): 5
+  4. ES256K
+  5. EdDSA
+  6. Ed25519
+  7. Ed448
+  8. PS512
+  9. PS256
+  10. PS384
+  11. RS512
+  12. RS384
+  13. RS256
+  14. ML-DSA-44
+  15. ML-DSA-65
+  16. ML-DSA-87
+  17. ML-DSA-44-ES256
+  18. ML-DSA-65-ES256
+  19. ML-DSA-87-ES384
+  20. ML-DSA-44-Ed25519
+  21. ML-DSA-65-Ed25519
+  22. ML-DSA-87-Ed448
+Select [1-22] (Enter to keep current): 8
   Set to PS512
 
 ========================================

@@ -73,6 +73,7 @@ icon: material/map-check
 ## Signing
 
 - [X] Support of various signing algorithms
+  - [X] Post-quantum (ML-DSA) and PQC-hybrid composite algorithms (see [Signing Config](../config/signing.md#alg))
 - [X] Support for Automatic Key Rotation
 - [X] Support for pkcs11
 - [X] Support for publishing "external" keys

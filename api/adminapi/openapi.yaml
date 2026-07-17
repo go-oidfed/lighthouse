@@ -4580,18 +4580,28 @@ components:
     SignatureAlgorithm:
       description: The signature algorithm to use in JOSE/JWA format
       enum:
-        - HS256
-        - HS384
-        - HS512
-        - RS256
-        - RS384
-        - RS512
+        - ES512
         - ES256
         - ES384
-        - ES512
+        - ES256K
+        - EdDSA
+        - Ed25519
+        - Ed448
+        - PS512
         - PS256
         - PS384
-        - PS512
+        - RS512
+        - RS384
+        - RS256
+        - ML-DSA-44
+        - ML-DSA-65
+        - ML-DSA-87
+        - ML-DSA-44-ES256
+        - ML-DSA-65-ES256
+        - ML-DSA-87-ES384
+        - ML-DSA-44-Ed25519
+        - ML-DSA-65-Ed25519
+        - ML-DSA-87-Ed448
       type: string
       example: ES512
     
