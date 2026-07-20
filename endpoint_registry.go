@@ -115,7 +115,10 @@ func (r *EndpointRegistry) count() int {
 func (r *EndpointRegistry) registerLegacy(ep *registeredEndpoint, expiresAt time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.legacy[ep.Path] = &legacyEntry{ep: ep, expiresAt: expiresAt}
+	r.legacy[ep.Path] = &legacyEntry{
+		ep:        ep,
+		expiresAt: expiresAt,
+	}
 }
 
 // lookupLegacy returns the registered endpoint for a legacy path, or nil if
@@ -313,13 +316,15 @@ func (fed *LightHouse) registerEndpoint(
 	if fed.endpointRegistry == nil {
 		fed.endpointRegistry = NewEndpointRegistry()
 	}
-	fed.endpointRegistry.register(&registeredEndpoint{
-		Type:    t,
-		Path:    path,
-		Method:  method,
-		Handler: handler,
-		Auth:    auth,
-	})
+	fed.endpointRegistry.register(
+		&registeredEndpoint{
+			Type:    t,
+			Path:    path,
+			Method:  method,
+			Handler: handler,
+			Auth:    auth,
+		},
+	)
 }
 
 // unregisterEndpoint removes an endpoint from the registry by type.
@@ -462,9 +467,11 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 		return fed.AddResolveEndpoint(endpointConf, allowedTAs, proactiveResolver)
 
 	case model.EndpointTypeTrustMarkStatus:
-		return fed.AddTrustMarkStatusEndpoint(endpointConf, TrustMarkStatusConfig{
-			InstanceStore: fed.storages.TrustMarkInstances,
-		})
+		return fed.AddTrustMarkStatusEndpoint(
+			endpointConf, TrustMarkStatusConfig{
+				InstanceStore: fed.storages.TrustMarkInstances,
+			},
+		)
 
 	case model.EndpointTypeTrustMarkListing:
 		return fed.AddTrustMarkedEntitiesListingEndpoint(endpointConf, fed.storages.TrustMarkInstances)
@@ -476,13 +483,15 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 		issuedTrustMarkCache := NewIssuedTrustMarkCache()
 		stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
 		_ = stopIssuedCacheCleanup // TODO: manage lifecycle
-		return fed.AddTrustMarkEndpointWithConfig(endpointConf, TrustMarkEndpointConfig{
-			Store:                fed.storages.TrustMarks,
-			SpecStore:            fed.storages.TrustMarkSpecs,
-			InstanceStore:        fed.storages.TrustMarkInstances,
-			Cache:                eligibilityCache,
-			IssuedTrustMarkCache: issuedTrustMarkCache,
-		})
+		return fed.AddTrustMarkEndpointWithConfig(
+			endpointConf, TrustMarkEndpointConfig{
+				Store:                fed.storages.TrustMarks,
+				SpecStore:            fed.storages.TrustMarkSpecs,
+				InstanceStore:        fed.storages.TrustMarkInstances,
+				Cache:                eligibilityCache,
+				IssuedTrustMarkCache: issuedTrustMarkCache,
+			},
+		)
 
 	case model.EndpointTypeTrustMarkRequest:
 		return fed.AddTrustMarkRequestEndpoint(endpointConf, fed.storages.TrustMarks)
@@ -535,6 +544,12 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 		return fed.AddEntityCollectionEndpoint(
 			endpointConf, collector, cfg.AllowedTrustAnchors, cfg.PaginationLimit > 0,
 		)
+
+	case model.EndpointTypeJwksUpdateTrigger:
+		return fed.AddJWKSUpdateTriggerEndpoint(endpointConf, fed.storages.Subordinates)
+
+	case model.EndpointTypeJwksUpdate:
+		return fed.AddJWKSUpdateEndpoint(endpointConf, fed.storages.Subordinates)
 
 	default:
 		return fmt.Errorf("unknown endpoint type: %s", ep.Type)

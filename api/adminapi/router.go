@@ -143,7 +143,7 @@ func Register(
 	}
 	registerEntityTrustMarks(r, storages.PublishedTrustMarks, trustMarkInvalidator)
 	// Subordinates - all handlers registered via single entry point (with transaction support)
-	RegisterSubordinateHandlers(r, storages, fedEntity)
+	RegisterSubordinateHandlers(r, storages, fedEntity, ctrl)
 	// Trust Mark Types and Issuance (with transaction support)
 	registerTrustMarkTypes(r, storages)
 	// Global Owners and Issuers

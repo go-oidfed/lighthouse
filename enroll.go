@@ -111,6 +111,7 @@ func (fed *LightHouse) AddEnrollEndpoint(
 			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 		}
+		fed.notifySubordinateJWKSRefresher(entityConfig.Subject)
 		// This is not necessarily needed, but we return a fetch response
 		payload := fed.CreateSubordinateStatement(&info)
 		jwt, err := fed.SignEntityStatement(payload)

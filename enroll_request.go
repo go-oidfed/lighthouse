@@ -86,6 +86,7 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 		}
+		fed.notifySubordinateJWKSRefresher(entityConfig.Subject)
 		ctx.Status(fiber.StatusAccepted)
 		return nil
 	}

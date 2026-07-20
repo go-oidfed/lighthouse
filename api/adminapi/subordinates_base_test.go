@@ -87,7 +87,7 @@ func setupSubordinateBaseApp(t *testing.T) (*fiber.App, testBackends) {
 
 	// Create a dummy fedEntity if needed, for statement previews.
 	// We pass nil for base handlers since they don't strictly use it.
-	registerSubordinatesBase(app, backends)
+	registerSubordinatesBase(app, backends, nil)
 
 	return app, testBackends{
 		Backends: backends,

@@ -7,17 +7,19 @@ import "gorm.io/gorm"
 type FederationEndpointType string
 
 const (
-	EndpointTypeFetch            FederationEndpointType = "fetch"
-	EndpointTypeList             FederationEndpointType = "list"
-	EndpointTypeResolve          FederationEndpointType = "resolve"
-	EndpointTypeTrustMark        FederationEndpointType = "trust_mark"
-	EndpointTypeTrustMarkStatus  FederationEndpointType = "trust_mark_status"
-	EndpointTypeTrustMarkListing FederationEndpointType = "trust_mark_listing"
-	EndpointTypeHistoricalKeys   FederationEndpointType = "historical_keys"
-	EndpointTypeEnroll           FederationEndpointType = "enroll"
-	EndpointTypeEnrollRequest    FederationEndpointType = "enroll_request"
-	EndpointTypeTrustMarkRequest FederationEndpointType = "trust_mark_request"
-	EndpointTypeEntityCollection FederationEndpointType = "entity_collection"
+	EndpointTypeFetch             FederationEndpointType = "fetch"
+	EndpointTypeList              FederationEndpointType = "list"
+	EndpointTypeResolve           FederationEndpointType = "resolve"
+	EndpointTypeTrustMark         FederationEndpointType = "trust_mark"
+	EndpointTypeTrustMarkStatus   FederationEndpointType = "trust_mark_status"
+	EndpointTypeTrustMarkListing  FederationEndpointType = "trust_mark_listing"
+	EndpointTypeHistoricalKeys    FederationEndpointType = "historical_keys"
+	EndpointTypeEnroll            FederationEndpointType = "enroll"
+	EndpointTypeEnrollRequest     FederationEndpointType = "enroll_request"
+	EndpointTypeTrustMarkRequest  FederationEndpointType = "trust_mark_request"
+	EndpointTypeEntityCollection  FederationEndpointType = "entity_collection"
+	EndpointTypeJwksUpdateTrigger FederationEndpointType = "jwks_update_trigger"
+	EndpointTypeJwksUpdate        FederationEndpointType = "jwks_update"
 )
 
 // AllFederationEndpointTypes returns all valid endpoint types.
@@ -34,6 +36,8 @@ func AllFederationEndpointTypes() []FederationEndpointType {
 		EndpointTypeEnrollRequest,
 		EndpointTypeTrustMarkRequest,
 		EndpointTypeEntityCollection,
+		EndpointTypeJwksUpdateTrigger,
+		EndpointTypeJwksUpdate,
 	}
 }
 

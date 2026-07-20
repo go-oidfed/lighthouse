@@ -2,6 +2,7 @@ arrange:
   - index.md
   - endpoints.md
   - trust_anchors.md
+  - subordinate_jwks_refresh.md
   - admin_api.md
   - entity_checks.md
   - trustmarks.md

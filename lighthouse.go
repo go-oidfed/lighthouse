@@ -100,21 +100,22 @@ type LightHouse struct {
 	oidfed.FederationEntity
 	*oidfed.TrustMarkIssuer
 	*jwx.GeneralJWTSigner
-	server                  *fiber.App
-	adminAPIServer          *fiber.App
-	serverConf              ServerConf
-	fedMetadata             oidfed.FederationEntityMetadata
-	keyManagement           adminapi.KeyManagement
-	LogoBanner              bool
-	VersionBanner           bool
-	storages                model.Backends
-	statsCollector          *stats.Collector
-	trustMarkConfigProvider *storage.TrustMarkConfigProvider
-	trustAnchorRepo         *TrustAnchorRepo
-	taJWKSRefresher         *oidfed.TAJWKSRefresher
-	endpointRegistry        *EndpointRegistry
-	backgroundStops         []func()
-	jtiCleanupStop          func()
+	server                   *fiber.App
+	adminAPIServer           *fiber.App
+	serverConf               ServerConf
+	fedMetadata              oidfed.FederationEntityMetadata
+	keyManagement            adminapi.KeyManagement
+	LogoBanner               bool
+	VersionBanner            bool
+	storages                 model.Backends
+	statsCollector           *stats.Collector
+	trustMarkConfigProvider  *storage.TrustMarkConfigProvider
+	trustAnchorRepo          *TrustAnchorRepo
+	taJWKSRefresher          *oidfed.TAJWKSRefresher
+	subordinateJWKSRefresher *oidfed.SubordinateJWKSRefresher
+	endpointRegistry         *EndpointRegistry
+	backgroundStops          []func()
+	jtiCleanupStop           func()
 }
 
 // FiberServerConfig is the fiber.Config that is used to init the http fiber.App
@@ -488,6 +489,17 @@ func (fed *LightHouse) SetTAJWKSRefresher(r *oidfed.TAJWKSRefresher) {
 	fed.taJWKSRefresher = r
 }
 
+// SubordinateJWKSRefresher returns the subordinate JWKS refresher, or nil if
+// not initialized.
+func (fed *LightHouse) SubordinateJWKSRefresher() *oidfed.SubordinateJWKSRefresher {
+	return fed.subordinateJWKSRefresher
+}
+
+// SetSubordinateJWKSRefresher sets the subordinate JWKS refresher.
+func (fed *LightHouse) SetSubordinateJWKSRefresher(r *oidfed.SubordinateJWKSRefresher) {
+	fed.subordinateJWKSRefresher = r
+}
+
 // SyncTrustAnchor reloads a TA from the database and updates the in-memory
 // repository. Called by the admin API after a DB mutation on a trust anchor.
 func (fed *LightHouse) SyncTrustAnchor(entityID string) {
@@ -610,6 +622,11 @@ func (fed *LightHouse) Stop() error {
 	// Stop TA JWKS refresher if running
 	if fed.taJWKSRefresher != nil {
 		fed.taJWKSRefresher.Stop()
+	}
+
+	// Stop subordinate JWKS refresher if running
+	if fed.subordinateJWKSRefresher != nil {
+		fed.subordinateJWKSRefresher.Stop()
 	}
 
 	// Stop JTI cleanup if running

@@ -11,20 +11,22 @@ LightHouse.
 
 ## Available Endpoints
 
-| Endpoint                      | Type                  | Description |
-|-------------------------------|-----------------------|-------------|
-| Federation Config             | n/a                   | Always enabled. The federation endpoint where the entity configuration is published. |
-| Fetch                         | `fetch`               | Federation Subordinate Fetch Endpoint per Spec Section 8.1 |
-| Subordinate Listing           | `list`                | Federation Subordinate Listing Endpoint per Spec Section 8.2 |
-| Resolve                       | `resolve`             | Resolve Endpoint per Spec Section 8.3 |
-| Trust Mark Status             | `trust_mark_status`   | Trust Mark Status Endpoint per Spec Section 8.4 |
-| Trust Marked Entities Listing | `trust_mark_listing`  | Trust Marked Entities Listing Endpoint per Spec Section 8.5 |
-| Trust Mark                    | `trust_mark`          | Trust Mark Endpoint per Spec Section 8.6 |
-| Federation Historical Keys    | `historical_keys`     | Historical Keys Endpoint per Spec Section 8.7; only usable with automatic key rollover |
-| Enrollment                    | `enroll`              | An endpoint where entities can automatically enroll into the federation. For details see [Enrolling Entities](#enrolling-entities) |
-| Request Enrollment            | `enroll_request`      | An endpoint where entities can request enrollment into the federation. An federation administrator then can check and approve the request. |
-| Trust Mark Request            | `trust_mark_request`  | An endpoint where entities can request to be entitled for a trust mark. A federation administrator then can check and approve the request. |
+| Endpoint                      | Type                  | Description                                                                                                                                                                                        |
+|-------------------------------|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Federation Config             | n/a                   | Always enabled. The federation endpoint where the entity configuration is published.                                                                                                               |
+| Fetch                         | `fetch`               | Federation Subordinate Fetch Endpoint per Spec Section 8.1                                                                                                                                         |
+| Subordinate Listing           | `list`                | Federation Subordinate Listing Endpoint per Spec Section 8.2                                                                                                                                       |
+| Resolve                       | `resolve`             | Resolve Endpoint per Spec Section 8.3                                                                                                                                                              |
+| Trust Mark Status             | `trust_mark_status`   | Trust Mark Status Endpoint per Spec Section 8.4                                                                                                                                                    |
+| Trust Marked Entities Listing | `trust_mark_listing`  | Trust Marked Entities Listing Endpoint per Spec Section 8.5                                                                                                                                        |
+| Trust Mark                    | `trust_mark`          | Trust Mark Endpoint per Spec Section 8.6                                                                                                                                                           |
+| Federation Historical Keys    | `historical_keys`     | Historical Keys Endpoint per Spec Section 8.7; only usable with automatic key rollover                                                                                                             |
+| Enrollment                    | `enroll`              | An endpoint where entities can automatically enroll into the federation. For details see [Enrolling Entities](#enrolling-entities)                                                                 |
+| Request Enrollment            | `enroll_request`      | An endpoint where entities can request enrollment into the federation. An federation administrator then can check and approve the request.                                                         |
+| Trust Mark Request            | `trust_mark_request`  | An endpoint where entities can request to be entitled for a trust mark. A federation administrator then can check and approve the request.                                                         |
 | Entity Collection             | `entity_collection`   | An endpoint to query a filterable list of all entities in a federation. Per [Entity Collection Endpoint Extension Draft](https://zachmann.github.io/openid-federation-entity-collection/main.html) |
+| JWKS Update Trigger           | `jwks_update_trigger` | POST trigger for a subordinate to request LightHouse re-fetches its JWKS from its Entity Configuration. See [Subordinate JWKS Refreshing](subordinate_jwks_refresh.md)                             |
+| JWKS Update                   | `jwks_update`         | POST endpoint accepting a signed JWK Set (`application/jwk-set+jwt`) from the subordinate with its new federation keys. See [Subordinate JWKS Refreshing](subordinate_jwks_refresh.md)             |
 
 ## Managing Endpoints
 

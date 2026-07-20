@@ -14,7 +14,8 @@ import (
 
 // subordinatesBaseHandlers groups handlers for basic subordinate CRUD operations.
 type subordinatesBaseHandlers struct {
-	storages model.Backends
+	storages   model.Backends
+	controller LighthouseController
 }
 
 type listSubordinatesRequest struct {
@@ -72,9 +73,11 @@ func (h *subordinatesBaseHandlers) create(c *fiber.Ctx) error {
 	}
 	record := model.ExtendedSubordinateInfo{
 		BasicSubordinateInfo: model.BasicSubordinateInfo{
-			EntityID:    req.EntityID,
-			Status:      req.Status,
-			Description: req.Description,
+			EntityID:         req.EntityID,
+			Status:           req.Status,
+			Description:      req.Description,
+			EnableJWKSUpdate: req.EnableJWKSUpdate,
+			JWKSPollInterval: req.JWKSPollInterval,
 		},
 	}
 	if req.RegisteredEntityTypes != nil {
@@ -117,6 +120,7 @@ func (h *subordinatesBaseHandlers) create(c *fiber.Ctx) error {
 		}
 		return writeServerError(c, err)
 	}
+	h.notifySubordinateJWKSRefresher(req.EntityID)
 	return c.Status(fiber.StatusCreated).JSON(stored)
 }
 
@@ -157,6 +161,12 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 			}
 			existing.SubordinateEntityTypes = subordinateEntityTypes
 		}
+		if body.EnableJWKSUpdate != nil {
+			existing.EnableJWKSUpdate = *body.EnableJWKSUpdate
+		}
+		if body.JWKSPollInterval != nil {
+			existing.JWKSPollInterval = body.JWKSPollInterval
+		}
 		if err = tx.Subordinates.Update(existing.EntityID, *existing); err != nil {
 			return err
 		}
@@ -174,17 +184,20 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 		}
 		return writeServerError(c, err)
 	}
+	h.notifySubordinateJWKSRefresher(result.EntityID)
 	return c.JSON(result)
 }
 
 func (h *subordinatesBaseHandlers) delete(c *fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
+	var entityID string
 	err := h.storages.InTransaction(func(tx *model.Backends) error {
 		existing, err := getSubordinateByDBID(tx.Subordinates, id)
 		if err != nil {
 			return err
 		}
+		entityID = existing.EntityID
 		if err := tx.SubordinateEvents.DeleteBySubordinateID(existing.ID); err != nil {
 			return err
 		}
@@ -197,6 +210,11 @@ func (h *subordinatesBaseHandlers) delete(c *fiber.Ctx) error {
 			return writeNotFound(c, err.Error())
 		}
 		return writeServerError(c, err)
+	}
+	if entityID != "" && h.controller != nil {
+		if r := h.controller.SubordinateJWKSRefresher(); r != nil {
+			r.Remove(entityID)
+		}
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
@@ -260,6 +278,7 @@ func (h *subordinatesBaseHandlers) updateStatus(c *fiber.Ctx) error {
 		}
 		return writeServerError(c, err)
 	}
+	h.notifySubordinateJWKSRefresher(result.EntityID)
 	return c.JSON(result)
 }
 
@@ -379,12 +398,29 @@ func (*historyHandlers) normalizeLimit(limit int) int {
 	return limit
 }
 
+// notifySubordinateJWKSRefresher tells the subordinate JWKS refresher to
+// reconcile its polling set for the given entity. It is a no-op if the
+// refresher is not running.
+func (h *subordinatesBaseHandlers) notifySubordinateJWKSRefresher(entityID string) {
+	if h.controller == nil {
+		return
+	}
+	r := h.controller.SubordinateJWKSRefresher()
+	if r == nil {
+		return
+	}
+	if err := r.Update(entityID); err != nil {
+		// Log only; refresher failures must not fail the admin request.
+		_ = err
+	}
+}
+
 // registerSubordinatesBase registers basic CRUD endpoints for subordinates.
-func registerSubordinatesBase(r fiber.Router, storages model.Backends) {
+func registerSubordinatesBase(r fiber.Router, storages model.Backends, ctrl LighthouseController) {
 	g := r.Group("/subordinates")
 	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
 
-	baseH := &subordinatesBaseHandlers{storages: storages}
+	baseH := &subordinatesBaseHandlers{storages: storages, controller: ctrl}
 	historyH := &historyHandlers{
 		subordinates: storages.Subordinates,
 		events:       storages.SubordinateEvents,

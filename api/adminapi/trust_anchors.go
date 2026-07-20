@@ -18,6 +18,8 @@ import (
 type LighthouseController interface {
 	// TAJWKSRefresher returns the TA JWKS refresher (may be nil).
 	TAJWKSRefresher() *oidfed.TAJWKSRefresher
+	// SubordinateJWKSRefresher returns the subordinate JWKS refresher (may be nil).
+	SubordinateJWKSRefresher() *oidfed.SubordinateJWKSRefresher
 	// SyncTrustAnchor reloads a TA from the database and updates the in-memory
 	// repository. Called after a DB mutation on a trust anchor.
 	SyncTrustAnchor(entityID string)

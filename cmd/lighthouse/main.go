@@ -69,6 +69,10 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to load endpoints from DB")
 	}
 
+	if err = startSubordinateJWKSRefresher(lh, &backs); err != nil {
+		log.Fatal().Err(err).Msg("failed to start subordinate JWKS refresher")
+	}
+
 	log.Info().Msg("Added Endpoints")
 
 	lh.Start()
@@ -194,6 +198,22 @@ func startTAJWKSRefresher(lh *lighthouse.LightHouse, backs *model.Backends) erro
 		return errors.Wrap(err, "failed to start TA JWKS refresher")
 	}
 	lh.SetTAJWKSRefresher(refresher)
+	return nil
+}
+
+// startSubordinateJWKSRefresher starts the subordinate JWKS refresher if
+// subordinate storage is available and any subordinates have
+// enable_jwks_update=true.
+func startSubordinateJWKSRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
+	if backs.Subordinates == nil {
+		log.Debug().Msg("Subordinate storage not available; skipping subordinate JWKS refresher")
+		return nil
+	}
+	refresher, err := lighthouse.SetupSubordinateJWKSRefresher(backs.Subordinates, backs.SubordinateEvents)
+	if err != nil {
+		return errors.Wrap(err, "failed to start subordinate JWKS refresher")
+	}
+	lh.SetSubordinateJWKSRefresher(refresher)
 	return nil
 }
 

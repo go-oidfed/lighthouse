@@ -18,6 +18,8 @@ icon: material/map-check
 - [X] Endpoint to request enrollment
 - [X] Endpoint to request to be entitled for a trust mark
 - [X] Entity Collection Endpoint
+- [X] JWKS Update Trigger Endpoint
+- [X] JWKS Update Endpoint
 
 ## Entity Configuration
 
@@ -46,7 +48,10 @@ icon: material/map-check
 - [X] Support for individual Metadata Policies per Subordinate
 - [X] Support for individual Constraints per Subordinate
 - [X] Support for individual Metadata overwrite per Subordinate
-- [ ] Automatic updates of Subordinate JWKS (for key rotation)
+- [X] Automatic updates of Subordinate JWKS (for key rotation)
+  - [X] Periodic refreshing
+  - [X] JWKS Update Trigger endpoint
+  - [X] JWKS Update endpoint with signed JWK Set
 
 ## Trust Marks
 ### Trust Mark Issuance

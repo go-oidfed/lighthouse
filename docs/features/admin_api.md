@@ -64,6 +64,7 @@ Full lifecycle management of subordinate entities in your federation.
 - **Registration** - Add new subordinate entities
 - **Status Management** - Approve, suspend, or remove subordinates
 - **JWKS** - Manage subordinate signing keys
+- **JWKS Refreshing** - Enable periodic JWKS refresh per subordinate (`enable_jwks_update`, `jwks_poll_interval`); see [Subordinate JWKS Refreshing](subordinate_jwks_refresh.md)
 - **Metadata** - Configure subordinate-specific metadata
 - **Metadata Policies** - Define policies that apply to subordinate metadata
 - **Constraints** - Set constraints on subordinate trust chains

@@ -386,6 +386,29 @@ func (s *SubordinateStorage) GetAll() ([]model.BasicSubordinateInfo, error) {
 	return basics, nil
 }
 
+// ListEnabledForJWKSRefresh returns all subordinates with EnableJWKSUpdate=true,
+// with their JWKS preloaded. Used by the subordinate JWKS refresher.
+func (s *SubordinateStorage) ListEnabledForJWKSRefresh() ([]model.ExtendedSubordinateInfo, error) {
+	var infos []model.ExtendedSubordinateInfo
+	if err := s.db.Where(
+		"enable_jwks_update = ?", true,
+	).Preload("SubordinateEntityTypes").Preload("JWKS").Find(&infos).Error; err != nil {
+		return nil, errors.Wrap(err, "failed to list subordinates with jwks refresh enabled")
+	}
+	return infos, nil
+}
+
+// UpdateJWKSByEntityID updates the JWKS for a subordinate by entity ID. If the
+// subordinate has no JWKS yet, one is created and linked.
+func (s *SubordinateStorage) UpdateJWKSByEntityID(entityID string, jwks model.JWKS) error {
+	var info model.ExtendedSubordinateInfo
+	if err := s.db.Where("entity_id = ?", entityID).Preload("JWKS").First(&info).Error; err != nil {
+		return errors.Wrap(err, "failed to find subordinate by entity_id")
+	}
+	_, err := s.UpdateJWKSByDBID(fmt.Sprintf("%d", info.ID), jwks)
+	return err
+}
+
 // GetByStatus returns all subordinates with a specific status
 func (s *SubordinateStorage) GetByStatus(status model.Status) ([]model.BasicSubordinateInfo, error) {
 	var infos []model.ExtendedSubordinateInfo

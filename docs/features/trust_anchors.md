@@ -97,3 +97,10 @@ entity ID.
 If a poll fails (network error, signature verification failure, etc.),
 LightHouse retries with exponential backoff (starting at 1 second, capped at 5
 minutes). The backoff resets to 1 second on the next successful poll.
+
+## See Also
+
+Subordinate JWKS can be refreshed similarly; see
+[Subordinate JWKS Refreshing](subordinate_jwks_refresh.md) for the three
+supported approaches (periodic polling, trigger endpoint, and signed JWK Set
+update endpoint).
