@@ -758,6 +758,112 @@ func TestIssue85_ReRegisterAfterDelete(t *testing.T) {
 	)
 }
 
+// TestIssue103_UpdateReactivatesSoftDeleted verifies that Update (the path used by
+// the enroll_request endpoint) reactivates a soft-deleted subordinate instead of
+// leaving it soft-deleted. See issue #103.
+func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
+	t.Parallel()
+	_, backends := setupSubordinateBaseApp(t)
+
+	entityID := "https://re-enroll.example.org"
+
+	origSet := jwk.NewSet()
+	origSet.AddKey(createTestKey("original-key"))
+	origInfo := model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+			SubordinateEntityTypes: []model.SubordinateEntityType{
+				{EntityType: "openid_provider"},
+			},
+		},
+		JWKS: model.JWKS{Keys: jwx.JWKS{Set: origSet}},
+	}
+	if err := backends.Subordinates.Add(origInfo); err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+	saved, err := backends.Subordinates.Get(entityID)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if saved == nil {
+		t.Fatal("expected subordinate to exist after Add")
+	}
+
+	// Soft-delete via the admin delete path (DeleteByDBID).
+	if err := backends.Subordinates.DeleteByDBID(fmt.Sprintf("%d", saved.ID)); err != nil {
+		t.Fatalf("DeleteByDBID failed: %v", err)
+	}
+	if got, err := backends.Subordinates.Get(entityID); err != nil {
+		t.Fatalf("Get after delete failed: %v", err)
+	} else if got != nil {
+		t.Fatal("expected subordinate to be soft-deleted (Get should return nil)")
+	}
+
+	// Re-enroll via Update, mirroring what enroll_request does: pending status,
+	// fresh JWKS, and entity types.
+	newSet := jwk.NewSet()
+	newSet.AddKey(createTestKey("replacement-key"))
+	reEnroll := model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusPending,
+			SubordinateEntityTypes: []model.SubordinateEntityType{
+				{EntityType: "openid_relying_party"},
+			},
+		},
+		JWKS: model.JWKS{Keys: jwx.JWKS{Set: newSet}},
+	}
+	if err := backends.Subordinates.Update(entityID, reEnroll); err != nil {
+		t.Fatalf("Update after delete failed: %v", err)
+	}
+
+	// The reactivated subordinate must be visible to the default-scope Get.
+	reactivated, err := backends.Subordinates.Get(entityID)
+	if err != nil {
+		t.Fatalf("Get after Update failed: %v", err)
+	}
+	if reactivated == nil {
+		t.Fatal("expected reactivated subordinate to be visible via Get")
+	}
+	if reactivated.Status != model.StatusPending {
+		t.Errorf("expected status pending, got %s", reactivated.Status)
+	}
+	if reactivated.JWKSID == nil {
+		t.Fatal("expected a linked JWKS after reactivation")
+	}
+	if reactivated.JWKS.Keys.Set == nil || reactivated.JWKS.Keys.Len() != 1 {
+		t.Fatalf("expected 1 key in reactivated JWKS, got %v", reactivated.JWKS.Keys.Len())
+	}
+	k, ok := reactivated.JWKS.Keys.Set.Key(0)
+	if !ok {
+		t.Fatal("expected to retrieve key at index 0")
+	}
+	if kid, _ := k.KeyID(); kid != "replacement-key" {
+		t.Errorf("expected replacement-key, got %q", kid)
+	}
+	if len(reactivated.SubordinateEntityTypes) != 1 ||
+		reactivated.SubordinateEntityTypes[0].EntityType != "openid_relying_party" {
+		t.Errorf("unexpected entity types: %+v", reactivated.SubordinateEntityTypes)
+	}
+
+	// It must also appear in pending status queries (the "No pending requests" symptom).
+	pending, err := backends.Subordinates.GetByStatus(model.StatusPending)
+	if err != nil {
+		t.Fatalf("GetByStatus failed: %v", err)
+	}
+	found := false
+	for _, p := range pending {
+		if p.EntityID == entityID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("reactivated subordinate not present in GetByStatus(pending)")
+	}
+}
+
 // --- PUT /subordinates/:subordinateID/status TESTS ---
 
 func TestUpdateSubordinateStatus(t *testing.T) {

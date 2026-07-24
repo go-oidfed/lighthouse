@@ -266,10 +266,52 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 	return s.db.Transaction(
 		func(tx *gorm.DB) error {
 			var dbInfo model.ExtendedSubordinateInfo
-			result := tx.Where("entity_id = ?", entityID).First(&dbInfo)
+			result := tx.Unscoped().Where("entity_id = ?", entityID).First(&dbInfo)
 			if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				return result.Error
 			}
+
+			// Soft-deleted: reactivate it, applying the incoming fields (mirrors Add).
+			// DeleteByDBID permanently removed the old JWKS and nulled jwks_id, so a
+			// fresh JWKS is created from info when provided.
+			if result.Error == nil && dbInfo.DeletedAt.Valid {
+				dbInfo.DeletedAt = gorm.DeletedAt{}
+				dbInfo.Status = info.Status
+				dbInfo.Description = info.Description
+				dbInfo.Metadata = info.Metadata
+				dbInfo.MetadataPolicy = info.MetadataPolicy
+				dbInfo.Constraints = info.Constraints
+
+				if info.JWKS.Keys.Set != nil && info.JWKS.Keys.Len() > 0 {
+					if err := tx.Create(&info.JWKS).Error; err != nil {
+						return errors.Wrap(err, "failed to create new JWKS")
+					}
+					dbInfo.JWKSID = &info.JWKS.ID
+				} else {
+					dbInfo.JWKSID = nil
+				}
+
+				if err := tx.Save(&dbInfo).Error; err != nil {
+					return errors.Wrap(err, "failed to reactivate subordinate")
+				}
+
+				if err := tx.Where("subordinate_id = ?", dbInfo.ID).
+					Delete(&model.SubordinateEntityType{}).Error; err != nil {
+					return errors.Wrap(err, "failed to delete old entity types")
+				}
+				if len(info.SubordinateEntityTypes) > 0 {
+					for i := range info.SubordinateEntityTypes {
+						info.SubordinateEntityTypes[i].SubordinateID = dbInfo.ID
+					}
+					if err := tx.Create(&info.SubordinateEntityTypes).Error; err != nil {
+						return errors.Wrap(err, "failed to insert entity types")
+					}
+				}
+
+				info.ID = dbInfo.ID
+				return nil
+			}
+
 			info.ID = dbInfo.ID
 
 			// Save entity types separately to handle them with their own ON CONFLICT clause
