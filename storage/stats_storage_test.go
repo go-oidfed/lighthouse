@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -111,6 +112,109 @@ func TestGetTimeSeries_SqliteEndpointFilter(t *testing.T) {
 	require.Len(t, points, 1)
 	assert.Equal(t, int64(2), points[0].RequestCount)
 	assert.Equal(t, int64(1), points[0].ErrorCount)
+}
+
+// TestGetDailyStats_SqliteRange verifies that GetDailyStats returns the rows
+// stored in federation_daily_stats for a time range bounded by full RFC3339
+// timestamps, the same kind of bounds the HTTP handler forwards from
+// ?from=...&to=... query params. This guards against a regression where a
+// date-bucket comparison silently matches zero rows.
+func TestGetDailyStats_SqliteRange(t *testing.T) {
+	t.Helper()
+	dbPath := filepath.Join(t.TempDir(), "stats_daily_test.db")
+	db, err := gorm.Open(
+		sqlite.Open(dbPath),
+		&gorm.Config{Logger: logger.Default.LogMode(logger.Silent)},
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Migrator().CreateTable(&stats.DailyStats{}))
+	s := NewStatsStorage(db)
+
+	midnight := func(y, m, d int) time.Time {
+		return time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.UTC)
+	}
+	rows := []stats.DailyStats{
+		{Date: midnight(2026, 7, 19), Endpoint: "fetch", StatusCode: 200, RequestCount: 2814},
+		{Date: midnight(2026, 7, 20), Endpoint: "fetch", StatusCode: 200, RequestCount: 4830},
+		{Date: midnight(2026, 7, 23), Endpoint: "fetch", StatusCode: 500, RequestCount: 12, ErrorCount: 12},
+	}
+	for i := range rows {
+		require.NoError(t, db.Create(&rows[i]).Error)
+	}
+
+	from, err := time.Parse(time.RFC3339, "2026-07-01T00:00:00Z")
+	require.NoError(t, err)
+	to, err := time.Parse(time.RFC3339, "2026-07-23T23:59:59Z")
+	require.NoError(t, err)
+
+	got, err := s.GetDailyStats(from, to)
+	require.NoError(t, err)
+	require.Len(t, got, 3, "expected all 3 daily rows within the RFC3339-bounded range")
+
+	// Out-of-range window matches nothing.
+	gotEmpty, err := s.GetDailyStats(
+		time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
+	)
+	require.NoError(t, err)
+	assert.Empty(t, gotEmpty)
+}
+
+// TestAggregateAndBackfillDailyStats_Sqlite verifies the full aggregation
+// pipeline that the stats aggregator now drives on startup: detailed request
+// logs are rolled up into federation_daily_stats, HasDailyStatsForDate skips
+// already-aggregated days, and GetDailyStats returns the rolled-up rows for an
+// RFC3339-bounded range.
+func TestAggregateAndBackfillDailyStats_Sqlite(t *testing.T) {
+	t.Helper()
+	dbPath := filepath.Join(t.TempDir(), "stats_agg_test.db")
+	db, err := gorm.Open(
+		sqlite.Open(dbPath),
+		&gorm.Config{Logger: logger.Default.LogMode(logger.Silent)},
+	)
+	require.NoError(t, err)
+	require.NoError(t, db.Migrator().CreateTable(&stats.RequestLog{}))
+	require.NoError(t, db.Migrator().CreateTable(&stats.DailyStats{}))
+	s := NewStatsStorage(db)
+
+	day := func(y, m, d, hour int) time.Time {
+		return time.Date(y, time.Month(m), d, hour, 0, 0, 0, time.UTC)
+	}
+	// Logs across two days; one day is pre-aggregated to exercise the skip path.
+	insertLogs(t, s,
+		&stats.RequestLog{Timestamp: day(2026, 7, 18, 10), Endpoint: "fetch", Method: "GET", StatusCode: 200, DurationMs: 5},
+		&stats.RequestLog{Timestamp: day(2026, 7, 18, 22), Endpoint: "fetch", Method: "GET", StatusCode: 500, DurationMs: 7},
+		&stats.RequestLog{Timestamp: day(2026, 7, 19, 1), Endpoint: "fetch", Method: "GET", StatusCode: 200, DurationMs: 9},
+	)
+	require.NoError(t, s.AggregateDailyStats(day(2026, 7, 18, 0)))
+
+	exists18, err := s.HasDailyStatsForDate(day(2026, 7, 18, 0))
+	require.NoError(t, err)
+	require.True(t, exists18, "pre-aggregated day should report existing rows")
+	exists19, err := s.HasDailyStatsForDate(day(2026, 7, 19, 0))
+	require.NoError(t, err)
+	require.False(t, exists19, "not-yet-aggregated day should report no rows")
+	exists20, err := s.HasDailyStatsForDate(day(2026, 7, 20, 0))
+	require.NoError(t, err)
+	require.False(t, exists20, "day with no logs should report no rows")
+
+	// Backfill the missing day via the aggregator.
+	agg := stats.NewAggregator(s, 90*24*time.Hour, 365*24*time.Hour)
+	agg.Backfill(context.Background())
+
+	// After backfill, 07-19 has rows; 07-18 is unchanged (skipped, not overwritten).
+	exists19After, err := s.HasDailyStatsForDate(day(2026, 7, 19, 0))
+	require.NoError(t, err)
+	require.True(t, exists19After, "backfilled day should now report existing rows")
+
+	from, err := time.Parse(time.RFC3339, "2026-07-01T00:00:00Z")
+	require.NoError(t, err)
+	to, err := time.Parse(time.RFC3339, "2026-07-31T23:59:59Z")
+	require.NoError(t, err)
+	got, err := s.GetDailyStats(from, to)
+	require.NoError(t, err)
+	// 07-18: two endpoint/status combos; 07-19: one combo.
+	require.Len(t, got, 3, "expected 3 daily rows across the two aggregated days")
 }
 
 func TestGetTimeSeries_SqliteEmptyRange(t *testing.T) {

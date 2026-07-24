@@ -1,6 +1,7 @@
 package lighthouse
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -107,6 +108,8 @@ type LightHouse struct {
 	VersionBanner           bool
 	storages                model.Backends
 	statsCollector          *stats.Collector
+	statsAggregator         *stats.Aggregator
+	statsAggregatorCancel   context.CancelFunc
 	trustMarkConfigProvider *storage.TrustMarkConfigProvider
 	jtiCleanupStop          func()
 }
@@ -156,6 +159,8 @@ func NewLightHouse(
 		return nil, err
 	}
 
+	statsAggregator := initStatsAggregator(statsConfig, storages)
+
 	trustMarkConfigProvider := storage.NewTrustMarkConfigProvider(
 		storages.PublishedTrustMarks,
 		entityID,
@@ -173,6 +178,7 @@ func NewLightHouse(
 		keyManagement:           keyManagement,
 		storages:                storages,
 		statsCollector:          statsCollector,
+		statsAggregator:         statsAggregator,
 		trustMarkConfigProvider: trustMarkConfigProvider,
 	}
 
@@ -258,6 +264,20 @@ func initStatsCollector(statsConfig apistats.Config, storages model.Backends, se
 
 	server.Use(collector.Middleware())
 	return collector, nil
+}
+
+// initStatsAggregator builds the daily-stats aggregator when stats are enabled
+// and a stats storage backend is available. Returns nil otherwise; Start/Stop
+// treat a nil aggregator as a no-op.
+func initStatsAggregator(statsConfig apistats.Config, storages model.Backends) *stats.Aggregator {
+	if !statsConfig.Enabled || storages.Stats == nil {
+		return nil
+	}
+	return stats.NewAggregator(
+		storages.Stats,
+		statsConfig.DetailedRetention,
+		statsConfig.AggregatedRetention,
+	)
 }
 
 func buildDynamicFederationEntity(
@@ -480,6 +500,20 @@ func (fed *LightHouse) Start() {
 		fed.statsCollector.Start()
 	}
 
+	// Start the daily-stats aggregator if enabled. Only run in the parent
+	// process when prefork is enabled to avoid multiple aggregators racing on
+	// the same database.
+	if fed.statsAggregator != nil && !fiber.IsChild() {
+		ctx, cancel := context.WithCancel(context.Background())
+		fed.statsAggregatorCancel = cancel
+		go func() {
+			if err := fed.statsAggregator.Run(ctx); err != nil &&
+				err != context.Canceled {
+				log.WithError(err).Warn("stats aggregator stopped with error")
+			}
+		}()
+	}
+
 	conf := fed.serverConf
 	adminTLS := fed.adminAPIServer != nil && fed.adminAPIServer != fed.server && fed.serverConf.AdminTLS.Enabled
 
@@ -544,6 +578,11 @@ func (fed *LightHouse) Stop() error {
 		if err := fed.statsCollector.Stop(); err != nil {
 			log.WithError(err).Warn("error stopping stats collector")
 		}
+	}
+
+	// Stop stats aggregator if running
+	if fed.statsAggregatorCancel != nil {
+		fed.statsAggregatorCancel()
 	}
 
 	// Shutdown fiber servers

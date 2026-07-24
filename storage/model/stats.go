@@ -28,6 +28,7 @@ type StatsStorageBackend interface {
 
 	// Daily aggregation
 	AggregateDailyStats(date time.Time) error
+	HasDailyStatsForDate(date time.Time) (bool, error)
 	GetDailyStats(from, to time.Time) ([]stats.DailyStats, error)
 
 	// Maintenance

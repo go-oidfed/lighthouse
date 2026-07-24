@@ -732,6 +732,20 @@ func (s *StatsStorage) GetDailyStats(from, to time.Time) ([]stats.DailyStats, er
 	return results, err
 }
 
+// HasDailyStatsForDate reports whether any daily stats rows exist for the given
+// (UTC) date. The date is normalized to midnight UTC and matched against the
+// half-open [date, date+24h) interval. Used by the aggregator to skip days that
+// have already been aggregated during startup backfill.
+func (s *StatsStorage) HasDailyStatsForDate(date time.Time) (bool, error) {
+	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	endDate := date.Add(24 * time.Hour)
+	var count int64
+	err := s.db.Model(&stats.DailyStats{}).
+		Where("date >= ? AND date < ?", date, endDate).
+		Count(&count).Error
+	return count > 0, err
+}
+
 // PurgeDetailedLogs deletes request logs older than the given time.
 func (s *StatsStorage) PurgeDetailedLogs(before time.Time) (int64, error) {
 	result := s.db.Where("timestamp < ?", before).Delete(&stats.RequestLog{})
