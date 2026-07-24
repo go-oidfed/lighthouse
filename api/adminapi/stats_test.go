@@ -25,6 +25,7 @@ type mockStatsStorageBackend struct {
 	getTimeSeriesFn        func(time.Time, time.Time, string, istats.Interval) ([]istats.TimeSeriesPoint, error)
 	getLatencyFn           func(time.Time, time.Time, string) (*istats.LatencyStats, error)
 	aggregateDailyStatsFn  func(time.Time) error
+	hasDailyStatsForDateFn func(time.Time) (bool, error)
 	getDailyStatsFn        func(time.Time, time.Time) ([]istats.DailyStats, error)
 	purgeDetailedLogsFn    func(time.Time) (int64, error)
 	purgeAggregatedStatsFn func(time.Time) (int64, error)
@@ -76,6 +77,13 @@ func (m *mockStatsStorageBackend) AggregateDailyStats(date time.Time) error {
 		return m.aggregateDailyStatsFn(date)
 	}
 	return nil
+}
+
+func (m *mockStatsStorageBackend) HasDailyStatsForDate(date time.Time) (bool, error) {
+	if m.hasDailyStatsForDateFn != nil {
+		return m.hasDailyStatsForDateFn(date)
+	}
+	return false, nil
 }
 
 func (m *mockStatsStorageBackend) GetDailyStats(from, to time.Time) ([]istats.DailyStats, error) {

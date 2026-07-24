@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -324,8 +326,12 @@ func (s *StatsStorage) GetTimeSeries(from, to time.Time, endpoint string, interv
 		truncExpr = s.sqliteDateTrunc(interval)
 	}
 
+	// bucketScanner accepts both time.Time (postgres date_trunc) and string
+	// (sqlite strftime/date, mysql DATE_FORMAT/DATE) values. SQLite and MySQL
+	// truncation expressions return TEXT, which database/sql cannot scan
+	// directly into a *time.Time, so a custom scanner is required.
 	var results []struct {
-		Bucket       time.Time
+		Bucket       bucketScanner
 		RequestCount int64
 		ErrorCount   int64
 		AvgLatency   float64
@@ -352,7 +358,7 @@ func (s *StatsStorage) GetTimeSeries(from, to time.Time, endpoint string, interv
 	points := make([]stats.TimeSeriesPoint, len(results))
 	for i, r := range results {
 		points[i] = stats.TimeSeriesPoint{
-			Timestamp:    r.Bucket,
+			Timestamp:    r.Bucket.Time,
 			RequestCount: r.RequestCount,
 			ErrorCount:   r.ErrorCount,
 			AvgLatencyMs: r.AvgLatency,
@@ -360,6 +366,65 @@ func (s *StatsStorage) GetTimeSeries(from, to time.Time, endpoint string, interv
 	}
 	return points, nil
 }
+
+// bucketScanner is a sql.Scanner that accepts the bucket values produced by the
+// various driver-specific date-truncation expressions used in GetTimeSeries.
+// Postgres date_trunc returns a timestamp; sqlite strftime/date and MySQL
+// DATE_FORMAT/DATE return text. Text values are parsed against the layouts the
+// truncation helpers are known to emit and normalized to UTC.
+//
+// GormDataType is implemented so GORM recognizes this as a scalar field (with
+// the time data type) rather than attempting to parse it as a relationship when
+// it appears as an anonymous struct field in scan targets.
+type bucketScanner struct {
+	Time time.Time
+}
+
+// GormDataType implements schema.GormDataTypeInterface.
+func (b *bucketScanner) GormDataType() string {
+	return "time"
+}
+
+// Scan implements database/sql.Scanner.
+func (b *bucketScanner) Scan(src any) error {
+	switch v := src.(type) {
+	case nil:
+		return nil
+	case time.Time:
+		b.Time = v.UTC()
+		return nil
+	case []byte:
+		return b.parseString(string(v))
+	case string:
+		return b.parseString(v)
+	default:
+		return fmt.Errorf("bucketScanner: unsupported source type %T", src)
+	}
+}
+
+// parseString parses a bucket string emitted by the sqlite/mysql truncation
+// helpers. These produce layouts without timezone information; results are
+// interpreted as UTC.
+func (b *bucketScanner) parseString(s string) error {
+	// sqlite strftime: "2006-01-02 15:04:05"
+	// sqlite date / mysql DATE: "2006-01-02"
+	// Be tolerant of RFC3339 in case a driver emits it.
+	layouts := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+		time.RFC3339,
+	}
+	trimmed := strings.TrimSpace(s)
+	for _, layout := range layouts {
+		if t, err := time.ParseInLocation(layout, trimmed, time.UTC); err == nil {
+			b.Time = t.UTC()
+			return nil
+		}
+	}
+	return fmt.Errorf("bucketScanner: cannot parse bucket value %q", s)
+}
+
+var _ sql.Scanner = (*bucketScanner)(nil)
 
 // Date truncation helpers for different databases
 func (*StatsStorage) postgresDateTrunc(interval stats.Interval) string {
@@ -665,6 +730,20 @@ func (s *StatsStorage) GetDailyStats(from, to time.Time) ([]stats.DailyStats, er
 		Order("date DESC").
 		Find(&results).Error
 	return results, err
+}
+
+// HasDailyStatsForDate reports whether any daily stats rows exist for the given
+// (UTC) date. The date is normalized to midnight UTC and matched against the
+// half-open [date, date+24h) interval. Used by the aggregator to skip days that
+// have already been aggregated during startup backfill.
+func (s *StatsStorage) HasDailyStatsForDate(date time.Time) (bool, error) {
+	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+	endDate := date.Add(24 * time.Hour)
+	var count int64
+	err := s.db.Model(&stats.DailyStats{}).
+		Where("date >= ? AND date < ?", date, endDate).
+		Count(&count).Error
+	return count > 0, err
 }
 
 // PurgeDetailedLogs deletes request logs older than the given time.

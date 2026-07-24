@@ -2,6 +2,7 @@ package stats
 
 import (
 	"encoding/json"
+	"errors"
 	"hash/fnv"
 	"strings"
 	"time"
@@ -56,11 +57,27 @@ func Middleware(cfg MiddlewareConfig) fiber.Handler {
 
 		// Capture stats after response
 		duration := time.Since(start)
+
+		// The app's ErrorHandler runs after the middleware chain returns, so for
+		// any request whose status is set by the ErrorHandler (e.g. unmatched
+		// routes yielding fiber.ErrNotFound, or handlers returning *fiber.Error)
+		// the response status has not been applied yet. Derive the effective
+		// status from the error so the recorded value matches what the client
+		// receives. This mirrors the logic in the app's ErrorHandler.
+		statusCode := c.Response().StatusCode()
+		if err != nil {
+			statusCode = fiber.StatusInternalServerError
+			var fe *fiber.Error
+			if errors.As(err, &fe) {
+				statusCode = fe.Code
+			}
+		}
+
 		entry := &RequestLog{
 			Timestamp:    start,
 			Endpoint:     endpointName,
 			Method:       c.Method(),
-			StatusCode:   c.Response().StatusCode(),
+			StatusCode:   statusCode,
 			DurationMs:   int(duration.Milliseconds()),
 			ResponseSize: len(c.Response().Body()),
 			RequestSize:  len(c.Request().Body()),

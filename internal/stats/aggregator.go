@@ -10,6 +10,7 @@ import (
 // AggregatorStorage is the interface for aggregation storage operations.
 type AggregatorStorage interface {
 	AggregateDailyStats(date time.Time) error
+	HasDailyStatsForDate(date time.Time) (bool, error)
 	PurgeDetailedLogs(before time.Time) (int64, error)
 	PurgeAggregatedStats(before time.Time) (int64, error)
 }
@@ -49,6 +50,12 @@ func (a *Aggregator) Run(ctx context.Context) error {
 		Dur("detailed_retention", a.detailedRetention).
 		Dur("aggregated_retention", a.aggregatedRetention).
 		Msg("stats aggregator started")
+
+	// Backfill any missing days within the detailed-log retention window so
+	// /stats/daily is populated immediately on startup rather than only after
+	// the next 2 AM tick. Only days whose detailed logs are still retained are
+	// considered, so already-purged data is never overwritten.
+	a.Backfill(ctx)
 
 	// Wait until first run time
 	select {
@@ -109,6 +116,56 @@ func (a *Aggregator) runAggregation() {
 	}
 
 	log.Info().Dur("duration", time.Since(start)).Msg("daily stats aggregation completed")
+}
+
+// Backfill aggregates every day from (now - detailedRetention) up to yesterday
+// that does not already have daily stats rows. It is safe to run repeatedly:
+// days with existing rows are skipped, and only days whose detailed logs are
+// still retained are considered, so already-purged data is never overwritten.
+func (a *Aggregator) Backfill(ctx context.Context) {
+	now := time.Now().UTC()
+	yesterday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	horizon := yesterday.Add(-a.detailedRetention)
+
+	backfilled := 0
+	for d := horizon; d.Before(yesterday); d = d.Add(24 * time.Hour) {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		exists, err := a.storage.HasDailyStatsForDate(d)
+		if err != nil {
+			log.WithError(err).
+				WithField("date", d.Format("2006-01-02")).
+				Warn("failed to check existing daily stats during backfill")
+			continue
+		}
+		if exists {
+			continue
+		}
+
+		if err := a.storage.AggregateDailyStats(d); err != nil {
+			log.WithError(err).
+				WithField("date", d.Format("2006-01-02")).
+				Warn("failed to backfill daily stats")
+			continue
+		}
+		// Only count/log days that actually produced rows; days with no
+		// detailed logs aggregate to nothing and would otherwise spam the
+		// log on every startup.
+		created, err := a.storage.HasDailyStatsForDate(d)
+		if err != nil || !created {
+			continue
+		}
+		backfilled++
+		log.WithField("date", d.Format("2006-01-02")).Info("backfilled daily stats")
+	}
+
+	if backfilled > 0 {
+		log.WithField("days_backfilled", backfilled).Info("daily stats backfill completed")
+	}
 }
 
 // RunOnce performs a single aggregation for the specified date.
