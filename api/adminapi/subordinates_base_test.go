@@ -511,9 +511,11 @@ func TestPutSubordinateByID(t *testing.T) {
 			}
 
 			body := `{
-			"description": "New Description",
-			"registered_entity_types": ["new_type_1", "new_type_2"]
-		}`
+		"description": "New Description",
+		"registered_entity_types": ["new_type_1", "new_type_2"],
+		"enable_jwks_update": true,
+		"jwks_poll_interval": 3600
+	}`
 			req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			resp, bodyBytes := doRequest(t, app, req)
@@ -527,6 +529,12 @@ func TestPutSubordinateByID(t *testing.T) {
 			}
 			if updated.Description != "New Description" {
 				t.Errorf("Expected description 'New Description', got %q", updated.Description)
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("Expected EnableJWKSUpdate=true, got false")
+			}
+			if updated.JWKSPollInterval == nil || *updated.JWKSPollInterval != 3600 {
+				t.Errorf("Expected JWKSPollInterval=3600, got %v", updated.JWKSPollInterval)
 			}
 
 			// Note: GORM's UpdateAll currently appends related entities instead of replacing them
@@ -584,6 +592,188 @@ func TestPutSubordinateByID(t *testing.T) {
 			}
 
 			req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, respBody := doRequest(t, app, req)
+
+			assertErrorResponse(t, resp, respBody, http.StatusBadRequest, "invalid_request")
+		},
+	)
+}
+
+// --- PATCH /subordinates/:subordinateID TESTS ---
+
+func TestPatchSubordinateByID(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"Success_EnableJWKSRefresh", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID:         "https://patch-jwks.example.org",
+						Status:           model.StatusActive,
+						EnableJWKSUpdate: false,
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-jwks.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			body := `{"enable_jwks_update": true, "jwks_poll_interval": 7200}`
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			requireStatus(t, resp, bodyBytes, http.StatusOK)
+
+			// Response body should carry the new values.
+			var respInfo model.ExtendedSubordinateInfo
+			if err := json.Unmarshal(bodyBytes, &respInfo); err != nil {
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
+			if !respInfo.EnableJWKSUpdate {
+				t.Errorf("response EnableJWKSUpdate = false, want true")
+			}
+			if respInfo.JWKSPollInterval == nil || *respInfo.JWKSPollInterval != 7200 {
+				t.Errorf("response JWKSPollInterval = %v, want 7200", respInfo.JWKSPollInterval)
+			}
+
+			// Verify persistence in DB.
+			updated, err := backends.Subordinates.Get("https://patch-jwks.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("DB EnableJWKSUpdate = false, want true")
+			}
+			if updated.JWKSPollInterval == nil || *updated.JWKSPollInterval != 7200 {
+				t.Errorf("DB JWKSPollInterval = %v, want 7200", updated.JWKSPollInterval)
+			}
+		},
+	)
+
+	t.Run(
+		"PartialUnchanged", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+
+			interval := int64(3600)
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID:         "https://patch-unchanged.example.org",
+						Status:           model.StatusActive,
+						EnableJWKSUpdate: true,
+						JWKSPollInterval: &interval,
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-unchanged.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			// PATCH only description; refresh fields should be untouched.
+			body := `{"description": "patched"}`
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			requireStatus(t, resp, bodyBytes, http.StatusOK)
+
+			updated, err := backends.Subordinates.Get("https://patch-unchanged.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+			if updated.Description != "patched" {
+				t.Errorf("Description = %q, want %q", updated.Description, "patched")
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("EnableJWKSUpdate = false, want true (omitted field should be unchanged)")
+			}
+			if updated.JWKSPollInterval == nil || *updated.JWKSPollInterval != 3600 {
+				t.Errorf("JWKSPollInterval = %v, want 3600 (omitted field should be unchanged)", updated.JWKSPollInterval)
+			}
+		},
+	)
+
+	t.Run(
+		"ClearPollInterval", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+
+			interval := int64(3600)
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID:         "https://patch-clear.example.org",
+						Status:           model.StatusActive,
+						EnableJWKSUpdate: true,
+						JWKSPollInterval: &interval,
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-clear.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			body := `{"jwks_poll_interval": null}`
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			requireStatus(t, resp, bodyBytes, http.StatusOK)
+
+			updated, err := backends.Subordinates.Get("https://patch-clear.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+			if updated.JWKSPollInterval != nil {
+				t.Errorf("JWKSPollInterval = %v, want nil", updated.JWKSPollInterval)
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("EnableJWKSUpdate = false, want true (omitted field should be unchanged)")
+			}
+		},
+	)
+
+	t.Run(
+		"NotFound", func(t *testing.T) {
+			t.Parallel()
+			app, _ := setupSubordinateBaseApp(t)
+
+			body := `{"description": "New"}`
+			req := httptest.NewRequest("PATCH", "/subordinates/9999", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			assertStatus(t, resp, bodyBytes, http.StatusNotFound)
+		},
+	)
+
+	t.Run(
+		"InvalidBody", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID: "https://patch-bad.example.org",
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-bad.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`))
 			req.Header.Set("Content-Type", "application/json")
 			resp, respBody := doRequest(t, app, req)
 
@@ -804,10 +994,13 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 	// fresh JWKS, and entity types.
 	newSet := jwk.NewSet()
 	newSet.AddKey(createTestKey("replacement-key"))
+	reEnrollInterval := int64(7200)
 	reEnroll := model.ExtendedSubordinateInfo{
 		BasicSubordinateInfo: model.BasicSubordinateInfo{
-			EntityID: entityID,
-			Status:   model.StatusPending,
+			EntityID:         entityID,
+			Status:           model.StatusPending,
+			EnableJWKSUpdate: true,
+			JWKSPollInterval: &reEnrollInterval,
 			SubordinateEntityTypes: []model.SubordinateEntityType{
 				{EntityType: "openid_relying_party"},
 			},
@@ -845,6 +1038,12 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 	if len(reactivated.SubordinateEntityTypes) != 1 ||
 		reactivated.SubordinateEntityTypes[0].EntityType != "openid_relying_party" {
 		t.Errorf("unexpected entity types: %+v", reactivated.SubordinateEntityTypes)
+	}
+	if !reactivated.EnableJWKSUpdate {
+		t.Errorf("expected EnableJWKSUpdate=true after reactivation, got false")
+	}
+	if reactivated.JWKSPollInterval == nil || *reactivated.JWKSPollInterval != 7200 {
+		t.Errorf("expected JWKSPollInterval=7200 after reactivation, got %v", reactivated.JWKSPollInterval)
 	}
 
 	// It must also appear in pending status queries (the "No pending requests" symptom).

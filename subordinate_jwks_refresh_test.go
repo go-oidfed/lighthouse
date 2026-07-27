@@ -143,6 +143,74 @@ func TestJwksUpdate_SignedJWKSetVerification(t *testing.T) {
 	assert.False(t, parsed.Verify(otherKeys), "signature should NOT verify against unknown keys")
 }
 
+// TestSubordinateStorage_Update_PersistsJWKSRefreshFields verifies that
+// SubordinateStorage.Update persists enable_jwks_update and
+// jwks_poll_interval on an existing (non-deleted) subordinate. This is a
+// regression test for the bug where the GORM OnConflict upsert omitted these
+// columns from its AssignmentColumns list, so updates were silently dropped.
+func TestSubordinateStorage_Update_PersistsJWKSRefreshFields(t *testing.T) {
+	store := newTestStorage(t)
+	subStore := store.SubordinateStorage()
+
+	entityID := "https://sub-update-jwks.example"
+
+	require.NoError(t, subStore.Add(model.ExtendedSubordinateInfo{
+		JWKS: model.NewJWKS(pubJWKS(t, rsaKey(t))),
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID:         entityID,
+			Status:           model.StatusActive,
+			EnableJWKSUpdate: false,
+		},
+	}))
+
+	// Enable refreshing via Update on the existing (non-deleted) row.
+	existing, err := subStore.Get(entityID)
+	require.NoError(t, err)
+	require.NotNil(t, existing)
+	existing.EnableJWKSUpdate = true
+	interval := int64(3600)
+	existing.JWKSPollInterval = &interval
+	require.NoError(t, subStore.Update(entityID, *existing))
+
+	updated, err := subStore.Get(entityID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.True(t, updated.EnableJWKSUpdate, "EnableJWKSUpdate should be persisted by Update")
+	require.NotNil(t, updated.JWKSPollInterval, "JWKSPollInterval should be persisted by Update")
+	assert.Equal(t, int64(3600), *updated.JWKSPollInterval)
+
+	// ListEnabledForJWKSRefresh should now return it.
+	listed, err := subStore.ListEnabledForJWKSRefresh()
+	require.NoError(t, err)
+	found := false
+	for _, s := range listed {
+		if s.EntityID == entityID {
+			found = true
+		}
+	}
+	assert.True(t, found, "subordinate should appear in ListEnabledForJWKSRefresh after enabling")
+
+	// Toggle back off and clear the interval.
+	existing, err = subStore.Get(entityID)
+	require.NoError(t, err)
+	existing.EnableJWKSUpdate = false
+	existing.JWKSPollInterval = nil
+	require.NoError(t, subStore.Update(entityID, *existing))
+
+	updated, err = subStore.Get(entityID)
+	require.NoError(t, err)
+	assert.False(t, updated.EnableJWKSUpdate, "EnableJWKSUpdate should be toggled back to false")
+	assert.Nil(t, updated.JWKSPollInterval, "JWKSPollInterval should be cleared to nil")
+
+	listed, err = subStore.ListEnabledForJWKSRefresh()
+	require.NoError(t, err)
+	for _, s := range listed {
+		if s.EntityID == entityID {
+			t.Errorf("subordinate should no longer appear in ListEnabledForJWKSRefresh after disabling")
+		}
+	}
+}
+
 func TestAddedRemovedMsg(t *testing.T) {
 	assert.Equal(t, "", addedRemovedMsg(nil, nil))
 	assert.Equal(t, "added: a, b", addedRemovedMsg([]string{"a", "b"}, nil))

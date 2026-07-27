@@ -281,6 +281,8 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 				dbInfo.Metadata = info.Metadata
 				dbInfo.MetadataPolicy = info.MetadataPolicy
 				dbInfo.Constraints = info.Constraints
+				dbInfo.EnableJWKSUpdate = info.EnableJWKSUpdate
+				dbInfo.JWKSPollInterval = info.JWKSPollInterval
 
 				if info.JWKS.Keys.Set != nil && info.JWKS.Keys.Len() > 0 {
 					if err := tx.Create(&info.JWKS).Error; err != nil {
@@ -331,6 +333,8 @@ func (s *SubordinateStorage) Update(entityID string, info model.ExtendedSubordin
 							"metadata",
 							"metadata_policy",
 							"constraints",
+							"enable_jwks_update",
+							"jwks_poll_interval",
 						},
 					),
 				},

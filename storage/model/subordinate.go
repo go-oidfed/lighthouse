@@ -152,8 +152,45 @@ type AddSubordinate struct {
 
 // UpdateSubordinate represents the payload for updating a subordinate.
 type UpdateSubordinate struct {
-	Description           *string  `json:"description,omitempty"`
-	RegisteredEntityTypes []string `json:"registered_entity_types,omitempty"`
-	EnableJWKSUpdate      *bool    `json:"enable_jwks_update,omitempty"`
-	JWKSPollInterval      *int64   `json:"jwks_poll_interval,omitempty"`
+	Description           *string       `json:"description,omitempty"`
+	RegisteredEntityTypes []string      `json:"registered_entity_types,omitempty"`
+	EnableJWKSUpdate      *bool         `json:"enable_jwks_update,omitempty"`
+	JWKSPollInterval      NullableInt64 `json:"jwks_poll_interval,omitempty"`
+}
+
+// NullableInt64 is an int64 field that can distinguish between "key absent"
+// and "key present as null" in JSON. This is needed for partial updates where
+// `null` should clear the stored value while an omitted key should leave it
+// unchanged.
+//
+//   - JSON key absent  → Defined=false, Value=nil
+//   - JSON null         → Defined=true,  Value=nil  (clears the stored value)
+//   - JSON integer      → Defined=true,  Value=&v   (sets the stored value)
+type NullableInt64 struct {
+	Defined bool
+	Value   *int64
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (n *NullableInt64) UnmarshalJSON(b []byte) error {
+	n.Defined = true
+	if string(b) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var v int64
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	n.Value = &v
+	return nil
+}
+
+// MarshalJSON implements json.Marshaler so the type serializes like a plain
+// nullable int64 (null when Value is nil).
+func (n NullableInt64) MarshalJSON() ([]byte, error) {
+	if n.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(*n.Value)
 }

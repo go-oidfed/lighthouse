@@ -2797,6 +2797,45 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: updateSubordinateDetails
       summary: Update subordinate details
+      description: |
+        Updates fields of an existing subordinate. The request body uses partial-update
+        semantics: only fields that are present in the body are changed; omitted fields
+        are left unchanged. `null` clears a nullable field.
+
+        `PATCH` is the preferred verb for partial updates (see `patchSubordinateDetails`).
+        `PUT` is retained for backward compatibility and accepts the same partial-update body.
+    patch:
+      tags:
+        - Subordinates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubordinate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateDetails'
+          description: Successfully patched subordinate details.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: patchSubordinateDetails
+      summary: Patch subordinate details
+      description: |
+        Partially updates fields of an existing subordinate. Only fields present in
+        the request body are changed; omitted fields are left unchanged. Set a nullable
+        field to `null` to clear it (for example, `jwks_poll_interval: null` resets the
+        poll interval to be derived from the Entity Configuration expiration time).
+
+        This is the preferred verb for partial updates. `PUT` accepts the same body for
+        backward compatibility.
     delete:
       tags:
         - Subordinates

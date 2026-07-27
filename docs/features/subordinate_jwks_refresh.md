@@ -53,8 +53,8 @@ curl -X POST -u admin:password \
 ```
 
 ```bash
-# Enable refreshing on an existing subordinate
-curl -X PUT -u admin:password \
+# Enable refreshing on an existing subordinate (PATCH, preferred for partial updates)
+curl -X PATCH -u admin:password \
   -H "Content-Type: application/json" \
   -d '{"enable_jwks_update": true, "jwks_poll_interval": 7200}' \
   https://localhost:8081/api/v1/admin/subordinates/{subordinateID}

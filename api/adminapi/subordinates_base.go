@@ -164,8 +164,8 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 		if body.EnableJWKSUpdate != nil {
 			existing.EnableJWKSUpdate = *body.EnableJWKSUpdate
 		}
-		if body.JWKSPollInterval != nil {
-			existing.JWKSPollInterval = body.JWKSPollInterval
+		if body.JWKSPollInterval.Defined {
+			existing.JWKSPollInterval = body.JWKSPollInterval.Value
 		}
 		if err = tx.Subordinates.Update(existing.EntityID, *existing); err != nil {
 			return err
@@ -430,6 +430,7 @@ func registerSubordinatesBase(r fiber.Router, storages model.Backends, ctrl Ligh
 	g.Post("/", baseH.create)
 	g.Get("/:subordinateID", baseH.get)
 	withCacheWipe.Put("/:subordinateID", baseH.update)
+	withCacheWipe.Patch("/:subordinateID", baseH.update)
 	withCacheWipe.Delete("/:subordinateID", baseH.delete)
 	withCacheWipe.Put("/:subordinateID/status", baseH.updateStatus)
 	g.Get("/:subordinateID/history", historyH.getHistory)
