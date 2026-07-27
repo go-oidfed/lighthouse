@@ -6,6 +6,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -70,12 +71,26 @@ func buildSubordinateStatementPayload(
 	)
 	metadataPolicyCrit := filterUsedPolicyOperators(subordinate.MetadataPolicy, configuredCritOperators)
 
+	// Publish only non-expired keys, mirroring lighthouse.CreateSubordinateStatement.
+	filteredJWKS := subordinate.JWKS.Keys.WithoutExpired(now)
+	if subordinate.JWKS.Keys.Set != nil && subordinate.JWKS.Keys.Len() > 0 && filteredJWKS.Len() == 0 {
+		log.Warn().Str("subordinate", subordinate.EntityID).
+			Msg("all subordinate keys are expired; publishing empty JWKS in subordinate statement preview")
+	}
+
+	// Cap the statement's expiration to the latest key expiration so the
+	// statement never outlives any published key.
+	exp := unixtime.Unixtime{Time: now.Add(lifetime)}
+	if maxKeyExp := filteredJWKS.MaximalExpirationTime(); !maxKeyExp.IsZero() && maxKeyExp.Before(exp.Time) {
+		exp = unixtime.Unixtime{Time: maxKeyExp.Time}
+	}
+
 	return oidfed.EntityStatementPayload{
 		Issuer:             issuer,
 		Subject:            subordinate.EntityID,
 		IssuedAt:           unixtime.Unixtime{Time: now},
-		ExpiresAt:          unixtime.Unixtime{Time: now.Add(lifetime)},
-		JWKS:               subordinate.JWKS.Keys,
+		ExpiresAt:          exp,
+		JWKS:               filteredJWKS,
 		Metadata:           subordinate.Metadata,
 		MetadataPolicy:     subordinate.MetadataPolicy,
 		Constraints:        subordinate.Constraints,

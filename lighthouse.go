@@ -728,13 +728,32 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 	// Filter to only include operators actually used in the metadata policy
 	metadataPolicyCrit := filterUsedOperators(subordinate.MetadataPolicy, configuredCritOperators)
 
+	// Publish only non-expired keys: a key is dropped if it has an `exp` claim
+	// strictly before now (exp == now is still valid). Keys without `exp` are
+	// always included. The stored JWKS is not modified, so incoming Entity
+	// Configurations / signed JWK Sets can still be verified against historical
+	// keys during rotation.
+	filteredJWKS := subordinate.JWKS.Keys.WithoutExpired(now)
+	if subordinate.JWKS.Keys.Set != nil && subordinate.JWKS.Keys.Len() > 0 && filteredJWKS.Len() == 0 {
+		log.Warn().Str("subordinate", subordinate.EntityID).
+			Msg("all subordinate keys are expired; publishing empty JWKS in subordinate statement")
+	}
+
+	// Cap the statement's expiration to the latest key expiration so the
+	// statement never outlives any published key. No cap is applied when no
+	// published key has an `exp` (MaximalExpirationTime returns zero).
+	exp := unixtime.Unixtime{Time: now.Add(lifetime)}
+	if maxKeyExp := filteredJWKS.MaximalExpirationTime(); !maxKeyExp.IsZero() && maxKeyExp.Before(exp.Time) {
+		exp = unixtime.Unixtime{Time: maxKeyExp.Time}
+	}
+
 	return oidfed.EntityStatementPayload{
 		Issuer:             fed.FederationEntity.EntityID(),
 		Subject:            subordinate.EntityID,
 		IssuedAt:           unixtime.Unixtime{Time: now},
-		ExpiresAt:          unixtime.Unixtime{Time: now.Add(lifetime)},
+		ExpiresAt:          exp,
 		SourceEndpoint:     fed.fedMetadata.FederationFetchEndpoint,
-		JWKS:               subordinate.JWKS.Keys,
+		JWKS:               filteredJWKS,
 		Metadata:           subordinate.Metadata,
 		MetadataPolicy:     subordinate.MetadataPolicy,
 		Constraints:        subordinate.Constraints,

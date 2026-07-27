@@ -217,3 +217,32 @@ Each mechanism records an event in the subordinate's
 
 These complement the existing `jwks_replaced`, `jwk_added`, and `jwk_removed`
 events recorded by manual admin-API JWKS operations.
+
+## Expired Key Filtering in Subordinate Statements
+
+When LightHouse issues a subordinate statement (at the fetch endpoint, or in the
+admin-API statement preview), the `jwks` claim contains only keys that are not
+expired at issuance time:
+
+- A key with an `exp` claim strictly before `now` is **omitted**.
+- `exp == now` is still considered valid (inclusive boundary, matching
+  `unixtime.VerifyTime`).
+- Keys without an `exp` claim (or with a zero `exp`) are **always included**.
+
+Filtering is **publish-only**: the stored JWKS retains all keys, including
+expired ones, so that incoming Entity Configurations and signed JWK Sets can
+still be verified against historical keys during a rotation. Only the published
+statement reflects the filtered set.
+
+If every key in the stored JWKS is expired, LightHouse publishes an **empty**
+`jwks` (the statement is still issued, not errored) and logs a warning. A
+downstream verifier will fail to verify the subordinate's statements until new
+keys are provided — which is the intended signal.
+
+### Statement Expiration Capping
+
+The subordinate statement's own `exp` is capped to the **maximal** key
+expiration among the *published* (non-expired) keys, so the statement never
+outlives any key it advertises. When no published key has an `exp` claim, no
+cap is applied and the statement keeps its configured lifetime.
+
