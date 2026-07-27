@@ -6,11 +6,11 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.4
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.10.13-0.20260720084801-1dc08ac1e556
+	github.com/go-oidfed/lib v0.10.13-0.20260727113417-781359ddaac1
 	github.com/gofiber/fiber/v2 v2.52.14
 	github.com/google/uuid v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/lestrrat-go/jwx/v4 v4.1.0
+	github.com/lestrrat-go/jwx/v4 v4.2.0
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.21.0
@@ -32,7 +32,7 @@ require (
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	filippo.io/mldsa v0.0.0-20260711112038-ff3f469cee29 // indirect
-	github.com/ThalesGroup/crypto11 v1.6.2 // indirect
+	github.com/ThalesGroup/crypto11 v1.6.4 // indirect
 	github.com/TwiN/gocache/v2 v2.4.0 // indirect
 	github.com/andybalholm/brotli v1.2.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -58,19 +58,19 @@ require (
 	github.com/jarcoal/httpmock v1.4.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/jwx-go/compsig/v4 v4.0.3 // indirect
-	github.com/jwx-go/ed448/v4 v4.0.3 // indirect
-	github.com/jwx-go/es256k/v4 v4.0.3 // indirect
-	github.com/jwx-go/mldsa/v4 v4.0.3 // indirect
-	github.com/klauspost/compress v1.19.0 // indirect
+	github.com/jwx-go/compsig/v4 v4.0.4 // indirect
+	github.com/jwx-go/ed448/v4 v4.0.4 // indirect
+	github.com/jwx-go/es256k/v4 v4.0.4 // indirect
+	github.com/jwx-go/mldsa/v4 v4.0.4 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/lestrrat-go/dsig v1.3.0 // indirect
 	github.com/lestrrat-go/dsig-circl-ed448 v1.0.0 // indirect
 	github.com/lestrrat-go/dsig-secp256k1 v1.0.0 // indirect
 	github.com/lestrrat-go/option/v3 v3.0.0-alpha1 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
-	github.com/mattn/go-isatty v0.0.23 // indirect
-	github.com/mattn/go-runewidth v0.0.24 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/mattn/go-sqlite3 v1.14.44 // indirect
 	github.com/miekg/pkcs11 v1.1.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -93,5 +93,5 @@ require (
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.7 // indirect
 )

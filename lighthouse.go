@@ -144,7 +144,7 @@ func NewLightHouse(
 	*LightHouse,
 	error,
 ) {
-	keyManagement, err := initKey(signingConf, storages)
+	keyManagement, err := initKey(entityID, signingConf, storages)
 	if err != nil {
 		return nil, err
 	}
