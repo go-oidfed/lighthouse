@@ -582,7 +582,7 @@ func (fed *LightHouse) Start() {
 		go func() {
 			if err := fed.statsAggregator.Run(ctx); err != nil &&
 				err != context.Canceled {
-				log.WithError(err).Warn("stats aggregator stopped with error")
+				log.Warn().Err(err).Msg("stats aggregator stopped with error")
 			}
 		}()
 	}

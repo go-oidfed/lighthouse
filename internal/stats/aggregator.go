@@ -137,9 +137,9 @@ func (a *Aggregator) Backfill(ctx context.Context) {
 
 		exists, err := a.storage.HasDailyStatsForDate(d)
 		if err != nil {
-			log.WithError(err).
-				WithField("date", d.Format("2006-01-02")).
-				Warn("failed to check existing daily stats during backfill")
+			log.Warn().Err(err).
+				Str("date", d.Format("2006-01-02")).
+				Msg("failed to check existing daily stats during backfill")
 			continue
 		}
 		if exists {
@@ -147,9 +147,9 @@ func (a *Aggregator) Backfill(ctx context.Context) {
 		}
 
 		if err := a.storage.AggregateDailyStats(d); err != nil {
-			log.WithError(err).
-				WithField("date", d.Format("2006-01-02")).
-				Warn("failed to backfill daily stats")
+			log.Warn().Err(err).
+				Str("date", d.Format("2006-01-02")).
+				Msg("failed to backfill daily stats")
 			continue
 		}
 		// Only count/log days that actually produced rows; days with no
@@ -160,11 +160,11 @@ func (a *Aggregator) Backfill(ctx context.Context) {
 			continue
 		}
 		backfilled++
-		log.WithField("date", d.Format("2006-01-02")).Info("backfilled daily stats")
+		log.Info().Str("date", d.Format("2006-01-02")).Msg("backfilled daily stats")
 	}
 
 	if backfilled > 0 {
-		log.WithField("days_backfilled", backfilled).Info("daily stats backfill completed")
+		log.Info().Int("days_backfilled", backfilled).Msg("daily stats backfill completed")
 	}
 }
 
