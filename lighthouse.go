@@ -38,6 +38,12 @@ import (
 
 const MaximumEntityConfigurationCachePeriod = 8 * time.Hour
 
+// MaximumSubordinateStatementCachePeriod is the upper bound on how long a
+// signed subordinate statement JWT is cached at the fetch endpoint. The actual
+// cache TTL is further capped by the statement's own expiration and by the
+// earliest published key expiration (see subordinateStatementCacheTTL).
+const MaximumSubordinateStatementCachePeriod = 8 * time.Hour
+
 // parseRequest populates req from query parameters (GET) and, for POST requests,
 // also from the request body (form or JSON).
 func parseRequest(ctx *fiber.Ctx, req interface{}) error {
@@ -761,6 +767,23 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 		MetadataPolicyCrit: metadataPolicyCrit,
 		Extra:              extra,
 	}
+}
+
+// subordinateStatementCacheTTL computes the cache TTL for a signed subordinate
+// statement, ensuring the cache entry expires before the statement itself and
+// before the earliest published key expires (strict no-expired-keys guarantee).
+// Returns a non-positive duration if the entry should not be cached.
+func subordinateStatementCacheTTL(payload oidfed.EntityStatementPayload) time.Duration {
+	ttl := MaximumSubordinateStatementCachePeriod
+	if t := time.Until(payload.ExpiresAt.Time.Add(-time.Minute)); t < ttl {
+		ttl = t
+	}
+	if minKeyExp := payload.JWKS.MinimalExpirationTime(); !minKeyExp.IsZero() {
+		if t := time.Until(minKeyExp.Time); t < ttl {
+			ttl = t
+		}
+	}
+	return ttl
 }
 
 // filterUsedOperators returns only the operators from configuredCrit that are actually

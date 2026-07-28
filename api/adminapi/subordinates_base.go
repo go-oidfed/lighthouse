@@ -418,7 +418,7 @@ func (h *subordinatesBaseHandlers) notifySubordinateJWKSRefresher(entityID strin
 // registerSubordinatesBase registers basic CRUD endpoints for subordinates.
 func registerSubordinatesBase(r fiber.Router, storages model.Backends, ctrl LighthouseController) {
 	g := r.Group("/subordinates")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	baseH := &subordinatesBaseHandlers{storages: storages, controller: ctrl}
 	historyH := &historyHandlers{

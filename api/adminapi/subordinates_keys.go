@@ -18,7 +18,7 @@ func registerSubordinateKeys(
 	storages model.Backends,
 ) {
 	g := r.Group("/subordinates/:subordinateID/jwks")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	// GET / - Get subordinate JWKS
 	g.Get("/", handleGetSubordinateJWKS(storages.Subordinates))

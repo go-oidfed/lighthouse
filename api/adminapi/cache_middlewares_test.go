@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,8 +10,10 @@ import (
 
 	"github.com/go-oidfed/lib/cache"
 	"github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/require"
 
 	"github.com/go-oidfed/lighthouse/internal"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 func setCacheEntry(t *testing.T, key string, value []byte) {
@@ -78,15 +81,15 @@ func TestEntityConfigurationCacheInvalidationMiddleware(t *testing.T) {
 	// TODO: Currently there are no redirects. If we add any in the future, we should verify that they do not clear the cache.
 	// t.Run("RedirectDoesNotClearCache", func(t *testing.T) {
 	// 	setEntityConfigurationCache(t, cacheValue)
-
+	//
 	// 	app := fiber.New()
 	// 	app.Post("/entity-config", entityConfigurationCacheInvalidationMiddleware, func(c *fiber.Ctx) error {
 	// 		return c.Redirect("/other", fiber.StatusMovedPermanently)
 	// 	})
-
+	//
 	// 	req := httptest.NewRequest(http.MethodPost, "/entity-config", http.NoBody)
 	// 	resp, bodyBytes := doRequest(t, app, req)
-
+	//
 	// 	requireStatus(t, resp, bodyBytes, fiber.StatusMovedPermanently)
 	// 	requireEntityConfigurationCache(t, true, cacheValue)
 	// })
@@ -96,54 +99,115 @@ func TestEntityConfigurationCacheInvalidationMiddleware(t *testing.T) {
 // It operates on the global process-wide cache (cache.Set/Get/Delete), which is
 // shared mutable state. Parallelizing these subtests would cause race conditions
 // on the subordinate statement cache keys.
+//
+// The fetch endpoint caches statements keyed by entity ID, but admin routes
+// identify subordinates by DB primary key. The middleware closure resolves the
+// DB ID to the entity ID before deleting the cache entry.
 func TestSubordinateStatementsCacheInvalidationMiddleware(t *testing.T) {
-	key123 := cache.Key(internal.CacheKeySubordinateStatement, "123")
-	key456 := cache.Key(internal.CacheKeySubordinateStatement, "456")
-	value123 := []byte("statement-123")
-	value456 := []byte("statement-456")
+	entity1 := "https://sub1.example"
+	entity2 := "https://sub2.example"
+	key1 := internal.SubordinateStatementCacheKey(entity1)
+	key2 := internal.SubordinateStatementCacheKey(entity2)
+	value1 := []byte("statement-1")
+	value2 := []byte("statement-2")
+
+	// Helper to build a storage backend with two subordinates whose DB IDs
+	// are known, so tests can send requests with :subordinateID = DB ID.
+	setupStorage := func(t *testing.T) (model.SubordinateStorageBackend, string, string) {
+		t.Helper()
+		store := newSubordinateTestStorage(t)
+		require.NoError(t, store.SubordinateStorage().Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: entity1,
+				Status:   model.StatusActive,
+			},
+		}))
+		require.NoError(t, store.SubordinateStorage().Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: entity2,
+				Status:   model.StatusActive,
+			},
+		}))
+		sub1, err := store.SubordinateStorage().Get(entity1)
+		require.NoError(t, err)
+		sub2, err := store.SubordinateStorage().Get(entity2)
+		require.NoError(t, err)
+		return store.SubordinateStorage(), fmt.Sprintf("%d", sub1.ID), fmt.Sprintf("%d", sub2.ID)
+	}
 
 	t.Run("SpecificSubordinateDeletesOnlyTarget", func(t *testing.T) {
-		setCacheEntry(t, key123, value123)
-		setCacheEntry(t, key456, value456)
-		app := fiber.New()
-		app.Delete("/subordinates/:subordinateID", subordinateStatementsCacheInvalidationMiddleware, func(c *fiber.Ctx) error {
-			return c.SendStatus(http.StatusNoContent)
-		})
+		store, dbID1, _ := setupStorage(t)
+		setCacheEntry(t, key1, value1)
+		setCacheEntry(t, key2, value2)
 
-		req := httptest.NewRequest(http.MethodDelete, "/subordinates/123", http.NoBody)
+		app := fiber.New()
+		app.Delete(
+			"/subordinates/:subordinateID",
+			subordinateStatementsCacheInvalidationMiddleware(store),
+			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) },
+		)
+
+		req := httptest.NewRequest(http.MethodDelete, "/subordinates/"+dbID1, http.NoBody)
 		resp, bodyBytes := doRequest(t, app, req)
 		requireStatus(t, resp, bodyBytes, http.StatusNoContent)
-		requireCacheEntry(t, key123, false, nil)
-		requireCacheEntry(t, key456, true, value456)
+		requireCacheEntry(t, key1, false, nil)
+		requireCacheEntry(t, key2, true, value2)
 	})
 
 	t.Run("CollectionSuccessClearsAll", func(t *testing.T) {
-		setCacheEntry(t, key123, value123)
-		setCacheEntry(t, key456, value456)
+		setCacheEntry(t, key1, value1)
+		setCacheEntry(t, key2, value2)
+
 		app := fiber.New()
-		app.Post("/subordinates", subordinateStatementsCacheInvalidationMiddleware, func(c *fiber.Ctx) error {
-			return c.SendStatus(http.StatusCreated)
-		})
+		app.Post(
+			"/subordinates",
+			subordinateStatementsCacheInvalidationMiddleware(nil),
+			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusCreated) },
+		)
 
 		req := httptest.NewRequest(http.MethodPost, "/subordinates", http.NoBody)
 		resp, bodyBytes := doRequest(t, app, req)
 		requireStatus(t, resp, bodyBytes, http.StatusCreated)
-		requireCacheEntry(t, key123, false, nil)
-		requireCacheEntry(t, key456, false, nil)
+		requireCacheEntry(t, key1, false, nil)
+		requireCacheEntry(t, key2, false, nil)
+	})
+
+	t.Run("LookupFailureClearsAll", func(t *testing.T) {
+		store := newSubordinateTestStorage(t).SubordinateStorage()
+		setCacheEntry(t, key1, value1)
+		setCacheEntry(t, key2, value2)
+
+		app := fiber.New()
+		app.Delete(
+			"/subordinates/:subordinateID",
+			subordinateStatementsCacheInvalidationMiddleware(store),
+			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) },
+		)
+
+		// Use a nonexistent DB ID — lookup fails, middleware falls back to Clear all.
+		req := httptest.NewRequest(http.MethodDelete, "/subordinates/9999", http.NoBody)
+		resp, bodyBytes := doRequest(t, app, req)
+		requireStatus(t, resp, bodyBytes, http.StatusNoContent)
+		requireCacheEntry(t, key1, false, nil)
+		requireCacheEntry(t, key2, false, nil)
 	})
 
 	t.Run("FailureKeepsAll", func(t *testing.T) {
-		setCacheEntry(t, key123, value123)
-		setCacheEntry(t, key456, value456)
-		app := fiber.New()
-		app.Delete("/subordinates/:subordinateID", subordinateStatementsCacheInvalidationMiddleware, func(c *fiber.Ctx) error {
-			return c.SendStatus(http.StatusInternalServerError)
-		})
+		store, dbID1, _ := setupStorage(t)
+		setCacheEntry(t, key1, value1)
+		setCacheEntry(t, key2, value2)
 
-		req := httptest.NewRequest(http.MethodDelete, "/subordinates/123", http.NoBody)
+		app := fiber.New()
+		app.Delete(
+			"/subordinates/:subordinateID",
+			subordinateStatementsCacheInvalidationMiddleware(store),
+			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusInternalServerError) },
+		)
+
+		req := httptest.NewRequest(http.MethodDelete, "/subordinates/"+dbID1, http.NoBody)
 		resp, bodyBytes := doRequest(t, app, req)
 		requireStatus(t, resp, bodyBytes, http.StatusInternalServerError)
-		requireCacheEntry(t, key123, true, value123)
-		requireCacheEntry(t, key456, true, value456)
+		requireCacheEntry(t, key1, true, value1)
+		requireCacheEntry(t, key2, true, value2)
 	})
 }

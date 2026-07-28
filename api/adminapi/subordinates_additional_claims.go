@@ -17,7 +17,7 @@ func registerSubordinateAdditionalClaims(
 	storages model.Backends,
 ) {
 	g := r.Group("/subordinates/:subordinateID/additional-claims")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	// GET / - List all additional claims for a subordinate
 	g.Get("/", handleListSubordinateAdditionalClaims(storages.Subordinates))
@@ -215,7 +215,7 @@ type generalAdditionalClaim struct {
 // registerGeneralAdditionalClaims adds handlers for general additional claims applied to all subordinates.
 func registerGeneralAdditionalClaims(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/additional-claims")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	// GET / - List all general additional claims
 	g.Get("/", handleListGeneralAdditionalClaims(kv))

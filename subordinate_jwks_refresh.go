@@ -5,10 +5,12 @@ import (
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -70,6 +72,7 @@ func (a *subordinateJWKSRefreshStorage) UpdateJWKS(entityID string, jwks jwx.JWK
 	if err := a.store.UpdateJWKSByEntityID(entityID, model.NewJWKS(jwks)); err != nil {
 		return err
 	}
+	_ = cache.Delete(internal.SubordinateStatementCacheKey(entityID))
 	if a.eventStore != nil {
 		info, err := a.store.Get(entityID)
 		if err != nil || info == nil {
@@ -138,6 +141,7 @@ func (fed *LightHouse) RefreshSubordinateJWKSFromEC(entityID string) (changed bo
 	if err := store.UpdateJWKSByEntityID(entityID, model.NewJWKS(ec.JWKS)); err != nil {
 		return false, errors.Wrap(err, "failed to update stored JWKS")
 	}
+	_ = cache.Delete(internal.SubordinateStatementCacheKey(entityID))
 	if fed.storages.SubordinateEvents != nil {
 		if err := fed.storages.SubordinateEvents.Add(
 			model.SubordinateEvent{

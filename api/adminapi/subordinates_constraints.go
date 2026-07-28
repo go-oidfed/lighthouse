@@ -621,7 +621,7 @@ func (h *generalConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) error
 // registerSubordinateConstraints registers subordinate-specific constraint endpoints.
 func registerSubordinateConstraints(r fiber.Router, storages model.Backends) {
 	g := r.Group("/subordinates/:subordinateID/constraints")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	h := &subordinateConstraintsHandlers{storages: storages}
 
@@ -647,7 +647,7 @@ func registerSubordinateConstraints(r fiber.Router, storages model.Backends) {
 // registerGeneralConstraints registers general constraint endpoints.
 func registerGeneralConstraints(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/constraints")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	store := &generalConstraintsStore{kv: kv}
 	h := &generalConstraintsHandlers{store: store}

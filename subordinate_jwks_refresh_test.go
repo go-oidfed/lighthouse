@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
@@ -14,9 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	oidfed "github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 
+	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -223,4 +226,46 @@ func TestBoolPtrIfTrue(t *testing.T) {
 	p := boolPtrIfTrue(true, "msg")
 	require.NotNil(t, p)
 	assert.Equal(t, "msg", *p)
+}
+
+// TestSubordinateJWKSRefreshStorage_UpdateJWKS_InvalidatesCache verifies that
+// the refresher adapter's UpdateJWKS invalidates the cached subordinate
+// statement by entity ID. Must NOT use t.Parallel() — operates on the global
+// cache.
+func TestSubordinateJWKSRefreshStorage_UpdateJWKS_InvalidatesCache(t *testing.T) {
+	entityID := "https://sub-refresh-cache.example"
+	cacheKey := internal.SubordinateStatementCacheKey(entityID)
+
+	store := newTestStorage(t)
+	subStore := store.SubordinateStorage()
+	eventStore := store.SubordinateEventsStorage()
+
+	require.NoError(t, subStore.Add(model.ExtendedSubordinateInfo{
+		JWKS: model.NewJWKS(pubJWKS(t, rsaKey(t))),
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+		},
+	}))
+
+	// Seed the cache with a stale statement.
+	staleJWT := []byte("stale-statement-jwt")
+	require.NoError(t, cache.Set(cacheKey, staleJWT, time.Minute))
+	t.Cleanup(func() { _ = cache.Delete(cacheKey) })
+
+	// Verify it's there.
+	var cached []byte
+	set, err := cache.Get(cacheKey, &cached)
+	require.NoError(t, err)
+	require.True(t, set)
+
+	// Update JWKS via the adapter — should invalidate the cache entry.
+	adapter := NewSubordinateJWKSRefreshStorage(subStore, eventStore)
+	newKeys := jwksWithKid(t, "new-kid")
+	require.NoError(t, adapter.UpdateJWKS(entityID, newKeys))
+
+	// The cache entry should be gone.
+	set, err = cache.Get(cacheKey, &cached)
+	require.NoError(t, err)
+	assert.False(t, set, "cached subordinate statement should be invalidated after UpdateJWKS")
 }

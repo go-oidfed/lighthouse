@@ -853,7 +853,7 @@ func (h *metadataPolicyCritHandlers) delete(c *fiber.Ctx) error {
 // registerGeneralMetadataPolicies registers general metadata policy endpoints (no subordinateID).
 func registerGeneralMetadataPolicies(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/metadata-policies")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	store := &generalMetadataPolicyStore{kv: kv}
 	h := &generalPolicyHandlers{store: store}
@@ -880,7 +880,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, kv model.KeyValueStore) {
 // registerSubordinateMetadataPolicies registers subordinate-specific metadata policy endpoints.
 func registerSubordinateMetadataPolicies(r fiber.Router, storages model.Backends) {
 	g := r.Group("/subordinates/:subordinateID/metadata-policies")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	h := &subordinatePolicyHandlers{storages: storages}
 
@@ -907,7 +907,7 @@ func registerSubordinateMetadataPolicies(r fiber.Router, storages model.Backends
 // registerSubordinateMetadataPolicyCrit registers general metadata policy crit endpoints.
 func registerSubordinateMetadataPolicyCrit(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/metadata-policy-crit")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	h := &metadataPolicyCritHandlers{kv: kv}
 

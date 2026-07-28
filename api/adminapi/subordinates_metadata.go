@@ -16,7 +16,7 @@ func registerSubordinateMetadata(
 	storages model.Backends,
 ) {
 	g := r.Group("/subordinates/:subordinateID/metadata")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	// GET / - Get full subordinate-specific metadata
 	g.Get("/", handleGetSubordinateMetadata(storages.Subordinates))
