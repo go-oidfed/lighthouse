@@ -14,6 +14,20 @@ import (
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
+// Sentinel errors for RefreshSubordinateJWKSFromEC, used by callers (e.g. the
+// jwks_update_trigger endpoint handler) to map failures to the appropriate
+// HTTP status and OAuth error code. They are matched with errors.Is.
+var (
+	// errECFetchFailed is returned when the subordinate's Entity Configuration
+	// could not be fetched or is malformed (e.g. missing exp). This is an
+	// upstream failure and maps to 502 server_error.
+	errECFetchFailed = errors.New("failed to fetch entity configuration")
+	// errECSignatureFailed is returned when the fetched Entity Configuration's
+	// signature cannot be verified against the subordinate's currently stored
+	// JWKS. This is an authenticity failure and maps to 401 invalid_client.
+	errECSignatureFailed = errors.New("entity configuration signature verification failed")
+)
+
 // subordinateJWKSRefreshStorage adapts model.SubordinateStorageBackend to the
 // oidfed.SubordinateJWKSRefreshStorage interface used by the refresher.
 type subordinateJWKSRefreshStorage struct {
@@ -118,16 +132,16 @@ func (fed *LightHouse) RefreshSubordinateJWKSFromEC(entityID string) (changed bo
 
 	ec, err := oidfed.GetEntityConfiguration(entityID)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to fetch entity configuration")
+		return false, errors.Wrap(errECFetchFailed, err.Error())
 	}
 	if ec.ExpiresAt.IsZero() || ec.ExpiresAt.Unix() == 0 {
-		return false, errors.New("entity configuration has no exp; exp is required")
+		return false, errors.Wrap(errECFetchFailed, "exp is required")
 	}
 
 	// Verify the EC signature against the currently stored JWKS.
 	if info.JWKS.Keys.Set != nil && info.JWKS.Keys.Len() > 0 {
 		if !ec.Verify(info.JWKS.Keys) {
-			return false, errors.New("entity configuration signature verification failed against stored JWKS")
+			return false, errors.Wrap(errECSignatureFailed, "against stored JWKS")
 		}
 	}
 

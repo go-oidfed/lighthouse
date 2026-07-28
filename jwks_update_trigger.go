@@ -1,6 +1,8 @@
 package lighthouse
 
 import (
+	stderrors "errors"
+
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
@@ -51,7 +53,7 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 				target = v
 			} else {
 				ctx.Status(fiber.StatusUnauthorized)
-				return ctx.JSON(oidfed.ErrorInvalidRequest("client authentication required"))
+				return ctx.JSON(oidfed.ErrorInvalidClient("client authentication required"))
 			}
 		} else {
 			var req jwksUpdateTriggerRequest
@@ -78,7 +80,21 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 
 		changed, err := fed.RefreshSubordinateJWKSFromEC(target)
 		if err != nil {
-			ctx.Status(fiber.StatusBadGateway)
+			// The EC signature failing to verify against the stored JWKS is an
+			// authenticity failure of the subordinate, mirroring the jwks_update
+			// endpoint semantics: 401 invalid_client.
+			if stderrors.Is(err, errECSignatureFailed) {
+				ctx.Status(fiber.StatusUnauthorized)
+				return ctx.JSON(oidfed.ErrorInvalidClient("failed to refresh JWKS: " + err.Error()))
+			}
+			// A fetch failure (network error or malformed EC) is an upstream
+			// problem: 502 server_error.
+			if stderrors.Is(err, errECFetchFailed) {
+				ctx.Status(fiber.StatusBadGateway)
+				return ctx.JSON(oidfed.ErrorServerError("failed to refresh JWKS: " + err.Error()))
+			}
+			// Anything else (internal store errors, etc.) is a server fault.
+			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError("failed to refresh JWKS: " + err.Error()))
 		}
 

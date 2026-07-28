@@ -77,19 +77,22 @@ func (fed *LightHouse) AddJWKSUpdateEndpoint(
 
 		// Verify the signed JWK Set signature against the subordinate's
 		// currently stored federation JWKS. This enforces that the update is
-		// signed with one of the old federation keys known to Lighthouse.
+		// signed with one of the old federation keys known to Lighthouse. The
+		// signature on the signed JWK Set is the client-auth mechanism for this
+		// endpoint, so a verification failure is an authentication failure
+		// (401 invalid_client), not a forbidden request.
 		if info.JWKS.Keys.Set == nil || info.JWKS.Keys.Len() == 0 {
-			ctx.Status(fiber.StatusForbidden)
+			ctx.Status(fiber.StatusUnauthorized)
 			return ctx.JSON(
-				oidfed.ErrorInvalidRequest(
+				oidfed.ErrorInvalidClient(
 					"subordinate has no known JWKS to verify the signed JWK Set against",
 				),
 			)
 		}
 		if !signed.Verify(info.JWKS.Keys) {
-			ctx.Status(fiber.StatusForbidden)
+			ctx.Status(fiber.StatusUnauthorized)
 			return ctx.JSON(
-				oidfed.ErrorInvalidRequest(
+				oidfed.ErrorInvalidClient(
 					"signed JWK Set signature could not be verified with the subordinate's known keys",
 				),
 			)
