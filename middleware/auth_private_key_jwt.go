@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"slices"
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -172,13 +173,7 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 	}
 
 	// Validate audience matches this entity
-	audMatch := false
-	for _, audEntry := range aud {
-		if audEntry == a.entityID {
-			audMatch = true
-			break
-		}
-	}
+	audMatch := slices.Contains(aud, a.entityID)
 	if !audMatch {
 		return "", nil, ErrInvalidClient("client assertion audience does not match this entity")
 	}

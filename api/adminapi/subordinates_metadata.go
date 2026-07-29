@@ -3,6 +3,7 @@ package adminapi
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -184,9 +185,7 @@ func handlePostSubordinateMetadataEntityType(storages model.Backends) fiber.Hand
 				if existing == nil {
 					existing = map[string]any{}
 				}
-				for k, v := range body {
-					existing[k] = v
-				}
+				maps.Copy(existing, body)
 				setEntityMetadata(info.Metadata, et, existing)
 				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 					return err

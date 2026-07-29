@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -46,10 +47,8 @@ func assertStatus(t *testing.T, resp *http.Response, body []byte, expected int) 
 // assertStatusOneOf checks that the response status code is one of the expected values.
 func assertStatusOneOf(t *testing.T, resp *http.Response, expected ...int) {
 	t.Helper()
-	for _, e := range expected {
-		if resp.StatusCode == e {
-			return
-		}
+	if slices.Contains(expected, resp.StatusCode) {
+		return
 	}
 	t.Errorf("Expected status one of %v, got %d", expected, resp.StatusCode)
 }

@@ -23,7 +23,7 @@ func (fed *LightHouse) AddJWKSUpdateEndpoint(
 	endpoint EndpointConf, store model.SubordinateStorageBackend,
 ) error {
 	if fed.fedMetadata.Extra == nil {
-		fed.fedMetadata.Extra = make(map[string]interface{})
+		fed.fedMetadata.Extra = make(map[string]any)
 	}
 	fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateEndpoint] = endpoint.ValidateURL(
 		fed.FederationEntity.EntityID(),

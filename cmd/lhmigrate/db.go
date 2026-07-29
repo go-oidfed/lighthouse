@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -49,12 +50,7 @@ func parseDBSections(s string) ([]dbMigrationSection, error) {
 }
 
 func isValidDBSection(s dbMigrationSection) bool {
-	for _, valid := range allDBSections() {
-		if s == valid {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allDBSections(), s)
 }
 
 // dbMigrationResult holds the result of a single migration operation
@@ -80,12 +76,7 @@ type dbMigrator struct {
 
 // shouldMigrate checks if a section should be migrated
 func (m *dbMigrator) shouldMigrate(s dbMigrationSection) bool {
-	for _, sec := range m.sections {
-		if sec == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.sections, s)
 }
 
 // migrate runs the migration for all enabled sections

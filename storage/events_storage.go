@@ -39,10 +39,7 @@ func (s *SubordinateEventsStorage) GetBySubordinateID(
 		limit = 100
 	}
 
-	offset := opts.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(opts.Offset, 0)
 
 	// Build query
 	query := s.db.Model(&model.SubordinateEvent{}).Where("subordinate_id = ?", subordinateID)

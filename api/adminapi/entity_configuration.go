@@ -3,6 +3,7 @@ package adminapi
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -332,9 +333,7 @@ func (h *metadataHandlers) postEntityType(c *fiber.Ctx) error {
 	if _, ok := meta[entityType]; !ok {
 		meta[entityType] = make(map[string]json.RawMessage)
 	}
-	for claim, raw := range body {
-		meta[entityType][claim] = raw
-	}
+	maps.Copy(meta[entityType], body)
 
 	if err := h.store.save(meta); err != nil {
 		return serverError(c, err.Error())

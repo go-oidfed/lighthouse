@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/fatih/structs"
@@ -31,9 +32,7 @@ func MergeMaps(overwrite bool, mm ...map[string]any) map[string]any {
 	}
 	all := make(map[string]any)
 	for _, m := range mm {
-		for k, v := range m {
-			all[k] = v
-		}
+		maps.Copy(all, m)
 	}
 	return all
 }

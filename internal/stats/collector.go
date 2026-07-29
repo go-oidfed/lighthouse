@@ -75,15 +75,17 @@ func (c *Collector) Middleware() fiber.Handler {
 		}
 	}
 
-	return Middleware(MiddlewareConfig{
-		CaptureClientIP:       c.config.CaptureClientIP,
-		CaptureUserAgent:      c.config.CaptureUserAgent,
-		CaptureQueryParams:    c.config.CaptureQueryParams,
-		CaptureClientEntityID: c.config.CaptureClientEntityID,
-		GeoIP:                 c.geoIP,
-		TrackedEndpoints:      c.trackedEndpoints,
-		Buffer:                c.buffer,
-	})
+	return Middleware(
+		MiddlewareConfig{
+			CaptureClientIP:       c.config.CaptureClientIP,
+			CaptureUserAgent:      c.config.CaptureUserAgent,
+			CaptureQueryParams:    c.config.CaptureQueryParams,
+			CaptureClientEntityID: c.config.CaptureClientEntityID,
+			GeoIP:                 c.geoIP,
+			TrackedEndpoints:      c.trackedEndpoints,
+			Buffer:                c.buffer,
+		},
+	)
 }
 
 // Start begins the background flushing goroutine.
@@ -93,13 +95,13 @@ func (c *Collector) Start() {
 		return
 	}
 
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		if err := c.flusher.Run(c.ctx); err != nil && err != context.Canceled {
-			log.Error().Err(err).Msg("stats flusher exited with error")
-		}
-	}()
+	c.wg.Go(
+		func() {
+			if err := c.flusher.Run(c.ctx); err != nil && err != context.Canceled {
+				log.Error().Err(err).Msg("stats flusher exited with error")
+			}
+		},
+	)
 
 	log.Info().Msg("stats collector started")
 }

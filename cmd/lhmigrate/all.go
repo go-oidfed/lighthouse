@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -66,13 +67,7 @@ func parseSkipSteps(s string) (map[allStep]bool, error) {
 	validSteps := allSteps()
 	for _, p := range parts {
 		step := allStep(p)
-		valid := false
-		for _, vs := range validSteps {
-			if step == vs {
-				valid = true
-				break
-			}
-		}
+		valid := slices.Contains(validSteps, step)
 		if !valid {
 			return nil, fmt.Errorf("invalid step: %s (valid steps: %s)", p, strings.Join(stepNames(), ", "))
 		}

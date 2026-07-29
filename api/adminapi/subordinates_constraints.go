@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"encoding/json"
+	"slices"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -346,11 +347,9 @@ func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) er
 			if info.Constraints == nil {
 				info.Constraints = &oidfed.ConstraintSpecification{}
 			}
-			for _, t := range info.Constraints.AllowedEntityTypes {
-				if t == entityType {
-					result = info.Constraints.AllowedEntityTypes
-					return nil
-				}
+			if slices.Contains(info.Constraints.AllowedEntityTypes, entityType) {
+				result = info.Constraints.AllowedEntityTypes
+				return nil
 			}
 			info.Constraints.AllowedEntityTypes = append(info.Constraints.AllowedEntityTypes, entityType)
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
@@ -489,10 +488,8 @@ func (h *generalConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) error 
 	if cs == nil {
 		cs = &oidfed.ConstraintSpecification{}
 	}
-	for _, t := range cs.AllowedEntityTypes {
-		if t == entityType {
-			return c.Status(fiber.StatusCreated).JSON(cs.AllowedEntityTypes)
-		}
+	if slices.Contains(cs.AllowedEntityTypes, entityType) {
+		return c.Status(fiber.StatusCreated).JSON(cs.AllowedEntityTypes)
 	}
 	cs.AllowedEntityTypes = append(cs.AllowedEntityTypes, entityType)
 	if err := h.store.save(cs); err != nil {

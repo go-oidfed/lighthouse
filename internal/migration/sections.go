@@ -1,5 +1,7 @@
 package migration
 
+import "slices"
+
 // Section represents which sections to migrate/configure
 type Section string
 
@@ -88,12 +90,7 @@ func ParseSkipSections(s string) (map[Section]bool, error) {
 
 // IsValidSection checks if a section is valid
 func IsValidSection(s Section) bool {
-	for _, valid := range AllSections() {
-		if s == valid {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(AllSections(), s)
 }
 
 func splitAndTrim(s, sep string) []string {

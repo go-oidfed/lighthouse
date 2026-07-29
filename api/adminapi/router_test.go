@@ -76,23 +76,24 @@ servers:
 	}
 
 	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result, err := yamlToJSON([]byte(tt.yamlData))
-			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error but got none")
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+				result, err := yamlToJSON([]byte(tt.yamlData))
+				if tt.wantErr {
+					if err == nil {
+						t.Error("Expected error but got none")
+					}
+					return
 				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
-			if tt.validate != nil {
-				tt.validate(t, result)
-			}
-		})
+				if err != nil {
+					t.Fatalf("Unexpected error: %v", err)
+				}
+				if tt.validate != nil {
+					tt.validate(t, result)
+				}
+			},
+		)
 	}
 }
 
@@ -167,11 +168,12 @@ func TestConvertMapKeysToStrings(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result := convertMapKeysToStrings(tt.input)
-			tt.verify(t, result)
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+				result := convertMapKeysToStrings(tt.input)
+				tt.verify(t, result)
+			},
+		)
 	}
 }

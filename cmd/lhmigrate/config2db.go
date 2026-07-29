@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -292,12 +293,7 @@ type configMigrator struct {
 }
 
 func (m *configMigrator) shouldMigrate(s migrationSection) bool {
-	for _, sec := range m.sections {
-		if sec == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.sections, s)
 }
 
 func (m *configMigrator) migrate() []migrationResult {

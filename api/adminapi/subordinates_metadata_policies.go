@@ -2,6 +2,8 @@ package adminapi
 
 import (
 	"encoding/json"
+	"maps"
+	"slices"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -111,9 +113,7 @@ func (h *generalPolicyHandlers) postEntityType(c *fiber.Ctx) error {
 	if existing == nil {
 		existing = oidfed.MetadataPolicy{}
 	}
-	for claim, ops := range body {
-		existing[claim] = ops
-	}
+	maps.Copy(existing, body)
 	setMetadataPolicy(mp, et, existing)
 	if err = h.store.save(mp); err != nil {
 		return writeServerError(c, err)
@@ -186,9 +186,7 @@ func (h *generalPolicyHandlers) postClaim(c *fiber.Ctx) error {
 	if existing == nil {
 		existing = oidfed.MetadataPolicyEntry{}
 	}
-	for op, val := range body {
-		existing[op] = val
-	}
+	maps.Copy(existing, body)
 	setMetadataPolicyEntry(mp, et, claim, existing)
 	if err := h.store.save(mp); err != nil {
 		return writeServerError(c, err)
@@ -462,9 +460,7 @@ func (h *subordinatePolicyHandlers) postEntityType(c *fiber.Ctx) error {
 			if existing == nil {
 				existing = oidfed.MetadataPolicy{}
 			}
-			for claim, ops := range body {
-				existing[claim] = ops
-			}
+			maps.Copy(existing, body)
 			setMetadataPolicy(info.MetadataPolicy, et, existing)
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
@@ -593,9 +589,7 @@ func (h *subordinatePolicyHandlers) postClaim(c *fiber.Ctx) error {
 			if existing == nil {
 				existing = oidfed.MetadataPolicyEntry{}
 			}
-			for op, v := range body {
-				existing[op] = v
-			}
+			maps.Copy(existing, body)
 			policy[claim] = existing
 			setMetadataPolicy(info.MetadataPolicy, et, policy)
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
@@ -829,10 +823,8 @@ func (h *metadataPolicyCritHandlers) post(c *fiber.Ctx) error {
 	if err != nil {
 		return writeServerError(c, err)
 	}
-	for _, op := range operators {
-		if op == operator {
-			return writeConflict(c, "operator already exists")
-		}
+	if slices.Contains(operators, operator) {
+		return writeConflict(c, "operator already exists")
 	}
 	operators = append(operators, operator)
 	if err := h.save(operators); err != nil {

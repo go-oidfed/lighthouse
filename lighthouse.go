@@ -46,7 +46,7 @@ const MaximumSubordinateStatementCachePeriod = 8 * time.Hour
 
 // parseRequest populates req from query parameters (GET) and, for POST requests,
 // also from the request body (form or JSON).
-func parseRequest(ctx *fiber.Ctx, req interface{}) error {
+func parseRequest(ctx *fiber.Ctx, req any) error {
 	if err := ctx.QueryParser(req); err != nil {
 		return err
 	}

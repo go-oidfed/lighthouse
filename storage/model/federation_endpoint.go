@@ -1,6 +1,10 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"slices"
+
+	"gorm.io/gorm"
+)
 
 // FederationEndpointType enumerates the federation endpoint types managed in
 // the database. There is at most one endpoint of each type.
@@ -43,12 +47,7 @@ func AllFederationEndpointTypes() []FederationEndpointType {
 
 // IsValidFederationEndpointType reports whether t is a known endpoint type.
 func IsValidFederationEndpointType(t FederationEndpointType) bool {
-	for _, v := range AllFederationEndpointTypes() {
-		if v == t {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(AllFederationEndpointTypes(), t)
 }
 
 // FederationEndpointAuthTA is the explicit join table for the many-to-many

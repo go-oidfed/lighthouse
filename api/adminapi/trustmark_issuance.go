@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"errors"
+	"maps"
 	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -240,12 +241,8 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
 	// Merge spec's additional claims into subject claims
 	// Start with spec claims as base, then overlay existing subject claims
 	mergedClaims := make(map[string]any)
-	for k, v := range spec.AdditionalClaims {
-		mergedClaims[k] = v
-	}
-	for k, v := range subject.AdditionalClaims {
-		mergedClaims[k] = v
-	}
+	maps.Copy(mergedClaims, spec.AdditionalClaims)
+	maps.Copy(mergedClaims, subject.AdditionalClaims)
 
 	subject.AdditionalClaims = mergedClaims
 	updatePayload := &model.AddTrustMarkSubject{
