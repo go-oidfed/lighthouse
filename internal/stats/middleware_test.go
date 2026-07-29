@@ -93,7 +93,7 @@ func TestMiddleware_RecordsExplicitFiberErrorStatus(t *testing.T) {
 	buffer := NewRingBuffer(100, 0.8)
 	app := newTestApp(t, buffer)
 	app.Get(
-		"/fail", func(c *fiber.Ctx) error {
+		"/fail", func(*fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusServiceUnavailable, "downstream gone")
 		},
 	)
@@ -114,7 +114,7 @@ func TestMiddleware_RecordsGenericErrorAsInternalServerError(t *testing.T) {
 	buffer := NewRingBuffer(100, 0.8)
 	app := newTestApp(t, buffer)
 	app.Get(
-		"/boom", func(c *fiber.Ctx) error {
+		"/boom", func(*fiber.Ctx) error {
 			return assert.AnError // a non-fiber error
 		},
 	)
