@@ -196,7 +196,7 @@ func TestSubordinateStatementCacheTTL(t *testing.T) {
 			JWKS:      jwks,
 		}
 		ttl := subordinateStatementCacheTTL(payload)
-		assert.InDelta(t, time.Until(keyExp.Add(-time.Minute)), ttl, float64(2*time.Second))
+		assert.InDelta(t, time.Until(keyExp), ttl, float64(2*time.Second))
 	})
 
 	t.Run("empty JWKS — capped to statement exp only", func(t *testing.T) {

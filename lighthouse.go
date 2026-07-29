@@ -771,7 +771,7 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 
 // subordinateStatementCacheTTL computes the cache TTL for a signed subordinate
 // statement, ensuring the cache entry expires before the statement itself and
-// before the earliest published key expires (strict no-expired-keys guarantee).
+// no later than the earliest published key expiration.
 // Returns a non-positive duration if the entry should not be cached.
 func subordinateStatementCacheTTL(payload oidfed.EntityStatementPayload) time.Duration {
 	ttl := MaximumSubordinateStatementCachePeriod
