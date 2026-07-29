@@ -38,7 +38,7 @@ type TrustMarkOwner struct {
 type AddTrustMarkOwner struct {
 	OwnerID  *string `json:"owner_id,omitempty"`
 	EntityID string  `json:"entity_id,omitempty"`
-	JWKS     JWKS    `json:"jwks,omitempty"`
+	JWKS     JWKS    `json:"jwks,omitzero"`
 }
 
 // UnmarshalJSON allows owner_id to be provided as either a number or a numeric string.
@@ -47,7 +47,7 @@ func (a *AddTrustMarkOwner) UnmarshalJSON(data []byte) error {
 	var wire struct {
 		OwnerID  json.RawMessage `json:"owner_id"`
 		EntityID string          `json:"entity_id,omitempty"`
-		JWKS     JWKS            `json:"jwks,omitempty"`
+		JWKS     JWKS            `json:"jwks,omitzero"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
