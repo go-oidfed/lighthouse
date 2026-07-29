@@ -2830,8 +2830,8 @@ paths:
       summary: Patch subordinate details
       description: |
         Partially updates fields of an existing subordinate. Only fields present in
-        the request body are changed; omitted fields are left unchanged. Set a nullable
-        field to `null` to clear it (for example, `jwks_poll_interval: null` resets the
+        the request body are changed; omitted fields (and `null` for nullable fields)
+        are left unchanged. Set `jwks_poll_interval` to `0` to clear it (resetting the
         poll interval to be derived from the Entity Configuration expiration time).
 
         This is the preferred verb for partial updates. `PUT` accepts the same body for
@@ -5138,11 +5138,10 @@ components:
           default: false
         jwks_poll_interval:
           type: integer
-          nullable: true
           description: >
             Per-subordinate poll interval in seconds for JWKS refreshing.
-            Null means the interval is derived from the Entity Configuration
-            expiration time.
+            0 (or omitted) means the interval is derived from the Entity
+            Configuration expiration time.
       example:
         entity_id: https://subordinate.example.com
         registered_entity_types:
@@ -5195,10 +5194,9 @@ components:
           default: false
         jwks_poll_interval:
           type: integer
-          nullable: true
           description: >
             Per-subordinate poll interval in seconds for JWKS refreshing.
-            When null or <= 0, the refresher derives the interval from the
+            When 0 or <= 0, the refresher derives the interval from the
             subordinate's Entity Configuration expiration time.
       example:
         entity_id: https://subordinate.example.com
@@ -5231,8 +5229,9 @@ components:
           nullable: true
           description: >
             Per-subordinate poll interval in seconds for JWKS refreshing.
-            Set to null to clear (derive from the Entity Configuration
-            expiration time). Omit to leave the current value unchanged.
+            Set to 0 to clear (derive from the Entity Configuration
+            expiration time). Omit or set to null to leave the current
+            value unchanged.
       example:
         description: Updated description
         registered_entity_types:
@@ -5289,11 +5288,10 @@ components:
           default: false
         jwks_poll_interval:
           type: integer
-          nullable: true
           description: >
             Per-subordinate poll interval in seconds for JWKS refreshing.
-            Null means the interval is derived from the Entity Configuration
-            expiration time.
+            0 (or omitted) means the interval is derived from the Entity
+            Configuration expiration time.
       example:
         id: id
         entity_id: https://subordinate.example.com

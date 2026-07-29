@@ -58,7 +58,7 @@ func (a *subordinateJWKSRefreshStorage) ListEnabled() ([]oidfed.SubordinateJWKSI
 			out, oidfed.SubordinateJWKSInfo{
 				EntityID:         info.EntityID,
 				EnableJWKSUpdate: info.EnableJWKSUpdate,
-				JWKSPollInterval: info.JWKSPollInterval,
+				JWKSPollInterval: pollIntervalPtr(info.JWKSPollInterval),
 				JWKS:             info.JWKS.Keys,
 			},
 		)
@@ -77,9 +77,19 @@ func (a *subordinateJWKSRefreshStorage) Get(entityID string) (*oidfed.Subordinat
 	return &oidfed.SubordinateJWKSInfo{
 		EntityID:         info.EntityID,
 		EnableJWKSUpdate: info.EnableJWKSUpdate,
-		JWKSPollInterval: info.JWKSPollInterval,
+		JWKSPollInterval: pollIntervalPtr(info.JWKSPollInterval),
 		JWKS:             info.JWKS.Keys,
 	}, nil
+}
+
+// pollIntervalPtr converts the stored int64 poll interval into the *int64 the
+// refresher expects. 0 (the unset sentinel) maps to nil so the refresher
+// derives the interval from the Entity Configuration expiration time.
+func pollIntervalPtr(v int64) *int64 {
+	if v <= 0 {
+		return nil
+	}
+	return &v
 }
 
 func (a *subordinateJWKSRefreshStorage) UpdateJWKS(entityID string, jwks jwx.JWKS) error {

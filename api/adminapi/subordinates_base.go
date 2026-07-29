@@ -166,8 +166,8 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 			if body.EnableJWKSUpdate != nil {
 				existing.EnableJWKSUpdate = *body.EnableJWKSUpdate
 			}
-			if body.JWKSPollInterval.Defined {
-				existing.JWKSPollInterval = body.JWKSPollInterval.Value
+			if body.JWKSPollInterval != nil {
+				existing.JWKSPollInterval = *body.JWKSPollInterval
 			}
 			if err = tx.Subordinates.Update(existing.EntityID, *existing); err != nil {
 				return err

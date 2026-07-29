@@ -184,15 +184,14 @@ func TestSubordinateStorage_Update_PersistsJWKSRefreshFields(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, existing)
 	existing.EnableJWKSUpdate = true
-	existing.JWKSPollInterval = new(int64(3600))
+	existing.JWKSPollInterval = 3600
 	require.NoError(t, subStore.Update(entityID, *existing))
 
 	updated, err := subStore.Get(entityID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	assert.True(t, updated.EnableJWKSUpdate, "EnableJWKSUpdate should be persisted by Update")
-	require.NotNil(t, updated.JWKSPollInterval, "JWKSPollInterval should be persisted by Update")
-	assert.Equal(t, int64(3600), *updated.JWKSPollInterval)
+	assert.Equal(t, int64(3600), updated.JWKSPollInterval)
 
 	// ListEnabledForJWKSRefresh should now return it.
 	listed, err := subStore.ListEnabledForJWKSRefresh()
@@ -209,13 +208,13 @@ func TestSubordinateStorage_Update_PersistsJWKSRefreshFields(t *testing.T) {
 	existing, err = subStore.Get(entityID)
 	require.NoError(t, err)
 	existing.EnableJWKSUpdate = false
-	existing.JWKSPollInterval = nil
+	existing.JWKSPollInterval = 0
 	require.NoError(t, subStore.Update(entityID, *existing))
 
 	updated, err = subStore.Get(entityID)
 	require.NoError(t, err)
 	assert.False(t, updated.EnableJWKSUpdate, "EnableJWKSUpdate should be toggled back to false")
-	assert.Nil(t, updated.JWKSPollInterval, "JWKSPollInterval should be cleared to nil")
+	assert.Equal(t, int64(0), updated.JWKSPollInterval, "JWKSPollInterval should be cleared to 0")
 
 	listed, err = subStore.ListEnabledForJWKSRefresh()
 	require.NoError(t, err)

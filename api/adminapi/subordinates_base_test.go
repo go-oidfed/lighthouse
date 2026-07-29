@@ -540,7 +540,7 @@ func TestPutSubordinateByID(t *testing.T) {
 			if !updated.EnableJWKSUpdate {
 				t.Errorf("Expected EnableJWKSUpdate=true, got false")
 			}
-			if updated.JWKSPollInterval == nil || *updated.JWKSPollInterval != 3600 {
+			if updated.JWKSPollInterval != 3600 {
 				t.Errorf("Expected JWKSPollInterval=3600, got %v", updated.JWKSPollInterval)
 			}
 
@@ -646,7 +646,7 @@ func TestPatchSubordinateByID(t *testing.T) {
 			if !respInfo.EnableJWKSUpdate {
 				t.Errorf("response EnableJWKSUpdate = false, want true")
 			}
-			if respInfo.JWKSPollInterval == nil || *respInfo.JWKSPollInterval != 7200 {
+			if respInfo.JWKSPollInterval != 7200 {
 				t.Errorf("response JWKSPollInterval = %v, want 7200", respInfo.JWKSPollInterval)
 			}
 
@@ -658,7 +658,7 @@ func TestPatchSubordinateByID(t *testing.T) {
 			if !updated.EnableJWKSUpdate {
 				t.Errorf("DB EnableJWKSUpdate = false, want true")
 			}
-			if updated.JWKSPollInterval == nil || *updated.JWKSPollInterval != 7200 {
+			if updated.JWKSPollInterval != 7200 {
 				t.Errorf("DB JWKSPollInterval = %v, want 7200", updated.JWKSPollInterval)
 			}
 		},
@@ -675,7 +675,7 @@ func TestPatchSubordinateByID(t *testing.T) {
 						EntityID:         "https://patch-unchanged.example.org",
 						Status:           model.StatusActive,
 						EnableJWKSUpdate: true,
-						JWKSPollInterval: new(int64(3600)),
+						JWKSPollInterval: 3600,
 					},
 				},
 			)
@@ -702,7 +702,7 @@ func TestPatchSubordinateByID(t *testing.T) {
 			if !updated.EnableJWKSUpdate {
 				t.Errorf("EnableJWKSUpdate = false, want true (omitted field should be unchanged)")
 			}
-			if updated.JWKSPollInterval == nil || *updated.JWKSPollInterval != 3600 {
+			if updated.JWKSPollInterval != 3600 {
 				t.Errorf(
 					"JWKSPollInterval = %v, want 3600 (omitted field should be unchanged)", updated.JWKSPollInterval,
 				)
@@ -721,7 +721,7 @@ func TestPatchSubordinateByID(t *testing.T) {
 						EntityID:         "https://patch-clear.example.org",
 						Status:           model.StatusActive,
 						EnableJWKSUpdate: true,
-						JWKSPollInterval: new(int64(3600)),
+						JWKSPollInterval: 3600,
 					},
 				},
 			)
@@ -730,7 +730,7 @@ func TestPatchSubordinateByID(t *testing.T) {
 				t.Fatalf("Failed to get subordinate: %v", err)
 			}
 
-			body := `{"jwks_poll_interval": null}`
+			body := `{"jwks_poll_interval": 0}`
 			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			resp, bodyBytes := doRequest(t, app, req)
@@ -741,8 +741,8 @@ func TestPatchSubordinateByID(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to get subordinate: %v", err)
 			}
-			if updated.JWKSPollInterval != nil {
-				t.Errorf("JWKSPollInterval = %v, want nil", updated.JWKSPollInterval)
+			if updated.JWKSPollInterval != 0 {
+				t.Errorf("JWKSPollInterval = %v, want 0", updated.JWKSPollInterval)
 			}
 			if !updated.EnableJWKSUpdate {
 				t.Errorf("EnableJWKSUpdate = false, want true (omitted field should be unchanged)")
@@ -1009,7 +1009,7 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 			EntityID:         entityID,
 			Status:           model.StatusPending,
 			EnableJWKSUpdate: true,
-			JWKSPollInterval: new(int64(7200)),
+			JWKSPollInterval: 7200,
 			SubordinateEntityTypes: []model.SubordinateEntityType{
 				{EntityType: oidfedconst.EntityTypeOpenIDRelyingParty},
 			},
@@ -1051,7 +1051,7 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 	if !reactivated.EnableJWKSUpdate {
 		t.Errorf("expected EnableJWKSUpdate=true after reactivation, got false")
 	}
-	if reactivated.JWKSPollInterval == nil || *reactivated.JWKSPollInterval != 7200 {
+	if reactivated.JWKSPollInterval != 7200 {
 		t.Errorf("expected JWKSPollInterval=7200 after reactivation, got %v", reactivated.JWKSPollInterval)
 	}
 
