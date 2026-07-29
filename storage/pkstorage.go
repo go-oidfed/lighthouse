@@ -209,8 +209,7 @@ func (D *DBPublicKeyStorage) Revoke(kid, reason string) error {
 		}
 		return errors.WithStack(res.Error)
 	}
-	now := unixtime.Now()
-	row.RevokedAt = &now
+	row.RevokedAt = new(unixtime.Now())
 	row.Reason = reason
 	return errors.WithStack(D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Save(&row).Error)
 }

@@ -21,16 +21,13 @@ func handleStoreError(c *fiber.Ctx, err error, notFoundMsg string) error {
 	if err == nil {
 		return nil
 	}
-	var notFoundError model.NotFoundError
-	if errors.As(err, &notFoundError) {
+	if _, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(notFoundMsg))
 	}
-	var alreadyExistsError model.AlreadyExistsError
-	if errors.As(err, &alreadyExistsError) {
+	if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
-	var validationError model.ValidationError
-	if errors.As(err, &validationError) {
+	if _, ok := errors.AsType[model.ValidationError](err); ok {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))

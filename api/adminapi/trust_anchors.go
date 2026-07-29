@@ -47,8 +47,7 @@ func (h *trustAnchorsHandlers) list(c *fiber.Ctx) error {
 func (h *trustAnchorsHandlers) get(c *fiber.Ctx) error {
 	item, err := h.store.Get(c.Params("entityID"))
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust anchor not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -66,12 +65,10 @@ func (h *trustAnchorsHandlers) create(c *fiber.Ctx) error {
 	}
 	item, err := h.store.Create(req)
 	if err != nil {
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("trust anchor already exists"))
 		}
-		var ve model.ValidationError
-		if errors.As(err, &ve) {
+		if _, ok := errors.AsType[model.ValidationError](err); ok {
 			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -91,12 +88,10 @@ func (h *trustAnchorsHandlers) update(c *fiber.Ctx) error {
 	}
 	item, err := h.store.Update(c.Params("entityID"), req)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust anchor not found"))
 		}
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("trust anchor already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -113,8 +108,7 @@ func (h *trustAnchorsHandlers) delete(c *fiber.Ctx) error {
 		r.Remove(entityID)
 	}
 	if err := h.store.Delete(entityID); err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust anchor not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -168,7 +162,10 @@ func registerTrustAnchors(r fiber.Router, store model.TrustAnchorStore, ctrl Lig
 		return
 	}
 	g := r.Group("/trust-anchors")
-	h := &trustAnchorsHandlers{store: store, controller: ctrl}
+	h := &trustAnchorsHandlers{
+		store:      store,
+		controller: ctrl,
+	}
 
 	g.Get("/", h.list)
 	g.Post("/", h.create)

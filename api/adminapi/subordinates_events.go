@@ -19,8 +19,7 @@ func WithMessage(msg string) EventOption {
 // WithStatus sets the event status.
 func WithStatus(status model.Status) EventOption {
 	return func(e *model.SubordinateEvent) {
-		s := status.String()
-		e.Status = &s
+		e.Status = new(status.String())
 	}
 }
 

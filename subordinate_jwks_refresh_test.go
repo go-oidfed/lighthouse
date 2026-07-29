@@ -27,7 +27,12 @@ import (
 func newTestStorage(t *testing.T) *storage.Storage {
 	t.Helper()
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", url.PathEscape(t.Name()))
-	store, err := storage.NewStorage(storage.Config{Driver: storage.DriverSQLite, DSN: dsn})
+	store, err := storage.NewStorage(
+		storage.Config{
+			Driver: storage.DriverSQLite,
+			DSN:    dsn,
+		},
+	)
 	require.NoError(t, err)
 	return store
 }
@@ -71,14 +76,18 @@ func TestSubordinateJWKSRefreshStorage_Adapter(t *testing.T) {
 	sk := rsaKey(t)
 	keys := pubJWKS(t, sk)
 
-	require.NoError(t, subStore.Add(model.ExtendedSubordinateInfo{
-		JWKS: model.NewJWKS(keys),
-		BasicSubordinateInfo: model.BasicSubordinateInfo{
-			EntityID:         "https://sub-adapter.example",
-			Status:           model.StatusActive,
-			EnableJWKSUpdate: true,
-		},
-	}))
+	require.NoError(
+		t, subStore.Add(
+			model.ExtendedSubordinateInfo{
+				JWKS: model.NewJWKS(keys),
+				BasicSubordinateInfo: model.BasicSubordinateInfo{
+					EntityID:         "https://sub-adapter.example",
+					Status:           model.StatusActive,
+					EnableJWKSUpdate: true,
+				},
+			},
+		),
+	)
 
 	adapter := NewSubordinateJWKSRefreshStorage(subStore, eventStore)
 
@@ -157,22 +166,25 @@ func TestSubordinateStorage_Update_PersistsJWKSRefreshFields(t *testing.T) {
 
 	entityID := "https://sub-update-jwks.example"
 
-	require.NoError(t, subStore.Add(model.ExtendedSubordinateInfo{
-		JWKS: model.NewJWKS(pubJWKS(t, rsaKey(t))),
-		BasicSubordinateInfo: model.BasicSubordinateInfo{
-			EntityID:         entityID,
-			Status:           model.StatusActive,
-			EnableJWKSUpdate: false,
-		},
-	}))
+	require.NoError(
+		t, subStore.Add(
+			model.ExtendedSubordinateInfo{
+				JWKS: model.NewJWKS(pubJWKS(t, rsaKey(t))),
+				BasicSubordinateInfo: model.BasicSubordinateInfo{
+					EntityID:         entityID,
+					Status:           model.StatusActive,
+					EnableJWKSUpdate: false,
+				},
+			},
+		),
+	)
 
 	// Enable refreshing via Update on the existing (non-deleted) row.
 	existing, err := subStore.Get(entityID)
 	require.NoError(t, err)
 	require.NotNil(t, existing)
 	existing.EnableJWKSUpdate = true
-	interval := int64(3600)
-	existing.JWKSPollInterval = &interval
+	existing.JWKSPollInterval = new(int64(3600))
 	require.NoError(t, subStore.Update(entityID, *existing))
 
 	updated, err := subStore.Get(entityID)
@@ -216,7 +228,14 @@ func TestSubordinateStorage_Update_PersistsJWKSRefreshFields(t *testing.T) {
 
 func TestAddedRemovedMsg(t *testing.T) {
 	assert.Equal(t, "", addedRemovedMsg(nil, nil))
-	assert.Equal(t, "added: a, b", addedRemovedMsg([]string{"a", "b"}, nil))
+	assert.Equal(
+		t, "added: a, b", addedRemovedMsg(
+			[]string{
+				"a",
+				"b",
+			}, nil,
+		),
+	)
 	assert.Equal(t, "removed: x", addedRemovedMsg(nil, []string{"x"}))
 	assert.Equal(t, "added: a; removed: x", addedRemovedMsg([]string{"a"}, []string{"x"}))
 }
@@ -240,13 +259,17 @@ func TestSubordinateJWKSRefreshStorage_UpdateJWKS_InvalidatesCache(t *testing.T)
 	subStore := store.SubordinateStorage()
 	eventStore := store.SubordinateEventsStorage()
 
-	require.NoError(t, subStore.Add(model.ExtendedSubordinateInfo{
-		JWKS: model.NewJWKS(pubJWKS(t, rsaKey(t))),
-		BasicSubordinateInfo: model.BasicSubordinateInfo{
-			EntityID: entityID,
-			Status:   model.StatusActive,
-		},
-	}))
+	require.NoError(
+		t, subStore.Add(
+			model.ExtendedSubordinateInfo{
+				JWKS: model.NewJWKS(pubJWKS(t, rsaKey(t))),
+				BasicSubordinateInfo: model.BasicSubordinateInfo{
+					EntityID: entityID,
+					Status:   model.StatusActive,
+				},
+			},
+		),
+	)
 
 	// Seed the cache with a stale statement.
 	staleJWT := []byte("stale-statement-jwt")

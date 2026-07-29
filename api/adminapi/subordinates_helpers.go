@@ -40,8 +40,7 @@ func writeConflict(c *fiber.Ctx, msg string) error {
 // handleTxError handles errors from transactional operations.
 // It maps NotFoundError to 404 responses and other errors to 500 responses.
 func handleTxError(c *fiber.Ctx, err error) error {
-	var nf model.NotFoundError
-	if errors.As(err, &nf) {
+	if _, ok := errors.AsType[model.NotFoundError](err); ok {
 		return writeNotFound(c, err.Error())
 	}
 	return writeServerError(c, err)
@@ -71,8 +70,7 @@ func handleSubordinateLookup(
 	id := c.Params("subordinateID")
 	info, err := getSubordinateByDBID(subordinates, id)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			_ = writeNotFound(c, err.Error())
 			return nil, false
 		}

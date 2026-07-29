@@ -32,8 +32,7 @@ func (h *federationEndpointsHandlers) getByType(c *fiber.Ctx) error {
 	}
 	item, err := h.store.GetByType(t)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("federation endpoint not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -60,12 +59,10 @@ func (h *federationEndpointsHandlers) create(c *fiber.Ctx) error {
 	}
 	item, err := h.store.Create(req)
 	if err != nil {
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("federation endpoint already exists"))
 		}
-		var ve model.ValidationError
-		if errors.As(err, &ve) {
+		if _, ok := errors.AsType[model.ValidationError](err); ok {
 			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -97,12 +94,10 @@ func (h *federationEndpointsHandlers) update(c *fiber.Ctx) error {
 	}
 	item, err := h.store.Update(t, req)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("federation endpoint not found"))
 		}
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("federation endpoint already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -117,8 +112,7 @@ func (h *federationEndpointsHandlers) delete(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid endpoint type"))
 	}
 	if err := h.store.Delete(t); err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("federation endpoint not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -138,8 +132,7 @@ func (h *federationEndpointsHandlers) setAuthTrustAnchors(c *fiber.Ctx) error {
 	}
 	tas, err := h.store.SetAuthTrustAnchors(t, ids)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -165,7 +158,10 @@ func registerFederationEndpoints(r fiber.Router, store model.FederationEndpointS
 		return
 	}
 	g := r.Group("/federation-endpoints")
-	h := &federationEndpointsHandlers{store: store, controller: ctrl}
+	h := &federationEndpointsHandlers{
+		store:      store,
+		controller: ctrl,
+	}
 
 	g.Get("/", h.list)
 	g.Post("/", h.create)

@@ -81,12 +81,10 @@ func (h *trustMarkSpecHandlers) delete(c *fiber.Ctx) error {
 }
 
 func (*trustMarkSpecHandlers) handleError(c *fiber.Ctx, err error) error {
-	var notFound model.NotFoundError
-	if errors.As(err, &notFound) {
+	if notFound, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
 	}
-	var alreadyExists model.AlreadyExistsError
-	if errors.As(err, &alreadyExists) {
+	if alreadyExists, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -264,12 +262,10 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
 }
 
 func (*trustMarkSubjectHandlers) handleError(c *fiber.Ctx, err error) error {
-	var notFound model.NotFoundError
-	if errors.As(err, &notFound) {
+	if notFound, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
 	}
-	var alreadyExists model.AlreadyExistsError
-	if errors.As(err, &alreadyExists) {
+	if alreadyExists, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))

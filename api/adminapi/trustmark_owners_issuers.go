@@ -38,8 +38,7 @@ func (h *trustMarkOwnersHandlers) create(c *fiber.Ctx) error {
 	}
 	item, err := h.owners.Create(req)
 	if err != nil {
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("owner already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -62,12 +61,10 @@ func (h *trustMarkOwnersHandlers) update(c *fiber.Ctx) error {
 	}
 	item, err := h.owners.Update(c.Params("ownerID"), req)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("owner not found"))
 		}
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("owner already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -175,13 +172,14 @@ func (h *globalTrustMarkIssuersHandlers) create(c *fiber.Ctx) error {
 	if req.Issuer == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("issuer is required"))
 	}
-	item, err := h.issuers.Create(model.AddTrustMarkIssuer{
-		Issuer:      req.Issuer,
-		Description: req.Description,
-	})
+	item, err := h.issuers.Create(
+		model.AddTrustMarkIssuer{
+			Issuer:      req.Issuer,
+			Description: req.Description,
+		},
+	)
 	if err != nil {
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("issuer already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -204,12 +202,10 @@ func (h *globalTrustMarkIssuersHandlers) update(c *fiber.Ctx) error {
 	}
 	item, err := h.issuers.Update(c.Params("issuerID"), req)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("issuer not found"))
 		}
-		var exists model.AlreadyExistsError
-		if errors.As(err, &exists) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("issuer already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -297,7 +293,10 @@ func registerTrustMarkOwners(r fiber.Router, owners model.TrustMarkOwnersStore, 
 	g := r.Group("/trust-marks/owners")
 	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 
-	h := &trustMarkOwnersHandlers{owners: owners, types: types}
+	h := &trustMarkOwnersHandlers{
+		owners: owners,
+		types:  types,
+	}
 
 	g.Get("/", h.list)
 	g.Post("/", h.create)
@@ -316,7 +315,10 @@ func registerTrustMarkIssuers(r fiber.Router, issuers model.TrustMarkIssuersStor
 	g := r.Group("/trust-marks/issuers")
 	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 
-	h := &globalTrustMarkIssuersHandlers{issuers: issuers, types: types}
+	h := &globalTrustMarkIssuersHandlers{
+		issuers: issuers,
+		types:   types,
+	}
 
 	g.Get("/", h.list)
 	g.Post("/", h.create)

@@ -198,8 +198,7 @@ func (s *TrustAnchorStorage) GetJWKS(entityID string) (*jwx.JWKS, error) {
 	if ta.JWKSID == nil || ta.JWKS.Keys.Set == nil {
 		return nil, nil
 	}
-	keys := ta.JWKS.Keys
-	return &keys, nil
+	return new(ta.JWKS.Keys), nil
 }
 
 // UpdateJWKS stores/replaces the JWKS for an entity. If the entity has no JWKS

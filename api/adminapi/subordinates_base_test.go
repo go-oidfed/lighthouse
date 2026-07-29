@@ -202,7 +202,10 @@ func TestGetSubordinates(t *testing.T) {
 				},
 			)
 
-			req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates?entity_type=%s", oidfedconst.EntityTypeOpenIDRelyingParty), http.NoBody)
+			req := httptest.NewRequest(
+				"GET", fmt.Sprintf("/subordinates?entity_type=%s", oidfedconst.EntityTypeOpenIDRelyingParty),
+				http.NoBody,
+			)
 			resp, body := doRequest(t, app, req)
 
 			requireStatus(t, resp, body, http.StatusOK)
@@ -337,7 +340,10 @@ func TestPostSubordinates(t *testing.T) {
 				t.Errorf("Expected 1 key in JWKS, got %d", saved.JWKS.Keys.Len())
 			}
 			if len(saved.SubordinateEntityTypes) != 1 || saved.SubordinateEntityTypes[0].EntityType != oidfedconst.EntityTypeOpenIDProvider {
-				t.Errorf("Expected 1 entity type '%s', got %v", oidfedconst.EntityTypeOpenIDProvider, saved.SubordinateEntityTypes)
+				t.Errorf(
+					"Expected 1 entity type '%s', got %v", oidfedconst.EntityTypeOpenIDProvider,
+					saved.SubordinateEntityTypes,
+				)
 			}
 		},
 	)
@@ -663,14 +669,13 @@ func TestPatchSubordinateByID(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateBaseApp(t)
 
-			interval := int64(3600)
 			backends.Subordinates.Add(
 				model.ExtendedSubordinateInfo{
 					BasicSubordinateInfo: model.BasicSubordinateInfo{
 						EntityID:         "https://patch-unchanged.example.org",
 						Status:           model.StatusActive,
 						EnableJWKSUpdate: true,
-						JWKSPollInterval: &interval,
+						JWKSPollInterval: new(int64(3600)),
 					},
 				},
 			)
@@ -698,7 +703,9 @@ func TestPatchSubordinateByID(t *testing.T) {
 				t.Errorf("EnableJWKSUpdate = false, want true (omitted field should be unchanged)")
 			}
 			if updated.JWKSPollInterval == nil || *updated.JWKSPollInterval != 3600 {
-				t.Errorf("JWKSPollInterval = %v, want 3600 (omitted field should be unchanged)", updated.JWKSPollInterval)
+				t.Errorf(
+					"JWKSPollInterval = %v, want 3600 (omitted field should be unchanged)", updated.JWKSPollInterval,
+				)
 			}
 		},
 	)
@@ -708,14 +715,13 @@ func TestPatchSubordinateByID(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateBaseApp(t)
 
-			interval := int64(3600)
 			backends.Subordinates.Add(
 				model.ExtendedSubordinateInfo{
 					BasicSubordinateInfo: model.BasicSubordinateInfo{
 						EntityID:         "https://patch-clear.example.org",
 						Status:           model.StatusActive,
 						EnableJWKSUpdate: true,
-						JWKSPollInterval: &interval,
+						JWKSPollInterval: new(int64(3600)),
 					},
 				},
 			)
@@ -774,7 +780,9 @@ func TestPatchSubordinateByID(t *testing.T) {
 				t.Fatalf("Failed to get subordinate: %v", err)
 			}
 
-			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`))
+			req := httptest.NewRequest(
+				"PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`),
+			)
 			req.Header.Set("Content-Type", "application/json")
 			resp, respBody := doRequest(t, app, req)
 
@@ -919,7 +927,8 @@ func TestIssue85_ReRegisterAfterDelete(t *testing.T) {
 			createReq := httptest.NewRequest(
 				"POST", "/subordinates", strings.NewReader(
 					fmt.Sprintf(
-						`{"entity_id":"%s","registered_entity_types":["%s"],"status":"pending"}`, entityID, oidfedconst.EntityTypeOpenIDProvider,
+						`{"entity_id":"%s","registered_entity_types":["%s"],"status":"pending"}`, entityID,
+						oidfedconst.EntityTypeOpenIDProvider,
 					),
 				),
 			)
@@ -995,13 +1004,12 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 	// fresh JWKS, and entity types.
 	newSet := jwk.NewSet()
 	newSet.AddKey(createTestKey("replacement-key"))
-	reEnrollInterval := int64(7200)
 	reEnroll := model.ExtendedSubordinateInfo{
 		BasicSubordinateInfo: model.BasicSubordinateInfo{
 			EntityID:         entityID,
 			Status:           model.StatusPending,
 			EnableJWKSUpdate: true,
-			JWKSPollInterval: &reEnrollInterval,
+			JWKSPollInterval: new(int64(7200)),
 			SubordinateEntityTypes: []model.SubordinateEntityType{
 				{EntityType: oidfedconst.EntityTypeOpenIDRelyingParty},
 			},
@@ -1249,12 +1257,11 @@ func TestGetSubordinateHistory(t *testing.T) {
 					Type:          model.EventTypeCreated,
 				},
 			)
-			status := "active"
 			backends.SubordinateEvents.Add(
 				model.SubordinateEvent{
 					SubordinateID: saved.ID,
 					Type:          model.EventTypeStatusUpdated,
-					Status:        &status,
+					Status:        new("active"),
 				},
 			)
 

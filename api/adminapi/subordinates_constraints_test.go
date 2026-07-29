@@ -49,9 +49,8 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateConstraintsApp(t)
 
-			length := 5
 			constraints := &oidfed.ConstraintSpecification{
-				MaxPathLength: &length,
+				MaxPathLength: new(5),
 			}
 
 			backends.Subordinates.Add(
@@ -171,14 +170,13 @@ func TestSubordinateConstraintsAll(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateConstraintsApp(t)
 
-			length := 5
 			backends.Subordinates.Add(
 				model.ExtendedSubordinateInfo{
 					BasicSubordinateInfo: model.BasicSubordinateInfo{
 						EntityID: "https://constraints-delete.example.org",
 					},
 					Constraints: &oidfed.ConstraintSpecification{
-						MaxPathLength: &length,
+						MaxPathLength: new(5),
 					},
 				},
 			)
@@ -238,14 +236,13 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateConstraintsApp(t)
 
-			length := 5
 			backends.Subordinates.Add(
 				model.ExtendedSubordinateInfo{
 					BasicSubordinateInfo: model.BasicSubordinateInfo{
 						EntityID: "https://maxpath-get.example.org",
 					},
 					Constraints: &oidfed.ConstraintSpecification{
-						MaxPathLength: &length,
+						MaxPathLength: new(5),
 					},
 				},
 			)
@@ -344,14 +341,13 @@ func TestSubordinateConstraintsMaxPathLength(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateConstraintsApp(t)
 
-			length := 5
 			backends.Subordinates.Add(
 				model.ExtendedSubordinateInfo{
 					BasicSubordinateInfo: model.BasicSubordinateInfo{
 						EntityID: "https://maxpath-delete.example.org",
 					},
 					Constraints: &oidfed.ConstraintSpecification{
-						MaxPathLength:      &length,
+						MaxPathLength:      new(5),
 						AllowedEntityTypes: []string{"keep_me"},
 					},
 				},
@@ -477,7 +473,8 @@ func TestSubordinateConstraintsNamingConstraints(t *testing.T) {
 
 			body := `{"permitted": ["new.example.com"], "excluded": ["bad.example.com"]}`
 			req := httptest.NewRequest(
-				"PUT", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID), strings.NewReader(body),
+				"PUT", fmt.Sprintf("/subordinates/%d/constraints/naming-constraints", saved.ID),
+				strings.NewReader(body),
 			)
 			req.Header.Set("Content-Type", "application/json")
 			resp, bodyBytes := doRequest(t, app, req)
@@ -620,7 +617,6 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateConstraintsApp(t)
 
-			length := 5
 			backends.Subordinates.Add(
 				model.ExtendedSubordinateInfo{
 					BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -628,7 +624,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 					},
 					Constraints: &oidfed.ConstraintSpecification{
 						AllowedEntityTypes: []string{"old_type"},
-						MaxPathLength:      &length,
+						MaxPathLength:      new(5),
 					},
 				},
 			)
@@ -711,7 +707,6 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 			t.Parallel()
 			app, backends := setupSubordinateConstraintsApp(t)
 
-			length := 5
 			backends.Subordinates.Add(
 				model.ExtendedSubordinateInfo{
 					BasicSubordinateInfo: model.BasicSubordinateInfo{
@@ -722,7 +717,7 @@ func TestSubordinateConstraintsAllowedEntityTypes(t *testing.T) {
 							"delete_me",
 							"keep_me",
 						},
-						MaxPathLength: &length,
+						MaxPathLength: new(5),
 					},
 				},
 			)
@@ -784,10 +779,9 @@ func TestGeneralConstraintsAll(t *testing.T) {
 			t.Parallel()
 			app, backends := setupGeneralConstraintsApp(t)
 
-			length := 5
 			if err := backends.KV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
-					MaxPathLength: &length,
+					MaxPathLength: new(5),
 				},
 			); err != nil {
 				t.Fatalf("Failed to set KV value: %v", err)
@@ -853,10 +847,9 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		"GET Success", func(t *testing.T) {
 			t.Parallel()
 			app, backends := setupGeneralConstraintsApp(t)
-			length := 5
 			if err := backends.KV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
-					MaxPathLength: &length,
+					MaxPathLength: new(5),
 				},
 			); err != nil {
 				t.Fatalf("Failed to set KV value: %v", err)
@@ -914,10 +907,9 @@ func TestGeneralConstraintsMaxPathLength(t *testing.T) {
 		"DELETE Success", func(t *testing.T) {
 			t.Parallel()
 			app, backends := setupGeneralConstraintsApp(t)
-			length := 5
 			if err := backends.KV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
-					MaxPathLength:      &length,
+					MaxPathLength:      new(5),
 					AllowedEntityTypes: []string{"keep_me"},
 				},
 			); err != nil {
@@ -1191,10 +1183,9 @@ func TestSubordinateConstraintsPostAll(t *testing.T) {
 			app, backends := setupSubordinateConstraintsApp(t)
 
 			// Seed general constraints in KV
-			length := 3
 			if err := backends.KV.SetAny(
 				model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints, &oidfed.ConstraintSpecification{
-					MaxPathLength:      &length,
+					MaxPathLength:      new(3),
 					AllowedEntityTypes: []string{oidfedconst.EntityTypeOpenIDProvider},
 				},
 			); err != nil {

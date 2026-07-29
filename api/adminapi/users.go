@@ -39,8 +39,7 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 			}
 			u, err := users.Create(req.Username, req.Password, req.DisplayName)
 			if err != nil {
-				var alreadyExistsError model.AlreadyExistsError
-				if errors.As(err, &alreadyExistsError) {
+				if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("user already exists"))
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -63,8 +62,7 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 			}
 			u, err := users.Update(username, req.DisplayName, req.Password, req.Disabled)
 			if err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
+				if _, ok := errors.AsType[model.NotFoundError](err); ok {
 					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("user not found"))
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -78,8 +76,7 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 			username := c.Params("username")
 			u, err := users.Get(username)
 			if err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
+				if _, ok := errors.AsType[model.NotFoundError](err); ok {
 					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("user not found"))
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -92,8 +89,7 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 		"/:username", func(c *fiber.Ctx) error {
 			username := c.Params("username")
 			if err := users.Delete(username); err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
+				if _, ok := errors.AsType[model.NotFoundError](err); ok {
 					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("user not found"))
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
