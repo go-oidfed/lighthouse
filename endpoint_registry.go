@@ -9,6 +9,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
@@ -341,7 +342,7 @@ func (fed *LightHouse) dispatch(ctx *fiber.Ctx) error {
 	path := ctx.Path()
 
 	// Skip well-known and admin paths — they have their own routes.
-	if path == "/.well-known/openid-federation" ||
+	if path == oidfedconst.FederationSuffix ||
 		len(path) >= len("/api/v1/admin") && path[:len("/api/v1/admin")] == "/api/v1/admin" {
 		return ctx.Next()
 	}

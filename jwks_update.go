@@ -25,7 +25,7 @@ func (fed *LightHouse) AddJWKSUpdateEndpoint(
 	if fed.fedMetadata.Extra == nil {
 		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.fedMetadata.Extra["federation_jwks_update_endpoint"] = endpoint.ValidateURL(
+	fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateEndpoint] = endpoint.ValidateURL(
 		fed.FederationEntity.EntityID(),
 	)
 	if endpoint.Path == "" {

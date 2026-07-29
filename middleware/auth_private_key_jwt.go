@@ -4,6 +4,7 @@ import (
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/rs/zerolog"
@@ -11,8 +12,6 @@ import (
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
-
-const oauthClientAssertionJWTBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
 // TAResolver resolves trust anchor entity IDs to oidfed.TrustAnchors at
 // request time. This allows JWKS updates to propagate live without restarting
@@ -78,10 +77,10 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 		assertionType := ctx.FormValue("client_assertion_type")
 
 		// Validate client_assertion_type
-		if assertionType != oauthClientAssertionJWTBearer {
+		if assertionType != oidfedconst.OAuthClientAssertionJWTBearer {
 			a.logger.Debug().Str("assertion_type", assertionType).Msg("missing or invalid client_assertion_type")
 			return ctx.Status(fiber.StatusBadRequest).JSON(
-				oidfed.ErrorInvalidRequest("missing or invalid client_assertion_type, expected: " + oauthClientAssertionJWTBearer),
+				oidfed.ErrorInvalidRequest("missing or invalid client_assertion_type, expected: " + oidfedconst.OAuthClientAssertionJWTBearer),
 			)
 		}
 
@@ -114,7 +113,7 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 		// Set context values for downstream handlers
 		ctx.Locals("client_entity_id", clientEntityID)
 		ctx.Locals("client_entity_statement", entityStatement)
-		ctx.Locals("auth_method", "private_key_jwt")
+		ctx.Locals("auth_method", oidfedconst.AuthMethodPrivateKeyJWT)
 
 		a.logger.Debug().
 			Str("client_entity_id", clientEntityID).

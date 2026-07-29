@@ -38,7 +38,7 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 	if fed.fedMetadata.Extra == nil {
 		fed.fedMetadata.Extra = make(map[string]interface{})
 	}
-	fed.fedMetadata.Extra["federation_jwks_update_trigger_endpoint"] = endpoint.ValidateURL(
+	fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateTriggerEndpoint] = endpoint.ValidateURL(
 		fed.FederationEntity.EntityID(),
 	)
 	if endpoint.Path == "" {
@@ -138,7 +138,7 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 		fed.registerEndpoint(
 			model.EndpointTypeJwksUpdateTrigger, endpoint.Path, fiber.MethodPost, handler, auth.Middleware(),
 		)
-		fed.fedMetadata.Extra["federation_jwks_update_trigger_endpoint_auth_methods"] = []string{
+		fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateTriggerEndpointAuthMethods] = []string{
 			oidfedconst.AuthMethodPrivateKeyJWT,
 		}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

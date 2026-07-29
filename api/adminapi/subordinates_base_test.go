@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"gorm.io/gorm"
@@ -184,7 +185,7 @@ func TestGetSubordinates(t *testing.T) {
 						EntityID: "https://rp.example.org",
 						Status:   model.StatusActive,
 						SubordinateEntityTypes: []model.SubordinateEntityType{
-							{EntityType: "openid_relying_party"},
+							{EntityType: oidfedconst.EntityTypeOpenIDRelyingParty},
 						},
 					},
 				},
@@ -195,13 +196,13 @@ func TestGetSubordinates(t *testing.T) {
 						EntityID: "https://op.example.org",
 						Status:   model.StatusActive,
 						SubordinateEntityTypes: []model.SubordinateEntityType{
-							{EntityType: "openid_provider"},
+							{EntityType: oidfedconst.EntityTypeOpenIDProvider},
 						},
 					},
 				},
 			)
 
-			req := httptest.NewRequest("GET", "/subordinates?entity_type=openid_relying_party", http.NoBody)
+			req := httptest.NewRequest("GET", fmt.Sprintf("/subordinates?entity_type=%s", oidfedconst.EntityTypeOpenIDRelyingParty), http.NoBody)
 			resp, body := doRequest(t, app, req)
 
 			requireStatus(t, resp, body, http.StatusOK)
@@ -316,8 +317,8 @@ func TestPostSubordinates(t *testing.T) {
 					}
 				]
 			},
-			"registered_entity_types": ["openid_provider"]
-		}`, testRSAKeyN,
+		"registered_entity_types": ["%s"]
+	}`, testRSAKeyN, oidfedconst.EntityTypeOpenIDProvider,
 			)
 			req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -335,8 +336,8 @@ func TestPostSubordinates(t *testing.T) {
 			if saved.JWKS.Keys.Len() != 1 {
 				t.Errorf("Expected 1 key in JWKS, got %d", saved.JWKS.Keys.Len())
 			}
-			if len(saved.SubordinateEntityTypes) != 1 || saved.SubordinateEntityTypes[0].EntityType != "openid_provider" {
-				t.Errorf("Expected 1 entity type 'openid_provider', got %v", saved.SubordinateEntityTypes)
+			if len(saved.SubordinateEntityTypes) != 1 || saved.SubordinateEntityTypes[0].EntityType != oidfedconst.EntityTypeOpenIDProvider {
+				t.Errorf("Expected 1 entity type '%s', got %v", oidfedconst.EntityTypeOpenIDProvider, saved.SubordinateEntityTypes)
 			}
 		},
 	)
@@ -918,7 +919,7 @@ func TestIssue85_ReRegisterAfterDelete(t *testing.T) {
 			createReq := httptest.NewRequest(
 				"POST", "/subordinates", strings.NewReader(
 					fmt.Sprintf(
-						`{"entity_id":"%s","registered_entity_types":["openid_provider"],"status":"pending"}`, entityID,
+						`{"entity_id":"%s","registered_entity_types":["%s"],"status":"pending"}`, entityID, oidfedconst.EntityTypeOpenIDProvider,
 					),
 				),
 			)
@@ -964,7 +965,7 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 			EntityID: entityID,
 			Status:   model.StatusActive,
 			SubordinateEntityTypes: []model.SubordinateEntityType{
-				{EntityType: "openid_provider"},
+				{EntityType: oidfedconst.EntityTypeOpenIDProvider},
 			},
 		},
 		JWKS: model.JWKS{Keys: jwx.JWKS{Set: origSet}},
@@ -1002,7 +1003,7 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 			EnableJWKSUpdate: true,
 			JWKSPollInterval: &reEnrollInterval,
 			SubordinateEntityTypes: []model.SubordinateEntityType{
-				{EntityType: "openid_relying_party"},
+				{EntityType: oidfedconst.EntityTypeOpenIDRelyingParty},
 			},
 		},
 		JWKS: model.JWKS{Keys: jwx.JWKS{Set: newSet}},
@@ -1036,7 +1037,7 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 		t.Errorf("expected replacement-key, got %q", kid)
 	}
 	if len(reactivated.SubordinateEntityTypes) != 1 ||
-		reactivated.SubordinateEntityTypes[0].EntityType != "openid_relying_party" {
+		reactivated.SubordinateEntityTypes[0].EntityType != oidfedconst.EntityTypeOpenIDRelyingParty {
 		t.Errorf("unexpected entity types: %+v", reactivated.SubordinateEntityTypes)
 	}
 	if !reactivated.EnableJWKSUpdate {

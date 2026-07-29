@@ -385,7 +385,7 @@ func buildDynamicFederationEntity(
 
 func registerEntityConfigurationEndpoint(server *fiber.App, entity *LightHouse) {
 	server.Get(
-		"/.well-known/openid-federation", func(ctx *fiber.Ctx) error {
+		oidfedconst.FederationSuffix, func(ctx *fiber.Ctx) error {
 			var cached []byte
 			set, err := cache.Get(internal.CacheKeyEntityConfiguration, &cached)
 			if err != nil {
