@@ -34,6 +34,10 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 			ctx.Status(fiber.StatusBadRequest)
 			return ctx.JSON(oidfed.ErrorInvalidRequest("required parameter 'sub' not given"))
 		}
+		if req.Subject == fed.FederationEntity.EntityID() {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest("are you looking for the entity configuration?"))
+		}
 		cacheKey := internal.SubordinateStatementCacheKey(req.Subject)
 		var cached []byte
 		set, err := cache.Get(cacheKey, &cached)
