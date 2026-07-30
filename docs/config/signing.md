@@ -344,6 +344,56 @@ The interval at which keys are rotated. This defines the lifetime of each key.
 The overlap period between the current and next key. During this window, LightHouse transitions
 to using the new key while the old key's public key is still published.
 
+#### `key_announcement_lead_time`
+<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-blue" title="Default Value">`max(5 × entity configuration lifetime, 24h)`</span>
+<span class="badge badge-yellow" title="Deprecation status">deprecated</span>
+
+!!! warning "Deprecated - Database-managed"
+    
+    This config file option is **deprecated** and ignored at runtime. Use:
+    
+    - `lhmigrate config2db --only=key_rotation` to migrate from config file
+    - Admin API to view/change the value
+
+The **key announcement lead time** controls how far in advance a new key is
+published in the JWKS before it becomes the active signing key. This gives
+clients time to fetch the updated entity configuration and cache the new key
+before the old key is retired.
+
+The effective lead time is resolved as follows:
+
+1. If [`key_announcement_lead_time_ec_multiplier`](#key_announcement_lead_time_ec_multiplier) `> 0`: multiplier × entity configuration lifetime.
+2. If `key_announcement_lead_time` `> 0`: the fixed duration.
+3. Default: `max(5 × entity configuration lifetime, 24h)`.
+
+The result is clamped to a minimum of the entity configuration lifetime; if the
+configured value is shorter, the EC lifetime is used instead and a warning is
+logged.
+
+!!! info
+
+      In the past the key announcement lead time was set to one entity
+      configuration lifetime. This is only enough if all clients always fetch
+      the entity configuration as soon as it expires — an unrealistic
+      assumption. Set the lead time to a larger value in production.
+
+#### `key_announcement_lead_time_ec_multiplier`
+<span class="badge badge-purple" title="Value Type">float</span>
+<span class="badge badge-blue" title="Default Value">`0`</span>
+<span class="badge badge-yellow" title="Deprecation status">deprecated</span>
+
+!!! warning "Deprecated - Database-managed"
+    
+    This config file option is **deprecated** and ignored at runtime. Use:
+    
+    - `lhmigrate config2db --only=key_rotation` to migrate from config file
+    - Admin API to view/change the value
+
+Multiplier for the entity configuration lifetime to compute the announcement
+lead time. Takes precedence over
+[`key_announcement_lead_time`](#key_announcement_lead_time) if set (`> 0`).
+
 ## Complete Examples
 
 ??? file "Filesystem KMS with database public keys (Recommended)"
