@@ -62,72 +62,23 @@ will not be served and its URL will be omitted from the entity configuration.
 
 ### Type-Specific Configuration
 
-Some endpoints have type-specific configuration stored as a JSON `config` field:
+Some endpoints have type-specific configuration stored as a JSON `config` field.
+See the [Federation Endpoints Configuration Reference](../config/db/federation-endpoints.md#type-specific-configuration)
+for the full field reference and JSON shapes for each endpoint type.
 
-#### Resolve (`resolve`)
+When `use_entity_collection_allowed_trust_anchors` is `true` (resolve endpoint),
+the resolve endpoint dynamically uses the entity collection endpoint's
+`allowed_trust_anchors` at load time. Changes to the entity collection's TAs
+via the Admin API automatically propagate to the resolve endpoint on the next
+registry reload.
 
-```json
-{
-  "allowed_trust_anchors": ["https://ta.example.com"],
-  "use_entity_collection_allowed_trust_anchors": true,
-  "grace_period_seconds": 3600,
-  "time_elapsed_grace_factor": 0.5,
-  "proactive_resolver": {
-    "enabled": false,
-    "concurrency_limit": 64,
-    "queue_size": 10000,
-    "response_storage_dir": "/var/lib/lighthouse/resolver",
-    "response_storage_store_json": false,
-    "response_storage_store_jwt": true
-  }
-}
-```
-
-When `use_entity_collection_allowed_trust_anchors` is `true`, the resolve
-endpoint dynamically uses the entity collection endpoint's `allowed_trust_anchors`
-at load time. Changes to the entity collection's TAs via the Admin API
-automatically propagate to the resolve endpoint on the next registry reload.
-
-#### Enroll (`enroll`)
-
-```json
-{
-  "checker_type": "multiple_or",
-  "checker_config": [
-    {
-      "type": "trust_mark",
-      "config": {
-        "trust_mark_type": "https://tm.example.org",
-        "trust_anchors": ["https://ta.example.org"]
-      }
-    },
-    {
-      "type": "trust_path",
-      "config": {
-        "trust_anchors": ["https://ta2.example.org"]
-      }
-    }
-  ]
-}
-```
-
-The `trust_anchors` in checker configs are **entity ID strings** (not inline
-trust anchor objects with JWKS). They are resolved live from the
+The `trust_anchors` in enroll checker configs are **entity ID strings** (not
+inline trust anchor objects with JWKS). They are resolved live from the
 [Trust Anchor Repository](trust_anchors.md) at check time.
 
-#### Entity Collection (`entity_collection`)
-
-```json
-{
-  "allowed_trust_anchors": ["https://ta.example.com"],
-  "interval_seconds": 28800,
-  "concurrency_limit": 4,
-  "pagination_limit": 512
-}
-```
-
-When `interval_seconds` is set (> 0), a background periodic entity collector is
-started. Changes via the Admin API stop and restart the collector with the new
+When `interval_seconds` is set (> 0) on the entity collection endpoint, a
+background periodic entity collector is started. Changes via the Admin API stop
+and restart the collector with the new
 settings.
 
 ## Dynamic Dispatch

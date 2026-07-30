@@ -51,14 +51,8 @@ curl -X POST -u admin:password \
   https://localhost:8081/api/v1/admin/trust-anchors
 ```
 
-### Fields
-
-| Field                | Type    | Description                                                 |
-|----------------------|---------|-------------------------------------------------------------|
-| `entity_id`          | string  | The entity ID of the trust anchor (required)                |
-| `jwks`               | JWKS    | Optional initial JWKS for the trust anchor                  |
-| `enable_jwks_update` | boolean | Enable automatic JWKS refreshing (default: `false`)         |
-| `key_poll_interval`  | integer | Polling interval in seconds (0 = derive from EC expiration) |
+See [Trust Anchor Configuration Reference](../config/db/trust-anchors.md) for
+the full field reference.
 
 ## Automatic JWKS Refreshing
 

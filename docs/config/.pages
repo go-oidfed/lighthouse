@@ -1,11 +1,4 @@
 arrange:
   - index.md
-  - server.md
-  - logging.md
-  - storage.md
-  - cache.md
-  - signing.md
-  - api.md
-  - stats.md
-  - federation_data.md
-  - endpoints.md
+  - static
+  - db

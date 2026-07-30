@@ -1,4 +1,5 @@
 site_name: LightHouse
+site_url: https://go-oidfed.github.io/lighthouse
 site_author: Gabriel Zachmann
 theme:
   name: material
@@ -69,6 +70,9 @@ plugins:
   - privacy
   - markdown-exec
 extra:
+  version:
+    provider: mike
+    default: main
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/go-oidfed/lighthouse

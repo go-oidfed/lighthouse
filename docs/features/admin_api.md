@@ -13,7 +13,7 @@ separate port) and can require HTTP Basic Authentication.
 
 !!! info "Separate Port Configuration"
     The Admin API can be configured to run on a separate port from the main federation endpoints. 
-    See [Admin API Configuration](../config/api.md) for details.
+    See [Admin API Configuration](../config/static/api.md) for details.
 
 ## Interactive API Documentation
 
@@ -146,4 +146,4 @@ Manage admin users for API access. This functionality is available at a separate
     - **Firewall Rules** - Restrict access to the Admin API endpoints using firewall rules
 
 For configuration options including separate port binding and password hashing settings, see 
-[Admin API Configuration](../config/api.md).
+[Admin API Configuration](../config/static/api.md).

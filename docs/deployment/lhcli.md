@@ -359,7 +359,7 @@ in the configuration for these commands to work.
         enabled: true
     ```
     
-    See [Statistics Configuration](../config/stats.md) for all options.
+    See [Statistics Configuration](../config/static/stats.md) for all options.
 
 ### Common Flags
 

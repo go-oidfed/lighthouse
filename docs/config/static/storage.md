@@ -178,7 +178,7 @@ be used once.
 
 ### `jti_cleanup_interval`
 
-<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-purple" title="Value Type">[duration](../index.md#time-duration-configuration-options)</span>
 <span class="badge badge-blue" title="Default Value">`1h`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
 <span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_ENDPOINT_AUTH_JTI_CLEANUP_INTERVAL`</span>
@@ -221,4 +221,4 @@ has passed.
     The `backend` option with values `json` and `badger` is **deprecated** and no longer supported.
     
     If you are upgrading from an older version of LightHouse, use the `lhmigrate db` command to 
-    migrate your data to the new SQL-based storage. See the [Migration Guide](../migration.md) for details.
+    migrate your data to the new SQL-based storage. See the [Migration Guide](../../migration/index.md) for details.

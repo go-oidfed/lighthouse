@@ -28,12 +28,9 @@ the stored JWKS when the keys change. This is opt-in per subordinate.
 
 ### Enabling per Subordinate
 
-Two fields on a subordinate control periodic refreshing:
-
-| Field                | Type    | Description                                                                                                   |
-|----------------------|---------|---------------------------------------------------------------------------------------------------------------|
-| `enable_jwks_update` | boolean | Enable periodic refreshing (default: `false`)                                                                 |
-| `jwks_poll_interval` | integer | Poll interval in seconds. `0` (default) or `<= 0` ⇒ derive from the EC expiration time (floored to 1 minute). |
+Two fields on a subordinate control periodic refreshing. See
+[Subordinates Configuration Reference](../config/db/subordinates.md) for the
+full field reference.
 
 Set them when creating or updating a subordinate via the
 [Admin API](admin_api.md):

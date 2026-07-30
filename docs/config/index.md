@@ -138,7 +138,8 @@ The following is an example `config.yaml` file:
 
     Federation endpoints, trust anchors, metadata, authority hints, trust marks,
     signing algorithm, key rotation, and other runtime options are stored in the
-    database. Use [`lhsetup`](../deployment/lhsetup.md) for interactive setup,
+    database. See [Database-Managed Configuration](db/index.md) for the full
+    reference. Use [`lhsetup`](../deployment/lhsetup.md) for interactive setup,
     [`lhmigrate config2db`](../migration/0.22.md) for non-interactive migration
     from a config file, or the [Admin API](../features/admin_api.md) for runtime
     management.
@@ -167,23 +168,44 @@ The entity ID is typically the base URL where your federation endpoints are serv
 !!! note "Moved from federation_data"
     
     This option was previously located at `federation_data.entity_id`. It has been moved to 
-    a top-level configuration option. Use [`lhmigrate config`](../migration.md#config-migration) 
+    a top-level configuration option.     Use [`lhmigrate config`](../migration/index.md#config-migration) 
     to automatically update your config file.
 
 ## Configuration Sections
 
+LightHouse configuration is split into two categories:
+
+### Static Configuration (Config File & Environment Variables)
+
+These options are set in `config.yaml` and/or environment variables. They
+require a restart to change.
+
 <div class="grid cards" markdown>
 
+- [:material-server-network: Server](static/server.md)
+- [:material-script-text: Logging](static/logging.md)
+- [:material-database: Storage](static/storage.md)
+- [:material-database-clock: Cache](static/cache.md)
+- [:material-signature-freehand: Signing](static/signing.md)
+- [:material-api: Admin API](static/api.md)
+- [:material-chart-line: Statistics](static/stats.md)
 
-- [:material-server-network: Server](server.md)
-- [:material-script-text: Logging](logging.md)
-- [:material-database: Storage](storage.md)
-- [:material-database-clock: Cache](cache.md)
-- [:material-signature-freehand: Signing](signing.md)
-- [:material-routes: Endpoints](endpoints.md)
-- [:simple-openid: Federation Data](federation_data.md)
-- [:material-api: Admin API](api.md)
-- [:material-chart-line: Statistics](stats.md)
+</div>
+
+### Database-Managed Configuration
+
+These options are stored in the database and can be changed at runtime via the
+Admin API, `lhsetup`, or `lhmigrate config2db` — no restart required.
+
+<div class="grid cards" markdown>
+
+- [:material-database-cog: Database-Managed Config](db/index.md)
+- [:material-signature-freehand: Signing](db/signing.md)
+- [:material-openid: Entity Configuration](db/entity-configuration.md)
+- [:material-shield-check-outline: Trust Marks](db/trust-marks.md)
+- [:material-shield-check: Trust Anchors](db/trust-anchors.md)
+- [:material-routes: Federation Endpoints](db/federation-endpoints.md)
+- [:material-account-group: Subordinates](db/subordinates.md)
 
 </div>
 
