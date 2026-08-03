@@ -81,7 +81,7 @@ extra:
     - icon: fontawesome/solid/paper-plane
       link: mailto:oidfed@lists.kit.edu
   generator: false
-copyright: Copyright &copy; 2025 - 2025 Gabriel Zachmann
+copyright: Copyright &copy; 2025 - 2026 Karlsruhe Institute of Technology
 extra_css:
   - stylesheets/extra.css
   - stylesheets/admonitions.css
