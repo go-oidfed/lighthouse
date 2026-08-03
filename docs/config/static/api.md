@@ -94,6 +94,50 @@ Using a separate port can be useful for:
             port: 8080
     ```
 
+### `tls`
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable Prefix">`LH_API_ADMIN_TLS_`</span>
+
+Configuration for TLS (Transport Layer Security) on the Admin API when running on a separate port.
+When enabled, the Admin API will serve HTTPS instead of HTTP.
+
+??? file "config.yaml"
+
+    ```yaml
+    api:
+        admin:
+            enabled: true
+            port: 8443
+            tls:
+                enabled: true
+                cert: /path/to/admin.crt
+                key: /path/to/admin.key
+    ```
+
+#### `enabled`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_TLS_ENABLED`</span>
+
+Enables or disables TLS for the Admin API. When enabled, the Admin API will
+serve HTTPS on the configured port.
+
+#### `cert`
+<span class="badge badge-purple" title="Value Type">file path</span>
+<span class="badge badge-green" title="If this option is required or optional">required when enabled</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_TLS_CERT`</span>
+
+Path to the TLS certificate file for the Admin API.
+
+#### `key`
+<span class="badge badge-purple" title="Value Type">file path</span>
+<span class="badge badge-green" title="If this option is required or optional">required when enabled</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_TLS_KEY`</span>
+
+Path to the TLS private key file for the Admin API.
+
 ### `actor_source`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-blue" title="Default Value">`basic_auth`</span>
@@ -135,7 +179,7 @@ the authenticated user in a header.
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
 <span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_ACTOR_HEADER`</span>
 
-The HTTP header name to use for extracting the actor when `actor_source` is set to `header` or `both`.
+The HTTP header name to use for extracting the actor from header.
 
 This allows integration with reverse proxies or identity-aware proxies that authenticate 
 users and pass their identity in a custom header.
@@ -222,50 +266,6 @@ This is particularly useful for:
 - Using the Swagger UI documentation from a different server
 - Building admin dashboards hosted on different domains
 - Testing the Admin API from development tools
-
-### `tls`
-<span class="badge badge-purple" title="Value Type">object / mapping</span>
-<span class="badge badge-green" title="If this option is required or optional">optional</span>
-<span class="badge badge-cyan" title="Environment Variable Prefix">`LH_API_ADMIN_TLS_`</span>
-
-Configuration for TLS (Transport Layer Security) on the Admin API when running on a separate port.
-When enabled, the Admin API will serve HTTPS instead of HTTP.
-
-??? file "config.yaml"
-
-    ```yaml
-    api:
-        admin:
-            enabled: true
-            port: 8443
-            tls:
-                enabled: true
-                cert: /path/to/admin.crt
-                key: /path/to/admin.key
-    ```
-
-#### `enabled`
-<span class="badge badge-purple" title="Value Type">boolean</span>
-<span class="badge badge-blue" title="Default Value">`false`</span>
-<span class="badge badge-green" title="If this option is required or optional">optional</span>
-<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_TLS_ENABLED`</span>
-
-Enables or disables TLS for the Admin API. When enabled, the Admin API will 
-serve HTTPS on the configured port.
-
-#### `cert`
-<span class="badge badge-purple" title="Value Type">file path</span>
-<span class="badge badge-green" title="If this option is required or optional">required when enabled</span>
-<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_TLS_CERT`</span>
-
-Path to the TLS certificate file for the Admin API.
-
-#### `key`
-<span class="badge badge-purple" title="Value Type">file path</span>
-<span class="badge badge-green" title="If this option is required or optional">required when enabled</span>
-<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_TLS_KEY`</span>
-
-Path to the TLS private key file for the Admin API.
 
 ??? file "config.yaml"
 
@@ -378,6 +378,7 @@ Comma-separated list of headers that browsers are allowed to access.
 
 How long (in seconds) browsers should cache preflight request results. 
 Default is 3600 (1 hour).
+
 
 ## Complete Example
 

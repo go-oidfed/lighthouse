@@ -245,7 +245,7 @@ This guide covers deploying LightHouse using Docker with a Caddy reverse proxy.
       LH_ENTITY_ID: "https://lighthouse.example.com"
     ```
 
-    See [Configuration](../config/index.md#environment-variables) for details.
+    See [Configuration](../config/static/index.md#environment-variables) for details.
 
 ## Initial Setup
 

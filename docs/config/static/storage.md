@@ -10,7 +10,7 @@ LightHouse uses SQL databases for data storage. SQLite, MySQL, and PostgreSQL ar
 ## `driver`
 <span class="badge badge-purple" title="Value Type">enum</span>
 <span class="badge badge-blue" title="Default Value">sqlite</span>
-<span class="badge badge-red" title="If this option is required or optional">required</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
 <span class="badge badge-cyan" title="Environment Variable">`LH_STORAGE_DRIVER`</span>
 
 The `driver` option specifies which database driver to use.
@@ -103,13 +103,13 @@ host=hostname user=username password=password dbname=database port=5432 sslmode=
 
 Instead of providing a full `dsn` string, you can specify individual connection components:
 
-| Option | Description | Environment Variable |
-|--------|-------------|---------------------|
-| `user` | Database username | `LH_STORAGE_USER` |
-| `password` | Database password | `LH_STORAGE_PASSWORD` |
-| `host` | Database host (default: `localhost`) | `LH_STORAGE_HOST` |
-| `port` | Database port | `LH_STORAGE_PORT` |
-| `db` | Database name (default: `lighthouse`) | `LH_STORAGE_DB` |
+| Option     | Description                           | Environment Variable  |
+|------------|---------------------------------------|-----------------------|
+| `user`     | Database username                     | `LH_STORAGE_USER`     |
+| `password` | Database password                     | `LH_STORAGE_PASSWORD` |
+| `host`     | Database host (default: `localhost`)  | `LH_STORAGE_HOST`     |
+| `port`     | Database port                         | `LH_STORAGE_PORT`     |
+| `db`       | Database name (default: `lighthouse`) | `LH_STORAGE_DB`       |
 
 !!! tip "Sensitive Data"
     Use `LH_STORAGE_PASSWORD` environment variable to avoid storing database passwords in config files.
@@ -188,37 +188,3 @@ How often to clean up expired JTIs from the database. Only applicable when
 
 The cleanup runs as a background goroutine and removes JTIs whose expiration time
 has passed.
-
-## Complete Examples
-
-??? file "SQLite (Recommended for development)"
-
-    ```yaml
-    storage:
-        driver: sqlite
-        data_dir: /var/lib/lighthouse
-    ```
-
-??? file "PostgreSQL (Recommended for production)"
-
-    ```yaml
-    storage:
-        driver: postgres
-        dsn: "host=db.example.com user=lighthouse password=secret dbname=lighthouse port=5432 sslmode=require"
-    ```
-
-??? file "MySQL"
-
-    ```yaml
-    storage:
-        driver: mysql
-        dsn: "lighthouse:secret@tcp(db.example.com:3306)/lighthouse?charset=utf8mb4&parseTime=True&loc=Local&tls=true"
-    ```
-
-## Legacy Backends (Deprecated)
-
-!!! warning "Deprecated"
-    The `backend` option with values `json` and `badger` is **deprecated** and no longer supported.
-    
-    If you are upgrading from an older version of LightHouse, use the `lhmigrate db` command to 
-    migrate your data to the new SQL-based storage. See the [Migration Guide](../../migration/index.md) for details.

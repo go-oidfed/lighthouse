@@ -7,7 +7,7 @@ icon: material/shield-check
 LightHouse maintains a **common trust anchor repository** in the database. This
 is the single source of truth for all trust anchors and their JWKS. See the
 [Trust Anchor Repository](../../features/trust_anchors.md) feature documentation
-for how it works and how to manage trust anchors at runtime.
+for additional details.
 
 ## Fields
 
@@ -24,12 +24,7 @@ The entity ID of the trust anchor.
 <span class="badge badge-green" title="Optional">optional (recommended)</span>
 
 The JWKS of the trust anchor, obtained out-of-band. If omitted, LightHouse will
-fetch it from the trust anchor's Entity Configuration on the first poll (when
-`enable_jwks_update` is `true`).
-
-!!! tip
-    Provide the `jwks` as JSON. This way you can pass the whole `jwks` in a
-    single line.
+fetch it from the trust anchor's Entity Configuration on the first poll.
 
 ### `enable_jwks_update`
 
@@ -55,6 +50,8 @@ resolution logic.
 
 | Tool | Command |
 |------|---------|
-| Admin API | `GET/POST/PUT/DELETE /api/v1/admin/trust-anchors` |
+| Admin API | `GET /api/v1/admin/trust-anchors` (list) |
+| Admin API | `POST /api/v1/admin/trust-anchors` (create) |
+| Admin API | `GET/PUT/DELETE /api/v1/admin/trust-anchors/{entityID}` |
 | lhsetup | `lhsetup --only=trust_anchors` |
 | config2db | `lhmigrate config2db --only=trust_anchors` |

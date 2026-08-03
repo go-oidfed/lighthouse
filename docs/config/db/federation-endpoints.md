@@ -12,34 +12,34 @@ dynamic dispatch, authentication, and enrollment details.
 
 ## Endpoint Types
 
-| Endpoint Type | Description |
-|---------------|-------------|
-| `fetch` | Federation Subordinate Fetch Endpoint (Spec §8.1) |
-| `list` | Federation Subordinate Listing Endpoint (Spec §8.2) |
-| `resolve` | Resolve Endpoint (Spec §8.3) |
-| `trust_mark_status` | Trust Mark Status Endpoint (Spec §8.4) |
-| `trust_mark_listing` | Trust Marked Entities Listing Endpoint (Spec §8.5) |
-| `trust_mark` | Trust Mark Endpoint (Spec §8.6) |
-| `historical_keys` | Historical Keys Endpoint (Spec §8.7); requires automatic key rollover |
-| `enroll` | Automatic enrollment endpoint |
-| `enroll_request` | Request enrollment endpoint (admin approval) |
-| `trust_mark_request` | Trust mark request endpoint (admin approval) |
-| `entity_collection` | Entity Collection Endpoint ([extension draft](https://zachmann.github.io/openid-federation-entity-collection/main.html)) |
+| Endpoint Type         | Description                                                                                                                            |
+|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `fetch`               | Federation Subordinate Fetch Endpoint (Spec §8.1)                                                                                      |
+| `list`                | Federation Subordinate Listing Endpoint (Spec §8.2)                                                                                    |
+| `resolve`             | Resolve Endpoint (Spec §8.3)                                                                                                           |
+| `trust_mark_status`   | Trust Mark Status Endpoint (Spec §8.4)                                                                                                 |
+| `trust_mark_listing`  | Trust Marked Entities Listing Endpoint (Spec §8.5)                                                                                     |
+| `trust_mark`          | Trust Mark Endpoint (Spec §8.6)                                                                                                        |
+| `historical_keys`     | Historical Keys Endpoint (Spec §8.7); requires automatic key rollover                                                                  |
+| `enroll`              | Automatic enrollment endpoint                                                                                                          |
+| `enroll_request`      | Request enrollment endpoint (admin approval)                                                                                           |
+| `trust_mark_request`  | Trust mark request endpoint (admin approval)                                                                                           |
+| `entity_collection`   | Entity Collection Endpoint ([extension draft](https://openid.github.io/federation-entity-collection/main.html))                        |
 | `jwks_update_trigger` | POST trigger for a subordinate to request JWKS re-fetch. See [Subordinate JWKS Refreshing](../../features/subordinate_jwks_refresh.md) |
-| `jwks_update` | POST endpoint accepting a signed JWK Set. See [Subordinate JWKS Refreshing](../../features/subordinate_jwks_refresh.md) |
+| `jwks_update`         | POST endpoint accepting a signed JWK Set. See [Subordinate JWKS Refreshing](../../features/subordinate_jwks_refresh.md)                |
 
 ## Common Fields
 
 All endpoint types share these fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `type` | string (enum) | The endpoint type (see table above) |
-| `path` | string \| null | URL path under which the endpoint is served. Set to `null` to disable the endpoint without deleting it. |
-| `url` | string \| null | External URL published in the Entity Configuration. If not set, the URL is derived from `<entity_id><path>`. |
-| `auth_enabled` | boolean | When `true`, requires `private_key_jwt` client authentication. |
-| `auth_trust_anchor_ids` | list of integers | Database IDs of trust anchors used to verify client assertions (when `auth_enabled` is `true`). |
-| `config` | JSON string | Type-specific configuration (see below). |
+| Field                   | Type             | Description                                                                                                  |
+|-------------------------|------------------|--------------------------------------------------------------------------------------------------------------|
+| `type`                  | string (enum)    | The endpoint type (see table above)                                                                          |
+| `path`                  | string \| null   | URL path under which the endpoint is served. Set to `null` to disable the endpoint without deleting it.      |
+| `url`                   | string \| null   | External URL published in the Entity Configuration. If not set, the URL is derived from `<entity_id><path>`. |
+| `auth_enabled`          | boolean          | When `true`, requires `private_key_jwt` client authentication.                                               |
+| `auth_trust_anchor_ids` | list of integers | Database IDs of trust anchors used to verify client assertions (when `auth_enabled` is `true`).              |
+| `config`                | JSON             | Type-specific configuration (see below).                                                                     |
 
 ## Type-Specific Configuration
 
@@ -123,7 +123,9 @@ details.
 
 | Tool | Command |
 |------|---------|
-| Admin API | `GET/POST/PUT/DELETE /api/v1/admin/federation-endpoints` |
+| Admin API | `GET /api/v1/admin/federation-endpoints` (list) |
+| Admin API | `POST /api/v1/admin/federation-endpoints` (create) |
+| Admin API | `GET/PUT/DELETE /api/v1/admin/federation-endpoints/{type}` |
 | Admin API (auth TAs) | `PUT /api/v1/admin/federation-endpoints/{type}/auth-trust-anchors` |
 | lhsetup | `lhsetup --only=endpoints` |
 | config2db | `lhmigrate config2db --only=endpoints` |

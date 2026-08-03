@@ -1,5 +1,6 @@
 ---
 icon: material/signature-freehand
+title: Signing
 ---
 
 # Database-Managed Signing Options
@@ -26,15 +27,15 @@ Trust Marks.
 
 - `ES256`, `ES384`, `ES512`
 
-**EdDSA (RFC 9864)**
-
-- `Ed25519` (curve-specific, recommended)
-- `Ed448`
-- `EdDSA` (deprecated polymorphic form; resolves to Ed25519 — prefer `Ed25519`)
-
 **secp256k1**
 
 - `ES256K`
+
+**EdDSA (RFC 9864)**
+
+- `Ed25519` (curve-specific, recommended over `EdDSA`)
+- `Ed448`
+- `EdDSA` (deprecated polymorphic form; resolves to Ed25519 — prefer `Ed25519`)
 
 **RSA**
 
@@ -52,11 +53,11 @@ Trust Marks.
 
 ### Management
 
-| Tool | Command |
-|------|---------|
-| Admin API | `GET/PUT /api/v1/admin/signing/alg` |
-| lhsetup | `lhsetup --only=alg` |
-| config2db | `lhmigrate config2db --only=alg` |
+| Tool      | Command                             |
+|-----------|-------------------------------------|
+| Admin API | `GET /api/v1/admin/kms` (KMS info) \| `PUT /api/v1/admin/kms/alg` |
+| lhsetup   | `lhsetup --only=alg`                |
+| config2db | `lhmigrate config2db --only=alg`    |
 
 ## RSA Key Length (`rsa_key_len`)
 
@@ -68,11 +69,11 @@ relevant when the signing algorithm is RSA-based (`RS*` or `PS*`).
 
 ### Management
 
-| Tool | Command |
-|------|---------|
-| Admin API | `GET/PUT /api/v1/admin/signing/rsa-key-len` |
-| lhsetup | `lhsetup --only=rsa_key_len` |
-| config2db | `lhmigrate config2db --only=rsa_key_len` |
+| Tool      | Command                                     |
+|-----------|---------------------------------------------|
+| Admin API | `GET /api/v1/admin/kms` (KMS info) \| `PUT /api/v1/admin/kms/rsa-key-len` |
+| lhsetup   | `lhsetup --only=rsa_key_len`                |
+| config2db | `lhmigrate config2db --only=rsa_key_len`    |
 
 ## Key Rotation (`key_rotation`)
 
@@ -96,7 +97,7 @@ Enables automatic key rotation.
 
 The interval at which keys are rotated. This defines the lifetime of each key.
 
-!!! note
+!!! warning
     The interval should not be smaller than the lifetime of Entity
     Configurations, Entity Statements, Trust Marks, or other JWTs signed with
     the federation key.
@@ -106,9 +107,9 @@ The interval at which keys are rotated. This defines the lifetime of each key.
 <span class="badge badge-purple" title="Value Type">[duration](../index.md#time-duration-configuration-options)</span>
 <span class="badge badge-blue" title="Default Value">1 hour</span>
 
-The overlap period between the current and next key. During this window,
-LightHouse transitions to using the new key while the old key's public key is
-still published.
+The overlap period between the current and next key. During this window both 
+keys will be valid, and LightHouse transitions to using the new key 
+(somewhere in the middle of the period).
 
 ### `key_announcement_lead_time`
 
@@ -148,8 +149,9 @@ lead time. Takes precedence over
 
 ### Management
 
-| Tool | Command |
-|------|---------|
-| Admin API | `GET/PUT/PATCH /api/v1/admin/keys/rotation` |
-| lhsetup | `lhsetup --only=key_rotation` |
-| config2db | `lhmigrate config2db --only=key_rotation` |
+| Tool      | Command                                     |
+|-----------|---------------------------------------------|
+| Admin API | `GET/PUT/PATCH /api/v1/admin/kms/rotation`  |
+| Admin API | `POST /api/v1/admin/kms/rotate` (manual trigger) |
+| lhsetup   | `lhsetup --only=key_rotation`               |
+| config2db | `lhmigrate config2db --only=key_rotation`   |
