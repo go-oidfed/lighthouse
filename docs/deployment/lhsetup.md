@@ -74,25 +74,26 @@ is only shown as a hint when it differs from the current DB value.
 `lhsetup` covers all configuration that was formerly in the config file and is
 now stored in the database:
 
-| Section                   | Description                                                              |
-|---------------------------|--------------------------------------------------------------------------|
-| `config_lifetime`         | Entity configuration lifetime                                            |
-| `statement_lifetime`      | Subordinate statement lifetime                                           |
-| `alg`                     | Signing algorithm                                                        |
-| `rsa_key_len`             | RSA key length (only prompted for RSA/PS algorithms)                     |
-| `key_rotation`            | Key rotation settings (enabled, interval, overlap, lead time)            |
-| `metadata`                | Federation entity metadata (via JSON file)                               |
-| `constraints`             | General subordinate statement constraints (via JSON file)                |
-| `metadata_policies`       | General metadata policies (via JSON file)                                |
-| `metadata_policy_crit`    | Critical metadata policy operators                                       |
-| `authority_hints`         | Authority hints (add/remove)                                             |
-| `extra_entity_config`     | Extra entity configuration claims (add/remove)                           |
-| `trust_marks`             | Published trust marks (add/remove)                                       |
-| `trust_mark_specs`        | Trust mark issuance specs (add/remove)                                   |
-| `trust_mark_issuers`      | Trust mark issuers per type (add/remove)                                 |
-| `trust_mark_owners`       | Trust mark owners per type (add/remove)                                  |
-| `trust_anchors`           | Trust anchors (add/remove with JWKS)                                     |
-| `endpoints`               | Federation endpoints (path, URL, auth, type-specific config)             |
+| Section                         | Description                                                   |
+|---------------------------------|---------------------------------------------------------------|
+| `config_lifetime`               | Entity configuration lifetime                                 |
+| `statement_lifetime`            | Subordinate statement lifetime                                |
+| `alg`                           | Signing algorithm                                             |
+| `rsa_key_len`                   | RSA key length (only prompted for RSA/PS algorithms)          |
+| `key_rotation`                  | Key rotation settings (enabled, interval, overlap, lead time) |
+| `metadata`                      | Federation entity metadata (via JSON file)                    |
+| `constraints`                   | General subordinate statement constraints (via JSON file)     |
+| `metadata_policies`             | General metadata policies (via JSON file)                     |
+| `metadata_policy_crit`          | Critical metadata policy operators                            |
+| `authority_hints`               | Authority hints (add/remove)                                  |
+| `extra_entity_config`           | Extra entity configuration claims (add/remove)                |
+| `subordinate_additional_claims` | General subordinate additional claims (add/remove)            |
+| `trust_marks`                   | Published trust marks (add/remove)                            |
+| `trust_mark_specs`              | Trust mark issuance specs (add/remove)                        |
+| `trust_mark_issuers`            | Trust mark issuers per type (add/remove)                      |
+| `trust_mark_owners`             | Trust mark owners per type (add/remove)                       |
+| `trust_anchors`                 | Trust anchors (add/remove with JWKS)                          |
+| `endpoints`                     | Federation endpoints (path, URL, auth, type-specific config)  |
 
 Use `--only` or `--skip` to select specific sections:
 

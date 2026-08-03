@@ -41,6 +41,8 @@ func runWizard(sections []migration.Section) {
 			sectionAuthorityHints()
 		case migration.SectionExtraEntityConfigData:
 			sectionExtraEntityConfig()
+		case migration.SectionSubordinateAdditionalClaims:
+			sectionSubordinateAdditionalClaims()
 		case migration.SectionTrustMarks:
 			sectionPublishedTrustMarks()
 		case migration.SectionTrustMarkSpecs:

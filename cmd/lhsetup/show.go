@@ -18,6 +18,7 @@ func showAll() {
 	showMetadataPolicyCrit()
 	showAuthorityHints()
 	showExtraEntityConfig()
+	showSubordinateAdditionalClaims()
 	showPublishedTrustMarks()
 	showTrustMarkSpecs()
 	showTrustMarkIssuers()
@@ -182,6 +183,27 @@ func showExtraEntityConfig() {
 	printHeader("Extra Entity Configuration Claims")
 
 	claims, err := backends.AdditionalClaims.List()
+	if err != nil {
+		fmt.Printf("  Error: %s\n", err)
+		return
+	}
+	if len(claims) == 0 {
+		fmt.Println("  (none)")
+		return
+	}
+	for _, c := range claims {
+		critStr := ""
+		if c.Crit {
+			critStr = " [crit]"
+		}
+		fmt.Printf("  %s%s: %v\n", c.Claim, critStr, c.Value)
+	}
+}
+
+func showSubordinateAdditionalClaims() {
+	printHeader("General Subordinate Additional Claims")
+
+	claims, err := loadSubordinateAdditionalClaims()
 	if err != nil {
 		fmt.Printf("  Error: %s\n", err)
 		return

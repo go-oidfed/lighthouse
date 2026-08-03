@@ -167,3 +167,146 @@ func sectionMetadataPolicyCrit() {
 	}
 	fmt.Printf("  Saved %d crit operators.\n", len(ops))
 }
+
+// generalSubordinateAdditionalClaim mirrors the KV-stored format used by the
+// Admin API for general subordinate additional claims.
+type generalSubordinateAdditionalClaim struct {
+	ID    int    `json:"id"`
+	Claim string `json:"claim"`
+	Value any    `json:"value"`
+	Crit  bool   `json:"crit"`
+}
+
+func sectionSubordinateAdditionalClaims() {
+	printHeader("General Subordinate Additional Claims")
+
+	claims, err := loadSubordinateAdditionalClaims()
+	if err != nil {
+		fmt.Printf("  Error reading: %s\n", err)
+		return
+	}
+	if len(claims) > 0 {
+		for _, c := range claims {
+			critStr := ""
+			if c.Crit {
+				critStr = " [crit]"
+			}
+			fmt.Printf("  %s%s: %v\n", c.Claim, critStr, c.Value)
+		}
+	} else {
+		fmt.Println("  (none)")
+	}
+
+	for {
+		fmt.Println()
+		fmt.Println("  1. Add/update a claim")
+		fmt.Println("  2. Remove a claim")
+		fmt.Println("  3. Done")
+
+		choice := promptString("Select", "")
+		switch choice {
+		case "1":
+			addSubordinateAdditionalClaim(claims)
+		case "2":
+			removeSubordinateAdditionalClaim(claims)
+		case "3", "":
+			return
+		}
+	}
+}
+
+func loadSubordinateAdditionalClaims() ([]generalSubordinateAdditionalClaim, error) {
+	var claims []generalSubordinateAdditionalClaim
+	found, err := backends.KV.GetAs(
+		model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, &claims,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return []generalSubordinateAdditionalClaim{}, nil
+	}
+	return claims, nil
+}
+
+func saveSubordinateAdditionalClaims(claims []generalSubordinateAdditionalClaim) error {
+	if len(claims) == 0 {
+		return backends.KV.Delete(
+			model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims,
+		)
+	}
+	return backends.KV.SetAny(
+		model.KeyValueScopeSubordinateStatement, model.KeyValueKeyAdditionalClaims, claims,
+	)
+}
+
+func nextSubordinateAdditionalClaimID(claims []generalSubordinateAdditionalClaim) int {
+	maxID := 0
+	for _, c := range claims {
+		if c.ID > maxID {
+			maxID = c.ID
+		}
+	}
+	return maxID + 1
+}
+
+func addSubordinateAdditionalClaim(claims []generalSubordinateAdditionalClaim) {
+	name := promptStringRequired("Claim name")
+
+	valueStr := promptStringRequired("Claim value (JSON, e.g. \"string\", 123, true, {\"key\":\"val\"})")
+	var value any
+	if err := json.Unmarshal([]byte(valueStr), &value); err != nil {
+		fmt.Printf("  Error parsing value as JSON: %s\n", err)
+		return
+	}
+	crit := promptBool("Critical?", false)
+
+	for i := range claims {
+		if claims[i].Claim == name {
+			claims[i].Value = value
+			claims[i].Crit = crit
+			if err := saveSubordinateAdditionalClaims(claims); err != nil {
+				fmt.Printf("  Error writing: %s\n", err)
+				return
+			}
+			fmt.Printf("  Updated claim '%s'.\n", name)
+			return
+		}
+	}
+
+	claims = append(claims, generalSubordinateAdditionalClaim{
+		ID:    nextSubordinateAdditionalClaimID(claims),
+		Claim: name,
+		Value: value,
+		Crit:  crit,
+	})
+	if err := saveSubordinateAdditionalClaims(claims); err != nil {
+		fmt.Printf("  Error writing: %s\n", err)
+		return
+	}
+	fmt.Printf("  Claim '%s' saved.\n", name)
+}
+
+func removeSubordinateAdditionalClaim(claims []generalSubordinateAdditionalClaim) {
+	name := promptStringRequired("Claim name to remove")
+	if !promptConfirm(fmt.Sprintf("Remove '%s'?", name)) {
+		return
+	}
+	found := false
+	for i, c := range claims {
+		if c.Claim == name {
+			claims = append(claims[:i], claims[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		fmt.Printf("  Claim '%s' not found.\n", name)
+		return
+	}
+	if err := saveSubordinateAdditionalClaims(claims); err != nil {
+		fmt.Printf("  Error writing: %s\n", err)
+		return
+	}
+	fmt.Printf("  Claim '%s' removed.\n", name)
+}

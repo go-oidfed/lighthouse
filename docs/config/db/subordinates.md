@@ -77,18 +77,18 @@ OpenID Federation Specification. Managed as a JSON object via the Admin API.
 
 Critical metadata policy operators as per the OpenID Federation Specification.
 
-| Tool | Command |
-|------|---------|
+| Tool      | Command                                                   |
+|-----------|-----------------------------------------------------------|
 | Admin API | `GET/PUT /api/v1/admin/subordinates/metadata-policy-crit` |
-| lhsetup | `lhsetup --only=metadata_policy_crit` |
-| config2db | `lhmigrate config2db --only=metadata_policy_crit` |
+| lhsetup   | `lhsetup --only=metadata_policy_crit`                     |
+| config2db | `lhmigrate config2db --only=metadata_policy_crit`         |
 
 ### Additional Claims (`additional_claims`)
 
 <span class="badge badge-purple" title="Value Type">list of objects</span>
 
 Additional claims included in every subordinate statement. Each claim can be
-individually marked as critical. Managed via the Admin API only.
+individually marked as critical.
 
 Each claim object has the following fields:
 
@@ -103,6 +103,7 @@ Each claim object has the following fields:
 |-----------|--------------------------------------------------------------------------|
 | Admin API | `GET/PUT/POST /api/v1/admin/subordinates/additional-claims`              |
 | Admin API | `GET/PUT/DELETE /api/v1/admin/subordinates/additional-claims/{id}`       |
+| lhsetup   | `lhsetup --only=subordinate_additional_claims` (add/remove)              |
 
 ??? example "Example additional claim"
 

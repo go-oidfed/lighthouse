@@ -6,25 +6,26 @@ import "slices"
 type Section string
 
 const (
-	SectionSigning               Section = "signing"
-	SectionFederation            Section = "federation"
-	SectionTrustMarkSpecs        Section = "trust_mark_specs"
-	SectionTrustMarks            Section = "trust_marks"
-	SectionAuthorityHints        Section = "authority_hints"
-	SectionMetadata              Section = "metadata"
-	SectionConstraints           Section = "constraints"
-	SectionMetadataPolicyCrit    Section = "metadata_policy_crit"
-	SectionMetadataPolicies      Section = "metadata_policies"
-	SectionConfigLifetime        Section = "config_lifetime"
-	SectionStatementLifetime     Section = "statement_lifetime"
-	SectionAlg                   Section = "alg"
-	SectionRSAKeyLen             Section = "rsa_key_len"
-	SectionKeyRotation           Section = "key_rotation"
-	SectionTrustMarkIssuers      Section = "trust_mark_issuers"
-	SectionTrustMarkOwners       Section = "trust_mark_owners"
-	SectionExtraEntityConfigData Section = "extra_entity_config"
-	SectionTrustAnchors          Section = "trust_anchors"
-	SectionEndpoints             Section = "endpoints"
+	SectionSigning                     Section = "signing"
+	SectionFederation                  Section = "federation"
+	SectionTrustMarkSpecs              Section = "trust_mark_specs"
+	SectionTrustMarks                  Section = "trust_marks"
+	SectionAuthorityHints              Section = "authority_hints"
+	SectionMetadata                    Section = "metadata"
+	SectionConstraints                 Section = "constraints"
+	SectionMetadataPolicyCrit          Section = "metadata_policy_crit"
+	SectionMetadataPolicies            Section = "metadata_policies"
+	SectionConfigLifetime              Section = "config_lifetime"
+	SectionStatementLifetime           Section = "statement_lifetime"
+	SectionAlg                         Section = "alg"
+	SectionRSAKeyLen                   Section = "rsa_key_len"
+	SectionKeyRotation                 Section = "key_rotation"
+	SectionTrustMarkIssuers            Section = "trust_mark_issuers"
+	SectionTrustMarkOwners             Section = "trust_mark_owners"
+	SectionExtraEntityConfigData       Section = "extra_entity_config"
+	SectionSubordinateAdditionalClaims Section = "subordinate_additional_claims"
+	SectionTrustAnchors                Section = "trust_anchors"
+	SectionEndpoints                   Section = "endpoints"
 )
 
 // AllSections returns all available migration/config sections
@@ -41,6 +42,7 @@ func AllSections() []Section {
 		SectionAuthorityHints,
 		SectionMetadata,
 		SectionExtraEntityConfigData,
+		SectionSubordinateAdditionalClaims,
 		SectionTrustMarkSpecs,
 		SectionTrustMarks,
 		SectionTrustMarkIssuers,
