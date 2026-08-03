@@ -126,11 +126,11 @@ func (h *federationEndpointsHandlers) setAuthTrustAnchors(c *fiber.Ctx) error {
 	if !model.IsValidFederationEndpointType(t) {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid endpoint type"))
 	}
-	var ids []uint
-	if err := c.BodyParser(&ids); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected array of trust anchor IDs"))
+	var entityIDs []string
+	if err := c.BodyParser(&entityIDs); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected array of trust anchor entity IDs"))
 	}
-	tas, err := h.store.SetAuthTrustAnchors(t, ids)
+	tas, err := h.store.SetAuthTrustAnchors(t, entityIDs)
 	if err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))

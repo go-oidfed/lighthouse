@@ -32,14 +32,14 @@ dynamic dispatch, authentication, and enrollment details.
 
 All endpoint types share these fields:
 
-| Field                   | Type             | Description                                                                                                  |
-|-------------------------|------------------|--------------------------------------------------------------------------------------------------------------|
-| `type`                  | string (enum)    | The endpoint type (see table above)                                                                          |
-| `path`                  | string \| null   | URL path under which the endpoint is served. Set to `null` to disable the endpoint without deleting it.      |
-| `url`                   | string \| null   | External URL published in the Entity Configuration. If not set, the URL is derived from `<entity_id><path>`. |
-| `auth_enabled`          | boolean          | When `true`, requires `private_key_jwt` client authentication.                                               |
-| `auth_trust_anchor_ids` | list of integers | Database IDs of trust anchors used to verify client assertions (when `auth_enabled` is `true`).              |
-| `config`                | JSON             | Type-specific configuration (see below).                                                                     |
+| Field                | Type                         | Description                                                                                                  |
+|----------------------|------------------------------|--------------------------------------------------------------------------------------------------------------|
+| `type`               | string (enum)                | The endpoint type (see table above)                                                                          |
+| `path`               | string \| null               | URL path under which the endpoint is served. Set to `null` to disable the endpoint without deleting it.      |
+| `url`                | string \| null               | External URL published in the Entity Configuration. If not set, the URL is derived from `<entity_id><path>`. |
+| `auth_enabled`       | boolean                      | When `true`, requires `private_key_jwt` client authentication.                                               |
+| `auth_trust_anchors` | list of strings (entity IDs) | Trust anchor entity IDs used to verify client assertions (when `auth_enabled` is `true`).                    |
+| `config`             | JSON                         | Type-specific configuration (see below).                                                                     |
 
 ## Type-Specific Configuration
 

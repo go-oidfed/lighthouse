@@ -50,7 +50,7 @@ curl -X POST -u admin:password \
     "type": "fetch",
     "path": "/fetch",
     "auth_enabled": true,
-    "auth_trust_anchor_ids": [1, 2]
+    "auth_trust_anchors": ["https://ta1.example.com", "https://ta2.example.com"]
   }' \
   https://localhost:8081/api/v1/admin/federation-endpoints
 ```

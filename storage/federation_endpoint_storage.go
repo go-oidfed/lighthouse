@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"strconv"
-
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 
@@ -175,12 +173,12 @@ func (s *FederationEndpointStorage) Delete(t model.FederationEndpointType) error
 }
 
 // SetAuthTrustAnchors replaces the auth trust anchors for an endpoint.
-func (s *FederationEndpointStorage) SetAuthTrustAnchors(t model.FederationEndpointType, trustAnchorIDs []uint) ([]model.TrustAnchor, error) {
+func (s *FederationEndpointStorage) SetAuthTrustAnchors(t model.FederationEndpointType, trustAnchorEntityIDs []string) ([]model.TrustAnchor, error) {
 	item, err := s.findByType(t)
 	if err != nil {
 		return nil, err
 	}
-	authTAs, err := s.resolveAuthTrustAnchors(trustAnchorIDs)
+	authTAs, err := s.resolveAuthTrustAnchors(trustAnchorEntityIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -190,25 +188,24 @@ func (s *FederationEndpointStorage) SetAuthTrustAnchors(t model.FederationEndpoi
 	return authTAs, nil
 }
 
-// resolveAuthTrustAnchors loads trust anchor rows by ID, skipping unknowns.
-func (s *FederationEndpointStorage) resolveAuthTrustAnchors(ids []uint) ([]model.TrustAnchor, error) {
-	if len(ids) == 0 {
+// resolveAuthTrustAnchors loads trust anchor rows by entity ID, skipping unknowns.
+func (s *FederationEndpointStorage) resolveAuthTrustAnchors(entityIDs []string) ([]model.TrustAnchor, error) {
+	if len(entityIDs) == 0 {
 		return nil, nil
 	}
 	var tas []model.TrustAnchor
-	if err := s.db.Where("id IN ?", ids).Find(&tas).Error; err != nil {
+	if err := s.db.Where("entity_id IN ?", entityIDs).Find(&tas).Error; err != nil {
 		return nil, errors.Wrap(err, "federation_endpoints: resolve auth trust anchors failed")
 	}
-	if len(tas) != len(ids) {
-		// Build a set of found IDs to report the missing ones.
-		found := make(map[uint]bool, len(tas))
+	if len(tas) != len(entityIDs) {
+		found := make(map[string]bool, len(tas))
 		for _, ta := range tas {
-			found[ta.ID] = true
+			found[ta.EntityID] = true
 		}
 		var missing []string
-		for _, id := range ids {
-			if !found[id] {
-				missing = append(missing, strconv.FormatUint(uint64(id), 10))
+		for _, entityID := range entityIDs {
+			if !found[entityID] {
+				missing = append(missing, entityID)
 			}
 		}
 		return nil, model.NotFoundErrorFmt("trust anchor(s) not found: %s", missing)

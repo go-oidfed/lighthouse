@@ -98,7 +98,7 @@ type FederationEndpointStore interface {
 	Create(req AddFederationEndpoint) (*FederationEndpoint, error)
 	Update(t FederationEndpointType, req AddFederationEndpoint) (*FederationEndpoint, error)
 	Delete(t FederationEndpointType) error
-	SetAuthTrustAnchors(t FederationEndpointType, trustAnchorIDs []uint) ([]TrustAnchor, error)
+	SetAuthTrustAnchors(t FederationEndpointType, trustAnchorEntityIDs []string) ([]TrustAnchor, error)
 }
 
 // AddFederationEndpoint is the request payload to create/update a FederationEndpoint.
@@ -108,5 +108,5 @@ type AddFederationEndpoint struct {
 	URL              *string                `json:"url,omitempty"`
 	AuthEnabled      bool                   `json:"auth_enabled"`
 	Config           string                 `json:"config,omitempty"`
-	AuthTrustAnchors []uint                 `json:"auth_trust_anchor_ids,omitempty"`
+	AuthTrustAnchors []string               `json:"auth_trust_anchors,omitempty"`
 }

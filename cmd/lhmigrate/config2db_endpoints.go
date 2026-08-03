@@ -173,19 +173,6 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		defaultTAEntityIDs = append(defaultTAEntityIDs, ta.EntityID)
 	}
 
-	// resolveAuthTAIDs resolves entity-id strings to DB IDs.
-	resolveAuthTAIDs := func(authTAs []string) ([]uint, error) {
-		var ids []uint
-		for _, taID := range authTAs {
-			ta, err := m.backends.TrustAnchors.Get(taID)
-			if err != nil {
-				return nil, fmt.Errorf("auth trust anchor %q not found in DB: %w", taID, err)
-			}
-			ids = append(ids, ta.ID)
-		}
-		return ids, nil
-	}
-
 	// createOrUpdateEndpoint creates or updates an endpoint in the DB.
 	createOrUpdateEndpoint := func(req model.AddFederationEndpoint) migrationResult {
 		result := migrationResult{section: sectionEndpoints, details: string(req.Type)}
@@ -224,18 +211,14 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 	buildSimpleReq := func(
 		epType model.FederationEndpointType, path, url string,
 		authEnabled bool, authTAs []string,
-	) (model.AddFederationEndpoint, error) {
-		taIDs, err := resolveAuthTAIDs(authTAs)
-		if err != nil {
-			return model.AddFederationEndpoint{}, err
-		}
+	) model.AddFederationEndpoint {
 		return model.AddFederationEndpoint{
 			Type:             epType,
 			Path:             migration.StrPtrOrNil(path),
 			URL:              migration.StrPtrOrNil(url),
 			AuthEnabled:      authEnabled,
-			AuthTrustAnchors: taIDs,
-		}, nil
+			AuthTrustAnchors: authTAs,
+		}
 	}
 
 	// Helper for simple endpoints (path/url/auth only).
@@ -249,14 +232,7 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		if authEnabled && len(authTAs) == 0 {
 			authTAs = defaultTAEntityIDs
 		}
-		req, err := buildSimpleReq(epType, path, url, authEnabled, authTAs)
-		if err != nil {
-			results = append(results, migrationResult{
-				section: sectionEndpoints, details: string(epType), err: err,
-			})
-			return
-		}
-		results = append(results, createOrUpdateEndpoint(req))
+		results = append(results, createOrUpdateEndpoint(buildSimpleReq(epType, path, url, authEnabled, authTAs)))
 	}
 
 	// Fetch
@@ -278,37 +254,30 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		if authEnabled && len(authTAs) == 0 {
 			authTAs = defaultTAEntityIDs
 		}
-		taIDs, err := resolveAuthTAIDs(authTAs)
-		if err != nil {
-			results = append(results, migrationResult{
-				section: sectionEndpoints, details: string(model.EndpointTypeResolve), err: err,
-			})
-		} else {
-			cfg := migration.ResolveDBConfigJSON{
-				AllowedTrustAnchors:                    m.config.Endpoints.Resolve.AllowedTrustAnchors,
-				UseEntityCollectionAllowedTrustAnchors: m.config.Endpoints.Resolve.UseEntityCollectionAllowedTrustAnchors,
-				GracePeriodSeconds:                     int64(m.config.Endpoints.Resolve.GracePeriod.Duration().Seconds()),
-				TimeElapsedGraceFactor:                 m.config.Endpoints.Resolve.TimeElapsedGraceFactor,
-				ProactiveResolver: &migration.ProactiveResolverDBConfigJSON{
-					Enabled:                  m.config.Endpoints.Resolve.ProactiveResolver.Enabled,
-					ConcurrencyLimit:         m.config.Endpoints.Resolve.ProactiveResolver.ConcurrencyLimit,
-					QueueSize:                m.config.Endpoints.Resolve.ProactiveResolver.QueueSize,
-					ResponseStorageDir:       m.config.Endpoints.Resolve.ProactiveResolver.ResponseStorage.Dir,
-					ResponseStorageStoreJSON: m.config.Endpoints.Resolve.ProactiveResolver.ResponseStorage.StoreJSON,
-					ResponseStorageStoreJWT:  m.config.Endpoints.Resolve.ProactiveResolver.ResponseStorage.StoreJWT,
-				},
-			}
-			cfgJSON, _ := json.Marshal(cfg)
-			req := model.AddFederationEndpoint{
-				Type:             model.EndpointTypeResolve,
-				Path:             migration.StrPtrOrNil(m.config.Endpoints.Resolve.Path),
-				URL:              migration.StrPtrOrNil(m.config.Endpoints.Resolve.URL),
-				AuthEnabled:      authEnabled,
-				AuthTrustAnchors: taIDs,
-				Config:           string(cfgJSON),
-			}
-			results = append(results, createOrUpdateEndpoint(req))
+		cfg := migration.ResolveDBConfigJSON{
+			AllowedTrustAnchors:                    m.config.Endpoints.Resolve.AllowedTrustAnchors,
+			UseEntityCollectionAllowedTrustAnchors: m.config.Endpoints.Resolve.UseEntityCollectionAllowedTrustAnchors,
+			GracePeriodSeconds:                     int64(m.config.Endpoints.Resolve.GracePeriod.Duration().Seconds()),
+			TimeElapsedGraceFactor:                 m.config.Endpoints.Resolve.TimeElapsedGraceFactor,
+			ProactiveResolver: &migration.ProactiveResolverDBConfigJSON{
+				Enabled:                  m.config.Endpoints.Resolve.ProactiveResolver.Enabled,
+				ConcurrencyLimit:         m.config.Endpoints.Resolve.ProactiveResolver.ConcurrencyLimit,
+				QueueSize:                m.config.Endpoints.Resolve.ProactiveResolver.QueueSize,
+				ResponseStorageDir:       m.config.Endpoints.Resolve.ProactiveResolver.ResponseStorage.Dir,
+				ResponseStorageStoreJSON: m.config.Endpoints.Resolve.ProactiveResolver.ResponseStorage.StoreJSON,
+				ResponseStorageStoreJWT:  m.config.Endpoints.Resolve.ProactiveResolver.ResponseStorage.StoreJWT,
+			},
 		}
+		cfgJSON, _ := json.Marshal(cfg)
+		req := model.AddFederationEndpoint{
+			Type:             model.EndpointTypeResolve,
+			Path:             migration.StrPtrOrNil(m.config.Endpoints.Resolve.Path),
+			URL:              migration.StrPtrOrNil(m.config.Endpoints.Resolve.URL),
+			AuthEnabled:      authEnabled,
+			AuthTrustAnchors: authTAs,
+			Config:           string(cfgJSON),
+		}
+		results = append(results, createOrUpdateEndpoint(req))
 	}
 
 	// Simple endpoints
@@ -344,32 +313,25 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		if authEnabled && len(authTAs) == 0 {
 			authTAs = defaultTAEntityIDs
 		}
-		taIDs, err := resolveAuthTAIDs(authTAs)
-		if err != nil {
-			results = append(results, migrationResult{
-				section: sectionEndpoints, details: string(model.EndpointTypeEnroll), err: err,
-			})
-		} else {
-			checkerType, checkerConfig := migration.ConvertCheckerConfig(&m.config.Endpoints.Enroll.Checker)
-			cfgJSON := ""
-			if checkerType != "" {
-				cfg := migration.EnrollDBConfigJSON{
-					CheckerType:   checkerType,
-					CheckerConfig: checkerConfig,
-				}
-				b, _ := json.Marshal(cfg)
-				cfgJSON = string(b)
+		checkerType, checkerConfig := migration.ConvertCheckerConfig(&m.config.Endpoints.Enroll.Checker)
+		cfgJSON := ""
+		if checkerType != "" {
+			cfg := migration.EnrollDBConfigJSON{
+				CheckerType:   checkerType,
+				CheckerConfig: checkerConfig,
 			}
-			req := model.AddFederationEndpoint{
-				Type:             model.EndpointTypeEnroll,
-				Path:             migration.StrPtrOrNil(m.config.Endpoints.Enroll.Path),
-				URL:              migration.StrPtrOrNil(m.config.Endpoints.Enroll.URL),
-				AuthEnabled:      authEnabled,
-				AuthTrustAnchors: taIDs,
-				Config:           cfgJSON,
-			}
-			results = append(results, createOrUpdateEndpoint(req))
+			b, _ := json.Marshal(cfg)
+			cfgJSON = string(b)
 		}
+		req := model.AddFederationEndpoint{
+			Type:             model.EndpointTypeEnroll,
+			Path:             migration.StrPtrOrNil(m.config.Endpoints.Enroll.Path),
+			URL:              migration.StrPtrOrNil(m.config.Endpoints.Enroll.URL),
+			AuthEnabled:      authEnabled,
+			AuthTrustAnchors: authTAs,
+			Config:           cfgJSON,
+		}
+		results = append(results, createOrUpdateEndpoint(req))
 	}
 
 	// Entity collection
@@ -379,29 +341,22 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		if authEnabled && len(authTAs) == 0 {
 			authTAs = defaultTAEntityIDs
 		}
-		taIDs, err := resolveAuthTAIDs(authTAs)
-		if err != nil {
-			results = append(results, migrationResult{
-				section: sectionEndpoints, details: string(model.EndpointTypeEntityCollection), err: err,
-			})
-		} else {
-			cfg := migration.CollectionDBConfigJSON{
-				AllowedTrustAnchors: m.config.Endpoints.EntityCollection.AllowedTrustAnchors,
-				IntervalSeconds:     int64(m.config.Endpoints.EntityCollection.Interval.Duration().Seconds()),
-				ConcurrencyLimit:    m.config.Endpoints.EntityCollection.ConcurrencyLimit,
-				PaginationLimit:     m.config.Endpoints.EntityCollection.PaginationLimit,
-			}
-			cfgJSON, _ := json.Marshal(cfg)
-			req := model.AddFederationEndpoint{
-				Type:             model.EndpointTypeEntityCollection,
-				Path:             migration.StrPtrOrNil(m.config.Endpoints.EntityCollection.Path),
-				URL:              migration.StrPtrOrNil(m.config.Endpoints.EntityCollection.URL),
-				AuthEnabled:      authEnabled,
-				AuthTrustAnchors: taIDs,
-				Config:           string(cfgJSON),
-			}
-			results = append(results, createOrUpdateEndpoint(req))
+		cfg := migration.CollectionDBConfigJSON{
+			AllowedTrustAnchors: m.config.Endpoints.EntityCollection.AllowedTrustAnchors,
+			IntervalSeconds:     int64(m.config.Endpoints.EntityCollection.Interval.Duration().Seconds()),
+			ConcurrencyLimit:    m.config.Endpoints.EntityCollection.ConcurrencyLimit,
+			PaginationLimit:     m.config.Endpoints.EntityCollection.PaginationLimit,
 		}
+		cfgJSON, _ := json.Marshal(cfg)
+		req := model.AddFederationEndpoint{
+			Type:             model.EndpointTypeEntityCollection,
+			Path:             migration.StrPtrOrNil(m.config.Endpoints.EntityCollection.Path),
+			URL:              migration.StrPtrOrNil(m.config.Endpoints.EntityCollection.URL),
+			AuthEnabled:      authEnabled,
+			AuthTrustAnchors: authTAs,
+			Config:           string(cfgJSON),
+		}
+		results = append(results, createOrUpdateEndpoint(req))
 	}
 
 	if len(results) == 0 {

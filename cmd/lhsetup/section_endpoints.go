@@ -31,15 +31,13 @@ func sectionEndpoints() {
 		return
 	}
 	taEntityIDs := make([]string, 0, len(tas))
-	taByEntityID := make(map[string]uint)
 	for _, ta := range tas {
 		taEntityIDs = append(taEntityIDs, ta.EntityID)
-		taByEntityID[ta.EntityID] = ta.ID
 	}
 
 	for _, epType := range model.AllFederationEndpointTypes() {
 		fmt.Println()
-		configureEndpoint(epType, existing, taEntityIDs, taByEntityID)
+		configureEndpoint(epType, existing, taEntityIDs)
 	}
 }
 
@@ -47,7 +45,6 @@ func configureEndpoint(
 	epType model.FederationEndpointType,
 	existing map[model.FederationEndpointType]*model.FederationEndpoint,
 	taEntityIDs []string,
-	taByEntityID map[string]uint,
 ) {
 	printSubHeader(fmt.Sprintf("Endpoint: %s", epType))
 
@@ -84,7 +81,7 @@ func configureEndpoint(
 	newURL := promptString("URL (optional, Enter to keep current)", url)
 	newAuthEnabled := promptBool("Auth enabled?", authEnabled)
 
-	var authTAIDs []uint
+	var authTAEntityIDs []string
 	if newAuthEnabled {
 		fmt.Println("  Available trust anchors:")
 		for i, id := range taEntityIDs {
@@ -99,16 +96,10 @@ func configureEndpoint(
 		fmt.Println("  Enter trust anchor entity IDs (comma-separated, or 'all' for all):")
 		taInput := promptString("Auth trust anchors", fmt.Sprintf("%s", currentTAs))
 		if taInput == "all" {
-			for _, id := range taEntityIDs {
-				authTAIDs = append(authTAIDs, taByEntityID[id])
-			}
+			authTAEntityIDs = append(authTAEntityIDs, taEntityIDs...)
 		} else if taInput != "" {
 			for _, id := range splitCommaList(taInput) {
-				if dbID, ok := taByEntityID[id]; ok {
-					authTAIDs = append(authTAIDs, dbID)
-				} else {
-					fmt.Printf("  Warning: trust anchor '%s' not found in DB, skipping.\n", id)
-				}
+				authTAEntityIDs = append(authTAEntityIDs, id)
 			}
 		}
 	}
@@ -128,7 +119,7 @@ func configureEndpoint(
 		Path:             migration.StrPtrOrNil(newPath),
 		URL:              migration.StrPtrOrNil(newURL),
 		AuthEnabled:      newAuthEnabled,
-		AuthTrustAnchors: authTAIDs,
+		AuthTrustAnchors: authTAEntityIDs,
 		Config:           configJSON,
 	}
 
