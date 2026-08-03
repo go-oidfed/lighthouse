@@ -117,21 +117,71 @@ Each claim object has the following fields:
 
 ## Per-Subordinate Configuration
 
-Per-subordinate configuration that controls JWKS refreshing. Subordinates
-themselves (entity ID, JWKS, metadata, policies, status, etc.) are managed via
-the [Admin API](../../features/admin_api.md). See
-[Subordinate JWKS Refreshing](../../features/subordinate_jwks_refresh.md) for
-the full feature documentation.
+Each subordinate is stored as a record with basic fields, JWKS, JWKS refresh
+settings, and optional per-subordinate statement overrides. When a statement
+override is not set, the corresponding
+[general subordinate statement configuration](#general-subordinate-statement-configuration)
+is used as a fallback.
 
-In addition to the JWKS refresh fields below, per-subordinate overrides for
-constraints, metadata, metadata policies, and additional claims are available
-via the Admin API at `/api/v1/admin/subordinates/{id}/...`. When set, these
-overrides take precedence over the
-[general subordinate statement configuration](#general-subordinate-statement-configuration).
+See [Subordinate JWKS Refreshing](../../features/subordinate_jwks_refresh.md)
+for the full JWKS refresh feature documentation.
 
-### JWKS Refresh Fields
+### Subordinate Record
 
-These fields are set on each subordinate and control periodic JWKS polling.
+The basic fields on each subordinate, set when creating or updating via the
+Admin API:
+
+| Field                     | Type    | Description                                                                |
+|---------------------------|---------|----------------------------------------------------------------------------|
+| `entity_id`               | string  | Entity ID of the subordinate                                               |
+| `status`                  | string  | `active`, `blocked`, `pending`, or `inactive`                              |
+| `description`             | string  | Human-readable description                                                 |
+| `registered_entity_types` | list    | Entity types this subordinate is registered as (e.g. `openid_provider`)    |
+| `enable_jwks_update`      | boolean | Enable periodic JWKS polling (see [JWKS Refresh](#enable_jwks_update))     |
+| `jwks_poll_interval`      | integer | Poll interval in seconds (see [JWKS Refresh](#jwks_poll_interval))         |
+
+| Tool      | Command                                                                          |
+|-----------|----------------------------------------------------------------------------------|
+| Admin API | `GET/POST /api/v1/admin/subordinates`                                            |
+| Admin API | `GET/PUT/PATCH/DELETE /api/v1/admin/subordinates/{subordinateID}`                |
+| Admin API | `PUT /api/v1/admin/subordinates/{subordinateID}/status`                          |
+| lhsetup   | Not applicable (per-subordinate, set via Admin API or enroll endpoint)           |
+
+??? example "Create a subordinate"
+
+    ```bash
+    curl -X POST -u admin:password \
+      -H "Content-Type: application/json" \
+      -d '{
+        "entity_id": "https://sub.example.com",
+        "status": "active",
+        "jwks": {"keys": [...]},
+        "enable_jwks_update": true,
+        "jwks_poll_interval": 3600
+      }' \
+      https://localhost:8081/api/v1/admin/subordinates
+    ```
+
+??? example "Update a subordinate (PATCH for partial updates)"
+
+    ```bash
+    curl -X PATCH -u admin:password \
+      -H "Content-Type: application/json" \
+      -d '{"enable_jwks_update": true, "jwks_poll_interval": 7200}' \
+      https://localhost:8081/api/v1/admin/subordinates/{subordinateID}
+    ```
+
+### JWKS
+
+The subordinate's JWKS, used to verify signatures on its Entity Configuration
+and signed JWK Sets. Managed via dedicated JWKS endpoints:
+
+| Tool      | Command                                                                  |
+|-----------|--------------------------------------------------------------------------|
+| Admin API | `GET/PUT/POST /api/v1/admin/subordinates/{subordinateID}/jwks`          |
+| Admin API | `DELETE /api/v1/admin/subordinates/{subordinateID}/jwks/{kid}`          |
+
+### JWKS Refresh
 
 #### `enable_jwks_update`
 
@@ -152,31 +202,93 @@ Poll interval in seconds. When `0` (the default) or `<= 0`, LightHouse derives
 the interval from the subordinate's Entity Configuration expiration time
 (with a small buffer), floored to a minimum of **1 minute**.
 
-### Management
+### Statement Overrides
 
-Set these fields when creating or updating a subordinate via the Admin API:
+The following options override the
+[general subordinate statement configuration](#general-subordinate-statement-configuration)
+for a specific subordinate. When not set, the general value is used as a
+fallback.
 
-```bash
-# Create a subordinate with periodic refreshing enabled
-curl -X POST -u admin:password \
-  -H "Content-Type: application/json" \
-  -d '{
-    "entity_id": "https://sub.example.com",
-    "status": "active",
-    "jwks": {"keys": [...]},
-    "enable_jwks_update": true,
-    "jwks_poll_interval": 3600
-  }' \
-  https://localhost:8081/api/v1/admin/subordinates
+#### Metadata (`metadata`)
 
-# Enable refreshing on an existing subordinate (PATCH preferred for partial updates)
-curl -X PATCH -u admin:password \
-  -H "Content-Type: application/json" \
-  -d '{"enable_jwks_update": true, "jwks_poll_interval": 7200}' \
-  https://localhost:8081/api/v1/admin/subordinates/{subordinateID}
-```
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
 
-| Tool | Command |
-|------|---------|
-| Admin API | `POST/PATCH /api/v1/admin/subordinates` or `/api/v1/admin/subordinates/{id}` |
-| lhsetup | Not applicable (per-subordinate, set via Admin API or enroll endpoint) |
+Per-subordinate metadata included in the subordinate statement. When not set,
+no metadata is included (there is no general subordinate metadata fallback).
+
+| Tool      | Command                                                                                  |
+|-----------|------------------------------------------------------------------------------------------|
+| Admin API | `GET/PUT /api/v1/admin/subordinates/{subordinateID}/metadata`                            |
+| Admin API | `GET/PUT/POST/DELETE /api/v1/admin/subordinates/{subordinateID}/metadata/{entityType}`   |
+| Admin API | `GET/PUT/DELETE /api/v1/admin/subordinates/{subordinateID}/metadata/{entityType}/{claim}`|
+
+#### Constraints (`constraints`)
+
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+
+Per-subordinate constraints, overriding the
+[general constraints](#constraints-constraints). When not set, the general
+constraints are used.
+
+| Tool      | Command                                                                                              |
+|-----------|------------------------------------------------------------------------------------------------------|
+| Admin API | `GET/PUT/POST/DELETE /api/v1/admin/subordinates/{subordinateID}/constraints`                        |
+| Admin API | `GET/PUT/DELETE /api/v1/admin/subordinates/{subordinateID}/constraints/max-path-length`             |
+| Admin API | `GET/PUT/DELETE /api/v1/admin/subordinates/{subordinateID}/constraints/naming-constraints`          |
+| Admin API | `GET/PUT/POST/DELETE /api/v1/admin/subordinates/{subordinateID}/constraints/allowed-entity-types`   |
+
+#### Metadata Policies (`metadata_policies`)
+
+<span class="badge badge-purple" title="Value Type">object / mapping</span>
+
+Per-subordinate metadata policies, overriding the
+[general metadata policies](#metadata-policies-metadata_policies). When not
+set, the general metadata policies are used.
+
+| Tool      | Command                                                                                                    |
+|-----------|------------------------------------------------------------------------------------------------------------|
+| Admin API | `GET/PUT/POST/DELETE /api/v1/admin/subordinates/{subordinateID}/metadata-policies`                        |
+| Admin API | `GET/PUT/POST/DELETE /api/v1/admin/subordinates/{subordinateID}/metadata-policies/{entityType}`           |
+| Admin API | `GET/PUT/POST/DELETE /api/v1/admin/subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}`   |
+| Admin API | `GET/PUT/DELETE /api/v1/admin/subordinates/{subordinateID}/metadata-policies/{entityType}/{claim}/{operator}` |
+
+#### Additional Claims (`additional_claims`)
+
+<span class="badge badge-purple" title="Value Type">list of objects</span>
+
+Per-subordinate additional claims, overriding the
+[general additional claims](#additional-claims-additional_claims). When not
+set, the general additional claims are used.
+
+Each claim object has the following fields:
+
+| Field   | Type    | Description                                  |
+|---------|---------|----------------------------------------------|
+| `id`    | integer | Read-only identifier (assigned by the API)   |
+| `claim` | string  | Claim name                                   |
+| `value` | any     | Claim value (any JSON type)                  |
+| `crit`  | boolean | Whether the claim is marked as critical      |
+
+| Tool      | Command                                                                          |
+|-----------|----------------------------------------------------------------------------------|
+| Admin API | `GET/PUT/POST /api/v1/admin/subordinates/{subordinateID}/additional-claims`      |
+| Admin API | `GET/PUT/DELETE /api/v1/admin/subordinates/{subordinateID}/additional-claims/{id}` |
+
+### Statement Preview
+
+Preview the subordinate statement (Entity Statement payload) that LightHouse
+would issue for a specific subordinate, including all resolved overrides and
+fallbacks:
+
+| Tool      | Command                                                                  |
+|-----------|--------------------------------------------------------------------------|
+| Admin API | `GET /api/v1/admin/subordinates/{subordinateID}/statement`               |
+
+### Event History
+
+View the history of changes for a subordinate (status changes, JWKS updates,
+constraint/policy/claim modifications, etc.):
+
+| Tool      | Command                                                                  |
+|-----------|--------------------------------------------------------------------------|
+| Admin API | `GET /api/v1/admin/subordinates/{subordinateID}/history`                 |
