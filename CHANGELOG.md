@@ -68,7 +68,7 @@ The [`except` metadata policy operator](https://zachmann.github.io/federation-ex
 
 - Go **1.26** (with `GOEXPERIMENT=jsonv2` in the Docker build).
 - `lestrrat-go/jwx` upgraded v3 → **v4**.
-- `go-oidfed/lib` upgraded to 0.11.0.
+- `go-oidfed/lib` upgraded to 0.11.1.
 - `badger/v4` 4.9.2 → 4.9.4, `fiber/v2` 2.52.13 → 2.52.14, `go-redis/v9` 9.20.1 → 9.21.0, plus `golang.org/x/crypto`, `gorm` dependency bumps.
 
 ### Migration
