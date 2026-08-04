@@ -36,6 +36,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/eclipse-keypont/crypto11 v1.6.5 h1:m5m6c1ttIYNsG4ZeuHcV1sBXk8KBday/HPYHFO17zGs=
 github.com/eclipse-keypont/crypto11 v1.6.5/go.mod h1:NIBgfiTuqvCyaktz22yE33PB4Aa0dU0M2Uf6QUTfDFk=
+github.com/eclipse-keypont/crypto11 v1.6.8 h1:4OE1GSUYFWbZb27S2+Glj6bQpiPND5BfnPIFxOCIkKU=
+github.com/eclipse-keypont/crypto11 v1.6.8/go.mod h1:NIBgfiTuqvCyaktz22yE33PB4Aa0dU0M2Uf6QUTfDFk=
 github.com/fatih/set v0.2.1 h1:nn2CaJyknWE/6txyUDGwysr3G5QC6xWB/PtVjPBbeaA=
 github.com/fatih/set v0.2.1/go.mod h1:+RKtMCH+favT2+3YecHGxcc0b4KyVWA1QWWJUs4E0CI=
 github.com/fatih/structs v1.1.0 h1:Q7juDM0QtcnhCpeyLGQKyg4TOIghuNXrkL32pHAUMxo=
@@ -53,6 +55,8 @@ github.com/go-oidfed/lib v0.10.13-0.20260728133522-ae8a60cea9eb h1:JLu7u5rZzpDVT
 github.com/go-oidfed/lib v0.10.13-0.20260728133522-ae8a60cea9eb/go.mod h1:r3CAR+fiyTB7nJ1dBgmMsIsC2UO+MQt9d7ipL8mpYC8=
 github.com/go-oidfed/lib v0.11.0 h1:FJJB4I4VZVLiVFZGVB4kaCRz57bVY5TTc4FTNGlGTCM=
 github.com/go-oidfed/lib v0.11.0/go.mod h1:ngQ3PzD/YOFBRFHMfamfEn2w6Xg0ng0eOXhV9kPJ3/w=
+github.com/go-oidfed/lib v0.11.1 h1:YCM6L5GEFN8QWzp789DQEerMdC9BvVv9hSrH+zS0dFk=
+github.com/go-oidfed/lib v0.11.1/go.mod h1:TKa3SB1VpLwDov70D296QebOcbZDLN4RH96Ytt/bG+w=
 github.com/go-resty/resty/v2 v2.17.2 h1:FQW5oHYcIlkCNrMD2lloGScxcHJ0gkjshV3qcQAyHQk=
 github.com/go-resty/resty/v2 v2.17.2/go.mod h1:kCKZ3wWmwJaNc7S29BRtUhJwy7iqmn+2mLtQrOyQlVA=
 github.com/go-sql-driver/mysql v1.10.0 h1:Q+1LV8DkHJvSYAdR83XzuhDaTykuDx0l6fkXxoWCWfw=
@@ -144,6 +148,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/redis/go-redis/v9 v9.21.0 h1:FPBE4hhbAke+TLmcY3WkpbDffJEomdqPn3HYiqAtL9E=
 github.com/redis/go-redis/v9 v9.21.0/go.mod h1:v/M13XI1PVCDcm01VtPFOADfZtHf8YW3baQf57KlIkA=
+github.com/redis/go-redis/v9 v9.22.0 h1:laDvpYXTJtZLloinw1fA5Kqd6HAEH2XKxOkG/PDq2F0=
+github.com/redis/go-redis/v9 v9.22.0/go.mod h1:y2g0Wj8rQvuK0ELM+oxSudcLtC09JScs98I/X9gRWY4=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/rs/zerolog v1.35.1 h1:m7xQeoiLIiV0BCEY4Hs+j2NG4Gp2o2KPKmhnnLiazKI=

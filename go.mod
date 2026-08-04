@@ -6,14 +6,14 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.5
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.11.0
+	github.com/go-oidfed/lib v0.11.1
 	github.com/gofiber/fiber/v2 v2.52.14
 	github.com/google/uuid v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lestrrat-go/jwx/v4 v4.2.0
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.21.0
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
@@ -42,7 +42,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dgraph-io/ristretto/v2 v2.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eclipse-keypont/crypto11 v1.6.5 // indirect
+	github.com/eclipse-keypont/crypto11 v1.6.8 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
