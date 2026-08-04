@@ -987,6 +987,128 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Command
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Command">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decision-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#entity-data-passed-to-the-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Entity Data Passed to the Command
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#config-parameters_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="HTTP">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decision-logic_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#body-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Body Modes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#config-parameters_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#examples_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2054,6 +2176,8 @@ box by LightHouse:</p>
 <li><a href="#db-list"><code>db_list</code></a>: Checks if the entity is in the database with active status (trust mark issuance only)</li>
 <li><a href="#http-list"><code>http_list</code></a>: Fetches a list of allowed entity IDs from an HTTP endpoint</li>
 <li><a href="#http-list-jwt"><code>http_list_jwt</code></a>: Fetches a signed JWT containing allowed entity IDs from an HTTP endpoint</li>
+<li><a href="#command"><code>cmd</code></a>: Runs an external command and uses its exit code to decide</li>
+<li><a href="#http"><code>http</code></a>: Sends a per-entity HTTP request to a decision service and uses the response status code to decide</li>
 </ul>
 <p>In the following we describe in more details how to configure the different
 Entity Checkers:</p>
@@ -2588,6 +2712,251 @@ trust mark issuance.</p>
 <span class="w">      </span><span class="nt">trust_anchors</span><span class="p">:</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://ta1.example.org</span>
 <span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://ta2.example.org</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="command">Command<a class="headerlink" href="#command" title="Permanent link">&para;</a></h2>
+<p>The Command Entity Checker runs an external command for each entity being
+checked and uses the command's exit code as the allow/deny decision. The
+entity's Entity Configuration payload is written to the command's stdin as
+JSON, and the entity ID and types are provided via environment variables.</p>
+<h3 id="decision-logic">Decision Logic<a class="headerlink" href="#decision-logic" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Exit Code</th>
+<th>Result</th>
+<th>HTTP Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Allow</td>
+<td>-</td>
+</tr>
+<tr>
+<td>non-zero</td>
+<td>Deny</td>
+<td>403 Forbidden (stderr used as description)</td>
+</tr>
+<tr>
+<td>timeout</td>
+<td>Error</td>
+<td>500 Internal Server Error</td>
+</tr>
+<tr>
+<td>not found</td>
+<td>Error</td>
+<td>500 Internal Server Error</td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity-data-passed-to-the-command">Entity Data Passed to the Command<a class="headerlink" href="#entity-data-passed-to-the-command" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>stdin</strong>: The entity's Entity Configuration payload as JSON
+  (<code>EntityStatementPayload</code>, including <code>sub</code>, <code>iss</code>, <code>jwks</code>, <code>metadata</code>, etc.)</li>
+<li><strong><code>ENTITY_ID</code></strong> env var: The entity's subject ID</li>
+<li><strong><code>ENTITY_TYPES</code></strong> env var: Comma-joined list of detected entity types</li>
+</ul>
+<h3 id="config-parameters_7">Config Parameters<a class="headerlink" href="#config-parameters_7" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Necessity</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code></td>
+<td>REQUIRED</td>
+<td>-</td>
+<td>Path to the executable to run</td>
+</tr>
+<tr>
+<td><code>args</code></td>
+<td>OPTIONAL</td>
+<td>-</td>
+<td>Command-line arguments passed to the executable</td>
+</tr>
+<tr>
+<td><code>env</code></td>
+<td>OPTIONAL</td>
+<td>-</td>
+<td>Additional environment variables (appended to inherited env)</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>OPTIONAL</td>
+<td><code>30</code></td>
+<td>Maximum duration the command may run, in seconds</td>
+</tr>
+</tbody>
+</table>
+<h3 id="examples_3">Examples<a class="headerlink" href="#examples_3" title="Permanent link">&para;</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="basic-usage_1" name="__tabbed_4" type="radio" /><input id="with-arguments-and-environment" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="basic-usage_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg></span> Basic Usage</label><label for="with-arguments-and-environment"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg></span> With Arguments and Environment</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nt">checker</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmd</span>
+<span class="w">  </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/local/bin/check-entity.sh</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nt">checker</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmd</span>
+<span class="w">  </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/local/bin/check-entity.sh</span>
+<span class="w">    </span><span class="nt">args</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--strict</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">--db</span>
+<span class="w">    </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DB_HOST=localhost</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DB_PORT=5432</span>
+<span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="http">HTTP<a class="headerlink" href="#http" title="Permanent link">&para;</a></h2>
+<p>The HTTP Entity Checker sends a per-entity HTTP request to an external
+decision service and uses the response status code as the allow/deny
+decision. Unlike <a href="#http-list"><code>http_list</code></a> (which fetches a static list and
+checks membership), this checker delegates the decision to the remote
+service on every request and performs no caching.</p>
+<h3 id="decision-logic_1">Decision Logic<a class="headerlink" href="#decision-logic_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Response Status</th>
+<th>Result</th>
+<th>HTTP Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>2xx</code></td>
+<td>Allow</td>
+<td>-</td>
+</tr>
+<tr>
+<td><code>4xx</code></td>
+<td>Deny</td>
+<td>Remote status code passed through</td>
+</tr>
+<tr>
+<td><code>5xx</code> / network error</td>
+<td>Error</td>
+<td>502 Bad Gateway</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-modes">Body Modes<a class="headerlink" href="#body-modes" title="Permanent link">&para;</a></h3>
+<p>The <code>body_mode</code> parameter controls what is sent in the request body:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Body</th>
+<th>Content-Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code></td>
+<td>no body</td>
+<td>-</td>
+</tr>
+<tr>
+<td><code>entity_id</code></td>
+<td><code>{"sub":"...","entity_types":[...]}</code></td>
+<td><code>application/json</code></td>
+</tr>
+<tr>
+<td><code>entity_configuration</code></td>
+<td>Full Entity Configuration payload JSON (default)</td>
+<td><code>application/json</code></td>
+</tr>
+</tbody>
+</table>
+<p>Regardless of <code>body_mode</code>, the entity ID and types are always sent in the
+<code>X-Entity-ID</code> and <code>X-Entity-Types</code> request headers.</p>
+<h3 id="config-parameters_8">Config Parameters<a class="headerlink" href="#config-parameters_8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Necessity</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code></td>
+<td>REQUIRED</td>
+<td>-</td>
+<td>The URL of the decision service</td>
+</tr>
+<tr>
+<td><code>method</code></td>
+<td>OPTIONAL</td>
+<td><code>POST</code></td>
+<td>HTTP method to use</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td>OPTIONAL</td>
+<td>-</td>
+<td>Additional HTTP headers as key-value pairs</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>OPTIONAL</td>
+<td><code>30</code></td>
+<td>Request timeout in seconds</td>
+</tr>
+<tr>
+<td><code>body_mode</code></td>
+<td>OPTIONAL</td>
+<td><code>entity_configuration</code></td>
+<td>What to send in the body (see above)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="examples_4">Examples<a class="headerlink" href="#examples_4" title="Permanent link">&para;</a></h3>
+<div class="tabbed-set tabbed-alternate" data-tabs="5:3"><input checked="checked" id="basic-usage-defaults" name="__tabbed_5" type="radio" /><input id="entity-id-only" name="__tabbed_5" type="radio" /><input id="with-headers-and-custom-method" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="basic-usage-defaults"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg></span> Basic Usage (defaults)</label><label for="entity-id-only"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg></span> Entity ID Only</label><label for="with-headers-and-custom-method"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg></span> With Headers and Custom Method</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nt">checker</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<span class="w">  </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://decision.example.org/check</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nt">checker</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<span class="w">  </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://decision.example.org/check</span>
+<span class="w">    </span><span class="nt">body_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">entity_id</span>
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code><span class="nt">checker</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<span class="w">  </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://decision.example.org/api/authorize</span>
+<span class="w">    </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PUT</span>
+<span class="w">    </span><span class="nt">headers</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">Authorization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Bearer secret-token</span>
+<span class="w">    </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">    </span><span class="nt">body_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">entity_configuration</span>
 </code></pre></div>
 </div>
 </div>
