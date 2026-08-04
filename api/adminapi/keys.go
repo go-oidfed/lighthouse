@@ -13,8 +13,8 @@ import (
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse/storage"
@@ -128,16 +128,14 @@ func (h *publicKeyHandlers) update(c *fiber.Ctx) error {
 	}
 	err := h.apiManagedPKs.Update(kid, public.UpdateablePublicKeyMetadata{ExpiresAt: req.Exp})
 	if err != nil {
-		var nf public.NotFoundError
-		if errors.As(err, &nf) {
+		if nf, ok := errors.AsType[public.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(nf.Error()))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	updated, err := h.apiManagedPKs.Get(kid)
 	if err != nil {
-		var nf public.NotFoundError
-		if errors.As(err, &nf) {
+		if nf, ok := errors.AsType[public.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(nf.Error()))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -171,8 +169,7 @@ func (h *publicKeyHandlers) rotate(c *fiber.Ctx) error {
 		kid, _ = req.Key.KeyID()
 	}
 	if req.Nbf == nil {
-		now := unixtime.Now()
-		req.Nbf = &now
+		req.Nbf = new(unixtime.Now())
 	}
 	rotationConf, err := storage.GetKeyRotation(h.kvStorage)
 	if err != nil {
@@ -184,28 +181,33 @@ func (h *publicKeyHandlers) rotate(c *fiber.Ctx) error {
 	}
 
 	var created *public.PublicKeyEntry
-	err = h.storages.InTransaction(func(tx *smodel.Backends) error {
-		txPKStorage := tx.PKStorages("api-managed")
-		if err := txPKStorage.Update(oldKid, public.UpdateablePublicKeyMetadata{ExpiresAt: oldKeyExpiration}); err != nil {
+	err = h.storages.InTransaction(
+		func(tx *smodel.Backends) error {
+			txPKStorage := tx.PKStorages("api-managed")
+			if err := txPKStorage.Update(
+				oldKid, public.UpdateablePublicKeyMetadata{ExpiresAt: oldKeyExpiration},
+			); err != nil {
+				return err
+			}
+			if err := txPKStorage.Add(
+				public.PublicKeyEntry{
+					KID:                         kid,
+					Key:                         req.Key,
+					IssuedAt:                    req.Iat,
+					NotBefore:                   req.Nbf,
+					UpdateablePublicKeyMetadata: public.UpdateablePublicKeyMetadata{ExpiresAt: req.Exp},
+				},
+			); err != nil {
+				return err
+			}
+			var err error
+			created, err = txPKStorage.Get(kid)
 			return err
-		}
-		if err := txPKStorage.Add(public.PublicKeyEntry{
-			KID:                         kid,
-			Key:                         req.Key,
-			IssuedAt:                    req.Iat,
-			NotBefore:                   req.Nbf,
-			UpdateablePublicKeyMetadata: public.UpdateablePublicKeyMetadata{ExpiresAt: req.Exp},
-		}); err != nil {
-			return err
-		}
-		var err error
-		created, err = txPKStorage.Get(kid)
-		return err
-	})
+		},
+	)
 
 	if err != nil {
-		var nf public.NotFoundError
-		if errors.As(err, &nf) {
+		if nf, ok2 := errors.AsType[public.NotFoundError](err); ok2 {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(nf.Error()))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -264,13 +266,20 @@ func (h *kmsHandlers) putAlg(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	switchTime := unixtime.Unixtime{Time: time.Now().Add(ecLifetime).Add(10 * time.Second)}
-	if err = h.keyManagement.Keys.ChangeAlgsAt([]jwa.SignatureAlgorithm{jwaAlg}, switchTime, rot.Overlap.Duration()); err != nil {
+	if err = h.keyManagement.Keys.ChangeAlgsAt(
+		[]jwa.SignatureAlgorithm{jwaAlg}, switchTime, rot.Overlap.Duration(),
+	); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	if err = h.keyManagement.Keys.ChangeDefaultAlgorithmAt(jwaAlg, switchTime); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
-	if err = storage.SetSigningAlg(h.kvStorage, storage.SigningAlgWithNbf{SigningAlg: alg, Nbf: &switchTime}); err != nil {
+	if err = storage.SetSigningAlg(
+		h.kvStorage, storage.SigningAlgWithNbf{
+			SigningAlg: alg,
+			Nbf:        &switchTime,
+		},
+	); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	info, err := h.buildKMSInfo()
@@ -350,6 +359,12 @@ func (h *kmsHandlers) patchRotation(c *fiber.Ctx) error {
 	if v, ok := patch["overlap"].(float64); ok {
 		current.Overlap = duration.DurationOption(time.Duration(v) * time.Second)
 	}
+	if v, ok := patch["key_announcement_lead_time"].(float64); ok {
+		current.KeyAnnouncementLeadTime = duration.DurationOption(time.Duration(v) * time.Second)
+	}
+	if v, ok := patch["key_announcement_lead_time_ec_multiplier"].(float64); ok {
+		current.KeyAnnouncementLeadTimeECMultiplier = v
+	}
 	if err = storage.SetKeyRotation(h.kvStorage, current); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
@@ -401,7 +416,9 @@ func (h *kmsHandlers) buildKMSInfo() (*kmsInfo, error) {
 }
 
 // registerKeys wires routes for managing public keys and KMS-related endpoints.
-func registerKeys(r fiber.Router, keyManagement KeyManagement, kvStorage smodel.KeyValueStore, storages smodel.Backends) {
+func registerKeys(
+	r fiber.Router, keyManagement KeyManagement, kvStorage smodel.KeyValueStore, storages smodel.Backends,
+) {
 	jwksH := &jwksHandlers{keyManagement: keyManagement}
 	pkH := &publicKeyHandlers{
 		apiManagedPKs: keyManagement.APIManagedPKs,

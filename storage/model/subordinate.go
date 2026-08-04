@@ -29,6 +29,16 @@ type BasicSubordinateInfo struct {
 	Description            string                  `gorm:"type:text" json:"description,omitempty"`
 	SubordinateEntityTypes []SubordinateEntityType `gorm:"foreignKey:SubordinateID;constraint:OnDelete:CASCADE" json:"registered_entity_types,omitempty"`
 	Status                 Status                  `gorm:"index" json:"status"`
+	// EnableJWKSUpdate controls whether Lighthouse periodically polls this
+	// subordinate's Entity Configuration for JWKS changes (approach A) and
+	// whether the subordinate is a valid target for the jwks_update_trigger
+	// endpoint (approach B).
+	EnableJWKSUpdate bool `gorm:"default:false" json:"enable_jwks_update,omitempty"`
+	// JWKSPollInterval is the per-subordinate polling interval in seconds
+	// used by the subordinate JWKS refresher. When 0 (the default), the
+	// refresher derives the interval from the subordinate's Entity
+	// Configuration expiration time.
+	JWKSPollInterval int64 `gorm:"default:0" json:"jwks_poll_interval,omitempty"`
 }
 
 func (ExtendedSubordinateInfo) TableName() string { return "subordinates" }
@@ -136,10 +146,14 @@ type AddSubordinate struct {
 	Description           string   `json:"description,omitempty"`
 	RegisteredEntityTypes []string `json:"registered_entity_types,omitempty"`
 	JWKS                  *JWKS    `json:"jwks,omitempty"`
+	EnableJWKSUpdate      bool     `json:"enable_jwks_update,omitempty"`
+	JWKSPollInterval      int64    `json:"jwks_poll_interval,omitempty"`
 }
 
 // UpdateSubordinate represents the payload for updating a subordinate.
 type UpdateSubordinate struct {
 	Description           *string  `json:"description,omitempty"`
 	RegisteredEntityTypes []string `json:"registered_entity_types,omitempty"`
+	EnableJWKSUpdate      *bool    `json:"enable_jwks_update,omitempty"`
+	JWKSPollInterval      *int64   `json:"jwks_poll_interval,omitempty"`
 }

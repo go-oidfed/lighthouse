@@ -13,7 +13,7 @@ import (
 // registerGeneralSubordinateLifetime adds handlers for the general subordinate lifetime endpoints.
 func registerGeneralSubordinateLifetime(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	// GET /subordinates/lifetime - Get general subordinate lifetime in seconds
 	g.Get("/lifetime", handleGetSubordinateLifetime(kv))

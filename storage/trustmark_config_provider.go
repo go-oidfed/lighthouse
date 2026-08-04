@@ -6,7 +6,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -129,8 +129,8 @@ func (p *TrustMarkConfigProvider) loadConfigs() error {
 
 		// Verify initializes the config (extracts claims from JWT, sets defaults, etc.)
 		if err := config.Verify(p.entityID, p.trustMarkEndpoint, signer); err != nil {
-			log.WithError(err).WithField("trust_mark_type", tm.TrustMarkType).
-				Warn("Failed to verify trust mark config, skipping")
+			log.Warn().Err(err).Str("trust_mark_type", tm.TrustMarkType).
+				Msg("Failed to verify trust mark config, skipping")
 			continue
 		}
 

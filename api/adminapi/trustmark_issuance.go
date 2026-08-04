@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"errors"
+	"maps"
 	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -81,12 +82,10 @@ func (h *trustMarkSpecHandlers) delete(c *fiber.Ctx) error {
 }
 
 func (*trustMarkSpecHandlers) handleError(c *fiber.Ctx, err error) error {
-	var notFound model.NotFoundError
-	if errors.As(err, &notFound) {
+	if notFound, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
 	}
-	var alreadyExists model.AlreadyExistsError
-	if errors.As(err, &alreadyExists) {
+	if alreadyExists, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -242,12 +241,8 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
 	// Merge spec's additional claims into subject claims
 	// Start with spec claims as base, then overlay existing subject claims
 	mergedClaims := make(map[string]any)
-	for k, v := range spec.AdditionalClaims {
-		mergedClaims[k] = v
-	}
-	for k, v := range subject.AdditionalClaims {
-		mergedClaims[k] = v
-	}
+	maps.Copy(mergedClaims, spec.AdditionalClaims)
+	maps.Copy(mergedClaims, subject.AdditionalClaims)
 
 	subject.AdditionalClaims = mergedClaims
 	updatePayload := &model.AddTrustMarkSubject{
@@ -264,12 +259,10 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
 }
 
 func (*trustMarkSubjectHandlers) handleError(c *fiber.Ctx, err error) error {
-	var notFound model.NotFoundError
-	if errors.As(err, &notFound) {
+	if notFound, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
 	}
-	var alreadyExists model.AlreadyExistsError
-	if errors.As(err, &alreadyExists) {
+	if alreadyExists, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(string(alreadyExists)))
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))

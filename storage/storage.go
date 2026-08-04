@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -43,6 +43,9 @@ var models = []any{
 	&model.EntityConfigurationAdditionalClaim{},
 	&model.User{},
 	&model.JTIUsed{},
+	&model.TrustAnchor{},
+	&model.FederationEndpoint{},
+	&model.FederationEndpointAuthTA{},
 }
 
 // statsModels contains models for the stats feature.
@@ -59,7 +62,17 @@ func NewStorage(config Config) (*Storage, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Auto migrate the schemas
+	// Configure the explicit join table model before auto-migrate so GORM
+	// uses FederationEndpointAuthTA (with its composite primary key) for the
+	// many2many relation. CASCADE FK constraints are declared via the
+	// constraint tag on the AuthTrustAnchors relationship field.
+	if err = db.SetupJoinTable(&model.FederationEndpoint{}, "AuthTrustAnchors", &model.FederationEndpointAuthTA{}); err != nil {
+		return nil, fmt.Errorf("failed to setup join table: %w", err)
+	}
+
+	// Auto migrate the schemas. CASCADE foreign keys on the join table are
+	// declared via the constraint tag on the AuthTrustAnchors relationship
+	// field, so GORM creates named constraints during migration.
 	if err = db.AutoMigrate(models...); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
@@ -1322,20 +1335,20 @@ func (s *TrustMarkSpecStorage) revokeInstancesForSubject(subjectID uint, entityI
 		})
 
 	if result.Error != nil {
-		log.WithError(result.Error).WithFields(log.Fields{
-			"subject_id": subjectID,
-			"entity_id":  entityID,
-			"spec_ident": specIdent,
-		}).Error("failed to revoke trust mark instances for subject")
+		log.Error().Err(result.Error).
+			Uint("subject_id", subjectID).
+			Str("entity_id", entityID).
+			Str("spec_ident", specIdent).
+			Msg("failed to revoke trust mark instances for subject")
 		return
 	}
 
 	if result.RowsAffected > 0 {
-		log.WithFields(log.Fields{
-			"subject_id":    subjectID,
-			"entity_id":     entityID,
-			"spec_ident":    specIdent,
-			"revoked_count": result.RowsAffected,
-		}).Info("automatically revoked trust mark instances due to subject status change")
+		log.Info().
+			Uint("subject_id", subjectID).
+			Str("entity_id", entityID).
+			Str("spec_ident", specIdent).
+			Int64("revoked_count", result.RowsAffected).
+			Msg("automatically revoked trust mark instances due to subject status change")
 	}
 }

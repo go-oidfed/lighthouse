@@ -1,4 +1,5 @@
 site_name: LightHouse
+site_url: https://go-oidfed.github.io/lighthouse
 site_author: Gabriel Zachmann
 theme:
   name: material
@@ -69,6 +70,9 @@ plugins:
   - privacy
   - markdown-exec
 extra:
+  version:
+    provider: mike
+    default: main
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/go-oidfed/lighthouse
@@ -77,7 +81,7 @@ extra:
     - icon: fontawesome/solid/paper-plane
       link: mailto:oidfed@lists.kit.edu
   generator: false
-copyright: Copyright &copy; 2025 - 2025 Gabriel Zachmann
+copyright: Copyright &copy; 2025 - 2026 Karlsruhe Institute of Technology
 extra_css:
   - stylesheets/extra.css
   - stylesheets/admonitions.css

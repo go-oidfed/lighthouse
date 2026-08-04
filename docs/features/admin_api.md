@@ -13,7 +13,7 @@ separate port) and can require HTTP Basic Authentication.
 
 !!! info "Separate Port Configuration"
     The Admin API can be configured to run on a separate port from the main federation endpoints. 
-    See [Admin API Configuration](../config/api.md) for details.
+    See [Admin API Configuration](../config/static/api.md) for details.
 
 ## Interactive API Documentation
 
@@ -64,6 +64,7 @@ Full lifecycle management of subordinate entities in your federation.
 - **Registration** - Add new subordinate entities
 - **Status Management** - Approve, suspend, or remove subordinates
 - **JWKS** - Manage subordinate signing keys
+- **JWKS Refreshing** - Enable periodic JWKS refresh per subordinate (`enable_jwks_update`, `jwks_poll_interval`); see [Subordinate JWKS Refreshing](subordinate_jwks_refresh.md)
 - **Metadata** - Configure subordinate-specific metadata
 - **Metadata Policies** - Define policies that apply to subordinate metadata
 - **Constraints** - Set constraints on subordinate trust chains
@@ -79,6 +80,46 @@ Configure trust mark issuance for your federation.
 - **Owners & Issuers** - Configure trust mark delegation (owners and authorized issuers)
 - **Issuance Specifications** - Define issuance parameters for each trust mark type
 - **Subjects** - Manage which entities are entitled to receive specific trust marks
+
+### Trust Anchors
+
+Manage the [Trust Anchor Repository](trust_anchors.md) — the single source of
+truth for all trust anchors and their JWKS.
+
+- **CRUD** - Create, read, update, and delete trust anchors
+- **JWKS Refreshing** - Enable or disable automatic JWKS refreshing per trust anchor
+- **Polling Interval** - Configure how often each trust anchor's entity configuration is polled for key changes
+
+Endpoints:
+
+| Operation | Method | Path |
+|-----------|--------|------|
+| List all trust anchors | `GET` | `/api/v1/admin/trust-anchors` |
+| Get a trust anchor | `GET` | `/api/v1/admin/trust-anchors/{entityID}` |
+| Create a trust anchor | `POST` | `/api/v1/admin/trust-anchors` |
+| Update a trust anchor | `PUT` | `/api/v1/admin/trust-anchors/{entityID}` |
+| Delete a trust anchor | `DELETE` | `/api/v1/admin/trust-anchors/{entityID}` |
+
+### Federation Endpoints
+
+Manage federation endpoint paths, URLs, authentication, and type-specific
+configuration at runtime. See [Endpoints](endpoints.md) for details.
+
+- **CRUD** - Create, read, update, and delete federation endpoints by type
+- **Authentication** - Enable/disable `private_key_jwt` auth and assign trust anchors
+- **Type-Specific Config** - Configure resolve settings, entity collection, enroll checkers, etc.
+- **Dynamic Reload** - Changes take effect immediately without restart
+
+Endpoints:
+
+| Operation | Method | Path |
+|-----------|--------|------|
+| List all endpoints | `GET` | `/api/v1/admin/federation-endpoints` |
+| Get an endpoint by type | `GET` | `/api/v1/admin/federation-endpoints/{type}` |
+| Create an endpoint | `POST` | `/api/v1/admin/federation-endpoints` |
+| Update an endpoint | `PUT` | `/api/v1/admin/federation-endpoints/{type}` |
+| Delete an endpoint | `DELETE` | `/api/v1/admin/federation-endpoints/{type}` |
+| Set auth trust anchors | `PUT` | `/api/v1/admin/federation-endpoints/{type}/auth-trust-anchors` |
 
 ### Users
 
@@ -105,4 +146,4 @@ Manage admin users for API access. This functionality is available at a separate
     - **Firewall Rules** - Restrict access to the Admin API endpoints using firewall rules
 
 For configuration options including separate port binding and password hashing settings, see 
-[Admin API Configuration](../config/api.md).
+[Admin API Configuration](../config/static/api.md).

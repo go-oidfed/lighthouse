@@ -6,7 +6,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -18,7 +18,7 @@ func registerSubordinateKeys(
 	storages model.Backends,
 ) {
 	g := r.Group("/subordinates/:subordinateID/jwks")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	// GET / - Get subordinate JWKS
 	g.Get("/", handleGetSubordinateJWKS(storages.Subordinates))
@@ -53,6 +53,19 @@ func handlePutSubordinateJWKS(storages model.Backends) fiber.Handler {
 		var body model.JWKS
 		if err := c.BodyParser(&body); err != nil {
 			return writeBadBody(c)
+		}
+		if body.Keys.Set != nil {
+			for _, k := range body.Keys.All() {
+				if jwk.IsUnsupportedKey(k) {
+					msg := "invalid JWK in set"
+					if uk, ok := k.(jwk.UnsupportedKey); ok {
+						msg = "invalid JWK: " + uk.Reason().Error()
+					}
+					return c.Status(fiber.StatusBadRequest).JSON(
+						oidfed.ErrorInvalidRequest(msg),
+					)
+				}
+			}
 		}
 
 		var result *model.JWKS

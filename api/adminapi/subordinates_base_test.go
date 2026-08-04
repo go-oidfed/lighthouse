@@ -11,8 +11,9 @@ import (
 	"testing"
 
 	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 	"gorm.io/gorm"
 
 	"github.com/go-oidfed/lighthouse/storage"
@@ -87,7 +88,7 @@ func setupSubordinateBaseApp(t *testing.T) (*fiber.App, testBackends) {
 
 	// Create a dummy fedEntity if needed, for statement previews.
 	// We pass nil for base handlers since they don't strictly use it.
-	registerSubordinatesBase(app, backends)
+	registerSubordinatesBase(app, backends, nil)
 
 	return app, testBackends{
 		Backends: backends,
@@ -184,7 +185,7 @@ func TestGetSubordinates(t *testing.T) {
 						EntityID: "https://rp.example.org",
 						Status:   model.StatusActive,
 						SubordinateEntityTypes: []model.SubordinateEntityType{
-							{EntityType: "openid_relying_party"},
+							{EntityType: oidfedconst.EntityTypeOpenIDRelyingParty},
 						},
 					},
 				},
@@ -195,13 +196,16 @@ func TestGetSubordinates(t *testing.T) {
 						EntityID: "https://op.example.org",
 						Status:   model.StatusActive,
 						SubordinateEntityTypes: []model.SubordinateEntityType{
-							{EntityType: "openid_provider"},
+							{EntityType: oidfedconst.EntityTypeOpenIDProvider},
 						},
 					},
 				},
 			)
 
-			req := httptest.NewRequest("GET", "/subordinates?entity_type=openid_relying_party", http.NoBody)
+			req := httptest.NewRequest(
+				"GET", fmt.Sprintf("/subordinates?entity_type=%s", oidfedconst.EntityTypeOpenIDRelyingParty),
+				http.NoBody,
+			)
 			resp, body := doRequest(t, app, req)
 
 			requireStatus(t, resp, body, http.StatusOK)
@@ -316,8 +320,8 @@ func TestPostSubordinates(t *testing.T) {
 					}
 				]
 			},
-			"registered_entity_types": ["openid_provider"]
-		}`, testRSAKeyN,
+		"registered_entity_types": ["%s"]
+	}`, testRSAKeyN, oidfedconst.EntityTypeOpenIDProvider,
 			)
 			req := httptest.NewRequest("POST", "/subordinates", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -335,8 +339,11 @@ func TestPostSubordinates(t *testing.T) {
 			if saved.JWKS.Keys.Len() != 1 {
 				t.Errorf("Expected 1 key in JWKS, got %d", saved.JWKS.Keys.Len())
 			}
-			if len(saved.SubordinateEntityTypes) != 1 || saved.SubordinateEntityTypes[0].EntityType != "openid_provider" {
-				t.Errorf("Expected 1 entity type 'openid_provider', got %v", saved.SubordinateEntityTypes)
+			if len(saved.SubordinateEntityTypes) != 1 || saved.SubordinateEntityTypes[0].EntityType != oidfedconst.EntityTypeOpenIDProvider {
+				t.Errorf(
+					"Expected 1 entity type '%s', got %v", oidfedconst.EntityTypeOpenIDProvider,
+					saved.SubordinateEntityTypes,
+				)
 			}
 		},
 	)
@@ -511,9 +518,11 @@ func TestPutSubordinateByID(t *testing.T) {
 			}
 
 			body := `{
-			"description": "New Description",
-			"registered_entity_types": ["new_type_1", "new_type_2"]
-		}`
+		"description": "New Description",
+		"registered_entity_types": ["new_type_1", "new_type_2"],
+		"enable_jwks_update": true,
+		"jwks_poll_interval": 3600
+	}`
 			req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			resp, bodyBytes := doRequest(t, app, req)
@@ -527,6 +536,12 @@ func TestPutSubordinateByID(t *testing.T) {
 			}
 			if updated.Description != "New Description" {
 				t.Errorf("Expected description 'New Description', got %q", updated.Description)
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("Expected EnableJWKSUpdate=true, got false")
+			}
+			if updated.JWKSPollInterval != 3600 {
+				t.Errorf("Expected JWKSPollInterval=3600, got %v", updated.JWKSPollInterval)
 			}
 
 			// Note: GORM's UpdateAll currently appends related entities instead of replacing them
@@ -584,6 +599,190 @@ func TestPutSubordinateByID(t *testing.T) {
 			}
 
 			req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, respBody := doRequest(t, app, req)
+
+			assertErrorResponse(t, resp, respBody, http.StatusBadRequest, "invalid_request")
+		},
+	)
+}
+
+// --- PATCH /subordinates/:subordinateID TESTS ---
+
+func TestPatchSubordinateByID(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"Success_EnableJWKSRefresh", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID:         "https://patch-jwks.example.org",
+						Status:           model.StatusActive,
+						EnableJWKSUpdate: false,
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-jwks.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			body := `{"enable_jwks_update": true, "jwks_poll_interval": 7200}`
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			requireStatus(t, resp, bodyBytes, http.StatusOK)
+
+			// Response body should carry the new values.
+			var respInfo model.ExtendedSubordinateInfo
+			if err := json.Unmarshal(bodyBytes, &respInfo); err != nil {
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
+			if !respInfo.EnableJWKSUpdate {
+				t.Errorf("response EnableJWKSUpdate = false, want true")
+			}
+			if respInfo.JWKSPollInterval != 7200 {
+				t.Errorf("response JWKSPollInterval = %v, want 7200", respInfo.JWKSPollInterval)
+			}
+
+			// Verify persistence in DB.
+			updated, err := backends.Subordinates.Get("https://patch-jwks.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("DB EnableJWKSUpdate = false, want true")
+			}
+			if updated.JWKSPollInterval != 7200 {
+				t.Errorf("DB JWKSPollInterval = %v, want 7200", updated.JWKSPollInterval)
+			}
+		},
+	)
+
+	t.Run(
+		"PartialUnchanged", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID:         "https://patch-unchanged.example.org",
+						Status:           model.StatusActive,
+						EnableJWKSUpdate: true,
+						JWKSPollInterval: 3600,
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-unchanged.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			// PATCH only description; refresh fields should be untouched.
+			body := `{"description": "patched"}`
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			requireStatus(t, resp, bodyBytes, http.StatusOK)
+
+			updated, err := backends.Subordinates.Get("https://patch-unchanged.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+			if updated.Description != "patched" {
+				t.Errorf("Description = %q, want %q", updated.Description, "patched")
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("EnableJWKSUpdate = false, want true (omitted field should be unchanged)")
+			}
+			if updated.JWKSPollInterval != 3600 {
+				t.Errorf(
+					"JWKSPollInterval = %v, want 3600 (omitted field should be unchanged)", updated.JWKSPollInterval,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"ClearPollInterval", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID:         "https://patch-clear.example.org",
+						Status:           model.StatusActive,
+						EnableJWKSUpdate: true,
+						JWKSPollInterval: 3600,
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-clear.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			body := `{"jwks_poll_interval": 0}`
+			req := httptest.NewRequest("PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			requireStatus(t, resp, bodyBytes, http.StatusOK)
+
+			updated, err := backends.Subordinates.Get("https://patch-clear.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+			if updated.JWKSPollInterval != 0 {
+				t.Errorf("JWKSPollInterval = %v, want 0", updated.JWKSPollInterval)
+			}
+			if !updated.EnableJWKSUpdate {
+				t.Errorf("EnableJWKSUpdate = false, want true (omitted field should be unchanged)")
+			}
+		},
+	)
+
+	t.Run(
+		"NotFound", func(t *testing.T) {
+			t.Parallel()
+			app, _ := setupSubordinateBaseApp(t)
+
+			body := `{"description": "New"}`
+			req := httptest.NewRequest("PATCH", "/subordinates/9999", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+
+			assertStatus(t, resp, bodyBytes, http.StatusNotFound)
+		},
+	)
+
+	t.Run(
+		"InvalidBody", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupSubordinateBaseApp(t)
+			backends.Subordinates.Add(
+				model.ExtendedSubordinateInfo{
+					BasicSubordinateInfo: model.BasicSubordinateInfo{
+						EntityID: "https://patch-bad.example.org",
+					},
+				},
+			)
+			saved, err := backends.Subordinates.Get("https://patch-bad.example.org")
+			if err != nil {
+				t.Fatalf("Failed to get subordinate: %v", err)
+			}
+
+			req := httptest.NewRequest(
+				"PATCH", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(`not json`),
+			)
 			req.Header.Set("Content-Type", "application/json")
 			resp, respBody := doRequest(t, app, req)
 
@@ -728,7 +927,8 @@ func TestIssue85_ReRegisterAfterDelete(t *testing.T) {
 			createReq := httptest.NewRequest(
 				"POST", "/subordinates", strings.NewReader(
 					fmt.Sprintf(
-						`{"entity_id":"%s","registered_entity_types":["openid_provider"],"status":"pending"}`, entityID,
+						`{"entity_id":"%s","registered_entity_types":["%s"],"status":"pending"}`, entityID,
+						oidfedconst.EntityTypeOpenIDProvider,
 					),
 				),
 			)
@@ -774,7 +974,7 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 			EntityID: entityID,
 			Status:   model.StatusActive,
 			SubordinateEntityTypes: []model.SubordinateEntityType{
-				{EntityType: "openid_provider"},
+				{EntityType: oidfedconst.EntityTypeOpenIDProvider},
 			},
 		},
 		JWKS: model.JWKS{Keys: jwx.JWKS{Set: origSet}},
@@ -806,10 +1006,12 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 	newSet.AddKey(createTestKey("replacement-key"))
 	reEnroll := model.ExtendedSubordinateInfo{
 		BasicSubordinateInfo: model.BasicSubordinateInfo{
-			EntityID: entityID,
-			Status:   model.StatusPending,
+			EntityID:         entityID,
+			Status:           model.StatusPending,
+			EnableJWKSUpdate: true,
+			JWKSPollInterval: 7200,
 			SubordinateEntityTypes: []model.SubordinateEntityType{
-				{EntityType: "openid_relying_party"},
+				{EntityType: oidfedconst.EntityTypeOpenIDRelyingParty},
 			},
 		},
 		JWKS: model.JWKS{Keys: jwx.JWKS{Set: newSet}},
@@ -843,8 +1045,14 @@ func TestIssue103_UpdateReactivatesSoftDeleted(t *testing.T) {
 		t.Errorf("expected replacement-key, got %q", kid)
 	}
 	if len(reactivated.SubordinateEntityTypes) != 1 ||
-		reactivated.SubordinateEntityTypes[0].EntityType != "openid_relying_party" {
+		reactivated.SubordinateEntityTypes[0].EntityType != oidfedconst.EntityTypeOpenIDRelyingParty {
 		t.Errorf("unexpected entity types: %+v", reactivated.SubordinateEntityTypes)
+	}
+	if !reactivated.EnableJWKSUpdate {
+		t.Errorf("expected EnableJWKSUpdate=true after reactivation, got false")
+	}
+	if reactivated.JWKSPollInterval != 7200 {
+		t.Errorf("expected JWKSPollInterval=7200 after reactivation, got %v", reactivated.JWKSPollInterval)
 	}
 
 	// It must also appear in pending status queries (the "No pending requests" symptom).
@@ -1049,12 +1257,11 @@ func TestGetSubordinateHistory(t *testing.T) {
 					Type:          model.EventTypeCreated,
 				},
 			)
-			status := "active"
 			backends.SubordinateEvents.Add(
 				model.SubordinateEvent{
 					SubordinateID: saved.ID,
 					Type:          model.EventTypeStatusUpdated,
-					Status:        &status,
+					Status:        new("active"),
 				},
 			)
 

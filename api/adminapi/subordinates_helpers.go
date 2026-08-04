@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	oidfed "github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -39,8 +40,7 @@ func writeConflict(c *fiber.Ctx, msg string) error {
 // handleTxError handles errors from transactional operations.
 // It maps NotFoundError to 404 responses and other errors to 500 responses.
 func handleTxError(c *fiber.Ctx, err error) error {
-	var nf model.NotFoundError
-	if errors.As(err, &nf) {
+	if _, ok := errors.AsType[model.NotFoundError](err); ok {
 		return writeNotFound(c, err.Error())
 	}
 	return writeServerError(c, err)
@@ -49,7 +49,9 @@ func handleTxError(c *fiber.Ctx, err error) error {
 // Subordinate lookup helpers
 
 // getSubordinateByDBID retrieves a subordinate by database ID, returning an error if not found.
-func getSubordinateByDBID(subordinates model.SubordinateStorageBackend, dbID string) (*model.ExtendedSubordinateInfo, error) {
+func getSubordinateByDBID(subordinates model.SubordinateStorageBackend, dbID string) (
+	*model.ExtendedSubordinateInfo, error,
+) {
 	info, err := subordinates.GetByDBID(dbID)
 	if err != nil {
 		return nil, err
@@ -62,12 +64,13 @@ func getSubordinateByDBID(subordinates model.SubordinateStorageBackend, dbID str
 
 // handleSubordinateLookup retrieves a subordinate and handles error responses.
 // Returns (info, true) on success, or (nil, false) if an error response was written.
-func handleSubordinateLookup(c *fiber.Ctx, subordinates model.SubordinateStorageBackend) (*model.ExtendedSubordinateInfo, bool) {
+func handleSubordinateLookup(
+	c *fiber.Ctx, subordinates model.SubordinateStorageBackend,
+) (*model.ExtendedSubordinateInfo, bool) {
 	id := c.Params("subordinateID")
 	info, err := getSubordinateByDBID(subordinates, id)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			_ = writeNotFound(c, err.Error())
 			return nil, false
 		}
@@ -85,17 +88,17 @@ func getMetadataPolicy(mp *oidfed.MetadataPolicies, et string) oidfed.MetadataPo
 		return nil
 	}
 	switch et {
-	case "openid_provider":
+	case oidfedconst.EntityTypeOpenIDProvider:
 		return mp.OpenIDProvider
-	case "openid_relying_party":
+	case oidfedconst.EntityTypeOpenIDRelyingParty:
 		return mp.RelyingParty
-	case "oauth_authorization_server":
+	case oidfedconst.EntityTypeOAuthAuthorizationServer:
 		return mp.OAuthAuthorizationServer
-	case "oauth_client":
+	case oidfedconst.EntityTypeOAuthClient:
 		return mp.OAuthClient
-	case "oauth_resource":
+	case oidfedconst.EntityTypeOAuthProtectedResource:
 		return mp.OAuthProtectedResource
-	case "federation_entity":
+	case oidfedconst.EntityTypeFederationEntity:
 		return mp.FederationEntity
 	default:
 		if mp.Extra != nil {
@@ -108,17 +111,17 @@ func getMetadataPolicy(mp *oidfed.MetadataPolicies, et string) oidfed.MetadataPo
 // setMetadataPolicy sets a metadata policy for a given entity type.
 func setMetadataPolicy(mp *oidfed.MetadataPolicies, et string, policy oidfed.MetadataPolicy) {
 	switch et {
-	case "openid_provider":
+	case oidfedconst.EntityTypeOpenIDProvider:
 		mp.OpenIDProvider = policy
-	case "openid_relying_party":
+	case oidfedconst.EntityTypeOpenIDRelyingParty:
 		mp.RelyingParty = policy
-	case "oauth_authorization_server":
+	case oidfedconst.EntityTypeOAuthAuthorizationServer:
 		mp.OAuthAuthorizationServer = policy
-	case "oauth_client":
+	case oidfedconst.EntityTypeOAuthClient:
 		mp.OAuthClient = policy
-	case "oauth_resource":
+	case oidfedconst.EntityTypeOAuthProtectedResource:
 		mp.OAuthProtectedResource = policy
-	case "federation_entity":
+	case oidfedconst.EntityTypeFederationEntity:
 		mp.FederationEntity = policy
 	default:
 		if mp.Extra == nil {
@@ -134,17 +137,17 @@ func deleteMetadataPolicy(mp *oidfed.MetadataPolicies, et string) {
 		return
 	}
 	switch et {
-	case "openid_provider":
+	case oidfedconst.EntityTypeOpenIDProvider:
 		mp.OpenIDProvider = nil
-	case "openid_relying_party":
+	case oidfedconst.EntityTypeOpenIDRelyingParty:
 		mp.RelyingParty = nil
-	case "oauth_authorization_server":
+	case oidfedconst.EntityTypeOAuthAuthorizationServer:
 		mp.OAuthAuthorizationServer = nil
-	case "oauth_client":
+	case oidfedconst.EntityTypeOAuthClient:
 		mp.OAuthClient = nil
-	case "oauth_resource":
+	case oidfedconst.EntityTypeOAuthProtectedResource:
 		mp.OAuthProtectedResource = nil
-	case "federation_entity":
+	case oidfedconst.EntityTypeFederationEntity:
 		mp.FederationEntity = nil
 	default:
 		if mp.Extra != nil {

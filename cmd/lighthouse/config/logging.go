@@ -13,8 +13,8 @@ import (
 //   - LH_LOGGING_INTERNAL_DIR: Directory for internal logs
 //   - LH_LOGGING_INTERNAL_STDERR: Log internal to stderr
 //   - LH_LOGGING_INTERNAL_LEVEL: Log level (DEBUG, INFO, WARN, ERROR)
-//   - LH_LOGGING_INTERNAL_SMART_ENABLED: Enable smart logging
-//   - LH_LOGGING_INTERNAL_SMART_DIR: Smart log directory
+//   - LH_LOGGING_INTERNAL_STDERR_FORMAT: Format for stderr output (console, json)
+//   - LH_LOGGING_INTERNAL_DIR_FORMAT: Format for file output (console, json)
 //   - LH_LOGGING_BANNER_LOGO: Print logo on startup
 //   - LH_LOGGING_BANNER_VERSION: Print version on startup
 //
@@ -30,9 +30,8 @@ import (
 //	    dir: /var/log/lighthouse
 //	    stderr: false
 //	    level: INFO
-//	    smart:
-//	      enabled: false
-//	      dir: /var/log/lighthouse/smart
+//	    stderr_format: console
+//	    dir_format: json
 //	  banner:
 //	    logo: true
 //	    version: true
@@ -66,52 +65,38 @@ type bannerConf struct {
 
 // internalLoggerConf configures application-internal logging.
 // Level accepts standard log levels (e.g. DEBUG, INFO, WARN, ERROR).
-// When Smart logging is enabled, errors are duplicated to a dedicated directory.
 //
 // Environment variables (with prefix LH_LOGGING_INTERNAL_):
 //   - LH_LOGGING_INTERNAL_DIR: Directory for internal logs
 //   - LH_LOGGING_INTERNAL_STDERR: Log to stderr
 //   - LH_LOGGING_INTERNAL_LEVEL: Log level (DEBUG, INFO, WARN, ERROR)
-//   - LH_LOGGING_INTERNAL_SMART_ENABLED: Enable smart logging
-//   - LH_LOGGING_INTERNAL_SMART_DIR: Smart log directory
+//   - LH_LOGGING_INTERNAL_STDERR_FORMAT: Format for stderr (console, json)
+//   - LH_LOGGING_INTERNAL_DIR_FORMAT: Format for file (console, json)
 type internalLoggerConf struct {
 	LoggerConf `yaml:",inline"`
 	// Level sets the verbosity for internal logs (e.g. DEBUG, INFO).
 	// Env: LH_LOGGING_INTERNAL_LEVEL or LH_LOG_LEVEL (shortcut)
 	Level string `yaml:"level" envconfig:"LEVEL"`
-	// Smart enables additional error-focused logging alongside general logs.
-	// Env prefix: LH_LOGGING_INTERNAL_SMART_
-	Smart smartLoggerConf `yaml:"smart" envconfig:"SMART"`
+	// StdErrFormat selects the output format for stderr: "console"
+	// (human-friendly, colored) or "json" (structured JSON).
+	// Default: "console".
+	// Env: LH_LOGGING_INTERNAL_STDERR_FORMAT
+	StdErrFormat string `yaml:"stderr_format" envconfig:"STDERR_FORMAT"`
+	// DirFormat selects the output format for log files: "console"
+	// (human-friendly, no colors) or "json" (structured JSON).
+	// Default: "json".
+	// Env: LH_LOGGING_INTERNAL_DIR_FORMAT
+	DirFormat string `yaml:"dir_format" envconfig:"DIR_FORMAT"`
 }
 
 // LoggerConf holds configuration related to logging.
-//
-// Environment variables depend on context:
-//   - Access logs: LH_LOGGING_ACCESS_DIR, LH_LOGGING_ACCESS_STDERR
-//   - Internal logs: LH_LOGGING_INTERNAL_DIR, LH_LOGGING_INTERNAL_STDERR
 type LoggerConf struct {
 	// Dir is the directory for log files.
-	// Env: LH_LOGGING_ACCESS_DIR or LH_LOGGING_INTERNAL_DIR
+	// Env: LH_LOGGING_INTERNAL_DIR or LH_LOGGING_ACCESS_DIR
 	Dir string `yaml:"dir" envconfig:"DIR"`
 	// StdErr enables logging to stderr.
-	// Env: LH_LOGGING_ACCESS_STDERR or LH_LOGGING_INTERNAL_STDERR
+	// Env: LH_LOGGING_INTERNAL_STDERR or LH_LOGGING_ACCESS_STDERR
 	StdErr bool `yaml:"stderr" envconfig:"STDERR"`
-}
-
-// smartLoggerConf enables and configures 'smart' logging.
-// If Enabled, error logs are also written to `Dir`. If `Dir` is empty, it
-// falls back to the internal logger's `Dir`.
-//
-// Environment variables (with prefix LH_LOGGING_INTERNAL_SMART_):
-//   - LH_LOGGING_INTERNAL_SMART_ENABLED: Enable smart logging
-//   - LH_LOGGING_INTERNAL_SMART_DIR: Smart log directory
-type smartLoggerConf struct {
-	// Enabled enables smart logging.
-	// Env: LH_LOGGING_INTERNAL_SMART_ENABLED
-	Enabled bool `yaml:"enabled" envconfig:"ENABLED"`
-	// Dir is the directory for smart logs.
-	// Env: LH_LOGGING_INTERNAL_SMART_DIR
-	Dir string `yaml:"dir" envconfig:"DIR"`
 }
 
 func checkLoggingDirExists(dir string) error {
@@ -128,14 +113,6 @@ func (log *loggingConf) validate() error {
 	if err := checkLoggingDirExists(log.Internal.Dir); err != nil {
 		return err
 	}
-	if log.Internal.Smart.Enabled {
-		if log.Internal.Smart.Dir == "" {
-			log.Internal.Smart.Dir = log.Internal.Dir
-		}
-		if err := checkLoggingDirExists(log.Internal.Smart.Dir); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -145,6 +122,8 @@ var defaultLoggingConf = loggingConf{
 		Version: true,
 	},
 	Internal: internalLoggerConf{
-		Level: "INFO",
+		Level:        "INFO",
+		StdErrFormat: "console",
+		DirFormat:    "json",
 	},
 }

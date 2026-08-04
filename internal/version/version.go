@@ -186,10 +186,7 @@ func Banner(width int) string {
 		}
 
 		// Attempt to append glyph to current group, with a single space as gap
-		newHeight := curHeight
-		if len(lines) > newHeight {
-			newHeight = len(lines)
-		}
+		newHeight := max(len(lines), curHeight)
 
 		// Compute max current line width for padding if we need extra lines
 		maxCurWidth := 0

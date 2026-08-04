@@ -36,8 +36,7 @@ func (h *trustMarkTypesHandlers) create(c *fiber.Ctx) error {
 	}
 	item, err := h.store().Create(req)
 	if err != nil {
-		var alreadyExistsError model.AlreadyExistsError
-		if errors.As(err, &alreadyExistsError) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("trust mark type already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -64,27 +63,29 @@ func (h *trustMarkTypesHandlers) update(c *fiber.Ctx) error {
 	}
 
 	var item *model.TrustMarkType
-	err := h.storages.InTransaction(func(tx *model.Backends) error {
-		txStore := tx.TrustMarkTypes
-		var err error
-		item, err = txStore.Update(trustMarkTypeID, req)
-		if err != nil {
-			return err
-		}
-
-		if req.TrustMarkOwner != nil {
-			if err := h.updateOwnerInTx(txStore, trustMarkTypeID, req); err != nil {
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			txStore := tx.TrustMarkTypes
+			var err error
+			item, err = txStore.Update(trustMarkTypeID, req)
+			if err != nil {
 				return err
 			}
-		}
 
-		if len(req.TrustMarkIssuers) > 0 {
-			if _, err := txStore.SetIssuers(trustMarkTypeID, req.TrustMarkIssuers); err != nil {
-				return err
+			if req.TrustMarkOwner != nil {
+				if err := h.updateOwnerInTx(txStore, trustMarkTypeID, req); err != nil {
+					return err
+				}
 			}
-		}
-		return nil
-	})
+
+			if len(req.TrustMarkIssuers) > 0 {
+				if _, err := txStore.SetIssuers(trustMarkTypeID, req.TrustMarkIssuers); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	)
 
 	if err != nil {
 		return h.handleTxError(c, err)
@@ -92,10 +93,11 @@ func (h *trustMarkTypesHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (*trustMarkTypesHandlers) updateOwnerInTx(txStore model.TrustMarkTypesStore, trustMarkTypeID string, req model.AddTrustMarkType) error {
+func (*trustMarkTypesHandlers) updateOwnerInTx(
+	txStore model.TrustMarkTypesStore, trustMarkTypeID string, req model.AddTrustMarkType,
+) error {
 	if _, err := txStore.UpdateOwner(trustMarkTypeID, *req.TrustMarkOwner); err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			if req.TrustMarkOwner.OwnerID == nil {
 				if _, err := txStore.CreateOwner(trustMarkTypeID, *req.TrustMarkOwner); err != nil {
 					return err
@@ -111,8 +113,7 @@ func (*trustMarkTypesHandlers) updateOwnerInTx(txStore model.TrustMarkTypesStore
 
 func (h *trustMarkTypesHandlers) delete(c *fiber.Ctx) error {
 	if err := h.store().Delete(c.Params("trustMarkTypeID")); err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -121,12 +122,10 @@ func (h *trustMarkTypesHandlers) delete(c *fiber.Ctx) error {
 }
 
 func (*trustMarkTypesHandlers) handleTxError(c *fiber.Ctx, err error) error {
-	var notFoundError model.NotFoundError
-	if errors.As(err, &notFoundError) {
+	if _, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
 	}
-	var alreadyExistsError model.AlreadyExistsError
-	if errors.As(err, &alreadyExistsError) {
+	if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 		return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("trust mark type already exists"))
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -140,8 +139,7 @@ type trustMarkIssuersHandlers struct {
 func (h *trustMarkIssuersHandlers) list(c *fiber.Ctx) error {
 	issuers, err := h.store.ListIssuers(c.Params("trustMarkTypeID"))
 	if err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -156,8 +154,7 @@ func (h *trustMarkIssuersHandlers) set(c *fiber.Ctx) error {
 	}
 	issuers, err := h.store.SetIssuers(c.Params("trustMarkTypeID"), req)
 	if err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -172,8 +169,7 @@ func (h *trustMarkIssuersHandlers) add(c *fiber.Ctx) error {
 	}
 	issuers, err := h.store.AddIssuer(c.Params("trustMarkTypeID"), issuer)
 	if err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -187,8 +183,7 @@ func (h *trustMarkIssuersHandlers) delete(c *fiber.Ctx) error {
 
 	issuerID, err := h.resolveIssuerID(trustMarkTypeID, issuerIDParam)
 	if err != nil {
-		var nf model.NotFoundError
-		if errors.As(err, &nf) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("issuer not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -199,8 +194,7 @@ func (h *trustMarkIssuersHandlers) delete(c *fiber.Ctx) error {
 
 	issuers, err := h.store.DeleteIssuerByID(trustMarkTypeID, issuerID)
 	if err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -248,8 +242,7 @@ type trustMarkOwnerHandlers struct {
 func (h *trustMarkOwnerHandlers) get(c *fiber.Ctx) error {
 	owner, err := h.store.GetOwner(c.Params("trustMarkTypeID"))
 	if err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark owner not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -267,12 +260,10 @@ func (h *trustMarkOwnerHandlers) update(c *fiber.Ctx) error {
 	}
 	owner, err := h.store.UpdateOwner(c.Params("trustMarkTypeID"), req)
 	if err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark owner not found"))
 		}
-		var alreadyExistsError model.AlreadyExistsError
-		if errors.As(err, &alreadyExistsError) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("trust mark owner already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -290,12 +281,10 @@ func (h *trustMarkOwnerHandlers) create(c *fiber.Ctx) error {
 	}
 	owner, err := h.store.CreateOwner(c.Params("trustMarkTypeID"), req)
 	if err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
 		}
-		var alreadyExistsError model.AlreadyExistsError
-		if errors.As(err, &alreadyExistsError) {
+		if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("trust mark owner already exists"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -305,8 +294,7 @@ func (h *trustMarkOwnerHandlers) create(c *fiber.Ctx) error {
 
 func (h *trustMarkOwnerHandlers) delete(c *fiber.Ctx) error {
 	if err := h.store.DeleteOwner(c.Params("trustMarkTypeID")); err != nil {
-		var notFoundError model.NotFoundError
-		if errors.As(err, &notFoundError) {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark owner not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))

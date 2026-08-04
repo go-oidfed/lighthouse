@@ -182,7 +182,7 @@ func promptInTrustMarkRequest(trustMarkType, entityID string) error {
 	return trustMarkedEntitiesStorage.Block(trustMarkType, entityID)
 }
 
-func promptApproval(f string, args ...interface{}) bool {
+func promptApproval(f string, args ...any) bool {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf(f+" (y/n): ", args...)

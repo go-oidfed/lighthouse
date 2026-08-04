@@ -67,8 +67,7 @@ func Middleware(cfg MiddlewareConfig) fiber.Handler {
 		statusCode := c.Response().StatusCode()
 		if err != nil {
 			statusCode = fiber.StatusInternalServerError
-			var fe *fiber.Error
-			if errors.As(err, &fe) {
+			if fe, ok := errors.AsType[*fiber.Error](err); ok {
 				statusCode = fe.Code
 			}
 		}

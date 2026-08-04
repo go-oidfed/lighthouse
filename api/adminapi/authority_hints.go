@@ -35,8 +35,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 			}
 			item, err := store.Create(req)
 			if err != nil {
-				var alreadyExistsError model.AlreadyExistsError
-				if errors.As(err, &alreadyExistsError) {
+				if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("authority hint already exists"))
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -66,12 +65,10 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 			}
 			item, err := store.Update(c.Params("authorityHintID"), req)
 			if err != nil {
-				var notFoundError model.NotFoundError
-				if errors.As(err, &notFoundError) {
+				if _, ok := errors.AsType[model.NotFoundError](err); ok {
 					return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("authority hint not found"))
 				}
-				var alreadyExistsError model.AlreadyExistsError
-				if errors.As(err, &alreadyExistsError) {
+				if _, ok := errors.AsType[model.AlreadyExistsError](err); ok {
 					return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("authority hint already exists"))
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))

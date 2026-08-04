@@ -1,11 +1,12 @@
 package lighthouse
 
+import "io"
+
 // ServerConf holds the server configuration.
 //
 // Environment variables (accent prefix LH_SERVER_):
 //   - LH_SERVER_IP_LISTEN: IP address to listen on
 //   - LH_SERVER_PORT: HTTP server port
-//   - LH_SERVER_PREFORK: Enable multiple processes (prefork)
 //   - LH_SERVER_TRUSTED_PROXIES: Comma-separated list of trusted proxy IPs
 //   - LH_SERVER_FORWARDED_IP_HEADER: Header name for forwarded IP
 //   - LH_SERVER_TLS_ENABLED: Enable TLS
@@ -20,13 +21,6 @@ type ServerConf struct {
 	// Port is the HTTP server port.
 	// Env: LH_SERVER_PORT
 	Port int `yaml:"port" envconfig:"PORT"`
-	// Prefork enables multiple processes listening on the same port.
-	// When enabled, Fiber spawns child processes to distribute connections
-	// across CPU cores for improved performance.
-	// Note: When using prefork, it is strongly recommended to use Redis for
-	// caching to ensure cache consistency across processes.
-	// Env: LH_SERVER_PREFORK
-	Prefork bool `yaml:"prefork" envconfig:"PREFORK"`
 	// AdminAPIPort is set internally and not configurable via env.
 	AdminAPIPort int `yaml:"-" envconfig:"-"`
 	// AdminTLS holds TLS configuration for the admin API.
@@ -44,6 +38,10 @@ type ServerConf struct {
 	// CORS holds CORS middleware configuration for the main server.
 	// Env prefix: LH_SERVER_CORS_
 	CORS CORSConf `yaml:"cors" envconfig:"CORS"`
+	// AccessLogWriter is the io.Writer used for HTTP access logs (fiber
+	// logger middleware). Set internally by the application entry point from
+	// the logging configuration; not configurable via YAML or env.
+	AccessLogWriter io.Writer `yaml:"-" envconfig:"-"`
 	// Secure bool    `yaml:"-"`
 	// Basepath       string       `yaml:"-"`
 }

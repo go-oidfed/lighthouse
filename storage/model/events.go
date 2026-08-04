@@ -38,6 +38,18 @@ const (
 	EventTypeClaimDeleted = "claim_deleted"
 	// EventTypeLifetimeUpdated is recorded when subordinate lifetime is updated.
 	EventTypeLifetimeUpdated = "lifetime_updated"
+	// EventTypeJWKSRefreshed is recorded when a subordinate's JWKS are updated
+	// by the periodic refresher (approach A) after detecting a change in the
+	// subordinate's Entity Configuration.
+	EventTypeJWKSRefreshed = "jwks_refreshed"
+	// EventTypeJWKSUpdateTriggered is recorded when the
+	// federation_jwks_update_trigger_endpoint (approach B) is called and LH
+	// re-fetches the subordinate's JWKS from its Entity Configuration.
+	EventTypeJWKSUpdateTriggered = "jwks_update_triggered"
+	// EventTypeJWKSUpdated is recorded when the federation_jwks_update_endpoint
+	// (approach C) accepts a signed JWK Set from the subordinate and updates
+	// the stored JWKS.
+	EventTypeJWKSUpdated = "jwks_updated"
 )
 
 // SubordinateEvent stores an event related to a subordinate.

@@ -33,6 +33,7 @@ func RegisterSubordinateHandlers(
 	r fiber.Router,
 	storages model.Backends,
 	fedEntity oidfed.FederationEntity,
+	ctrl LighthouseController,
 ) {
 	// Register general endpoints first (routes without :subordinateID in the path)
 	// These must be registered before subordinate-specific routes to avoid conflicts
@@ -53,7 +54,7 @@ func RegisterSubordinateHandlers(
 	registerGeneralSubordinateLifetime(r, storages.KV)
 
 	// Base CRUD operations: /subordinates, /subordinates/:subordinateID, etc.
-	registerSubordinatesBase(r, storages)
+	registerSubordinatesBase(r, storages, ctrl)
 
 	// Statement preview: /subordinates/:subordinateID/statement
 	registerSubordinateStatement(r, storages.Subordinates, storages.KV, fedEntity)

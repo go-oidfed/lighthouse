@@ -3,6 +3,7 @@ package adminapi
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -16,7 +17,7 @@ func registerSubordinateMetadata(
 	storages model.Backends,
 ) {
 	g := r.Group("/subordinates/:subordinateID/metadata")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	// GET / - Get full subordinate-specific metadata
 	g.Get("/", handleGetSubordinateMetadata(storages.Subordinates))
@@ -58,30 +59,33 @@ func handlePutSubordinateMetadata(storages model.Backends) fiber.Handler {
 		}
 
 		var result *oidfed.Metadata
-		err := storages.InTransaction(func(tx *model.Backends) error {
-			info, err := tx.Subordinates.GetByDBID(id)
-			if err != nil {
-				return err
-			}
-			if info == nil {
-				return model.NotFoundError("subordinate not found")
-			}
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				info, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if info == nil {
+					return model.NotFoundError("subordinate not found")
+				}
 
-			info.Metadata = &body
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-				return err
-			}
-			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithActor(GetActor(c))); err != nil {
-				return err
-			}
-			result = &body
-			return nil
-		})
+				info.Metadata = &body
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				// Record metadata update event within transaction
+				if err := RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithActor(GetActor(c)),
+				); err != nil {
+					return err
+				}
+				result = &body
+				return nil
+			},
+		)
 
 		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
+			if _, ok := errors.AsType[model.NotFoundError](err); ok {
 				return writeNotFound(c, err.Error())
 			}
 			return writeServerError(c, err)
@@ -115,33 +119,37 @@ func handlePutSubordinateMetadataEntityType(storages model.Backends) fiber.Handl
 		}
 
 		var result map[string]any
-		err := storages.InTransaction(func(tx *model.Backends) error {
-			info, err := tx.Subordinates.GetByDBID(id)
-			if err != nil {
-				return err
-			}
-			if info == nil {
-				return model.NotFoundError("subordinate not found")
-			}
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				info, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if info == nil {
+					return model.NotFoundError("subordinate not found")
+				}
 
-			if info.Metadata == nil {
-				info.Metadata = &oidfed.Metadata{}
-			}
-			setEntityMetadata(info.Metadata, et, body)
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-				return err
-			}
-			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c))); err != nil {
-				return err
-			}
-			result = body
-			return nil
-		})
+				if info.Metadata == nil {
+					info.Metadata = &oidfed.Metadata{}
+				}
+				setEntityMetadata(info.Metadata, et, body)
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				// Record metadata update event within transaction
+				if err := RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et),
+					WithActor(GetActor(c)),
+				); err != nil {
+					return err
+				}
+				result = body
+				return nil
+			},
+		)
 
 		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
+			if _, ok := errors.AsType[model.NotFoundError](err); ok {
 				return writeNotFound(c, err.Error())
 			}
 			return writeServerError(c, err)
@@ -160,40 +168,42 @@ func handlePostSubordinateMetadataEntityType(storages model.Backends) fiber.Hand
 		}
 
 		var result map[string]any
-		err := storages.InTransaction(func(tx *model.Backends) error {
-			info, err := tx.Subordinates.GetByDBID(id)
-			if err != nil {
-				return err
-			}
-			if info == nil {
-				return model.NotFoundError("subordinate not found")
-			}
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				info, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if info == nil {
+					return model.NotFoundError("subordinate not found")
+				}
 
-			if info.Metadata == nil {
-				info.Metadata = &oidfed.Metadata{}
-			}
-			existing := getEntityMetadata(info.Metadata, et)
-			if existing == nil {
-				existing = map[string]any{}
-			}
-			for k, v := range body {
-				existing[k] = v
-			}
-			setEntityMetadata(info.Metadata, et, existing)
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-				return err
-			}
-			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c))); err != nil {
-				return err
-			}
-			result = existing
-			return nil
-		})
+				if info.Metadata == nil {
+					info.Metadata = &oidfed.Metadata{}
+				}
+				existing := getEntityMetadata(info.Metadata, et)
+				if existing == nil {
+					existing = map[string]any{}
+				}
+				maps.Copy(existing, body)
+				setEntityMetadata(info.Metadata, et, existing)
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				// Record metadata update event within transaction
+				if err := RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage("entity type: "+et),
+					WithActor(GetActor(c)),
+				); err != nil {
+					return err
+				}
+				result = existing
+				return nil
+			},
+		)
 
 		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
+			if _, ok := errors.AsType[model.NotFoundError](err); ok {
 				return writeNotFound(c, err.Error())
 			}
 			return writeServerError(c, err)
@@ -207,32 +217,36 @@ func handleDeleteSubordinateMetadataEntityType(storages model.Backends) fiber.Ha
 		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 
-		err := storages.InTransaction(func(tx *model.Backends) error {
-			info, err := tx.Subordinates.GetByDBID(id)
-			if err != nil {
-				return err
-			}
-			if info == nil {
-				return model.NotFoundError("subordinate not found")
-			}
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				info, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if info == nil {
+					return model.NotFoundError("subordinate not found")
+				}
 
-			if getEntityMetadata(info.Metadata, et) == nil {
-				return model.NotFoundError("metadata not found")
-			}
-			if info.Metadata == nil {
-				info.Metadata = &oidfed.Metadata{}
-			}
-			deleteEntityMetadata(info.Metadata, et)
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-				return err
-			}
-			// Record metadata deleted event within transaction
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage("entity type: "+et), WithActor(GetActor(c)))
-		})
+				if getEntityMetadata(info.Metadata, et) == nil {
+					return model.NotFoundError("metadata not found")
+				}
+				if info.Metadata == nil {
+					info.Metadata = &oidfed.Metadata{}
+				}
+				deleteEntityMetadata(info.Metadata, et)
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				// Record metadata deleted event within transaction
+				return RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage("entity type: "+et),
+					WithActor(GetActor(c)),
+				)
+			},
+		)
 
 		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
+			if _, ok := errors.AsType[model.NotFoundError](err); ok {
 				return writeNotFound(c, err.Error())
 			}
 			return writeServerError(c, err)
@@ -273,43 +287,47 @@ func handlePutSubordinateMetadataClaim(storages model.Backends) fiber.Handler {
 
 		var result any
 		var created bool
-		err := storages.InTransaction(func(tx *model.Backends) error {
-			info, err := tx.Subordinates.GetByDBID(id)
-			if err != nil {
-				return err
-			}
-			if info == nil {
-				return model.NotFoundError("subordinate not found")
-			}
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				info, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if info == nil {
+					return model.NotFoundError("subordinate not found")
+				}
 
-			created = false
-			if info.Metadata == nil {
-				info.Metadata = &oidfed.Metadata{}
-			}
-			m := getEntityMetadata(info.Metadata, et)
-			if m == nil {
-				m = map[string]any{}
-				created = true
-			}
-			if _, ok := m[claim]; !ok {
-				created = true
-			}
-			m[claim] = body
-			setEntityMetadata(info.Metadata, et, m)
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-				return err
-			}
-			// Record metadata update event within transaction
-			if err := RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage(et+"."+claim), WithActor(GetActor(c))); err != nil {
-				return err
-			}
-			result = body
-			return nil
-		})
+				created = false
+				if info.Metadata == nil {
+					info.Metadata = &oidfed.Metadata{}
+				}
+				m := getEntityMetadata(info.Metadata, et)
+				if m == nil {
+					m = map[string]any{}
+					created = true
+				}
+				if _, ok := m[claim]; !ok {
+					created = true
+				}
+				m[claim] = body
+				setEntityMetadata(info.Metadata, et, m)
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				// Record metadata update event within transaction
+				if err := RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeMetadataUpdated, WithMessage(et+"."+claim),
+					WithActor(GetActor(c)),
+				); err != nil {
+					return err
+				}
+				result = body
+				return nil
+			},
+		)
 
 		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
+			if _, ok := errors.AsType[model.NotFoundError](err); ok {
 				return writeNotFound(c, err.Error())
 			}
 			return writeServerError(c, err)
@@ -327,37 +345,41 @@ func handleDeleteSubordinateMetadataClaim(storages model.Backends) fiber.Handler
 		et := c.Params("entityType")
 		claim := c.Params("claim")
 
-		err := storages.InTransaction(func(tx *model.Backends) error {
-			info, err := tx.Subordinates.GetByDBID(id)
-			if err != nil {
-				return err
-			}
-			if info == nil {
-				return model.NotFoundError("subordinate not found")
-			}
+		err := storages.InTransaction(
+			func(tx *model.Backends) error {
+				info, err := tx.Subordinates.GetByDBID(id)
+				if err != nil {
+					return err
+				}
+				if info == nil {
+					return model.NotFoundError("subordinate not found")
+				}
 
-			m := getEntityMetadata(info.Metadata, et)
-			if m == nil {
-				return model.NotFoundError("metadata not found")
-			}
-			if _, ok := m[claim]; !ok {
-				return model.NotFoundError("metadata not found")
-			}
-			delete(m, claim)
-			if info.Metadata == nil {
-				info.Metadata = &oidfed.Metadata{}
-			}
-			setEntityMetadata(info.Metadata, et, m)
-			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
-				return err
-			}
-			// Record metadata deleted event within transaction
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage(et+"."+claim), WithActor(GetActor(c)))
-		})
+				m := getEntityMetadata(info.Metadata, et)
+				if m == nil {
+					return model.NotFoundError("metadata not found")
+				}
+				if _, ok := m[claim]; !ok {
+					return model.NotFoundError("metadata not found")
+				}
+				delete(m, claim)
+				if info.Metadata == nil {
+					info.Metadata = &oidfed.Metadata{}
+				}
+				setEntityMetadata(info.Metadata, et, m)
+				if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
+					return err
+				}
+				// Record metadata deleted event within transaction
+				return RecordEvent(
+					tx.SubordinateEvents, info.ID, model.EventTypeMetadataDeleted, WithMessage(et+"."+claim),
+					WithActor(GetActor(c)),
+				)
+			},
+		)
 
 		if err != nil {
-			var nf model.NotFoundError
-			if errors.As(err, &nf) {
+			if _, ok := errors.AsType[model.NotFoundError](err); ok {
 				return writeNotFound(c, err.Error())
 			}
 			return writeServerError(c, err)

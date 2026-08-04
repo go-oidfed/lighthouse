@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
@@ -160,9 +160,9 @@ const (
 
 // JWTVerification configures how JWT signatures are verified
 type JWTVerification struct {
-	Mode         JWTVerificationMode `yaml:"mode" json:"mode"`
-	JWKS         *jwx.JWKS           `yaml:"jwks" json:"jwks,omitempty"`
-	TrustAnchors oidfed.TrustAnchors `yaml:"trust_anchors" json:"trust_anchors,omitempty"`
+	Mode           JWTVerificationMode `yaml:"mode" json:"mode"`
+	JWKS           *jwx.JWKS           `yaml:"jwks" json:"jwks,omitempty"`
+	TrustAnchorIDs []string            `yaml:"trust_anchors" json:"trust_anchors,omitempty"`
 }
 
 // HTTPListJWTEntityChecker fetches a signed JWT containing entity IDs from an HTTP endpoint.
@@ -262,7 +262,8 @@ func (c *HTTPListJWTEntityChecker) fetchAndVerifyList() ([]string, error) {
 	}
 
 	var rawList any
-	if err := token.Get(listClaim, &rawList); err != nil {
+	rawList, err = jwt.Get[any](token, listClaim)
+	if err != nil {
 		return nil, errors.Errorf("claim '%s' not found in JWT", listClaim)
 	}
 
@@ -321,7 +322,7 @@ func (c *HTTPListJWTEntityChecker) verifyWithJWKS(jwtString string) (jwt.Token, 
 }
 
 func (c *HTTPListJWTEntityChecker) verifyWithTrustAnchor(jwtString string) (jwt.Token, error) {
-	if len(c.Verification.TrustAnchors) == 0 {
+	if len(c.Verification.TrustAnchorIDs) == 0 {
 		return nil, errors.New("no trust anchors configured for JWT verification")
 	}
 
@@ -337,16 +338,16 @@ func (c *HTTPListJWTEntityChecker) verifyWithTrustAnchor(jwtString string) (jwt.
 
 	// Try each trust anchor
 	var lastErr error
-	for _, ta := range c.Verification.TrustAnchors {
+	for _, taID := range c.Verification.TrustAnchorIDs {
 		// Try to resolve trust path from issuer to trust anchor
 		valid, _ := oidfed.DefaultMetadataResolver.ResolvePossible(
 			apimodel.ResolveRequest{
 				Subject:     issuer,
-				TrustAnchor: []string{ta.EntityID},
+				TrustAnchor: []string{taID},
 			},
 		)
 		if !valid {
-			lastErr = errors.Errorf("no valid trust path from %s to %s", issuer, ta.EntityID)
+			lastErr = errors.Errorf("no valid trust path from %s to %s", issuer, taID)
 			continue
 		}
 

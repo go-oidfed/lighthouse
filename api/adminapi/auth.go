@@ -18,7 +18,12 @@ func authMiddleware(users model.UsersStore) fiber.Handler {
 		// If no users are configured, allow access
 		count, err := users.Count()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "server_error", "error_description": err.Error()})
+			return c.Status(fiber.StatusInternalServerError).JSON(
+				fiber.Map{
+					"error": "server_error",
+					"error_description": err.Error(),
+				},
+			)
 		}
 		if count == 0 {
 			return c.Next()
@@ -28,12 +33,22 @@ func authMiddleware(users model.UsersStore) fiber.Handler {
 		username, password, ok := parseBasicAuth(c)
 		if !ok {
 			c.Set("WWW-Authenticate", "Basic realm=admin")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid_client", "error_description": "missing credentials"})
+			return c.Status(fiber.StatusUnauthorized).JSON(
+				fiber.Map{
+					"error": "invalid_client",
+					"error_description": "missing credentials",
+				},
+			)
 		}
 		// Validate credentials
 		if _, err := users.Authenticate(username, password); err != nil {
 			c.Set("WWW-Authenticate", "Basic realm=admin")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid_client", "error_description": "invalid credentials"})
+			return c.Status(fiber.StatusUnauthorized).JSON(
+				fiber.Map{
+					"error": "invalid_client",
+					"error_description": "invalid credentials",
+				},
+			)
 		}
 		// Store authenticated username for actor extraction
 		SetAuthUsername(c, username)
@@ -57,9 +72,9 @@ func parseBasicAuth(c *fiber.Ctx) (username, password string, ok bool) {
 		return "", "", false
 	}
 	creds := string(b)
-	i := strings.IndexByte(creds, ':')
-	if i < 0 {
+	before, after, ok0 := strings.Cut(creds, ":")
+	if !ok0 {
 		return "", "", false
 	}
-	return creds[:i], creds[i+1:], true
+	return before, after, true
 }

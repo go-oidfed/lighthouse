@@ -1,32 +1,42 @@
 package middleware
 
 import (
+	"slices"
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwt"
-	log "github.com/sirupsen/logrus"
+	"github.com/lestrrat-go/jwx/v4/jwt"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
-const oauthClientAssertionJWTBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+// TAResolver resolves trust anchor entity IDs to oidfed.TrustAnchors at
+// request time. This allows JWKS updates to propagate live without restarting
+// the middleware.
+type TAResolver func(entityIDs []string) oidfed.TrustAnchors
 
 // PrivateKeyJWTAuth implements private_key_jwt authentication middleware
 type PrivateKeyJWTAuth struct {
-	entityID     string
-	fedEntity    oidfed.FederationEntity
-	trustAnchors oidfed.TrustAnchors
-	jtiStorage   model.JTIStorageBackend
-	logger       *log.Entry
+	entityID       string
+	fedEntity      oidfed.FederationEntity
+	trustAnchorIDs []string
+	taResolver     TAResolver
+	jtiStorage     model.JTIStorageBackend
+	logger         zerolog.Logger
 }
 
-// NewPrivateKeyJWTAuth creates a new private_key_jwt authentication middleware
+// NewPrivateKeyJWTAuth creates a new private_key_jwt authentication middleware.
+// The trustAnchorIDs are resolved to oidfed.TrustAnchors at request time via
+// taResolver, so JWKS updates propagate live.
 func NewPrivateKeyJWTAuth(
 	entityID string,
 	fedEntity oidfed.FederationEntity,
-	trustAnchors oidfed.TrustAnchors,
+	trustAnchorIDs []string,
+	taResolver TAResolver,
 	jtiStorage model.JTIStorageBackend,
 ) (*PrivateKeyJWTAuth, error) {
 	if entityID == "" {
@@ -35,24 +45,26 @@ func NewPrivateKeyJWTAuth(
 	if fedEntity == nil {
 		return nil, ErrInvalidConfig("federation entity is required")
 	}
-	if len(trustAnchors) == 0 {
+	if len(trustAnchorIDs) == 0 {
 		return nil, ErrInvalidConfig("at least one trust anchor is required")
+	}
+	if taResolver == nil {
+		return nil, ErrInvalidConfig("trust anchor resolver is required")
 	}
 	if jtiStorage == nil {
 		return nil, ErrInvalidConfig("JTI storage is required")
 	}
 
 	return &PrivateKeyJWTAuth{
-		entityID:     entityID,
-		fedEntity:    fedEntity,
-		trustAnchors: trustAnchors,
-		jtiStorage:   jtiStorage,
-		logger: log.WithFields(
-			log.Fields{
-				"component": "auth_private_key_jwt",
-				"entity_id": entityID,
-			},
-		),
+		entityID:       entityID,
+		fedEntity:      fedEntity,
+		trustAnchorIDs: trustAnchorIDs,
+		taResolver:     taResolver,
+		jtiStorage:     jtiStorage,
+		logger: log.With().
+			Str("component", "auth_private_key_jwt").
+			Str("entity_id", entityID).
+			Logger(),
 	}, nil
 }
 
@@ -66,16 +78,16 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 		assertionType := ctx.FormValue("client_assertion_type")
 
 		// Validate client_assertion_type
-		if assertionType != oauthClientAssertionJWTBearer {
-			a.logger.WithField("assertion_type", assertionType).Debug("missing or invalid client_assertion_type")
+		if assertionType != oidfedconst.OAuthClientAssertionJWTBearer {
+			a.logger.Debug().Str("assertion_type", assertionType).Msg("missing or invalid client_assertion_type")
 			return ctx.Status(fiber.StatusBadRequest).JSON(
-				oidfed.ErrorInvalidRequest("missing or invalid client_assertion_type, expected: " + oauthClientAssertionJWTBearer),
+				oidfed.ErrorInvalidRequest("missing or invalid client_assertion_type, expected: " + oidfedconst.OAuthClientAssertionJWTBearer),
 			)
 		}
 
 		// Validate client_assertion is present
 		if clientAssertion == "" {
-			a.logger.Debug("missing client_assertion parameter")
+			a.logger.Debug().Msg("missing client_assertion parameter")
 			return ctx.Status(fiber.StatusBadRequest).JSON(
 				oidfed.ErrorInvalidRequest("missing client_assertion parameter"),
 			)
@@ -95,21 +107,19 @@ func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 				)
 			}
 			// For non-AuthError, return server error
-			a.logger.WithError(err).Error("unexpected authentication error")
+			a.logger.Error().Err(err).Msg("unexpected authentication error")
 			return ctx.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("authentication failed"))
 		}
 
 		// Set context values for downstream handlers
 		ctx.Locals("client_entity_id", clientEntityID)
 		ctx.Locals("client_entity_statement", entityStatement)
-		ctx.Locals("auth_method", "private_key_jwt")
+		ctx.Locals("auth_method", oidfedconst.AuthMethodPrivateKeyJWT)
 
-		a.logger.WithFields(
-			log.Fields{
-				"client_entity_id": clientEntityID,
-				"duration_ms":      time.Since(startTime).Milliseconds(),
-			},
-		).Debug("successful private_key_jwt authentication")
+		a.logger.Debug().
+			Str("client_entity_id", clientEntityID).
+			Int64("duration_ms", time.Since(startTime).Milliseconds()).
+			Msg("successful private_key_jwt authentication")
 
 		return ctx.Next()
 	}
@@ -163,13 +173,7 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 	}
 
 	// Validate audience matches this entity
-	audMatch := false
-	for _, audEntry := range aud {
-		if audEntry == a.entityID {
-			audMatch = true
-			break
-		}
-	}
+	audMatch := slices.Contains(aud, a.entityID)
 	if !audMatch {
 		return "", nil, ErrInvalidClient("client assertion audience does not match this entity")
 	}
@@ -196,9 +200,9 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 		return "", nil, ErrInvalidGrant("client assertion has expired")
 	}
 
-	// Get jti from token claims using the proper jwx v3 API
-	var jti string
-	if err := token.Get("jti", &jti); err != nil || jti == "" {
+	// Get jti from token claims using the proper jwx v4 API
+	jti, err := jwt.Get[string](token, "jti")
+	if err != nil || jti == "" {
 		return "", nil, ErrInvalidRequest("missing or invalid 'jti' claim in client assertion")
 	}
 
@@ -228,7 +232,7 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 	// Store JTI to prevent replay
 	// Use the assertion expiration time
 	if err = a.jtiStorage.Store(jti, exp); err != nil {
-		a.logger.WithError(err).WithField("jti", jti).Error("failed to store JTI")
+		a.logger.Error().Err(err).Str("jti", jti).Msg("failed to store JTI")
 	}
 
 	return iss, clientEntityStmt, nil
@@ -236,9 +240,14 @@ func (a *PrivateKeyJWTAuth) validateAssertion(clientAssertion string) (
 
 // resolveClientTrustChain resolves the client's trust chain and returns the leaf entity statement
 func (a *PrivateKeyJWTAuth) resolveClientTrustChain(clientEntityID string) (*oidfed.EntityStatement, error) {
+	// Resolve trust anchors live at request time so JWKS updates propagate.
+	trustAnchors := a.taResolver(a.trustAnchorIDs)
+	if len(trustAnchors) == 0 {
+		return nil, ErrInvalidClient("no resolvable trust anchors configured")
+	}
 	// Create trust resolver with configured trust anchors
 	resolver := oidfed.TrustResolver{
-		TrustAnchors:   a.trustAnchors,
+		TrustAnchors:   trustAnchors,
 		StartingEntity: clientEntityID,
 		Types:          nil, // Accept any entity type
 	}

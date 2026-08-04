@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	oidfed "github.com/go-oidfed/lib"
 
@@ -80,17 +80,18 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for trust mark endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(model.EndpointTypeTrustMark, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
 		fed.fedMetadata.FederationTrustMarkEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeTrustMark, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil
@@ -370,13 +371,11 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 
 		if err = config.InstanceStore.Create(instance); err != nil {
 			// Log the error but don't fail the request - the trust mark was issued successfully
-			log.WithError(err).WithFields(
-				log.Fields{
-					"jti":             jti,
-					"trust_mark_type": trustMarkType,
-					"subject":         sub,
-				},
-			).Warn("failed to persist issued trust mark instance")
+			log.Warn().Err(err).
+				Str("jti", jti).
+				Str("trust_mark_type", trustMarkType).
+				Str("subject", sub).
+				Msg("failed to persist issued trust mark instance")
 		}
 	}
 

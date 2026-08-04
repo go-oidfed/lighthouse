@@ -17,7 +17,10 @@ import (
 
 // UsersStorage returns a UsersStorage
 func (s *Storage) UsersStorage() *UsersStorage {
-	return &UsersStorage{db: s.db, params: s.userParams}
+	return &UsersStorage{
+		db:     s.db,
+		params: s.userParams,
+	}
 }
 
 // UsersStorage implements UsersStore using GORM
@@ -73,7 +76,11 @@ func (s *UsersStorage) Create(username, password, displayName string) (*model.Us
 	if err != nil {
 		return nil, err
 	}
-	u := model.User{Username: username, PasswordHash: hash, DisplayName: displayName}
+	u := model.User{
+		Username:     username,
+		PasswordHash: hash,
+		DisplayName:  displayName,
+	}
 	if err := s.db.Create(&u).Error; err != nil {
 		return nil, err
 	}
@@ -82,7 +89,9 @@ func (s *UsersStorage) Create(username, password, displayName string) (*model.Us
 }
 
 // Update updates display name / password / disabled
-func (s *UsersStorage) Update(username string, displayName *string, newPassword *string, disabled *bool) (*model.User, error) {
+func (s *UsersStorage) Update(username string, displayName *string, newPassword *string, disabled *bool) (
+	*model.User, error,
+) {
 	var u model.User
 	if err := s.db.Where("username = ?", username).First(&u).Error; err != nil {
 		return nil, model.NotFoundErrorFmt("user not found: %s", username)
@@ -192,21 +201,21 @@ func parseArgon2id(encoded string) (Argon2idParams, []byte, []byte, error) {
 	if parts[2] != "v=19" {
 		return out, nil, nil, errors.Errorf("unsupported argon2 version")
 	}
-	for _, kv := range strings.Split(parts[3], ",") {
-		if strings.HasPrefix(kv, "m=") {
-			v, err := strconv.ParseUint(strings.TrimPrefix(kv, "m="), 10, 32)
+	for kv := range strings.SplitSeq(parts[3], ",") {
+		if after, ok := strings.CutPrefix(kv, "m="); ok {
+			v, err := strconv.ParseUint(after, 10, 32)
 			if err != nil {
 				return out, nil, nil, err
 			}
 			out.MemoryKiB = uint32(v)
-		} else if strings.HasPrefix(kv, "t=") {
-			v, err := strconv.ParseUint(strings.TrimPrefix(kv, "t="), 10, 32)
+		} else if after, ok := strings.CutPrefix(kv, "t="); ok {
+			v, err := strconv.ParseUint(after, 10, 32)
 			if err != nil {
 				return out, nil, nil, err
 			}
 			out.Time = uint32(v)
-		} else if strings.HasPrefix(kv, "p=") {
-			v, err := strconv.ParseUint(strings.TrimPrefix(kv, "p="), 10, 8)
+		} else if after, ok := strings.CutPrefix(kv, "p="); ok {
+			v, err := strconv.ParseUint(after, 10, 8)
 			if err != nil {
 				return out, nil, nil, err
 			}
@@ -231,5 +240,11 @@ func argon2idParamsEqual(a, b Argon2idParams) bool {
 }
 
 func defaultArgon2idParams() Argon2idParams {
-	return Argon2idParams{Time: 1, MemoryKiB: 64 * 1024, Parallelism: 4, KeyLen: 32, SaltLen: 16}
+	return Argon2idParams{
+		Time:        1,
+		MemoryKiB:   64 * 1024,
+		Parallelism: 4,
+		KeyLen:      32,
+		SaltLen:     16,
+	}
 }

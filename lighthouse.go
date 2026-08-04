@@ -20,10 +20,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
 	apistats "github.com/go-oidfed/lighthouse/api/stats"
@@ -31,15 +31,22 @@ import (
 	"github.com/go-oidfed/lighthouse/internal/stats"
 	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/internal/version"
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 const MaximumEntityConfigurationCachePeriod = 8 * time.Hour
 
+// MaximumSubordinateStatementCachePeriod is the upper bound on how long a
+// signed subordinate statement JWT is cached at the fetch endpoint. The actual
+// cache TTL is further capped by the statement's own expiration and by the
+// earliest published key expiration (see subordinateStatementCacheTTL).
+const MaximumSubordinateStatementCachePeriod = 8 * time.Hour
+
 // parseRequest populates req from query parameters (GET) and, for POST requests,
 // also from the request body (form or JSON).
-func parseRequest(ctx *fiber.Ctx, req interface{}) error {
+func parseRequest(ctx *fiber.Ctx, req any) error {
 	if err := ctx.QueryParser(req); err != nil {
 		return err
 	}
@@ -73,10 +80,11 @@ type EndpointConf struct {
 	// When global endpoints.auth.all_require_auth is true, this is forced on.
 	// Env: LH_ENDPOINTS_<ENDPOINT>_AUTH_ENABLED
 	AuthEnabled bool `yaml:"auth_enabled" envconfig:"AUTH_ENABLED"`
-	// AuthTrustAnchors is the list of trust anchors for endpoint authentication.
+	// AuthTrustAnchors is the list of trust anchor entity IDs for endpoint authentication.
+	// These are resolved live from the TrustAnchorRepo at request time.
 	// If empty when auth is enabled, falls back to global endpoints.auth.trust_anchors.
 	// Env: LH_ENDPOINTS_<ENDPOINT>_AUTH_TRUST_ANCHORS (comma-separated)
-	AuthTrustAnchors oidfed.TrustAnchors `yaml:"auth_trust_anchors" envconfig:"AUTH_TRUST_ANCHORS"`
+	AuthTrustAnchors []string `yaml:"auth_trust_anchors" envconfig:"AUTH_TRUST_ANCHORS"`
 }
 
 // IsSet returns a bool indicating if this endpoint was configured or not
@@ -99,19 +107,24 @@ type LightHouse struct {
 	oidfed.FederationEntity
 	*oidfed.TrustMarkIssuer
 	*jwx.GeneralJWTSigner
-	server                  *fiber.App
-	adminAPIServer          *fiber.App
-	serverConf              ServerConf
-	fedMetadata             oidfed.FederationEntityMetadata
-	keyManagement           adminapi.KeyManagement
-	LogoBanner              bool
-	VersionBanner           bool
-	storages                model.Backends
-	statsCollector          *stats.Collector
-	statsAggregator         *stats.Aggregator
-	statsAggregatorCancel   context.CancelFunc
-	trustMarkConfigProvider *storage.TrustMarkConfigProvider
-	jtiCleanupStop          func()
+	server                   *fiber.App
+	adminAPIServer           *fiber.App
+	serverConf               ServerConf
+	fedMetadata              oidfed.FederationEntityMetadata
+	keyManagement            adminapi.KeyManagement
+	LogoBanner               bool
+	VersionBanner            bool
+	storages                 model.Backends
+	statsCollector           *stats.Collector
+	statsAggregator          *stats.Aggregator
+	statsAggregatorCancel    context.CancelFunc
+	trustMarkConfigProvider  *storage.TrustMarkConfigProvider
+	trustAnchorRepo          *TrustAnchorRepo
+	taJWKSRefresher          *oidfed.TAJWKSRefresher
+	subordinateJWKSRefresher *oidfed.SubordinateJWKSRefresher
+	endpointRegistry         *EndpointRegistry
+	backgroundStops          []func()
+	jtiCleanupStop           func()
 }
 
 // FiberServerConfig is the fiber.Config that is used to init the http fiber.App
@@ -137,7 +150,7 @@ func NewLightHouse(
 	*LightHouse,
 	error,
 ) {
-	keyManagement, err := initKey(signingConf, storages)
+	keyManagement, err := initKey(entityID, signingConf, storages)
 	if err != nil {
 		return nil, err
 	}
@@ -184,10 +197,18 @@ func NewLightHouse(
 
 	entity.FederationEntity = buildDynamicFederationEntity(entity, entityID, storages)
 
+	entity.endpointRegistry = NewEndpointRegistry()
+
 	registerEntityConfigurationEndpoint(server, entity)
 
+	// Register the catch-all dispatcher for federation endpoints.
+	// Specific routes (/.well-known/openid-federation, /api/v1/admin/*) take
+	// precedence in Fiber's radix tree; all other paths are dispatched via
+	// the endpoint registry.
+	server.All("/*", entity.dispatch)
+
 	adminAPIServer, err := initAdminAPI(
-		admin, serverConf, server, entityID, storages,
+		admin, serverConf, server, entity, entityID, storages,
 		entity.FederationEntity, keyManagement, trustMarkConfigProvider,
 	)
 	if err != nil {
@@ -231,19 +252,16 @@ func initFiberServer(serverConf ServerConf) (*fiber.App, error) {
 		FiberServerConfig.EnableTrustedProxyCheck = true
 		FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	}
-	if serverConf.Prefork {
-		FiberServerConfig.Prefork = true
-	}
 
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
 	server.Use(compress.New())
-	server.Use(logger.New())
+	server.Use(fiberlogger.New(fiberlogger.Config{Output: serverConf.AccessLogWriter}))
 	server.Use(requestid.New())
 
 	if serverConf.CORS.Enabled {
 		server.Use(cors.New(corsConfigFromConf(serverConf.CORS)))
-		log.Info("CORS enabled for main server")
+		log.Info().Msg("CORS enabled for main server")
 	}
 
 	return server, nil
@@ -258,7 +276,7 @@ func initStatsCollector(statsConfig apistats.Config, storages model.Backends, se
 
 	collector, err := stats.NewCollector(statsConfig, storages.Stats)
 	if err != nil {
-		log.WithError(err).Warn("failed to initialize stats collector, statistics disabled")
+		log.Warn().Err(err).Msg("failed to initialize stats collector, statistics disabled")
 		return nil, nil
 	}
 
@@ -367,7 +385,7 @@ func buildDynamicFederationEntity(
 
 func registerEntityConfigurationEndpoint(server *fiber.App, entity *LightHouse) {
 	server.Get(
-		"/.well-known/openid-federation", func(ctx *fiber.Ctx) error {
+		oidfedconst.FederationSuffix, func(ctx *fiber.Ctx) error {
 			var cached []byte
 			set, err := cache.Get(internal.CacheKeyEntityConfiguration, &cached)
 			if err != nil {
@@ -390,7 +408,7 @@ func registerEntityConfigurationEndpoint(server *fiber.App, entity *LightHouse) 
 				internal.CacheKeyEntityConfiguration, jwt,
 				min(MaximumEntityConfigurationCachePeriod, time.Until(ec.ExpiresAt.Time.Add(-1*time.Minute))),
 			); cacheErr != nil {
-				log.WithError(cacheErr).Error("failed to cache entity configuration")
+				log.Error().Err(cacheErr).Msg("failed to cache entity configuration")
 			}
 			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 			return ctx.Send(jwt)
@@ -402,6 +420,7 @@ func initAdminAPI(
 	admin AdminAPIOptions,
 	serverConf ServerConf,
 	server *fiber.App,
+	entity *LightHouse,
 	entityID string,
 	storages model.Backends,
 	fedEntity oidfed.FederationEntity,
@@ -420,12 +439,12 @@ func initAdminAPI(
 		adminAPIServer = fiber.New(FiberServerConfig)
 		adminAPIServer.Use(recover.New())
 		adminAPIServer.Use(compress.New())
-		adminAPIServer.Use(logger.New())
+		adminAPIServer.Use(fiberlogger.New(fiberlogger.Config{Output: serverConf.AccessLogWriter}))
 		adminAPIServer.Use(requestid.New())
 
 		if admin.CORS.Enabled {
 			adminAPIServer.Use(cors.New(corsConfigFromConf(admin.CORS)))
-			log.Info("CORS enabled for admin API server")
+			log.Info().Msg("CORS enabled for admin API server")
 		}
 	} else {
 		adminAPIServer = server
@@ -435,13 +454,14 @@ func initAdminAPI(
 
 	if admin.CORS.Enabled && adminAPIServer == server && !serverConf.CORS.Enabled {
 		adminGroup.Use(cors.New(corsConfigFromConf(admin.CORS)))
-		log.Info("CORS enabled for admin API routes on main server")
+		log.Info().Msg("CORS enabled for admin API routes on main server")
 	}
 
 	err := adminapi.Register(
 		adminGroup, entityID, storages,
 		fedEntity,
 		keyManagement,
+		entity,
 		&adminapi.Options{
 			UsersEnabled:               admin.UsersEnabled,
 			Port:                       admin.Port,
@@ -475,6 +495,66 @@ func (fed *LightHouse) SetJTICleanupStop(stop func()) {
 	fed.jtiCleanupStop = stop
 }
 
+// TrustAnchorRepo returns the trust anchor repository, or nil if not initialized.
+func (fed *LightHouse) TrustAnchorRepo() *TrustAnchorRepo {
+	return fed.trustAnchorRepo
+}
+
+// SetTrustAnchorRepo sets the trust anchor repository.
+func (fed *LightHouse) SetTrustAnchorRepo(repo *TrustAnchorRepo) {
+	fed.trustAnchorRepo = repo
+}
+
+// TAJWKSRefresher returns the TA JWKS refresher, or nil if not initialized.
+func (fed *LightHouse) TAJWKSRefresher() *oidfed.TAJWKSRefresher {
+	return fed.taJWKSRefresher
+}
+
+// SetTAJWKSRefresher sets the TA JWKS refresher.
+func (fed *LightHouse) SetTAJWKSRefresher(r *oidfed.TAJWKSRefresher) {
+	fed.taJWKSRefresher = r
+}
+
+// SubordinateJWKSRefresher returns the subordinate JWKS refresher, or nil if
+// not initialized.
+func (fed *LightHouse) SubordinateJWKSRefresher() *oidfed.SubordinateJWKSRefresher {
+	return fed.subordinateJWKSRefresher
+}
+
+// SetSubordinateJWKSRefresher sets the subordinate JWKS refresher.
+func (fed *LightHouse) SetSubordinateJWKSRefresher(r *oidfed.SubordinateJWKSRefresher) {
+	fed.subordinateJWKSRefresher = r
+}
+
+// SyncTrustAnchor reloads a TA from the database and updates the in-memory
+// repository. Called by the admin API after a DB mutation on a trust anchor.
+func (fed *LightHouse) SyncTrustAnchor(entityID string) {
+	if fed.trustAnchorRepo != nil {
+		fed.trustAnchorRepo.AddOrUpdate(entityID)
+	}
+}
+
+// RemoveTrustAnchor removes a TA from the in-memory repository.
+// Called by the admin API after a trust anchor is deleted.
+func (fed *LightHouse) RemoveTrustAnchor(entityID string) {
+	if fed.trustAnchorRepo != nil {
+		fed.trustAnchorRepo.Remove(entityID)
+	}
+}
+
+// TAResolver returns a middleware.TAResolver that resolves trust anchor entity
+// IDs to oidfed.TrustAnchors via the in-memory repo. If the repo is nil, falls
+// back to creating TrustAnchors from entity IDs without JWKS (suitable for
+// trust-chain resolution that fetches JWKS itself).
+func (fed *LightHouse) TAResolver() middleware.TAResolver {
+	return func(entityIDs []string) oidfed.TrustAnchors {
+		if fed.trustAnchorRepo != nil {
+			return fed.trustAnchorRepo.Resolve(entityIDs...)
+		}
+		return oidfed.NewTrustAnchorsFromEntityIDs(entityIDs...)
+	}
+}
+
 //go:embed banner.txt
 var bannerTxt string
 
@@ -487,7 +567,7 @@ func (fed *LightHouse) banner() {
 	if fed.VersionBanner {
 		fmt.Println(version.Banner(bannerWidth))
 	} else {
-		log.WithField("version", version.VERSION).Info("Starting lighthouse")
+		log.Info().Str("version", version.VERSION).Msg("Starting lighthouse")
 	}
 }
 
@@ -495,8 +575,7 @@ func (fed *LightHouse) Start() {
 	fed.banner()
 
 	// Start stats collector if enabled
-	// In prefork mode, only start in parent process to avoid duplicate stats
-	if fed.statsCollector != nil && !fiber.IsChild() {
+	if fed.statsCollector != nil {
 		fed.statsCollector.Start()
 	}
 
@@ -509,7 +588,7 @@ func (fed *LightHouse) Start() {
 		go func() {
 			if err := fed.statsAggregator.Run(ctx); err != nil &&
 				err != context.Canceled {
-				log.WithError(err).Warn("stats aggregator stopped with error")
+				log.Warn().Err(err).Msg("stats aggregator stopped with error")
 			}
 		}()
 	}
@@ -517,34 +596,39 @@ func (fed *LightHouse) Start() {
 	conf := fed.serverConf
 	adminTLS := fed.adminAPIServer != nil && fed.adminAPIServer != fed.server && fed.serverConf.AdminTLS.Enabled
 
-	// Admin API server should only run in parent process when prefork is enabled
-	// to avoid multiple processes binding to the same admin port
-	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server && !fiber.IsChild() {
+	// Admin API server
+	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
 		if adminTLS {
-			log.WithField("port", conf.AdminAPIPort).Info("starting admin api server with TLS")
+			log.Info().Int("port", conf.AdminAPIPort).Msg("starting admin api server with TLS")
 			go func() {
-				log.WithError(
-					fed.adminAPIServer.ListenTLS(
-						fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
-						fed.serverConf.AdminTLS.Cert,
-						fed.serverConf.AdminTLS.Key,
-					),
-				).Fatal()
+				if err := fed.adminAPIServer.ListenTLS(
+					fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
+					fed.serverConf.AdminTLS.Cert,
+					fed.serverConf.AdminTLS.Key,
+				); err != nil {
+					log.Fatal().Err(err).Send()
+				}
 			}()
 		} else {
-			log.WithField("port", conf.AdminAPIPort).Info("starting admin api server")
+			log.Info().Int("port", conf.AdminAPIPort).Msg("starting admin api server")
 			go func() {
-				log.WithError(fed.adminAPIServer.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort))).Fatal()
+				if err := fed.adminAPIServer.Listen(
+					fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
+				); err != nil {
+					log.Fatal().Err(err).Send()
+				}
 			}()
 		}
 	}
 	if !conf.TLS.Enabled {
-		log.WithField("port", conf.Port).Info("TLS is disabled starting http server")
-		log.WithError(fed.server.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.Port))).Fatal()
+		log.Info().Int("port", conf.Port).Msg("TLS is disabled starting http server")
+		if err := fed.server.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.Port)); err != nil {
+			log.Fatal().Err(err).Send()
+		}
 		return
 	}
 	// TLS enabled
-	if conf.TLS.RedirectHTTP && !fiber.IsChild() {
+	if conf.TLS.RedirectHTTP {
 		// HTTP redirect server only needs to run in one process
 		httpServer := fiber.New(FiberServerConfig)
 		httpServer.All(
@@ -556,18 +640,35 @@ func (fed *LightHouse) Start() {
 				)
 			},
 		)
-		log.Info("TLS and http redirect enabled, starting redirect server on port 80")
+		log.Info().Msg("TLS and http redirect enabled, starting redirect server on port 80")
 		go func() {
-			log.WithError(httpServer.Listen(conf.IPListen + ":80")).Fatal()
+			if err := httpServer.Listen(conf.IPListen + ":80"); err != nil {
+				log.Fatal().Err(err).Send()
+			}
 		}()
 	}
 	time.Sleep(time.Millisecond) // This is just for a more pretty output with the tls header printed after the http one
-	log.Info("TLS enabled, starting https server on port 443")
-	log.WithError(fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key)).Fatal()
+	log.Info().Msg("TLS enabled, starting https server on port 443")
+	if err := fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key); err != nil {
+		log.Fatal().Err(err).Send()
+	}
 }
 
 // Stop gracefully shuts down the LightHouse server and its components.
 func (fed *LightHouse) Stop() error {
+	// Stop background services
+	fed.stopBackgroundServices()
+
+	// Stop TA JWKS refresher if running
+	if fed.taJWKSRefresher != nil {
+		fed.taJWKSRefresher.Stop()
+	}
+
+	// Stop subordinate JWKS refresher if running
+	if fed.subordinateJWKSRefresher != nil {
+		fed.subordinateJWKSRefresher.Stop()
+	}
+
 	// Stop JTI cleanup if running
 	if fed.jtiCleanupStop != nil {
 		fed.jtiCleanupStop()
@@ -576,7 +677,7 @@ func (fed *LightHouse) Stop() error {
 	// Stop stats collector if running
 	if fed.statsCollector != nil {
 		if err := fed.statsCollector.Stop(); err != nil {
-			log.WithError(err).Warn("error stopping stats collector")
+			log.Warn().Err(err).Msg("error stopping stats collector")
 		}
 	}
 
@@ -604,7 +705,7 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 	now := time.Now()
 	lifetime, err := storage.GetSubordinateStatementLifetime(fed.storages.KV)
 	if err != nil {
-		log.WithError(err).Warn("failed to get subordinate statement lifetime, using default")
+		log.Warn().Err(err).Msg("failed to get subordinate statement lifetime, using default")
 		lifetime = storage.DefaultSubordinateStatementLifetime
 	}
 
@@ -627,19 +728,38 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 		model.KeyValueKeyMetadataPolicyCrit,
 		&configuredCritOperators,
 	); err != nil {
-		log.WithError(err).Warn("failed to get metadata policy crit from KV store")
+		log.Warn().Err(err).Msg("failed to get metadata policy crit from KV store")
 	}
 
 	// Filter to only include operators actually used in the metadata policy
 	metadataPolicyCrit := filterUsedOperators(subordinate.MetadataPolicy, configuredCritOperators)
 
+	// Publish only non-expired keys: a key is dropped if it has an `exp` claim
+	// strictly before now (exp == now is still valid). Keys without `exp` are
+	// always included. The stored JWKS is not modified, so incoming Entity
+	// Configurations / signed JWK Sets can still be verified against historical
+	// keys during rotation.
+	filteredJWKS := subordinate.JWKS.Keys.WithoutExpired(now)
+	if subordinate.JWKS.Keys.Set != nil && subordinate.JWKS.Keys.Len() > 0 && filteredJWKS.Len() == 0 {
+		log.Warn().Str("subordinate", subordinate.EntityID).
+			Msg("all subordinate keys are expired; publishing empty JWKS in subordinate statement")
+	}
+
+	// Cap the statement's expiration to the latest key expiration so the
+	// statement never outlives any published key. No cap is applied when no
+	// published key has an `exp` (MaximalExpirationTime returns zero).
+	exp := unixtime.Unixtime{Time: now.Add(lifetime)}
+	if maxKeyExp := filteredJWKS.MaximalExpirationTime(); !maxKeyExp.IsZero() && maxKeyExp.Before(exp.Time) {
+		exp = unixtime.Unixtime{Time: maxKeyExp.Time}
+	}
+
 	return oidfed.EntityStatementPayload{
 		Issuer:             fed.FederationEntity.EntityID(),
 		Subject:            subordinate.EntityID,
 		IssuedAt:           unixtime.Unixtime{Time: now},
-		ExpiresAt:          unixtime.Unixtime{Time: now.Add(lifetime)},
+		ExpiresAt:          exp,
 		SourceEndpoint:     fed.fedMetadata.FederationFetchEndpoint,
-		JWKS:               subordinate.JWKS.Keys,
+		JWKS:               filteredJWKS,
 		Metadata:           subordinate.Metadata,
 		MetadataPolicy:     subordinate.MetadataPolicy,
 		Constraints:        subordinate.Constraints,
@@ -647,6 +767,23 @@ func (fed *LightHouse) CreateSubordinateStatement(subordinate *model.ExtendedSub
 		MetadataPolicyCrit: metadataPolicyCrit,
 		Extra:              extra,
 	}
+}
+
+// subordinateStatementCacheTTL computes the cache TTL for a signed subordinate
+// statement, ensuring the cache entry expires before the statement itself and
+// no later than the earliest published key expiration.
+// Returns a non-positive duration if the entry should not be cached.
+func subordinateStatementCacheTTL(payload oidfed.EntityStatementPayload) time.Duration {
+	ttl := MaximumSubordinateStatementCachePeriod
+	if t := time.Until(payload.ExpiresAt.Time.Add(-time.Minute)); t < ttl {
+		ttl = t
+	}
+	if minKeyExp := payload.JWKS.MinimalExpirationTime(); !minKeyExp.IsZero() {
+		if t := time.Until(minKeyExp.Time); t < ttl {
+			ttl = t
+		}
+	}
+	return ttl
 }
 
 // filterUsedOperators returns only the operators from configuredCrit that are actually

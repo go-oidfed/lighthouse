@@ -17,6 +17,14 @@ This section covers deployment and operational aspects of LightHouse.
 
     [:octicons-arrow-right-24: Caddy & Docker](caddy.md)
 
+-   :material-wrench:{ .lg .middle } **Interactive Setup**
+
+    ---
+
+    Bootstrap DB-managed configuration with `lhsetup`.
+
+    [:octicons-arrow-right-24: Setup Utility](lhsetup.md)
+
 -   :material-console:{ .lg .middle } **Command-Line Interface**
 
     ---

@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/middleware"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddResolveEndpoint adds a resolve endpoint
@@ -97,17 +98,18 @@ func (fed *LightHouse) AddResolveEndpoint(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for resolve endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(model.EndpointTypeResolve, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
 		fed.fedMetadata.FederationResolveEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeResolve, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil

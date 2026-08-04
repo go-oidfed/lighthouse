@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/pkg/errors"
@@ -114,10 +115,12 @@ func addSubordinate(_ *cobra.Command, args []string) error {
 	// because this will also verify the signature.
 	resolver := oidfed.TrustResolver{
 		TrustAnchors: oidfed.TrustAnchors{
-			{
-				EntityID: entityID,
-				JWKS:     entityJWKS,
-			},
+			func() *oidfed.TrustAnchor {
+				t := &oidfed.
+					TrustAnchor{EntityID: entityID}
+				t.SetJWKS(entityJWKS)
+				return t
+			}(),
 		},
 		StartingEntity: entityID,
 		Types:          entityTypes,
@@ -222,7 +225,7 @@ func manageSubordinateRequests(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 	if printFlag {
-		var str string
+		var str strings.Builder
 		for _, info := range pending {
 			printStr := info.EntityID
 			if !onlyIDs {
@@ -235,9 +238,9 @@ func manageSubordinateRequests(_ *cobra.Command, _ []string) error {
 					return err
 				}
 			}
-			str += fmt.Sprintf("%s\n", printStr)
+			str.WriteString(fmt.Sprintf("%s\n", printStr))
 		}
-		fmt.Printf("The following entities have pending requests:\n%s\n\n", str)
+		fmt.Printf("The following entities have pending requests:\n%s\n\n", str.String())
 		return nil
 	}
 
@@ -273,7 +276,7 @@ func stringSubordinateInfo(info model.ExtendedSubordinateInfo) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var generic map[string]interface{}
+	var generic map[string]any
 	if err = json.Unmarshal(data, &generic); err != nil {
 		return "", err
 	}

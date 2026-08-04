@@ -2,6 +2,7 @@ package adminapi
 
 import (
 	"encoding/json"
+	"slices"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -96,15 +97,15 @@ func (h *subordinateConstraintsHandlers) postAll(c *fiber.Ctx) error {
 			if !found || general == nil {
 				info.Constraints = &oidfed.ConstraintSpecification{}
 			} else {
-				copied := *general
-				info.Constraints = &copied
+				info.Constraints = new(*general)
 			}
 			if err = tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
 			result = info.Constraints
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("copied from general"), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("copied from general"),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -174,7 +175,8 @@ func (h *subordinateConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("max_path_length"), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("max_path_length"),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -199,7 +201,8 @@ func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error
 					return err
 				}
 				return RecordEvent(
-					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("max_path_length"), WithActor(GetActor(c)),
+					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("max_path_length"),
+					WithActor(GetActor(c)),
 				)
 			}
 			return nil
@@ -243,7 +246,8 @@ func (h *subordinateConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) erro
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("naming_constraints"), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("naming_constraints"),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -268,7 +272,8 @@ func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) e
 					return err
 				}
 				return RecordEvent(
-					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("naming_constraints"), WithActor(GetActor(c)),
+					tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("naming_constraints"),
+					WithActor(GetActor(c)),
 				)
 			}
 			return nil
@@ -314,7 +319,8 @@ func (h *subordinateConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) err
 			}
 			result = info.Constraints.AllowedEntityTypes
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -341,11 +347,9 @@ func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) er
 			if info.Constraints == nil {
 				info.Constraints = &oidfed.ConstraintSpecification{}
 			}
-			for _, t := range info.Constraints.AllowedEntityTypes {
-				if t == entityType {
-					result = info.Constraints.AllowedEntityTypes
-					return nil
-				}
+			if slices.Contains(info.Constraints.AllowedEntityTypes, entityType) {
+				result = info.Constraints.AllowedEntityTypes
+				return nil
 			}
 			info.Constraints.AllowedEntityTypes = append(info.Constraints.AllowedEntityTypes, entityType)
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
@@ -353,7 +357,8 @@ func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) er
 			}
 			result = info.Constraints.AllowedEntityTypes
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsUpdated, WithMessage("allowed_entity_types"),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -397,7 +402,8 @@ func (h *subordinateConstraintsHandlers) deleteAllowedEntityType(c *fiber.Ctx) e
 			}
 			result = info.Constraints.AllowedEntityTypes
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("allowed_entity_types"), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypeConstraintsDeleted, WithMessage("allowed_entity_types"),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -482,10 +488,8 @@ func (h *generalConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) error 
 	if cs == nil {
 		cs = &oidfed.ConstraintSpecification{}
 	}
-	for _, t := range cs.AllowedEntityTypes {
-		if t == entityType {
-			return c.Status(fiber.StatusCreated).JSON(cs.AllowedEntityTypes)
-		}
+	if slices.Contains(cs.AllowedEntityTypes, entityType) {
+		return c.Status(fiber.StatusCreated).JSON(cs.AllowedEntityTypes)
 	}
 	cs.AllowedEntityTypes = append(cs.AllowedEntityTypes, entityType)
 	if err := h.store.save(cs); err != nil {
@@ -621,7 +625,7 @@ func (h *generalConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) error
 // registerSubordinateConstraints registers subordinate-specific constraint endpoints.
 func registerSubordinateConstraints(r fiber.Router, storages model.Backends) {
 	g := r.Group("/subordinates/:subordinateID/constraints")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	h := &subordinateConstraintsHandlers{storages: storages}
 
@@ -647,7 +651,7 @@ func registerSubordinateConstraints(r fiber.Router, storages model.Backends) {
 // registerGeneralConstraints registers general constraint endpoints.
 func registerGeneralConstraints(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/constraints")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	store := &generalConstraintsStore{kv: kv}
 	h := &generalConstraintsHandlers{store: store}

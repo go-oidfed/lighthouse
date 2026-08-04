@@ -6,9 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
@@ -76,7 +77,7 @@ func publicCmd(args []string) int {
 		return 2
 	}
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 	if src == "" {
 		_, _ = fmt.Fprintln(os.Stderr, "--source is required")
@@ -91,13 +92,11 @@ func publicCmd(args []string) int {
 		fs.Usage()
 		return 2
 	}
-	log.WithFields(
-		log.Fields{
-			"source": src,
-			"dest":   dst,
-			"type":   typeID,
-		},
-	).Info("migrating public key storage")
+	log.Info().
+		Str("source", src).
+		Str("dest", dst).
+		Str("type", typeID).
+		Msg("migrating public key storage")
 
 	// Build source legacy storage wrapper
 	legacy := &public.LegacyPublicKeyStorage{
@@ -105,7 +104,7 @@ func publicCmd(args []string) int {
 		TypeID: typeID,
 	}
 	if err := legacy.Load(); err != nil {
-		log.WithError(err).Error("failed to load legacy public key storage")
+		log.Error().Err(err).Msg("failed to load legacy public key storage")
 		return 1
 	}
 
@@ -113,7 +112,7 @@ func publicCmd(args []string) int {
 	if strings.TrimSpace(destDB) == "" {
 		// Filesystem destination
 		if _, err := public.NewFilesystemPublicKeyStorageFromStorage(dst, typeID, legacy); err != nil {
-			log.WithError(err).Error("public key migration failed")
+			log.Error().Err(err).Msg("public key migration failed")
 			return 1
 		}
 	} else {
@@ -138,15 +137,15 @@ func publicCmd(args []string) int {
 		}
 		db, err := storage.Connect(cfg)
 		if err != nil {
-			log.WithError(err).Error("failed to connect to destination database")
+			log.Error().Err(err).Msg("failed to connect to destination database")
 			return 1
 		}
 		if _, err = storage.NewDBPublicKeyStorageFromStorage(db, typeID, legacy); err != nil {
-			log.WithError(err).Error("public key migration to DB failed")
+			log.Error().Err(err).Msg("public key migration to DB failed")
 			return 1
 		}
 	}
-	log.Info("public key migration completed")
+	log.Info().Msg("public key migration completed")
 	return 0
 }
 
@@ -236,7 +235,7 @@ func kmsCmd(args []string) int {
 		return 2
 	}
 	if verbose {
-		log.SetLevel(log.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 	if src == "" {
 		_, _ = fmt.Fprintln(os.Stderr, "--source is required")
@@ -297,17 +296,15 @@ func kmsCmd(args []string) int {
 		}
 		defaultAlg = alg
 	}
-	log.WithFields(
-		log.Fields{
-			"source":   src,
-			"dest":     dst,
-			"type":     typeID,
-			"algs":     algsStr,
-			"default":  defaultAlg.String(),
-			"generate": generate,
-			"pks-type": pksType,
-		},
-	).Info("migrating KMS")
+	log.Info().
+		Str("source", src).
+		Str("dest", dst).
+		Str("type", typeID).
+		Str("algs", algsStr).
+		Str("default", defaultAlg.String()).
+		Bool("generate", generate).
+		Str("pks-type", pksType).
+		Msg("migrating KMS")
 
 	// Prepare legacy KMS source
 	legacyKMS := &kms.LegacyFilesystemKMS{
@@ -316,7 +313,7 @@ func kmsCmd(args []string) int {
 		Algs:   algs,
 	}
 	if err = legacyKMS.Load(); err != nil {
-		log.WithError(err).Error("failed to load legacy KMS")
+		log.Error().Err(err).Msg("failed to load legacy KMS")
 		return 1
 	}
 
@@ -331,7 +328,7 @@ func kmsCmd(args []string) int {
 	if pksType == "fs" {
 		dstPKS, err = public.NewFilesystemPublicKeyStorageFromStorage(dst, typeID, legacyPKS)
 		if err != nil {
-			log.WithError(err).Error("failed to migrate public key storage for KMS (filesystem)")
+			log.Error().Err(err).Msg("failed to migrate public key storage for KMS (filesystem)")
 			return 1
 		}
 	} else {
@@ -344,12 +341,12 @@ func kmsCmd(args []string) int {
 		}
 		db, dbErr := storage.Connect(dbCfg)
 		if dbErr != nil {
-			log.WithError(dbErr).Error("failed to connect to destination database for public key storage")
+			log.Error().Err(dbErr).Msg("failed to connect to destination database for public key storage")
 			return 1
 		}
 		dstPKS, err = storage.NewDBPublicKeyStorageFromStorage(db, typeID, legacyPKS)
 		if err != nil {
-			log.WithError(err).Error("failed to migrate public key storage for KMS (database)")
+			log.Error().Err(err).Msg("failed to migrate public key storage for KMS (database)")
 			return 1
 		}
 	}
@@ -368,10 +365,10 @@ func kmsCmd(args []string) int {
 	}
 
 	if _, err = kms.NewFilesystemKMSFromBasic(legacyKMS, cfg, dstPKS); err != nil {
-		log.WithError(err).Error("KMS migration failed")
+		log.Error().Err(err).Msg("KMS migration failed")
 		return 1
 	}
-	log.Info("KMS migration completed")
+	log.Info().Msg("KMS migration completed")
 	return 0
 }
 

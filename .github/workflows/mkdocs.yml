@@ -8,6 +8,8 @@ on:
       - 'mkdocs.yml'
       - 'logo_dm.svg'
       - 'logo_lm.svg'
+    tags:
+      - 'v*'
 
 permissions:
   contents: write  # Needed to push to gh-pages
@@ -19,6 +21,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # mike needs full history for gh-pages branch
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,7 +31,19 @@ jobs:
 
       - name: Install MkDocs and theme
         run: |
-          pip install mkdocs mkdocs-material mkdocs-macros-plugin mkdocs-awesome-pages-plugin mkdocs-material[imaging] markdown-exec[ansi]
+          pip install mkdocs mkdocs-material mike mkdocs-macros-plugin mkdocs-awesome-pages-plugin mkdocs-material[imaging] markdown-exec[ansi]
 
-      - name: Deploy docs to GitHub Pages
-        run: mkdocs gh-deploy --force
+      - name: Configure git for mike
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Deploy docs (main)
+        if: github.ref == 'refs/heads/main'
+        run: mike deploy --push main
+
+      - name: Deploy docs (versioned release tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          mike deploy --push "${VERSION}" main --update-aliases

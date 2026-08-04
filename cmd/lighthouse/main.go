@@ -2,13 +2,12 @@ package main
 
 import (
 	"os"
-	"strings"
 	"time"
 
 	"github.com/go-oidfed/lib/cache"
-	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
 	oidfed "github.com/go-oidfed/lib"
 
@@ -27,47 +26,54 @@ func main() {
 	}
 	config.MustLoad(configFile)
 	logger.Init()
-	log.Info("Loaded Config")
+	log.Info().Msg("Loaded Config")
 	c := config.Get()
 
 	if err := initCache(&c.Caching); err != nil {
-		log.WithError(err).Fatal("failed to initialize cache")
+		log.Fatal().Err(err).Msg("failed to initialize cache")
 	}
 
-	backs, err := initStorage(&c.Storage, c.API.Admin.Argon2idParams, c.Endpoints.Auth.JTIBackend)
+	backs, err := initStorage(&c.Storage, c.API.Admin.Argon2idParams)
 	if err != nil {
-		log.WithError(err).Fatal("failed to initialize storage")
+		log.Fatal().Err(err).Msg("failed to initialize storage")
 	}
-
-	logStorageWarnings(c.Server, &c.Storage, &c.Caching)
 
 	statsOpts := c.Stats.ToAPIConfig()
 
 	if c.Stats.Enabled {
 		if err = storage.MigrateStatsFromBackends(backs); err != nil {
-			log.WithError(err).Warn("failed to migrate stats tables")
+			log.Warn().Err(err).Msg("failed to migrate stats tables")
 		}
 	}
 
 	lh, err := initLighthouse(&c, backs, statsOpts)
 	if err != nil {
-		log.WithError(err).Fatal("failed to initialize lighthouse")
+		log.Fatal().Err(err).Msg("failed to initialize lighthouse")
 	}
 
 	setupTrustMarkIssuer(lh, c.EntityID, &backs)
 
-	log.Info("Initialized Entity")
+	log.Info().Msg("Initialized Entity")
 
-	proactiveResolver, err := registerEndpoints(lh, &c, &backs)
-	if err != nil {
-		log.WithError(err).Fatal("failed to register endpoints")
+	// Build the trust anchor repository.
+	// The JWKS refresher is started after the repo is loaded.
+	if err = setupTrustAnchorRepo(lh, &backs); err != nil {
+		log.Fatal().Err(err).Msg("failed to setup trust anchor repository")
+	}
+	if err = startTAJWKSRefresher(lh, &backs); err != nil {
+		log.Fatal().Err(err).Msg("failed to start TA JWKS refresher")
 	}
 
-	log.Info("Added Endpoints")
-
-	if err = startBackgroundServices(proactiveResolver, &c); err != nil {
-		log.WithError(err).Fatal("failed to start background services")
+	// Load federation endpoints from the database.
+	if err = lh.LoadEndpointsFromDB(); err != nil {
+		log.Fatal().Err(err).Msg("failed to load endpoints from DB")
 	}
+
+	if err = startSubordinateJWKSRefresher(lh, &backs); err != nil {
+		log.Fatal().Err(err).Msg("failed to start subordinate JWKS refresher")
+	}
+
+	log.Info().Msg("Added Endpoints")
 
 	lh.Start()
 }
@@ -89,7 +95,7 @@ func initCache(caching *config.CachingConf) error {
 		); err != nil {
 			return err
 		}
-		log.Info("Loaded Redis Cache")
+		log.Info().Msg("Loaded Redis Cache")
 	}
 
 	if caching.MaxLifetime.Duration() != 0 {
@@ -100,7 +106,7 @@ func initCache(caching *config.CachingConf) error {
 }
 
 func initStorage(
-	storageConf *config.StorageConf, usersHash storage.Argon2idParams, jtiBackend storage.JTIStorageType,
+	storageConf *config.StorageConf, usersHash storage.Argon2idParams,
 ) (model.Backends, error) {
 	cfg := storage.Config{
 		Driver:         storageConf.Driver,
@@ -108,32 +114,16 @@ func initStorage(
 		DataDir:        storageConf.DataDir,
 		Debug:          storageConf.Debug,
 		UsersHash:      usersHash,
-		JTIStorageType: jtiBackend,
+		JTIStorageType: storageConf.EndpointAuth.JTIBackend,
 	}
 	return storage.LoadStorageBackends(cfg)
-}
-
-func logStorageWarnings(server lighthouse.ServerConf, storageConf *config.StorageConf, caching *config.CachingConf) {
-	if server.Prefork && storageConf.Driver == "sqlite" {
-		log.Warn(
-			"Using SQLite with prefork enabled may cause write conflicts. " +
-				"Consider using MySQL or PostgreSQL for production deployments with prefork.",
-		)
-	}
-
-	if server.Prefork && caching.RedisAddr == "" && !caching.Disabled {
-		log.Warn(
-			"Prefork is enabled without Redis cache. In-memory caches will be process-local " +
-				"and may lead to inconsistencies. It is strongly recommended to configure Redis " +
-				"for caching when using prefork mode.",
-		)
-	}
 }
 
 func initLighthouse(c *config.Config, backs model.Backends, statsConfig stats.Config) (
 	*lighthouse.LightHouse, error,
 ) {
 	c.Server.AdminTLS = c.API.Admin.TLS
+	c.Server.AccessLogWriter = logger.AccessLogger()
 
 	lh, err := lighthouse.NewLightHouse(
 		c.Server,
@@ -156,8 +146,8 @@ func initLighthouse(c *config.Config, backs model.Backends, statsConfig stats.Co
 	}
 
 	// Start JTI cleanup goroutine if using DB backend
-	if c.Endpoints.Auth.JTIBackend == storage.JTIStorageDB {
-		lh.SetJTICleanupStop(startJTICleanup(backs.JTI, c.Endpoints.Auth.JTICleanupInterval.Duration()))
+	if c.Storage.EndpointAuth.JTIBackend == storage.JTIStorageDB {
+		lh.SetJTICleanupStop(startJTICleanup(backs.JTI, c.Storage.EndpointAuth.JTICleanupInterval.Duration()))
 	}
 
 	lh.LogoBanner = c.Logging.Banner.Logo
@@ -175,173 +165,55 @@ func setupTrustMarkIssuer(lh *lighthouse.LightHouse, entityID string, backs *mod
 	if backs.TrustMarkSpecs != nil {
 		dbProvider := lighthouse.NewDBTrustMarkSpecProvider(backs.TrustMarkSpecs)
 		lh.TrustMarkIssuer.SetProvider(dbProvider)
-		log.Info("Configured DB-based TrustMarkSpecProvider")
+		log.Info().Msg("Configured DB-based TrustMarkSpecProvider")
 	}
 }
 
-func registerEndpoints(lh *lighthouse.LightHouse, c *config.Config, backs *model.Backends) (
-	*oidfed.ProactiveResolver, error,
-) {
-	var proactiveResolver *oidfed.ProactiveResolver
-
-	if endpoint := c.Endpoints.FetchEndpoint; endpoint.IsSet() {
-		if err := lh.AddFetchEndpoint(endpoint, backs.Subordinates); err != nil {
-			return nil, err
-		}
+// setupTrustAnchorRepo builds the trust anchor repository from the database.
+// Called in all processes (read-only cache).
+func setupTrustAnchorRepo(lh *lighthouse.LightHouse, backs *model.Backends) error {
+	if backs.TrustAnchors == nil {
+		log.Warn().Msg("Trust anchor storage not available; skipping TA repository setup")
+		return nil
 	}
-
-	if endpoint := c.Endpoints.ListEndpoint; endpoint.IsSet() {
-		if err := lh.AddSubordinateListingEndpoint(endpoint, backs.Subordinates, backs.TrustMarks); err != nil {
-			return nil, err
-		}
+	repo := lighthouse.NewTrustAnchorRepo(backs.TrustAnchors)
+	if err := repo.Load(); err != nil {
+		return errors.Wrap(err, "failed to load trust anchor repository")
 	}
-
-	if endpoint := c.Endpoints.ResolveEndpoint; endpoint.IsSet() {
-		if endpoint.ProactiveResolver.Enabled {
-			proactiveResolver = &oidfed.ProactiveResolver{
-				EntityID: c.EntityID,
-				Store: oidfed.ResolveStore{
-					BaseDir:   endpoint.ProactiveResolver.ResponseStorage.Dir,
-					StoreJWT:  endpoint.ProactiveResolver.ResponseStorage.StoreJWT,
-					StoreJSON: endpoint.ProactiveResolver.ResponseStorage.StoreJSON,
-				},
-				Signer:      lh.ResolveResponseSigner(),
-				RefreshLead: endpoint.GracePeriod.Duration(),
-				Concurrency: endpoint.ProactiveResolver.ConcurrencyLimit,
-				QueueSize:   endpoint.ProactiveResolver.QueueSize,
-			}
-		}
-		if err := lh.AddResolveEndpoint(
-			endpoint.EndpointConf, endpoint.AllowedTrustAnchors, proactiveResolver,
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkStatusEndpoint; endpoint.IsSet() {
-		if err := lh.AddTrustMarkStatusEndpoint(
-			endpoint, lighthouse.TrustMarkStatusConfig{
-				InstanceStore: backs.TrustMarkInstances,
-			},
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkedEntitiesListingEndpoint; endpoint.IsSet() {
-		if err := lh.AddTrustMarkedEntitiesListingEndpoint(endpoint, backs.TrustMarkInstances); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkEndpoint; endpoint.IsSet() {
-		eligibilityCache := lighthouse.NewEligibilityCache()
-		stopEligibilityCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
-		defer stopEligibilityCacheCleanup()
-
-		issuedTrustMarkCache := lighthouse.NewIssuedTrustMarkCache()
-		stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
-		defer stopIssuedCacheCleanup()
-
-		if err := lh.AddTrustMarkEndpointWithConfig(
-			endpoint, lighthouse.TrustMarkEndpointConfig{
-				Store:                backs.TrustMarks,
-				SpecStore:            backs.TrustMarkSpecs,
-				InstanceStore:        backs.TrustMarkInstances,
-				Cache:                eligibilityCache,
-				IssuedTrustMarkCache: issuedTrustMarkCache,
-			},
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.TrustMarkRequestEndpoint; endpoint.IsSet() {
-		if err := lh.AddTrustMarkRequestEndpoint(endpoint, backs.TrustMarks); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.HistoricalKeysEndpoint; endpoint.IsSet() {
-		if err := lh.AddHistoricalKeysEndpoint(endpoint); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.EnrollmentEndpoint; endpoint.IsSet() {
-		var checker lighthouse.EntityChecker
-		if checkerConfig := endpoint.CheckerConfig; checkerConfig.Type != "" {
-			var err error
-			checker, err = lighthouse.EntityCheckerFromEntityCheckerConfig(checkerConfig)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if err := lh.AddEnrollEndpoint(endpoint.EndpointConf, backs.Subordinates, checker); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.EnrollmentRequestEndpoint; endpoint.IsSet() {
-		if err := lh.AddEnrollRequestEndpoint(endpoint, backs.Subordinates); err != nil {
-			return nil, err
-		}
-	}
-
-	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() {
-		var collector oidfed.EntityCollector = &oidfed.SimpleEntityCollector{}
-		if endpoint.Interval.Duration() != 0 {
-			pec := &oidfed.PeriodicEntityCollector{
-				TrustAnchors: endpoint.AllowedTrustAnchors,
-				Interval:     endpoint.Interval.Duration(),
-				Concurrency:  endpoint.ConcurrencyLimit,
-			}
-			if endpoint.PaginationLimit > 0 {
-				pec.SortEntitiesComparisonFunc = func(a, b *oidfed.CollectedEntity) int {
-					return strings.Compare(a.EntityID, b.EntityID)
-				}
-				pec.PagingLimit = endpoint.PaginationLimit
-			}
-			if proactiveResolver != nil {
-				pec.Handler = proactiveResolver
-			}
-			collector = pec
-		}
-		if err := lh.AddEntityCollectionEndpoint(
-			endpoint.EndpointConf, collector, endpoint.AllowedTrustAnchors, endpoint.PaginationLimit > 0,
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	return proactiveResolver, nil
+	log.Info().Int("count", repo.Count()).Msg("Loaded trust anchor repository")
+	lh.SetTrustAnchorRepo(repo)
+	return nil
 }
 
-func startBackgroundServices(proactiveResolver *oidfed.ProactiveResolver, c *config.Config) error {
-	if proactiveResolver != nil && !fiber.IsChild() {
-		proactiveResolver.Start()
+// startTAJWKSRefresher starts the TA JWKS refresher.
+func startTAJWKSRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
+	repo := lh.TrustAnchorRepo()
+	if repo == nil || len(repo.AllWithJWKSUpdate()) == 0 {
+		log.Debug().Msg("No trust anchors with enable_jwks_update=true; skipping refresher")
+		return nil
 	}
-
-	if endpoint := c.Endpoints.EntityCollectionEndpoint; endpoint.IsSet() && endpoint.Interval.Duration() != 0 {
-		pec := &oidfed.PeriodicEntityCollector{
-			TrustAnchors: endpoint.AllowedTrustAnchors,
-			Interval:     endpoint.Interval.Duration(),
-			Concurrency:  endpoint.ConcurrencyLimit,
-		}
-		if endpoint.PaginationLimit > 0 {
-			pec.SortEntitiesComparisonFunc = func(a, b *oidfed.CollectedEntity) int {
-				return strings.Compare(a.EntityID, b.EntityID)
-			}
-			pec.PagingLimit = endpoint.PaginationLimit
-		}
-		if proactiveResolver != nil {
-			pec.Handler = proactiveResolver
-		}
-		if !fiber.IsChild() {
-			pec.Start()
-		}
+	dbJWKStorage := storage.NewDBJWKStorage(storage.NewTrustAnchorStorage(backs.DB))
+	refresher, err := lighthouse.SetupTAJWKSRefresher(repo, dbJWKStorage)
+	if err != nil {
+		return errors.Wrap(err, "failed to start TA JWKS refresher")
 	}
+	lh.SetTAJWKSRefresher(refresher)
+	return nil
+}
 
+// startSubordinateJWKSRefresher starts the subordinate JWKS refresher if
+// subordinate storage is available and any subordinates have
+// enable_jwks_update=true.
+func startSubordinateJWKSRefresher(lh *lighthouse.LightHouse, backs *model.Backends) error {
+	if backs.Subordinates == nil {
+		log.Debug().Msg("Subordinate storage not available; skipping subordinate JWKS refresher")
+		return nil
+	}
+	refresher, err := lighthouse.SetupSubordinateJWKSRefresher(backs.Subordinates, backs.SubordinateEvents)
+	if err != nil {
+		return errors.Wrap(err, "failed to start subordinate JWKS refresher")
+	}
+	lh.SetSubordinateJWKSRefresher(refresher)
 	return nil
 }
 
@@ -354,7 +226,7 @@ func startJTICleanup(jtiStorage model.JTIStorageBackend, interval time.Duration)
 			select {
 			case <-ticker.C:
 				if err := jtiStorage.Cleanup(); err != nil {
-					log.WithError(err).Warn("JTI cleanup failed")
+					log.Warn().Err(err).Msg("JTI cleanup failed")
 				}
 			case <-done:
 				ticker.Stop()

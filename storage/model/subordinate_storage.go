@@ -32,6 +32,8 @@ type SubordinateStorageBackend interface {
 	UpdateStatus(entityID string, status Status) error
 	UpdateStatusByDBID(id string, status Status) error
 	UpdateJWKSByDBID(id string, jwks JWKS) (*JWKS, error)
+	// UpdateJWKSByEntityID updates the JWKS for a subordinate by entity ID.
+	UpdateJWKSByEntityID(entityID string, jwks JWKS) error
 	Get(entityID string) (*ExtendedSubordinateInfo, error)
 	GetByDBID(id string) (*ExtendedSubordinateInfo, error)
 	GetAll() ([]BasicSubordinateInfo, error)
@@ -40,6 +42,10 @@ type SubordinateStorageBackend interface {
 	GetByAnyEntityType(entityTypes []string) ([]BasicSubordinateInfo, error)
 	GetByStatusAndEntityTypes(status Status, entityTypes []string) ([]BasicSubordinateInfo, error)
 	GetByStatusAndAnyEntityType(status Status, entityTypes []string) ([]BasicSubordinateInfo, error)
+	// ListEnabledForJWKSRefresh returns all subordinates with
+	// EnableJWKSUpdate=true, with their full ExtendedSubordinateInfo (including
+	// JWKS). Used by the subordinate JWKS refresher (approach A).
+	ListEnabledForJWKSRefresh() ([]ExtendedSubordinateInfo, error)
 	Load() error
 
 	// Additional claims CRUD for a specific subordinate

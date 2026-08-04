@@ -1,8 +1,11 @@
 package config
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
+	"github.com/zachmann/go-utils/duration"
 
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -20,6 +23,8 @@ import (
 //   - LH_STORAGE_PORT: Database port
 //   - LH_STORAGE_DB: Database name
 //   - LH_STORAGE_DEBUG: Enable debug logging
+//   - LH_STORAGE_ENDPOINT_AUTH_JTI_BACKEND: JTI storage backend ("cache" or "db")
+//   - LH_STORAGE_ENDPOINT_AUTH_JTI_CLEANUP_INTERVAL: Cleanup interval for DB backend (e.g., "1h")
 type StorageConf struct {
 	// Deprecated: Only used for discovering a migration need
 	BackendType string `yaml:"backend" envconfig:"-"`
@@ -38,6 +43,25 @@ type StorageConf struct {
 	// Debug enables debug logging.
 	// Env: LH_STORAGE_DEBUG
 	Debug bool `yaml:"debug" envconfig:"DEBUG"`
+	// EndpointAuth holds JTI storage configuration for endpoint authentication.
+	// Env prefix: LH_STORAGE_ENDPOINT_AUTH_
+	EndpointAuth EndpointAuthConf `yaml:"endpoint_auth" envconfig:"ENDPOINT_AUTH"`
+}
+
+// EndpointAuthConf holds JTI storage configuration for endpoint authentication.
+//
+// Environment variables (with prefix LH_STORAGE_ENDPOINT_AUTH_):
+//   - LH_STORAGE_ENDPOINT_AUTH_JTI_BACKEND: JTI storage backend ("cache" or "db")
+//   - LH_STORAGE_ENDPOINT_AUTH_JTI_CLEANUP_INTERVAL: Cleanup interval for DB backend (e.g., "1h")
+type EndpointAuthConf struct {
+	// JTIBackend specifies where to store used JTIs ("cache" or "db").
+	// Default: "cache"
+	// Env: LH_STORAGE_ENDPOINT_AUTH_JTI_BACKEND
+	JTIBackend storage.JTIStorageType `yaml:"jti_backend" envconfig:"JTI_BACKEND"`
+	// JTICleanupInterval is how often to clean up expired JTIs (DB backend only).
+	// Default: 1h
+	// Env: LH_STORAGE_ENDPOINT_AUTH_JTI_CLEANUP_INTERVAL
+	JTICleanupInterval duration.DurationOption `yaml:"jti_cleanup_interval" envconfig:"JTI_CLEANUP_INTERVAL"`
 }
 
 // users hashing parameters moved under api.admin.users_hash
@@ -68,20 +92,25 @@ var defaultStorageConf = StorageConf{
 		DB:   "lighthouse",
 	},
 	Debug: false,
+	EndpointAuth: EndpointAuthConf{
+		JTIBackend:         storage.JTIStorageCache,
+		JTICleanupInterval: duration.DurationOption(time.Hour),
+	},
 }
 
 // LoadStorageBackends loads and returns the storage backends for the passed Config
 func LoadStorageBackends(c StorageConf) (model.Backends, error) {
 	cfg := storage.Config{
-		Driver:  c.Driver,
-		DSN:     c.DSN,
-		DataDir: c.DataDir,
-		Debug:   c.Debug,
+		Driver:         c.Driver,
+		DSN:            c.DSN,
+		DataDir:        c.DataDir,
+		Debug:          c.Debug,
+		JTIStorageType: c.EndpointAuth.JTIBackend,
 	}
 	backs, err := storage.LoadStorageBackends(cfg)
 	if err != nil {
 		return model.Backends{}, err
 	}
-	log.Info("Loaded storage backend")
+	log.Info().Msg("Loaded storage backend")
 	return backs, nil
 }

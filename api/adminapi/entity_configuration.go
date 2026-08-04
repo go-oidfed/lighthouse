@@ -3,6 +3,7 @@ package adminapi
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -103,8 +104,7 @@ func (h *additionalClaimsHandlers) create(c *fiber.Ctx) error {
 	}
 	row, err := h.store.Create(req)
 	if err != nil {
-		var alreadyExists smodel.AlreadyExistsError
-		if errors.As(err, &alreadyExists) {
+		if _, ok := errors.AsType[smodel.AlreadyExistsError](err); ok {
 			return conflict(c, "additional claim already exists")
 		}
 		return serverError(c, err.Error())
@@ -133,12 +133,10 @@ func (h *additionalClaimsHandlers) update(c *fiber.Ctx) error {
 	}
 	updated, err := h.store.Update(id, req)
 	if err != nil {
-		var notFoundErr smodel.NotFoundError
-		if errors.As(err, &notFoundErr) {
+		if _, ok := errors.AsType[smodel.NotFoundError](err); ok {
 			return notFound(c, "additional claim not found")
 		}
-		var alreadyExists smodel.AlreadyExistsError
-		if errors.As(err, &alreadyExists) {
+		if _, ok := errors.AsType[smodel.AlreadyExistsError](err); ok {
 			return conflict(c, "additional claim already exists")
 		}
 		return serverError(c, err.Error())
@@ -335,9 +333,7 @@ func (h *metadataHandlers) postEntityType(c *fiber.Ctx) error {
 	if _, ok := meta[entityType]; !ok {
 		meta[entityType] = make(map[string]json.RawMessage)
 	}
-	for claim, raw := range body {
-		meta[entityType][claim] = raw
-	}
+	maps.Copy(meta[entityType], body)
 
 	if err := h.store.save(meta); err != nil {
 		return serverError(c, err.Error())

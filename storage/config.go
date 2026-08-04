@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/pkg/errors"
@@ -159,6 +160,10 @@ func Connect(cfg Config) (*gorm.DB, error) {
 		if dsn == "" {
 			dsn = filepath.Join(cfg.DataDir, "lighthouse.db")
 		}
+		// Enable foreign key enforcement (PRAGMA foreign_keys = ON) on every
+		// connection in the pool via the DSN. This is required for ON DELETE
+		// CASCADE and other FK constraint behavior to work on SQLite.
+		dsn = withSQLiteForeignKeyPragma(dsn)
 		dialector = sqlite.Open(dsn)
 	case DriverMySQL:
 		dialector = mysql.Open(cfg.DSN)
@@ -179,6 +184,20 @@ func Connect(cfg Config) (*gorm.DB, error) {
 			SkipDefaultTransaction: true,
 		},
 	)
+}
+
+// withSQLiteForeignKeyPragma appends _foreign_keys=on to the SQLite DSN so
+// that foreign key enforcement (including ON DELETE CASCADE) is active on
+// every connection in the pool. Existing query parameters are preserved.
+func withSQLiteForeignKeyPragma(dsn string) string {
+	const param = "_foreign_keys=on"
+	if strings.Contains(dsn, "_foreign_keys=") {
+		return dsn
+	}
+	if strings.Contains(dsn, "?") {
+		return dsn + "&" + param
+	}
+	return dsn + "?" + param
 }
 
 // LoadStorageBackends initializes a warehouse and returns grouped backends.
@@ -216,6 +235,8 @@ func (s *Storage) backendsWithDB(db *gorm.DB, withTransaction bool, jtiType JTIS
 		TrustMarkIssuers:    &TrustMarkIssuersStorage{db: db},
 		AdditionalClaims:    &AdditionalClaimsStorage{db: db},
 		PublishedTrustMarks: &PublishedTrustMarksStorage{db: db},
+		TrustAnchors:        NewTrustAnchorStorage(db),
+		FederationEndpoints: NewFederationEndpointStorage(db),
 		KV:                  &KeyValueStorage{db: db},
 		Users: &UsersStorage{
 			db:     db,

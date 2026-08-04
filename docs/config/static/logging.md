@@ -51,14 +51,26 @@ logging, i.e. logging related to what LightHouse does.
             dir: /var/log/lighthouse
             stderr: true
             level: info
-            smart:
-                enabled: true
-                dir: /var/log/lighthouse/errors
+            stderr_format: console
+            dir_format: json
     ```
 
-All configuration options from [`access`](#access) also can be used with 
-`internal`.
-In additional the following options can be used:
+### `dir`
+<span class="badge badge-purple" title="Value Type">directory path</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_DIR`</span>
+
+The `dir` option is used to configure the directory where the log file 
+should be stored.
+If not set, LightHouse will not log to file.
+
+### `stderr`
+<span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_STDERR`</span>
+
+The `stderr` option indicates if LightHouse logs to `stderr`.
 
 ### `level`
 <span class="badge badge-purple" title="Value Type">enum</span>
@@ -76,42 +88,37 @@ Valid values are:
 - `trace`
 - `debug`
 - `info`
-- `warn` / `warning`
+- `warn` 
 - `error`
 - `fatal`
 - `panic`
 
-### `smart`
-
-Under the `smart` option 'smart' logging can be enabled and configured. 
-Smart logging allows to have a higher (less verbose) log level set for 
-general (internal) logging without loosing valuable debug information in 
-case errors occure.
-
-If smart logging is enabled, the general logs are still done with the level 
-set through the [`level`](#level) option, but if an error occurs a special 
-error log is created to a dedicated file. This dedicated error log contains 
-all log entries - including all log levels, also levels that normally woud 
-not be logged - for that particular request.
-
-#### `enabled`
-<span class="badge badge-purple" title="Value Type">boolean</span>
-<span class="badge badge-blue" title="Default Value">`false`</span>
+### `stderr_format`
+<span class="badge badge-purple" title="Value Type">enum</span>
+<span class="badge badge-blue" title="Default Value">console</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
-<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_SMART_ENABLED`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_STDERR_FORMAT`</span>
 
-The `enabled` option is used to enable smart logging.
+The `stderr_format` option selects the output format for logs written to
+stderr.
 
-#### `dir`
-<span class="badge badge-purple" title="Value Type">directory path</span>
-<span class="badge badge-blue" title="Default Value">same as the internal logging dir</span>
+Valid values are:
+
+- `console` — human-friendly, colored console output (default)
+- `json` — structured JSON output for machine parsing
+
+### `dir_format`
+<span class="badge badge-purple" title="Value Type">enum</span>
+<span class="badge badge-blue" title="Default Value">json</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
-<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_SMART_DIR`</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_LOGGING_INTERNAL_DIR_FORMAT`</span>
 
-The `dir` option is used to specify the directory where smart error log 
-files should be stored.
-If not set and smart logging is enabled, smart error logs are placed in the 
-same directory as the regular internal log file.
+The `dir_format` option selects the output format for logs written to file.
+
+Valid values are:
+
+- `json` — structured JSON output for machine parsing (default)
+- `console` — human-friendly console output (without ANSI color codes)
 
 ## `banner`
 <span class="badge badge-purple" title="Value Type">object</span>

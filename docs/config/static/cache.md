@@ -59,6 +59,7 @@ depending on your Redis setup.
 
 ## `redis_db`
 <span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">0</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
 <span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_REDIS_DB`</span>
 
@@ -76,6 +77,7 @@ Redis instance with other applications.
 
 ## `disabled`
 <span class="badge badge-purple" title="Value Type">boolean</span>
+<span class="badge badge-blue" title="Default Value">`false`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
 <span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_DISABLED`</span>
 
@@ -93,7 +95,7 @@ Disables caching entirely when set to `true`. Lighthouse uses a no-op cache and 
     ```
 
 ## `max_lifetime`
-<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
+<span class="badge badge-purple" title="Value Type">[duration](../index.md#time-duration-configuration-options)</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
 <span class="badge badge-cyan" title="Environment Variable">`LH_CACHE_MAX_LIFETIME`</span>
 

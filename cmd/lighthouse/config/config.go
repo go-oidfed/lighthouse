@@ -6,7 +6,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/fileutils"
 	"gopkg.in/yaml.v3"
 
@@ -25,12 +25,10 @@ import (
 // Environment variables (with prefix LH_):
 //   - LH_ENTITY_ID: Entity identifier URL
 //   - LH_SERVER_*: Server configuration (see ServerConf)
-//   - LH_LOGGING_*: Logging configuration (see loggingConf)
+//   - LH_LOGGING_*: Logging configuration (see loggingConf internal + banner)
 //   - LH_STORAGE_*: Storage configuration (see StorageConf)
 //   - LH_CACHE_*: Caching configuration (see CachingConf)
 //   - LH_SIGNING_*: Signing configuration (see SigningConf)
-//   - LH_ENDPOINTS_*: Endpoints configuration (see Endpoints)
-//   - LH_FEDERATION_DATA_*: Federation configuration (see federationConf)
 //   - LH_API_*: API configuration (see apiConf)
 //   - LH_STATS_*: Statistics configuration (see StatsConf)
 type Config struct {
@@ -44,7 +42,7 @@ type Config struct {
 	// Env prefix: LH_LOGGING_
 	Logging loggingConf `yaml:"logging" envconfig:"LOGGING"`
 	// Storage holds storage configuration.
-	// Env prefix: LH_SERVER_
+	// Env prefix: LH_STORAGE_
 	Storage StorageConf `yaml:"storage" envconfig:"STORAGE"`
 	// Caching holds caching configuration.
 	// Env prefix: LH_CACHE_
@@ -52,9 +50,6 @@ type Config struct {
 	// Signing holds signing configuration.
 	// Env prefix: LH_SIGNING_
 	Signing SigningConf `yaml:"signing" envconfig:"SIGNING"`
-	// Endpoints holds endpoints configuration.
-	// Env prefix: LH_ENDPOINTS_
-	Endpoints Endpoints `yaml:"endpoints" envconfig:"ENDPOINTS"`
 	// API holds API configuration.
 	// Env prefix: LH_API_
 	API apiConf `yaml:"api" envconfig:"API"`
@@ -99,13 +94,12 @@ func (c *Config) Validate() error {
 }
 
 var c = Config{
-	Server:    defaultServerConf,
-	Logging:   defaultLoggingConf,
-	Storage:   defaultStorageConf,
-	Signing:   defaultSigningConf,
-	Endpoints: defaultEndpointConf,
-	API:       defaultAPIConf,
-	Stats:     defaultStatsConf,
+	Server:  defaultServerConf,
+	Logging: defaultLoggingConf,
+	Storage: defaultStorageConf,
+	Signing: defaultSigningConf,
+	API:     defaultAPIConf,
+	Stats:   defaultStatsConf,
 }
 
 // Get returns the Config
@@ -179,6 +173,6 @@ func Load(filename string) error {
 // This should only be called from main() or init() functions.
 func MustLoad(filename string) {
 	if err := Load(filename); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 }

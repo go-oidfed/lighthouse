@@ -1,0 +1,8 @@
+arrange:
+  - index.md
+  - signing.md
+  - entity-configuration.md
+  - trust-marks.md
+  - trust-anchors.md
+  - federation-endpoints.md
+  - subordinates.md

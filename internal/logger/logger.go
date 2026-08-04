@@ -4,11 +4,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/writer"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/cmd/lighthouse/config"
 )
@@ -44,6 +45,17 @@ func MustUpdateAccessLogger() {
 	accessLogger.SetOutput(mustGetAccessLogger())
 }
 
+// AccessLogger returns the shared access log writer. Both the main server and
+// the admin API server should use this as the output for their fiber logger
+// middleware so that MustUpdateAccessLogger swaps the underlying writer for
+// both at once.
+func AccessLogger() io.Writer {
+	if accessLogger == nil {
+		return io.Discard
+	}
+	return accessLogger
+}
+
 func mustGetAccessLogger() io.Writer {
 	return mustGetLogWriter(config.Get().Logging.Access, "access.log")
 }
@@ -57,12 +69,6 @@ func (w *exchangeableWriter) SetOutput(out io.Writer) {
 	w.Writer = out
 }
 
-type nullWriter struct{}
-
-func (nullWriter) Write([]byte) (n int, err error) {
-	return 0, nil
-}
-
 func mustGetLogWriter(logConf config.LoggerConf, logfileName string) io.Writer {
 	var loggers []io.Writer
 	if logConf.StdErr {
@@ -73,7 +79,7 @@ func mustGetLogWriter(logConf config.LoggerConf, logfileName string) io.Writer {
 	}
 	switch len(loggers) {
 	case 0:
-		return nullWriter{}
+		return io.Discard
 	case 1:
 		return loggers[0]
 	default:
@@ -81,29 +87,36 @@ func mustGetLogWriter(logConf config.LoggerConf, logfileName string) io.Writer {
 	}
 }
 
-func parseLogLevel() log.Level {
-	logLevel := config.Get().Logging.Internal.Level
-	level, err := log.ParseLevel(logLevel)
+func parseLogLevel() zerolog.Level {
+	logLevel := strings.ToLower(config.Get().Logging.Internal.Level)
+	level, err := zerolog.ParseLevel(logLevel)
 	if err != nil {
-		log.WithField("level", logLevel).WithError(err).Error("Unknown log level")
-		return log.InfoLevel
+		log.Error().Str("level", logLevel).Err(err).Msg("Unknown log level")
+		return zerolog.InfoLevel
 	}
 	return level
 }
 
+// buildLogWriter wraps out with the appropriate zerolog writer for the given
+// format. "json" (or empty) passes raw JSON through; any other value produces
+// a zerolog.ConsoleWriter. noColor disables ANSI color codes (for file output).
+func buildLogWriter(out io.Writer, format string, noColor bool) io.Writer {
+	switch strings.ToLower(format) {
+	case "json", "":
+		return out
+	default: // "console"
+		return zerolog.ConsoleWriter{
+			Out:        out,
+			NoColor:    noColor,
+			TimeFormat: zerolog.TimeFieldFormat,
+		}
+	}
+}
+
 // Init initializes the logger
 func Init() {
-	log.SetLevel(log.TraceLevel) // This is not the log level for logs, this just asserts that hooks with all levels can
-	// be triggered
-
-	log.SetFormatter(
-		&log.TextFormatter{
-			DisableColors: true,
-			ForceQuote:    true,
-			FullTimestamp: true,
-		},
-	)
 	SetOutput()
+	MustGetAccessLogger()
 	if DebugEnabled() {
 		oidfed.EnableDebugLogging()
 	}
@@ -112,25 +125,40 @@ func Init() {
 // SetOutput sets the logging output
 func SetOutput() {
 	logLevel := parseLogLevel()
-	log.SetReportCaller(log.DebugLevel <= logLevel)
-	log.StandardLogger().Hooks = make(log.LevelHooks)
-	log.AddHook(
-		&writer.Hook{
-			Writer:    mustGetLogWriter(config.Get().Logging.Internal.LoggerConf, "lighthouse.log"),
-			LogLevels: minLogLevelToLevels(logLevel),
-		},
-	)
-	log.SetOutput(io.Discard)
+	zerolog.SetGlobalLevel(logLevel)
+
+	conf := config.Get().Logging.Internal
+
+	var writers []io.Writer
+	if conf.StdErr {
+		writers = append(writers, buildLogWriter(os.Stderr, conf.StdErrFormat, false))
+	}
+	if conf.Dir != "" {
+		file := mustGetFile(filepath.Join(conf.Dir, "lighthouse.log"))
+		writers = append(writers, buildLogWriter(file, conf.DirFormat, true))
+	}
+
+	var writer io.Writer
+	switch len(writers) {
+	case 0:
+		writer = io.Discard
+	case 1:
+		writer = writers[0]
+	default:
+		writer = io.MultiWriter(writers...)
+	}
+
+	ctx := log.With().Timestamp()
+	if logLevel <= zerolog.DebugLevel {
+		ctx = ctx.Caller()
+	}
+	log.Logger = ctx.Logger().Output(writer)
+
+	// Wire the lib's logger to the same output and level.
+	oidfed.SetLogOutput(writer)
+	oidfed.SetLogLevel(logLevel)
 }
 
 func DebugEnabled() bool {
-	logLevel := parseLogLevel()
-	return log.DebugLevel <= logLevel
-}
-
-func minLogLevelToLevels(minLevel log.Level) (levels []log.Level) {
-	for l := log.PanicLevel; l <= minLevel; l++ {
-		levels = append(levels, l)
-	}
-	return
+	return parseLogLevel() <= zerolog.DebugLevel
 }

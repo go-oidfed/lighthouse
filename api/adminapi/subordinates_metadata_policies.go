@@ -2,6 +2,8 @@ package adminapi
 
 import (
 	"encoding/json"
+	"maps"
+	"slices"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
@@ -111,9 +113,7 @@ func (h *generalPolicyHandlers) postEntityType(c *fiber.Ctx) error {
 	if existing == nil {
 		existing = oidfed.MetadataPolicy{}
 	}
-	for claim, ops := range body {
-		existing[claim] = ops
-	}
+	maps.Copy(existing, body)
 	setMetadataPolicy(mp, et, existing)
 	if err = h.store.save(mp); err != nil {
 		return writeServerError(c, err)
@@ -186,9 +186,7 @@ func (h *generalPolicyHandlers) postClaim(c *fiber.Ctx) error {
 	if existing == nil {
 		existing = oidfed.MetadataPolicyEntry{}
 	}
-	for op, val := range body {
-		existing[op] = val
-	}
+	maps.Copy(existing, body)
 	setMetadataPolicyEntry(mp, et, claim, existing)
 	if err := h.store.save(mp); err != nil {
 		return writeServerError(c, err)
@@ -348,15 +346,15 @@ func (h *subordinatePolicyHandlers) postAll(c *fiber.Ctx) error {
 			if !found || general == nil {
 				info.MetadataPolicy = &oidfed.MetadataPolicies{}
 			} else {
-				copied := *general
-				info.MetadataPolicy = &copied
+				info.MetadataPolicy = new(*general)
 			}
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
 			result = info.MetadataPolicy
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("copied from general"), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("copied from general"),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -429,7 +427,8 @@ func (h *subordinatePolicyHandlers) putEntityType(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -461,16 +460,15 @@ func (h *subordinatePolicyHandlers) postEntityType(c *fiber.Ctx) error {
 			if existing == nil {
 				existing = oidfed.MetadataPolicy{}
 			}
-			for claim, ops := range body {
-				existing[claim] = ops
-			}
+			maps.Copy(existing, body)
 			setMetadataPolicy(info.MetadataPolicy, et, existing)
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
 			result = existing
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage("entity type: "+et),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -498,7 +496,8 @@ func (h *subordinatePolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage("entity type: "+et), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage("entity type: "+et),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -551,7 +550,10 @@ func (h *subordinatePolicyHandlers) putClaim(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim), WithActor(GetActor(c)))
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim),
+				WithActor(GetActor(c)),
+			)
 		},
 	)
 	if err != nil {
@@ -587,16 +589,17 @@ func (h *subordinatePolicyHandlers) postClaim(c *fiber.Ctx) error {
 			if existing == nil {
 				existing = oidfed.MetadataPolicyEntry{}
 			}
-			for op, v := range body {
-				existing[op] = v
-			}
+			maps.Copy(existing, body)
 			policy[claim] = existing
 			setMetadataPolicy(info.MetadataPolicy, et, policy)
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
 			result = existing
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim), WithActor(GetActor(c)))
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim),
+				WithActor(GetActor(c)),
+			)
 		},
 	)
 	if err != nil {
@@ -631,7 +634,10 @@ func (h *subordinatePolicyHandlers) deleteClaim(c *fiber.Ctx) error {
 			if err := tx.Subordinates.Update(info.EntityID, *info); err != nil {
 				return err
 			}
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim), WithActor(GetActor(c)))
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim),
+				WithActor(GetActor(c)),
+			)
 		},
 	)
 	if err != nil {
@@ -707,7 +713,8 @@ func (h *subordinatePolicyHandlers) putOperator(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim+"."+string(op)), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyUpdated, WithMessage(et+"."+claim+"."+string(op)),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -756,7 +763,8 @@ func (h *subordinatePolicyHandlers) deleteOperator(c *fiber.Ctx) error {
 				return err
 			}
 			return RecordEvent(
-				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim+"."+string(op)), WithActor(GetActor(c)),
+				tx.SubordinateEvents, info.ID, model.EventTypePolicyDeleted, WithMessage(et+"."+claim+"."+string(op)),
+				WithActor(GetActor(c)),
 			)
 		},
 	)
@@ -815,10 +823,8 @@ func (h *metadataPolicyCritHandlers) post(c *fiber.Ctx) error {
 	if err != nil {
 		return writeServerError(c, err)
 	}
-	for _, op := range operators {
-		if op == operator {
-			return writeConflict(c, "operator already exists")
-		}
+	if slices.Contains(operators, operator) {
+		return writeConflict(c, "operator already exists")
 	}
 	operators = append(operators, operator)
 	if err := h.save(operators); err != nil {
@@ -853,7 +859,7 @@ func (h *metadataPolicyCritHandlers) delete(c *fiber.Ctx) error {
 // registerGeneralMetadataPolicies registers general metadata policy endpoints (no subordinateID).
 func registerGeneralMetadataPolicies(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/metadata-policies")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	store := &generalMetadataPolicyStore{kv: kv}
 	h := &generalPolicyHandlers{store: store}
@@ -880,7 +886,7 @@ func registerGeneralMetadataPolicies(r fiber.Router, kv model.KeyValueStore) {
 // registerSubordinateMetadataPolicies registers subordinate-specific metadata policy endpoints.
 func registerSubordinateMetadataPolicies(r fiber.Router, storages model.Backends) {
 	g := r.Group("/subordinates/:subordinateID/metadata-policies")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(storages.Subordinates))
 
 	h := &subordinatePolicyHandlers{storages: storages}
 
@@ -907,7 +913,7 @@ func registerSubordinateMetadataPolicies(r fiber.Router, storages model.Backends
 // registerSubordinateMetadataPolicyCrit registers general metadata policy crit endpoints.
 func registerSubordinateMetadataPolicyCrit(r fiber.Router, kv model.KeyValueStore) {
 	g := r.Group("/subordinates/metadata-policy-crit")
-	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware)
+	withCacheWipe := g.Use(subordinateStatementsCacheInvalidationMiddleware(nil))
 
 	h := &metadataPolicyCritHandlers{kv: kv}
 

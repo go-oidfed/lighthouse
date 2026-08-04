@@ -13,6 +13,7 @@ import (
 	"tideland.dev/go/slices"
 
 	"github.com/go-oidfed/lighthouse/middleware"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddEntityCollectionEndpoint adds an entity collection endpoint
@@ -21,7 +22,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 	allowedTrustAnchors []string, paginationSupported bool,
 ) error {
 	if fed.fedMetadata.Extra == nil {
-		fed.fedMetadata.Extra = make(map[string]interface{})
+		fed.fedMetadata.Extra = make(map[string]any)
 	}
 	fed.fedMetadata.Extra["federation_collection_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
@@ -101,17 +102,20 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for entity collection endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(
+			model.EndpointTypeEntityCollection, endpoint.Path, fiber.MethodPost, handler, auth.Middleware(),
+		)
 		fed.fedMetadata.Extra["federation_collection_endpoint_auth_methods"] = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeEntityCollection, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil

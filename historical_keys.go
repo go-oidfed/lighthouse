@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/middleware"
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // AddHistoricalKeysEndpoint adds the federation historical keys endpoint
@@ -60,17 +61,18 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) error {
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for historical keys endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(model.EndpointTypeHistoricalKeys, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
 		fed.fedMetadata.FederationHistoricalLKeysEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeHistoricalKeys, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil

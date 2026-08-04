@@ -38,6 +38,8 @@ type Backends struct {
 	TrustMarkIssuers    TrustMarkIssuersStore
 	AdditionalClaims    AdditionalClaimsStore
 	PublishedTrustMarks PublishedTrustMarksStore
+	TrustAnchors        TrustAnchorStore
+	FederationEndpoints FederationEndpointStore
 	KV                  KeyValueStore
 	Users               UsersStore
 	PKStorages          func(string) public.PublicKeyStorage

@@ -2797,6 +2797,45 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: updateSubordinateDetails
       summary: Update subordinate details
+      description: |
+        Updates fields of an existing subordinate. The request body uses partial-update
+        semantics: only fields that are present in the body are changed; omitted fields
+        are left unchanged. `null` clears a nullable field.
+
+        `PATCH` is the preferred verb for partial updates (see `patchSubordinateDetails`).
+        `PUT` is retained for backward compatibility and accepts the same partial-update body.
+    patch:
+      tags:
+        - Subordinates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubordinate'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateDetails'
+          description: Successfully patched subordinate details.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: patchSubordinateDetails
+      summary: Patch subordinate details
+      description: |
+        Partially updates fields of an existing subordinate. Only fields present in
+        the request body are changed; omitted fields (and `null` for nullable fields)
+        are left unchanged. Set `jwks_poll_interval` to `0` to clear it (resetting the
+        poll interval to be derived from the Entity Configuration expiration time).
+
+        This is the preferred verb for partial updates. `PUT` accepts the same body for
+        backward compatibility.
     delete:
       tags:
         - Subordinates
@@ -4194,8 +4233,268 @@ paths:
           $ref: '#/components/schemas/MetadataPolicyOperatorName'
         in: path
         required: true
+  /api/v1/admin/trust-anchors:
+    summary: Manage the trust anchor repository.
+    description: List and create trust anchors.
+    get:
+      tags:
+        - Trust Anchors
+      responses:
+        '200':
+          description: List of trust anchors.
+      operationId: listTrustAnchors
+      summary: List trust anchors
+    post:
+      tags:
+        - Trust Anchors
+      responses:
+        '201':
+          description: Trust anchor created.
+        '409':
+          description: Trust anchor already exists.
+      operationId: createTrustAnchor
+      summary: Create a trust anchor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustAnchor'
+  /api/v1/admin/trust-anchors/{entityID}:
+    summary: Manage a single trust anchor.
+    description: Get, update, or delete a trust anchor by entity ID.
+    get:
+      tags:
+        - Trust Anchors
+      responses:
+        '200':
+          description: Trust anchor details.
+        '404':
+          description: Trust anchor not found.
+      operationId: getTrustAnchor
+      summary: Get a trust anchor
+    put:
+      tags:
+        - Trust Anchors
+      responses:
+        '200':
+          description: Trust anchor updated.
+        '404':
+          description: Trust anchor not found.
+      operationId: updateTrustAnchor
+      summary: Update a trust anchor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTrustAnchor'
+    delete:
+      tags:
+        - Trust Anchors
+      responses:
+        '204':
+          description: Trust anchor deleted.
+        '404':
+          description: Trust anchor not found.
+      operationId: deleteTrustAnchor
+      summary: Delete a trust anchor
+    parameters:
+      - name: entityID
+        description: The entity ID of the trust anchor.
+        schema:
+          type: string
+        in: path
+        required: true
+  /api/v1/admin/federation-endpoints:
+    summary: Manage federation endpoints.
+    description: List and create federation endpoint configurations.
+    get:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: List of federation endpoints.
+      operationId: listFederationEndpoints
+      summary: List federation endpoints
+    post:
+      tags:
+        - Federation Endpoints
+      responses:
+        '201':
+          description: Federation endpoint created.
+        '409':
+          description: Federation endpoint already exists.
+      operationId: createFederationEndpoint
+      summary: Create a federation endpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFederationEndpoint'
+  /api/v1/admin/federation-endpoints/{type}:
+    summary: Manage a single federation endpoint by type.
+    description: Get, update, or delete a federation endpoint by type.
+    get:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: Federation endpoint details.
+        '404':
+          description: Federation endpoint not found.
+      operationId: getFederationEndpoint
+      summary: Get a federation endpoint
+    put:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: Federation endpoint updated.
+        '404':
+          description: Federation endpoint not found.
+      operationId: updateFederationEndpoint
+      summary: Update a federation endpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFederationEndpoint'
+    delete:
+      tags:
+        - Federation Endpoints
+      responses:
+        '204':
+          description: Federation endpoint deleted.
+        '404':
+          description: Federation endpoint not found.
+      operationId: deleteFederationEndpoint
+      summary: Delete a federation endpoint
+    parameters:
+      - name: type
+        description: >
+          The endpoint type. One of: fetch, list, resolve, trust_mark,
+          trust_mark_status, trust_mark_listing, historical_keys, enroll,
+          enroll_request, trust_mark_request, entity_collection,
+          jwks_update_trigger, jwks_update.
+        schema:
+          type: string
+        in: path
+        required: true
+  /api/v1/admin/federation-endpoints/{type}/auth-trust-anchors:
+    summary: Set auth trust anchors for an endpoint.
+    description: Replace the trust anchors used for endpoint authentication.
+    put:
+      tags:
+        - Federation Endpoints
+      responses:
+        '200':
+          description: Auth trust anchors updated.
+        '404':
+          description: Federation endpoint or trust anchor not found.
+      operationId: setFederationEndpointAuthTrustAnchors
+      summary: Set auth trust anchors for a federation endpoint
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: integer
+    parameters:
+      - name: type
+        description: The endpoint type.
+        schema:
+          type: string
+        in: path
+        required: true
 components:
   schemas:
+    AddTrustAnchor:
+      description: Request payload to create/update a trust anchor.
+      type: object
+      required:
+        - entity_id
+      properties:
+        entity_id:
+          type: string
+          description: The entity ID of the trust anchor.
+        jwks:
+          type: object
+          description: Optional initial JWKS for the trust anchor.
+        enable_jwks_update:
+          type: boolean
+          description: Enable automatic JWKS refreshing for this trust anchor.
+          default: false
+        key_poll_interval:
+          type: integer
+          description: Polling interval in seconds (0 = derive from EC expiration).
+          default: 0
+    AddFederationEndpoint:
+      description: |
+        Request payload to create/update a federation endpoint.
+
+        Endpoint types: fetch, list, resolve, trust_mark, trust_mark_status,
+        trust_mark_listing, historical_keys, enroll, enroll_request,
+        trust_mark_request, entity_collection, jwks_update_trigger,
+        jwks_update.
+
+        Notes on the JWKS-refresh endpoints:
+          - jwks_update_trigger (approach B): a POST trigger that tells
+            Lighthouse to re-fetch the subordinate's JWKS from its Entity
+            Configuration. Supports auth_enabled (private_key_jwt); when auth
+            is enabled the authenticated client entity is the target,
+            otherwise the subordinate is identified by "sub" in the body.
+            Published in federation_entity metadata as
+            "federation_jwks_update_trigger_endpoint".
+          - jwks_update (approach C): a POST endpoint that accepts a signed
+            JWK Set (application/jwk-set+jwt, typ jwk-set+jwt) from the
+            subordinate containing its new federation keys. The JWT must be
+            signed with one of the subordinate's currently known federation
+            keys. auth_enabled is not used (the signature is the
+            authentication). Published in federation_entity metadata as
+            "federation_jwks_update_endpoint".
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: >
+            Endpoint type. One of: fetch, list, resolve, trust_mark,
+            trust_mark_status, trust_mark_listing, historical_keys, enroll,
+            enroll_request, trust_mark_request, entity_collection,
+            jwks_update_trigger, jwks_update.
+          enum:
+            - fetch
+            - list
+            - resolve
+            - trust_mark
+            - trust_mark_status
+            - trust_mark_listing
+            - historical_keys
+            - enroll
+            - enroll_request
+            - trust_mark_request
+            - entity_collection
+            - jwks_update_trigger
+            - jwks_update
+        path:
+          type: string
+          description: Internal path for the endpoint (nullable; null = disabled).
+        url:
+          type: string
+          description: External URL for the endpoint (nullable; auto-derived from path if null).
+        auth_enabled:
+          type: boolean
+          description: Enable private_key_jwt authentication for this endpoint.
+          default: false
+        config:
+          type: string
+          description: JSON blob with type-specific configuration.
+        auth_trust_anchor_ids:
+          type: array
+          items:
+            type: integer
+          description: Trust anchor IDs used for endpoint authentication.
     PublicKeyEntry:
       description: A public key entry managed by the API.
       type: object
@@ -4364,18 +4663,28 @@ components:
     SignatureAlgorithm:
       description: The signature algorithm to use in JOSE/JWA format
       enum:
-        - HS256
-        - HS384
-        - HS512
-        - RS256
-        - RS384
-        - RS512
+        - ES512
         - ES256
         - ES384
-        - ES512
+        - ES256K
+        - EdDSA
+        - Ed25519
+        - Ed448
+        - PS512
         - PS256
         - PS384
-        - PS512
+        - RS512
+        - RS384
+        - RS256
+        - ML-DSA-44
+        - ML-DSA-65
+        - ML-DSA-87
+        - ML-DSA-44-ES256
+        - ML-DSA-65-ES256
+        - ML-DSA-87-ES384
+        - ML-DSA-44-Ed25519
+        - ML-DSA-65-Ed25519
+        - ML-DSA-87-Ed448
       type: string
       example: ES512
     
@@ -4424,6 +4733,29 @@ components:
           format: int64
           description: Overlap window where old and new keys are both valid, in seconds.
           example: 604800
+        key_announcement_lead_time:
+          type: integer
+          format: int64
+          nullable: true
+          description: >
+            Fixed duration (in seconds) how far in advance a new key is published
+            in the JWKS before it becomes the active signing key. If set, this
+            takes precedence over the default but is overridden by
+            key_announcement_lead_time_ec_multiplier if that is also set.
+            Must be at least the entity configuration lifetime; if shorter, the
+            EC lifetime is used as a minimum and a warning is logged.
+          example: 86400
+        key_announcement_lead_time_ec_multiplier:
+          type: number
+          format: float
+          nullable: true
+          description: >
+            Multiplier for the entity configuration lifetime to compute the key
+            announcement lead time. If set and greater than 0, this takes
+            precedence over key_announcement_lead_time. For example, 5 means the
+            new key is published 5 EC lifetimes before it becomes active.
+            The result is clamped to a minimum of the EC lifetime.
+          example: 5
     
     Jwk:
       required:
@@ -4798,11 +5130,25 @@ components:
           type: array
           items:
             type: string
+        enable_jwks_update:
+          type: boolean
+          description: >
+            Whether periodic JWKS refreshing (approach A) is enabled for this
+            subordinate.
+          default: false
+        jwks_poll_interval:
+          type: integer
+          description: >
+            Per-subordinate poll interval in seconds for JWKS refreshing.
+            0 (or omitted) means the interval is derived from the Entity
+            Configuration expiration time.
       example:
         entity_id: https://subordinate.example.com
         registered_entity_types:
           - openid_provider
           - openid_relying_party
+        enable_jwks_update: true
+        jwks_poll_interval: 3600
     AddSubordinate:
       description: |
         Data to create a new subordinate entity.
@@ -4837,12 +5183,29 @@ components:
         jwks:
           $ref: '#/components/schemas/Jwks'
           description: JWKS for the subordinate. Required if status is "active".
+        enable_jwks_update:
+          type: boolean
+          description: >
+            Enable periodic JWKS refreshing (approach A) for this subordinate.
+            When true, Lighthouse polls the subordinate's Entity Configuration
+            and updates the stored JWKS on change. Also required for the
+            federation_jwks_update_trigger_endpoint (approach B) to accept this
+            subordinate as a target.
+          default: false
+        jwks_poll_interval:
+          type: integer
+          description: >
+            Per-subordinate poll interval in seconds for JWKS refreshing.
+            When 0 or <= 0, the refresher derives the interval from the
+            subordinate's Entity Configuration expiration time.
       example:
         entity_id: https://subordinate.example.com
         status: pending
         description: My subordinate entity
         registered_entity_types:
           - openid_provider
+        enable_jwks_update: true
+        jwks_poll_interval: 3600
     UpdateSubordinate:
       description: Data to update a subordinate entity.
       type: object
@@ -4855,11 +5218,26 @@ components:
           type: array
           items:
             type: string
+        enable_jwks_update:
+          type: boolean
+          nullable: true
+          description: >
+            Enable or disable periodic JWKS refreshing (approach A) for this
+            subordinate. Omit to leave the current value unchanged.
+        jwks_poll_interval:
+          type: integer
+          nullable: true
+          description: >
+            Per-subordinate poll interval in seconds for JWKS refreshing.
+            Set to 0 to clear (derive from the Entity Configuration
+            expiration time). Omit or set to null to leave the current
+            value unchanged.
       example:
         description: Updated description
         registered_entity_types:
           - openid_provider
           - openid_relying_party
+        enable_jwks_update: true
     SubordinateDetails:
       description: Subordinate entity including managed data from the subordinate API.
       required:
@@ -4902,6 +5280,18 @@ components:
         additional_claims:
           $ref: '#/components/schemas/AdditionalClaims'
           description: Subordinate-specific additional custom claims.
+        enable_jwks_update:
+          type: boolean
+          description: >
+            Whether periodic JWKS refreshing (approach A) is enabled for this
+            subordinate.
+          default: false
+        jwks_poll_interval:
+          type: integer
+          description: >
+            Per-subordinate poll interval in seconds for JWKS refreshing.
+            0 (or omitted) means the interval is derived from the Entity
+            Configuration expiration time.
       example:
         id: id
         entity_id: https://subordinate.example.com
@@ -4930,6 +5320,8 @@ components:
           max_path_length: 2
         additional_claims:
           custom_claim: custom_value
+        enable_jwks_update: true
+        jwks_poll_interval: 3600
     SubordinateHistory:
       description: History of events related to a subordinate with pagination information.
       type: object
@@ -5900,3 +6292,7 @@ tags:
     description: Manage trust marks in the federation.
   - name: Trust Mark Issuance
     description: Manage issuance of trust marks.
+  - name: Trust Anchors
+    description: Manage the trust anchor repository and JWKS refreshing.
+  - name: Federation Endpoints
+    description: Manage federation endpoint paths and configuration.

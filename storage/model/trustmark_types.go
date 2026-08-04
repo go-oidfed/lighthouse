@@ -38,7 +38,7 @@ type TrustMarkOwner struct {
 type AddTrustMarkOwner struct {
 	OwnerID  *string `json:"owner_id,omitempty"`
 	EntityID string  `json:"entity_id,omitempty"`
-	JWKS     JWKS    `json:"jwks,omitempty"`
+	JWKS     JWKS    `json:"jwks,omitzero"`
 }
 
 // UnmarshalJSON allows owner_id to be provided as either a number or a numeric string.
@@ -47,7 +47,7 @@ func (a *AddTrustMarkOwner) UnmarshalJSON(data []byte) error {
 	var wire struct {
 		OwnerID  json.RawMessage `json:"owner_id"`
 		EntityID string          `json:"entity_id,omitempty"`
-		JWKS     JWKS            `json:"jwks,omitempty"`
+		JWKS     JWKS            `json:"jwks,omitzero"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
@@ -57,8 +57,7 @@ func (a *AddTrustMarkOwner) UnmarshalJSON(data []byte) error {
 	if len(wire.OwnerID) != 0 && string(wire.OwnerID) != "null" {
 		var asUint uint64
 		if err := json.Unmarshal(wire.OwnerID, &asUint); err == nil {
-			s := strconv.FormatUint(asUint, 10)
-			a.OwnerID = &s
+			a.OwnerID = new(strconv.FormatUint(asUint, 10))
 		} else {
 			var asStr string
 			if err2 := json.Unmarshal(wire.OwnerID, &asStr); err2 == nil && asStr != "" {
@@ -126,8 +125,7 @@ func (a *AddTrustMarkIssuer) UnmarshalJSON(data []byte) error {
 	if len(wire.IssuerID) != 0 && string(wire.IssuerID) != "null" {
 		var asUint uint64
 		if err := json.Unmarshal(wire.IssuerID, &asUint); err == nil {
-			s := strconv.FormatUint(asUint, 10)
-			a.IssuerID = &s
+			a.IssuerID = new(strconv.FormatUint(asUint, 10))
 		} else {
 			var asStr string
 			if err2 := json.Unmarshal(wire.IssuerID, &asStr); err2 == nil && asStr != "" {

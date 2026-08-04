@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/gofiber/fiber/v2"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/pkg/errors"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -50,24 +50,27 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for trust mark status endpoint")
 		}
 
-		fed.server.Post(
-			endpoint.Path, auth.Middleware(), func(ctx *fiber.Ctx) error {
+		fed.registerEndpoint(
+			model.EndpointTypeTrustMarkStatus, endpoint.Path, fiber.MethodPost,
+			func(ctx *fiber.Ctx) error {
 				return fed.handleTrustMarkStatusRequest(ctx, config)
-			},
+			}, auth.Middleware(),
 		)
 		fed.fedMetadata.FederationTrustMarkStatusEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Post(
-			endpoint.Path, func(ctx *fiber.Ctx) error {
+		fed.registerEndpoint(
+			model.EndpointTypeTrustMarkStatus, endpoint.Path, fiber.MethodPost,
+			func(ctx *fiber.Ctx) error {
 				return fed.handleTrustMarkStatusRequest(ctx, config)
-			},
+			}, nil,
 		)
 	}
 

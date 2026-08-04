@@ -1,12 +1,15 @@
 package lighthouse
 
 import (
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
+	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
+	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -35,6 +38,17 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 			ctx.Status(fiber.StatusBadRequest)
 			return ctx.JSON(oidfed.ErrorInvalidRequest("are you looking for the entity configuration?"))
 		}
+		cacheKey := internal.SubordinateStatementCacheKey(req.Subject)
+		var cached []byte
+		set, err := cache.Get(cacheKey, &cached)
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		if set {
+			ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
+			return ctx.Send(cached)
+		}
 		info, err := store.Get(req.Subject)
 		if err != nil {
 			ctx.Status(fiber.StatusInternalServerError)
@@ -50,6 +64,12 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 		}
+		if ttl := subordinateStatementCacheTTL(payload); ttl > 0 {
+			if cacheErr := cache.Set(cacheKey, jwt, ttl); cacheErr != nil {
+				log.Error().Err(cacheErr).Str("subordinate", req.Subject).
+					Msg("failed to cache subordinate statement")
+			}
+		}
 		ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeEntityStatement)
 		return ctx.Send(jwt)
 	}
@@ -59,17 +79,18 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
 			fed.storages.JTI,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for fetch endpoint")
 		}
 
-		fed.server.Post(endpoint.Path, auth.Middleware(), handler)
+		fed.registerEndpoint(model.EndpointTypeFetch, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
 		fed.fedMetadata.FederationFetchEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
-		fed.server.Get(endpoint.Path, handler)
+		fed.registerEndpoint(model.EndpointTypeFetch, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
 	return nil

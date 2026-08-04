@@ -5,8 +5,10 @@ icon: material/signature-freehand
 
 Under the `signing` config option the key management and signatures are configured.
 
-In LightHouse >= 0.20.0 some options (like `alg`, `rsa_key_len`, and `key_rotation`) are stored in the database
-and can be managed via the Admin API. Use `lhmigrate config2db` to migrate these values from a config file.
+Some signing options (signing algorithm, RSA key length, key rotation, and key
+announcement lead time) are stored in the database and managed via the Admin
+API, `lhsetup`, or `lhmigrate config2db`. See
+[Database-Managed Signing Options](../db/signing.md) for details.
 
 ## `kms`
 <span class="badge badge-purple" title="Value Type">enum</span>
@@ -231,95 +233,6 @@ Optional prefix for object labels inside the HSM.
 HSM object labels to load into this KMS even if they are not yet present in the public key storage.
 
 For environment variables, use comma-separated values: `LH_SIGNING_PKCS11_LOAD_LABELS="key1,key2"`
-
-## Database-Managed Options
-
-The following options are stored in the database and can be managed via the Admin API.
-These config file options are **deprecated and ignored at runtime**. Use 
-[`lhmigrate config2db`](../migration.md#config-to-database-migration-config2db) to migrate 
-values from your config file to the database.
-
-### `alg`
-<span class="badge badge-purple" title="Value Type">enum</span>
-<span class="badge badge-blue" title="Default Value">ES512</span>
-<span class="badge badge-yellow" title="Deprecation status">deprecated</span>
-
-The signing algorithm to use.
-
-Supported values:
-
-- `ES256`, `ES384`, `ES512` (ECDSA)
-- `EdDSA` (Ed25519)
-- `RS256`, `RS384`, `RS512` (RSA PKCS#1)
-- `PS256`, `PS384`, `PS512` (RSA PSS)
-
-!!! warning "Deprecated - Database-managed"
-    
-    This config file option is **deprecated** and ignored at runtime. Use:
-    
-    - `lhmigrate config2db --only=alg` to migrate from config file
-    - Admin API to view/change the value
-
-### `rsa_key_len`
-<span class="badge badge-purple" title="Value Type">integer</span>
-<span class="badge badge-blue" title="Default Value">2048</span>
-<span class="badge badge-yellow" title="Deprecation status">deprecated</span>
-
-The RSA key length when generating RSA-based signing keys.
-
-!!! warning "Deprecated - Database-managed"
-    
-    This config file option is **deprecated** and ignored at runtime. Use:
-    
-    - `lhmigrate config2db --only=rsa_key_len` to migrate from config file
-    - Admin API to view/change the value
-
-### `key_rotation`
-<span class="badge badge-purple" title="Value Type">object / mapping</span>
-<span class="badge badge-yellow" title="Deprecation status">deprecated</span>
-
-Configuration for automatic key rotation.
-
-!!! warning "Deprecated - Database-managed"
-    
-    This config file option is **deprecated** and ignored at runtime. Use:
-    
-    - `lhmigrate config2db --only=key_rotation` to migrate from config file
-    - Admin API to view/change the value
-
-??? file "Legacy config.yaml (for migration only)"
-
-    ```yaml
-    signing:
-        key_rotation:
-            enabled: true
-            interval: 30d
-            overlap: 1h
-    ```
-
-#### `enabled`
-<span class="badge badge-purple" title="Value Type">boolean</span>
-<span class="badge badge-blue" title="Default Value">`false`</span>
-
-Enables automatic key rotation. When enabled, LightHouse generates new signing keys according 
-to the configured interval and publishes both current and next public keys.
-
-#### `interval`
-<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
-<span class="badge badge-blue" title="Default Value">~1 week</span>
-
-The interval at which keys are rotated. This defines the lifetime of each key.
-
-!!! note
-    The interval should not be smaller than the lifetime of Entity Configurations, Entity Statements, 
-    Trust Marks, or other JWTs signed with the federation key.
-
-#### `overlap`
-<span class="badge badge-purple" title="Value Type">[duration](index.md#time-duration-configuration-options)</span>
-<span class="badge badge-blue" title="Default Value">1 hour</span>
-
-The overlap period between the current and next key. During this window, LightHouse transitions
-to using the new key while the old key's public key is still published.
 
 ## Complete Examples
 

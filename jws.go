@@ -3,7 +3,7 @@ package lighthouse
 import (
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
-	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
@@ -108,7 +108,7 @@ const (
 	PKBackendDatabase   = "db"
 )
 
-func initKey(c SigningConf, storages model.Backends) (
+func initKey(entityID string, c SigningConf, storages model.Backends) (
 	keyManagement adminapi.KeyManagement,
 	err error,
 ) {
@@ -165,6 +165,7 @@ func initKey(c SigningConf, storages model.Backends) (
 						GenerateKeys: c.AutoGenerateKeys,
 						RSAKeyLen:    rsaKeyLen,
 						KeyRotation:  rotationConf,
+						EntityID:     entityID,
 					},
 					Dir:    c.FileSystemBackend.KeyDir,
 					TypeID: "federation",
@@ -178,6 +179,7 @@ func initKey(c SigningConf, storages model.Backends) (
 					GenerateKeys: c.AutoGenerateKeys,
 					RSAKeyLen:    rsaKeyLen,
 					KeyRotation:  rotationConf,
+					EntityID:     entityID,
 				},
 				TypeID:            "federation",
 				StorageDir:        c.PKCS11Backend.StorageDir,
@@ -202,6 +204,7 @@ func initKey(c SigningConf, storages model.Backends) (
 				Algs:         []jwa.SignatureAlgorithm{alg},
 				RSAKeyLen:    rsaKeyLen,
 				KeyRotation:  rotationConf,
+				EntityID:     entityID,
 			},
 			pemStorer,
 			stateStorer,
