@@ -1,0 +1,48 @@
+[data-md-color-scheme="slate"] {
+    --md-primary-fg-color: #006491;
+    --md-primary-fg-color--dark: #002250;
+    --md-primary-fg-color--light: #006491;
+    --md-accent-fg-color: #f5aa19;
+}
+[data-md-color-scheme="default"] {
+    --md-primary-fg-color: #006491;
+    --md-primary-fg-color--dark: #006491;
+    --md-primary-fg-color--light: #002250;
+    --md-accent-fg-color: #002250;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.2em 0.4em;
+    font-size: 0.9em;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #fff;
+    background-color: #6c757d;
+    border-radius: 0.25rem;
+    vertical-align: middle;
+}
+
+.badge-orange {
+    background-color: #f5aa19;
+}
+
+.badge-red {
+    background-color: #ff5252;
+}
+
+.badge-purple {
+    background-color: #7c4dff;
+}
+
+.badge-green {
+    background-color: #007038;
+}
+
+.badge-blue {
+    background-color: #448aff;
+}
+
+.badge-silver {
+    background-color: #9e9e9e;
+}
