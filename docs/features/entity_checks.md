@@ -25,6 +25,8 @@ box by LightHouse:
 - [`db_list`](#db-list): Checks if the entity is in the database with active status (trust mark issuance only)
 - [`http_list`](#http-list): Fetches a list of allowed entity IDs from an HTTP endpoint
 - [`http_list_jwt`](#http-list-jwt): Fetches a signed JWT containing allowed entity IDs from an HTTP endpoint
+- [`cmd`](#command): Runs an external command and uses its exit code to decide
+- [`http`](#http): Sends a per-entity HTTP request to a decision service and uses the response status code to decide
 
 In the following we describe in more details how to configure the different
 Entity Checkers:
@@ -384,5 +386,138 @@ When using `trust_anchor` mode, the checker:
           trust_anchors:
             - entity_id: https://ta1.example.org
             - entity_id: https://ta2.example.org
+    ```
+
+## Command
+
+The Command Entity Checker runs an external command for each entity being
+checked and uses the command's exit code as the allow/deny decision. The
+entity's Entity Configuration payload is written to the command's stdin as
+JSON, and the entity ID and types are provided via environment variables.
+
+### Decision Logic
+
+| Exit Code | Result | HTTP Code                                  |
+|-----------|--------|--------------------------------------------|
+| `0`       | Allow  | -                                          |
+| non-zero  | Deny   | 403 Forbidden (stderr used as description) |
+| timeout   | Error  | 500 Internal Server Error                  |
+| not found | Error  | 500 Internal Server Error                  |
+
+### Entity Data Passed to the Command
+
+- **stdin**: The entity's Entity Configuration payload as JSON
+  (`EntityStatementPayload`, including `sub`, `iss`, `jwks`, `metadata`, etc.)
+- **`ENTITY_ID`** env var: The entity's subject ID
+- **`ENTITY_TYPES`** env var: Comma-joined list of detected entity types
+
+### Config Parameters
+
+| Parameter | Necessity | Default | Description                                                  |
+|-----------|-----------|---------|--------------------------------------------------------------|
+| `path`    | REQUIRED  | -       | Path to the executable to run                                |
+| `args`    | OPTIONAL  | -       | Command-line arguments passed to the executable              |
+| `env`     | OPTIONAL  | -       | Additional environment variables (appended to inherited env) |
+| `timeout` | OPTIONAL  | `30`    | Maximum duration the command may run, in seconds             |
+
+### Examples
+
+=== ":material-file-code: Basic Usage"
+
+    ```yaml
+    checker:
+      type: cmd
+      config:
+        path: /usr/local/bin/check-entity.sh
+    ```
+
+=== ":material-file-code: With Arguments and Environment"
+
+    ```yaml
+    checker:
+      type: cmd
+      config:
+        path: /usr/local/bin/check-entity.sh
+        args:
+          - --strict
+          - --db
+        env:
+          - DB_HOST=localhost
+          - DB_PORT=5432
+        timeout: 10
+    ```
+
+## HTTP
+
+The HTTP Entity Checker sends a per-entity HTTP request to an external
+decision service and uses the response status code as the allow/deny
+decision. Unlike [`http_list`](#http-list) (which fetches a static list and
+checks membership), this checker delegates the decision to the remote
+service on every request and performs no caching.
+
+### Decision Logic
+
+| Response Status       | Result | HTTP Code                         |
+|-----------------------|--------|-----------------------------------|
+| `2xx`                 | Allow  | -                                 |
+| `4xx`                 | Deny   | Remote status code passed through |
+| `5xx` / network error | Error  | 502 Bad Gateway                   |
+
+### Body Modes
+
+The `body_mode` parameter controls what is sent in the request body:
+
+| Mode                    | Body                                                     | Content-Type       |
+|-------------------------|----------------------------------------------------------|--------------------|
+| `none`                  | no body                                                  | -                  |
+| `entity_id`             | `{"sub":"...","entity_types":[...]}`                     | `application/json` |
+| `entity_configuration`  | Full Entity Configuration payload JSON (default)         | `application/json` |
+
+Regardless of `body_mode`, the entity ID and types are always sent in the
+`X-Entity-ID` and `X-Entity-Types` request headers.
+
+### Config Parameters
+
+| Parameter   | Necessity | Default                 | Description                                |
+|-------------|-----------|-------------------------|--------------------------------------------|
+| `url`       | REQUIRED  | -                       | The URL of the decision service            |
+| `method`    | OPTIONAL  | `POST`                  | HTTP method to use                         |
+| `headers`   | OPTIONAL  | -                       | Additional HTTP headers as key-value pairs |
+| `timeout`   | OPTIONAL  | `30`                    | Request timeout in seconds                 |
+| `body_mode` | OPTIONAL  | `entity_configuration`  | What to send in the body (see above)       |
+
+### Examples
+
+=== ":material-file-code: Basic Usage (defaults)"
+
+    ```yaml
+    checker:
+      type: http
+      config:
+        url: https://decision.example.org/check
+    ```
+
+=== ":material-file-code: Entity ID Only"
+
+    ```yaml
+    checker:
+      type: http
+      config:
+        url: https://decision.example.org/check
+        body_mode: entity_id
+    ```
+
+=== ":material-file-code: With Headers and Custom Method"
+
+    ```yaml
+    checker:
+      type: http
+      config:
+        url: https://decision.example.org/api/authorize
+        method: PUT
+        headers:
+          Authorization: Bearer secret-token
+        timeout: 10
+        body_mode: entity_configuration
     ```
 

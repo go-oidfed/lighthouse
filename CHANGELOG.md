@@ -1,3 +1,12 @@
+## LightHouse 0.22.1
+
+#### Features
+- Added two new Entity Checkers:
+  - **`cmd`** — runs an external command per entity; writes the Entity Configuration payload to stdin and exposes `ENTITY_ID`/`ENTITY_TYPES` env vars. Exit 0 allows; non-zero denies (stderr used as description).
+  - **`http`** — sends a per-entity HTTP request to a decision service (default `POST`, default body_mode `entity_configuration`). 2xx allows; 4xx denies with status passthrough; 5xx/network errors return 502. Unlike `http_list`, this delegates the decision to the remote service on every request (no caching).
+
+---
+
 ## LightHouse 0.22.0
 
 This is a major release. Federation endpoints and trust anchors have moved from the config file into the database and are now managed at runtime via the Admin API. A new `lhsetup` tool, subordinate JWKS refreshing, post-quantum signing, and a zerolog-based logging stack round out the headline changes.

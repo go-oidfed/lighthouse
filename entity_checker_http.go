@@ -1,16 +1,19 @@
 package lighthouse
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -420,7 +423,155 @@ func (c *HTTPListJWTEntityChecker) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
+// HTTPEntityChecker makes a per-entity HTTP request to an external decision
+// service and uses the response status code to decide whether the entity
+// satisfies the requirements: 2xx allows the entity, 4xx denies it (the
+// remote status code is passed through), and 5xx or a network error is
+// treated as a server error.
+//
+// Unlike HTTPListEntityChecker (which fetches a static list and checks
+// membership), this checker delegates the decision to the remote service on
+// every request and performs no caching.
+type HTTPEntityChecker struct {
+	URL      string            `yaml:"url" json:"url"`
+	Method   string            `yaml:"method" json:"method"`
+	Headers  map[string]string `yaml:"headers" json:"headers"`
+	Timeout  int               `yaml:"timeout" json:"timeout"`
+	BodyMode string            `yaml:"body_mode" json:"body_mode"`
+}
+
+// Check implements the EntityChecker interface
+func (c *HTTPEntityChecker) Check(
+	entityConfiguration *oidfed.EntityStatement,
+	entityTypes []string,
+) (bool, int, *oidfed.Error) {
+	if c.URL == "" {
+		return false, fiber.StatusInternalServerError,
+			oidfed.ErrorServerError("http checker: url is required")
+	}
+
+	method := c.Method
+	if method == "" {
+		method = http.MethodPost
+	}
+	timeout := c.Timeout
+	if timeout <= 0 {
+		timeout = 30
+	}
+	bodyMode := c.BodyMode
+	if bodyMode == "" {
+		bodyMode = "entity_configuration"
+	}
+
+	// Build the request body based on the configured mode.
+	var rawBody []byte
+	switch bodyMode {
+	case "none":
+		// no body
+	case "entity_id":
+		rawBody, _ = json.Marshal(map[string]any{
+			"sub":          entityConfiguration.Subject,
+			"entity_types": entityTypes,
+		})
+	case "entity_configuration":
+		var mErr error
+		rawBody, mErr = json.Marshal(entityConfiguration.EntityStatementPayload)
+		if mErr != nil {
+			return false, fiber.StatusInternalServerError,
+				oidfed.ErrorServerError("http checker: could not marshal entity configuration: " + mErr.Error())
+		}
+	default:
+		return false, fiber.StatusInternalServerError,
+			oidfed.ErrorServerError("http checker: unknown body_mode: " + bodyMode)
+	}
+
+	var bodyReader io.Reader
+	if rawBody != nil {
+		bodyReader = bytes.NewReader(rawBody)
+	}
+
+	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
+	req, err := http.NewRequest(method, c.URL, bodyReader)
+	if err != nil {
+		return false, fiber.StatusInternalServerError,
+			oidfed.ErrorServerError("http checker: could not create request: " + err.Error())
+	}
+	if rawBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	// Always expose the entity ID and types via headers so the decision
+	// service can use them even when BodyMode is "none".
+	req.Header.Set("X-Entity-ID", entityConfiguration.Subject)
+	req.Header.Set("X-Entity-Types", strings.Join(entityTypes, ","))
+	for k, v := range c.Headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Warn().Err(err).
+			Str("entity_id", entityConfiguration.Subject).
+			Str("url", c.URL).
+			Msg("http checker: request failed")
+		return false, fiber.StatusBadGateway,
+			oidfed.ErrorServerError("http checker: request failed: " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		log.Debug().
+			Str("entity_id", entityConfiguration.Subject).
+			Str("url", c.URL).
+			Int("status", resp.StatusCode).
+			Msg("http checker: decision service allowed entity")
+		return true, 0, nil
+	}
+
+	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		desc := strings.TrimSpace(string(respBody))
+		if desc == "" {
+			desc = "entity check failed"
+		}
+		if len(desc) > 500 {
+			desc = desc[:500]
+		}
+		log.Debug().
+			Str("entity_id", entityConfiguration.Subject).
+			Str("url", c.URL).
+			Int("status", resp.StatusCode).
+			Str("body", desc).
+			Msg("http checker: decision service denied entity")
+		return false, resp.StatusCode, &oidfed.Error{
+			Error:            "forbidden",
+			ErrorDescription: desc,
+		}
+	}
+
+	log.Warn().
+		Str("entity_id", entityConfiguration.Subject).
+		Str("url", c.URL).
+		Int("status", resp.StatusCode).
+		Str("body", strings.TrimSpace(string(respBody))).
+		Msg("http checker: decision service returned error status")
+	return false, fiber.StatusBadGateway,
+		oidfed.ErrorServerError("http checker: decision service returned error status")
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface
+func (c *HTTPEntityChecker) UnmarshalYAML(node *yaml.Node) error {
+	type Alias HTTPEntityChecker
+	var alias Alias
+	if err := node.Decode(&alias); err != nil {
+		return errors.WithStack(err)
+	}
+	*c = HTTPEntityChecker(alias)
+	return nil
+}
+
 func init() {
 	RegisterEntityChecker("http_list", func() EntityChecker { return &HTTPListEntityChecker{} })
 	RegisterEntityChecker("http_list_jwt", func() EntityChecker { return &HTTPListJWTEntityChecker{} })
+	RegisterEntityChecker("http", func() EntityChecker { return &HTTPEntityChecker{} })
 }
