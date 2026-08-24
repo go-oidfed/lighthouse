@@ -2109,10 +2109,10 @@ the <code>trust_mark</code> parameter (the JWT to verify).</p>
 <p><strong>Response:</strong> Signed JWT with <code>application/trust-mark-status-response+jwt</code>
 content type containing:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;iss&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://issuer.example.com&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;iat&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1234567890</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&lt;original JWT&gt;&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;active&quot;</span>
+<span class="w">  </span><span class="nt">"iss"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://issuer.example.com"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"iat"</span><span class="p">:</span><span class="w"> </span><span class="mi">1234567890</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"trust_mark"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;original JWT&gt;"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"active"</span>
 <span class="p">}</span>
 </code></pre></div>
 <h3 id="status-values">Status Values<a class="headerlink" href="#status-values" title="Permanent link">&para;</a></h3>
@@ -2176,7 +2176,7 @@ non-expired) trust marks.</p>
 </tbody>
 </table>
 <p><strong>Response:</strong> JSON array of entity IDs</p>
-<div class="highlight"><pre><span></span><code><span class="p">[</span><span class="s2">&quot;https://entity1.example.com&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;https://entity2.example.com&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><span class="p">[</span><span class="s2">"https://entity1.example.com"</span><span class="p">,</span><span class="w"> </span><span class="s2">"https://entity2.example.com"</span><span class="p">]</span>
 </code></pre></div>
 <h2 id="trust-mark-request-endpoint">Trust Mark Request Endpoint<a class="headerlink" href="#trust-mark-request-endpoint" title="Permanent link">&para;</a></h2>
 <p>Entities can self-enroll for trust marks using the request endpoint. This adds
@@ -2269,7 +2269,7 @@ issuance. They are configured via <code>EligibilityConfig.Checker</code> on each
 provides the required context (storage backend, trust mark type).</p>
 <h3 id="custom-checkers">Custom Checkers<a class="headerlink" href="#custom-checkers" title="Permanent link">&para;</a></h3>
 <p>Register custom checkers using <code>RegisterEntityChecker</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="nx">lighthouse</span><span class="p">.</span><span class="nx">RegisterEntityChecker</span><span class="p">(</span><span class="s">&quot;my_checker&quot;</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="nx">lighthouse</span><span class="p">.</span><span class="nx">EntityChecker</span><span class="w"> </span><span class="p">{</span>
+<div class="highlight"><pre><span></span><code><span class="nx">lighthouse</span><span class="p">.</span><span class="nx">RegisterEntityChecker</span><span class="p">(</span><span class="s">"my_checker"</span><span class="p">,</span><span class="w"> </span><span class="kd">func</span><span class="p">()</span><span class="w"> </span><span class="nx">lighthouse</span><span class="p">.</span><span class="nx">EntityChecker</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="o">&amp;</span><span class="nx">MyCustomChecker</span><span class="p">{}</span>
 <span class="p">})</span>
 </code></pre></div>

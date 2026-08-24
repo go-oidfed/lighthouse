@@ -2495,7 +2495,7 @@ lhcli<span class="w"> </span>subordinates<span class="w"> </span>status<span cla
 <p><strong>Behavior:</strong></p>
 <p>Without <code>--print</code>, the command iterates through each pending request and 
 prompts you to approve or reject it:</p>
-<div class="highlight"><pre><span></span><code>Do you approve entity &#39;https://new-rp.example.com&#39; (y/n): 
+<div class="highlight"><pre><span></span><code>Do you approve entity 'https://new-rp.example.com' (y/n): 
 </code></pre></div>
 <ul>
 <li>Answering <code>y</code> sets the subordinate status to <code>active</code></li>
@@ -2625,9 +2625,9 @@ able to obtain this trust mark.</p>
 <p>Without <code>--print</code>, the command iterates through pending requests for each 
 trust mark type (or a specific type if <code>--id</code> is provided) and prompts you 
 to approve or reject:</p>
-<div class="highlight"><pre><span></span><code>Managing trust mark id &#39;https://federation.example.com/trustmarks/certified&#39;:
+<div class="highlight"><pre><span></span><code>Managing trust mark id 'https://federation.example.com/trustmarks/certified':
 
-Do you approve entity &#39;https://rp.example.com&#39; (y/n): 
+Do you approve entity 'https://rp.example.com' (y/n): 
 </code></pre></div>
 <ul>
 <li>Answering <code>y</code> approves the trust mark entitlement</li>
@@ -2960,7 +2960,7 @@ authority to other entities.</p>
 </table>
 <h3 id="configuration-file-format">Configuration File Format<a class="headerlink" href="#configuration-file-format" title="Permanent link">&para;</a></h3>
 <p>The delegation configuration file has the following structure:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># The trust mark owner&#39;s entity ID</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># The trust mark owner's entity ID</span>
 <span class="nt">trust_mark_owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://federation.example.com</span>
 
 <span class="c1"># Optional: JWKS for the owner (generated if not provided)</span>
@@ -3077,8 +3077,8 @@ authority to other entities.</p>
 <span class="w">  </span><span class="nt">keys</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kty</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EC</span>
 <span class="w">      </span><span class="nt">crv</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">P-521</span>
-<span class="w">      </span><span class="nt">x</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;...&quot;</span>
-<span class="w">      </span><span class="nt">y</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;...&quot;</span>
+<span class="w">      </span><span class="nt">x</span><span class="p">:</span><span class="w"> </span><span class="s">"..."</span>
+<span class="w">      </span><span class="nt">y</span><span class="p">:</span><span class="w"> </span><span class="s">"..."</span>
 <span class="nt">signing_key</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <span class="w">  </span><span class="no">-----BEGIN EC PRIVATE KEY-----</span>
 <span class="w">  </span><span class="no">MIHuAgEAMBAGByqGSM49AgEGBSuBBAAjBIHWMIHTAgEBBEIA...</span>
@@ -3117,7 +3117,7 @@ lhcli<span class="w"> </span>trustmarks<span class="w"> </span>requests<span cla
 lhcli<span class="w"> </span>trustmarks<span class="w"> </span>requests<span class="w"> </span>--id<span class="w"> </span>https://federation.example.com/trustmarks/certified
 </code></pre></div>
 <h3 id="daily-statistics-review">Daily Statistics Review<a class="headerlink" href="#daily-statistics-review" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># View yesterday&#39;s summary</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># View yesterday's summary</span>
 lhcli<span class="w"> </span>stats<span class="w"> </span>summary<span class="w"> </span>--from<span class="w"> </span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span>yesterday<span class="w"> </span>+%Y-%m-%d<span class="k">)</span>
 
 <span class="c1"># Check top endpoints</span>
@@ -3127,10 +3127,10 @@ lhcli<span class="w"> </span>stats<span class="w"> </span>top<span class="w"> </
 lhcli<span class="w"> </span>stats<span class="w"> </span>timeseries<span class="w"> </span>--interval<span class="w"> </span>hour<span class="w"> </span>--from<span class="w"> </span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span>yesterday<span class="w"> </span>+%Y-%m-%d<span class="k">)</span>
 </code></pre></div>
 <h3 id="monthly-statistics-export">Monthly Statistics Export<a class="headerlink" href="#monthly-statistics-export" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Export last month&#39;s data to CSV</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Export last month's data to CSV</span>
 lhcli<span class="w"> </span>stats<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--from<span class="w"> </span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;last month&quot;</span><span class="w"> </span>+%Y-%m-01<span class="k">)</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--to<span class="w"> </span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>+%Y-%m-01<span class="k">)</span><span class="s2"> -1 day&quot;</span><span class="w"> </span>+%Y-%m-%d<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--from<span class="w"> </span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span><span class="s2">"last month"</span><span class="w"> </span>+%Y-%m-01<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--to<span class="w"> </span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>date<span class="w"> </span>+%Y-%m-01<span class="k">)</span><span class="s2"> -1 day"</span><span class="w"> </span>+%Y-%m-%d<span class="k">)</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--format<span class="w"> </span>csv<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="w"> </span>monthly-stats.csv
 </code></pre></div>

@@ -2021,14 +2021,14 @@ headers, which might be spoofed.</p>
 <summary>config.yaml</summary>
 <div class="highlight"><pre><span></span><code><span class="nt">server</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">trusted_proxies</span><span class="p">:</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;10.0.0.0/8&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;172.16.0.0/12&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;192.168.0.0/16&quot;</span>
-<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;fc00::/7&quot;</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"10.0.0.0/8"</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"172.16.0.0/12"</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"192.168.0.0/16"</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"fc00::/7"</span>
 </code></pre></div>
 </details>
 <div class="highlight"><pre><span></span><code><span class="c1"># Environment variable (comma-separated)</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">LH_SERVER_TRUSTED_PROXIES</span><span class="o">=</span><span class="s2">&quot;10.0.0.0/8,172.16.0.0/12,192.168.0.0/16&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LH_SERVER_TRUSTED_PROXIES</span><span class="o">=</span><span class="s2">"10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"</span>
 </code></pre></div>
 <h2 id="forwarded_ip_header"><code>forwarded_ip_header</code><a class="headerlink" href="#forwarded_ip_header" title="Permanent link">&para;</a></h2>
 <p><span class="badge badge-purple" title="Value Type">string</span>
@@ -2069,9 +2069,9 @@ CORS allows web browsers to make requests to the API from different origins.</p>
 <div class="highlight"><pre><span></span><code><span class="nt">server</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">cors</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="w">        </span><span class="nt">allow_origins</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*&quot;</span>
-<span class="w">        </span><span class="nt">allow_methods</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;GET,POST,HEAD,PUT,DELETE,PATCH&quot;</span>
-<span class="w">        </span><span class="nt">allow_headers</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Origin,Content-Type,Accept&quot;</span>
+<span class="w">        </span><span class="nt">allow_origins</span><span class="p">:</span><span class="w"> </span><span class="s">"*"</span>
+<span class="w">        </span><span class="nt">allow_methods</span><span class="p">:</span><span class="w"> </span><span class="s">"GET,POST,HEAD,PUT,DELETE,PATCH"</span>
+<span class="w">        </span><span class="nt">allow_headers</span><span class="p">:</span><span class="w"> </span><span class="s">"Origin,Content-Type,Accept"</span>
 <span class="w">        </span><span class="nt">allow_credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <span class="w">        </span><span class="nt">max_age</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3600</span>
 </code></pre></div>
@@ -2106,7 +2106,7 @@ CORS headers are sent and cross-origin requests from browsers will be blocked.</
 <div class="highlight"><pre><span></span><code><span class="nt">server</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">cors</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="w">        </span><span class="nt">allow_origins</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://example.com,https://app.example.com&quot;</span>
+<span class="w">        </span><span class="nt">allow_origins</span><span class="p">:</span><span class="w"> </span><span class="s">"https://example.com,https://app.example.com"</span>
 </code></pre></div>
 </details>
 <h3 id="allow_methods"><code>allow_methods</code><a class="headerlink" href="#allow_methods" title="Permanent link">&para;</a></h3>

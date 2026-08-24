@@ -2174,7 +2174,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <div class="admonition tip">
 <p class="admonition-title">Skip Steps</p>
 <p>Use <code>--skip</code> to skip specific steps:
-<div class="highlight"><pre><span></span><code><span class="c1"># Skip key migrations if you don&#39;t have legacy keys</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Skip key migrations if you don't have legacy keys</span>
 ./lhmigrate<span class="w"> </span>all<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
@@ -2365,7 +2365,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="o">=</span>db
 </code></pre></div>
@@ -2397,7 +2397,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
@@ -2406,14 +2406,14 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
 ./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
 <span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
@@ -2421,7 +2421,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 ./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--update-config
 
 <span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
@@ -2429,7 +2429,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 6. Update your deployment to use the new config and data locations</span>
 mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
@@ -2445,7 +2445,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--run-config2db
 </code></pre></div></p>
 </div>
@@ -2468,7 +2468,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="o">=</span>db
 </code></pre></div>
@@ -2500,7 +2500,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
@@ -2509,14 +2509,14 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
 ./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
 <span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
@@ -2524,7 +2524,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 ./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--update-config
 
 <span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
@@ -2532,7 +2532,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># 6. Update your deployment to use the new config and data locations</span>
 mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
@@ -2548,7 +2548,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--run-config2db
 </code></pre></div></p>
 </div>
@@ -2571,7 +2571,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="o">=</span>db
 </code></pre></div>
@@ -2603,7 +2603,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
@@ -2612,14 +2612,14 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
 ./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
 <span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
@@ -2627,7 +2627,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 ./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--update-config
 
 <span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
@@ -2635,7 +2635,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source-type<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/legacy<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 6. Update your deployment to use the new config and data locations</span>
 mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
@@ -2651,7 +2651,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--run-config2db
 </code></pre></div></p>
 </div>
@@ -2674,7 +2674,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--data-source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="o">=</span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="o">=</span>db
 </code></pre></div>
@@ -2706,7 +2706,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 2b. Migrate private keys to filesystem KMS (with DB-based public key storage)</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
@@ -2715,14 +2715,14 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 3. Transform configuration file to new format (with correct DB settings)</span>
 ./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 4. Migrate configuration values to database and clean up config file</span>
 <span class="c1"># IMPORTANT: Run this BEFORE migrating data (step 5)</span>
@@ -2730,7 +2730,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 ./lhmigrate<span class="w"> </span>config2db<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--config<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--update-config
 
 <span class="c1"># 5. Migrate data (subordinates, trust marked entities)</span>
@@ -2738,7 +2738,7 @@ go<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span
 <span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># 6. Update your deployment to use the new config and data locations</span>
 mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span>/etc/lighthouse/config.yaml
@@ -2754,7 +2754,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--source<span class="o">=</span>/etc/lighthouse/config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>/etc/lighthouse/config-new.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--run-config2db
 </code></pre></div></p>
 </div>
@@ -2788,11 +2788,11 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 
 <span class="c1"># MySQL</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span>--source<span class="w"> </span>&lt;legacy_dir&gt;<span class="w"> </span>--type<span class="w"> </span>&lt;typeID&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span>--db-dsn<span class="w"> </span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># PostgreSQL</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span>--source<span class="w"> </span>&lt;legacy_dir&gt;<span class="w"> </span>--type<span class="w"> </span>&lt;typeID&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=gorm password=gorm dbname=gorm port=9920&#39;</span>
+<span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span>--db-dsn<span class="w"> </span><span class="s1">'host=localhost user=gorm password=gorm dbname=gorm port=9920'</span>
 </code></pre></div>
 <p>Flags:</p>
 <ul>
@@ -2823,14 +2823,14 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># PostgreSQL DB migration</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>public<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="w"> </span>/var/lib/lighthouse/legacy-keys<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lh password=secret dbname=lighthouse port=9920&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'host=localhost user=lh password=secret dbname=lighthouse port=9920'</span>
 </code></pre></div>
 <h3 id="kms-private-key-migration">KMS (private key) migration<a class="headerlink" href="#kms-private-key-migration" title="Permanent link">&para;</a></h3>
 <p>Expected legacy layout: one PEM per algorithm in <code>--source</code>, named <code>&lt;type&gt;_&lt;alg&gt;.pem</code> (e.g., <code>federation_ES256.pem</code>).</p>
@@ -2875,7 +2875,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># Migrate keys with PostgreSQL-based public key storage</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
@@ -2884,7 +2884,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--type<span class="w"> </span>federation<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--algs<span class="w"> </span>ES256,RS256<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--pks-type<span class="w"> </span>db<span class="w"> </span>--db-type<span class="w"> </span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse port=5432&#39;</span>
+<span class="w">  </span>--db-dsn<span class="w"> </span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse port=5432'</span>
 
 <span class="c1"># Migrate ES256, set it as default, with DB storage</span>
 ./lhmigrate<span class="w"> </span>keys<span class="w"> </span>kms<span class="w"> </span><span class="se">\</span>
@@ -2918,7 +2918,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--source<span class="w"> </span>/path/to/source<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="w"> </span>&lt;sqlite<span class="p">|</span>mysql<span class="p">|</span>postgres&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="o">[</span>--dest<span class="w"> </span>/path/to/sqlite<span class="o">]</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="o">[</span>--db-dsn<span class="w"> </span><span class="s2">&quot;dsn for mysql/postgres&quot;</span><span class="o">]</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="o">[</span>--db-dsn<span class="w"> </span><span class="s2">"dsn for mysql/postgres"</span><span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="o">[</span>--force<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="o">[</span>--dry-run<span class="o">]</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="o">[</span>--only<span class="o">=</span>&lt;sections&gt;<span class="o">]</span><span class="w"> </span><span class="se">\</span>
@@ -2952,7 +2952,7 @@ mv<span class="w"> </span>/etc/lighthouse/config-new.yaml<span class="w"> </span
 <span class="w">  </span>--source-type<span class="o">=</span>badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>/var/lib/lighthouse/badger<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse'</span>
 
 <span class="c1"># Dry run to preview migration</span>
 ./lhmigrate<span class="w"> </span>db<span class="w"> </span><span class="se">\</span>
@@ -3256,14 +3256,14 @@ moved to top-level config (<code>entity_id</code>) or managed in the database. S
 <span class="w">  </span>--source<span class="o">=</span>old-config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>new-config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>postgres<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;host=localhost user=lighthouse password=secret dbname=lighthouse&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'host=localhost user=lighthouse password=secret dbname=lighthouse'</span>
 
 <span class="c1"># Transform config for MySQL</span>
 ./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--source<span class="o">=</span>old-config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--dest<span class="o">=</span>new-config.yaml<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--db-type<span class="o">=</span>mysql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">&#39;user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True&#39;</span>
+<span class="w">  </span>--db-dsn<span class="o">=</span><span class="s1">'user:pass@tcp(127.0.0.1:3306)/lighthouse?charset=utf8mb4&amp;parseTime=True'</span>
 
 <span class="c1"># Transform and also migrate values to database (combined)</span>
 ./lhmigrate<span class="w"> </span>config<span class="w"> </span><span class="se">\</span>

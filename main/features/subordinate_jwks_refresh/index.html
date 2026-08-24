@@ -1976,20 +1976,20 @@ full field reference.</p>
 <a href="../admin_api/">Admin API</a>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Create a subordinate with periodic refreshing enabled</span>
 curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;entity_id&quot;: &quot;https://sub.example.com&quot;,</span>
-<span class="s1">    &quot;status&quot;: &quot;active&quot;,</span>
-<span class="s1">    &quot;jwks&quot;: {&quot;keys&quot;: [...]},</span>
-<span class="s1">    &quot;enable_jwks_update&quot;: true,</span>
-<span class="s1">    &quot;jwks_poll_interval&quot;: 3600</span>
-<span class="s1">  }&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "entity_id": "https://sub.example.com",</span>
+<span class="s1">    "status": "active",</span>
+<span class="s1">    "jwks": {"keys": [...]},</span>
+<span class="s1">    "enable_jwks_update": true,</span>
+<span class="s1">    "jwks_poll_interval": 3600</span>
+<span class="s1">  }'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/subordinates
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># Enable refreshing on an existing subordinate (PATCH, preferred for partial updates)</span>
 curl<span class="w"> </span>-X<span class="w"> </span>PATCH<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;enable_jwks_update&quot;: true, &quot;jwks_poll_interval&quot;: 7200}&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"enable_jwks_update": true, "jwks_poll_interval": 7200}'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/subordinates/<span class="o">{</span>subordinateID<span class="o">}</span>
 </code></pre></div>
 <h3 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
@@ -2033,12 +2033,12 @@ is triggered on demand by the subordinate.</p>
 <h3 id="publishing-the-endpoint">Publishing the Endpoint<a class="headerlink" href="#publishing-the-endpoint" title="Permanent link">&para;</a></h3>
 <p>Create the endpoint via the <a href="../admin_api/">Admin API</a>:</p>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;type&quot;: &quot;jwks_update_trigger&quot;,</span>
-<span class="s1">    &quot;path&quot;: &quot;/jwks/update-trigger&quot;,</span>
-<span class="s1">    &quot;auth_enabled&quot;: false</span>
-<span class="s1">  }&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "type": "jwks_update_trigger",</span>
+<span class="s1">    "path": "/jwks/update-trigger",</span>
+<span class="s1">    "auth_enabled": false</span>
+<span class="s1">  }'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/federation-endpoints
 </code></pre></div>
 <p>The endpoint URL is published in the <code>federation_entity</code> metadata under
@@ -2066,8 +2066,8 @@ whether client auth is enabled:</p>
 </table>
 <div class="highlight"><pre><span></span><code><span class="c1"># Without client auth</span>
 curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;sub&quot;: &quot;https://sub.example.com&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"sub": "https://sub.example.com"}'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://federation.example.com/jwks/update-trigger
 </code></pre></div>
 <div class="admonition note">
@@ -2083,11 +2083,11 @@ encoded as a signed JWK Set. This reuses the signed JWK Set format defined for
 <code>signed_jwks_uri</code> in [Spec Section 5.2.1][spec-5.2.1].</p>
 <h3 id="publishing-the-endpoint_1">Publishing the Endpoint<a class="headerlink" href="#publishing-the-endpoint_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;type&quot;: &quot;jwks_update&quot;,</span>
-<span class="s1">    &quot;path&quot;: &quot;/jwks/update&quot;</span>
-<span class="s1">  }&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "type": "jwks_update",</span>
+<span class="s1">    "path": "/jwks/update"</span>
+<span class="s1">  }'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/federation-endpoints
 </code></pre></div>
 <p>The endpoint URL is published in the <code>federation_entity</code> metadata under
@@ -2145,7 +2145,7 @@ with:</p>
 <p>Every key in <code>keys</code> <strong>must</strong> have a unique, non-empty <code>kid</code>.</p>
 <h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/jwk-set+jwt&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/jwk-set+jwt"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--data-binary<span class="w"> </span>@signed-jwk-set.jwt<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://federation.example.com/jwks/update
 </code></pre></div>

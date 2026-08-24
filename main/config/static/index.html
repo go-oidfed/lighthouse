@@ -1767,7 +1767,7 @@ Environment variables <strong>override</strong> values from the YAML config file
 </table>
 <h3 id="arraylist-values">Array/List Values<a class="headerlink" href="#arraylist-values" title="Permanent link">&para;</a></h3>
 <p>For configuration options that accept lists (e.g., <code>trusted_proxies</code>), use comma-separated values:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">LH_SERVER_TRUSTED_PROXIES</span><span class="o">=</span><span class="s2">&quot;10.0.0.0/8,172.16.0.0/12,192.168.0.0/16&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">LH_SERVER_TRUSTED_PROXIES</span><span class="o">=</span><span class="s2">"10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"</span>
 </code></pre></div>
 <h3 id="yaml-only-options">YAML-Only Options<a class="headerlink" href="#yaml-only-options" title="Permanent link">&para;</a></h3>
 <p>Some complex configuration options can only be set via YAML (not environment variables):</p>
@@ -1800,7 +1800,7 @@ in the Entity Configuration JWT.</p>
 <p>The entity ID is typically the base URL where your federation endpoints are served.</p>
 <details class="file">
 <summary>config.yaml</summary>
-<div class="highlight"><pre><span></span><code><span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://ta.example.com&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">"https://ta.example.com"</span>
 </code></pre></div>
 </details>
 <div class="admonition warning">
@@ -1820,18 +1820,18 @@ to automatically update your config file.</p>
 <div class="highlight"><pre><span></span><code><span class="nt">server</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7672</span>
 
-<span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://ta.example.lh&quot;</span>
+<span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">"https://ta.example.lh"</span>
 
 <span class="nt">signing</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">kms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">filesystem</span>
 <span class="w">    </span><span class="nt">pk_backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db</span>
 <span class="w">    </span><span class="nt">auto_generate_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">    </span><span class="nt">filesystem</span><span class="p">:</span>
-<span class="w">        </span><span class="nt">key_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/keys&quot;</span>
+<span class="w">        </span><span class="nt">key_dir</span><span class="p">:</span><span class="w"> </span><span class="s">"/keys"</span>
 
 <span class="nt">storage</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sqlite</span>
-<span class="w">    </span><span class="nt">data_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/data&quot;</span>
+<span class="w">    </span><span class="nt">data_dir</span><span class="p">:</span><span class="w"> </span><span class="s">"/data"</span>
 
 <span class="nt">api</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">admin</span><span class="p">:</span>

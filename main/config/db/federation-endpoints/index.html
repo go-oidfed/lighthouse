@@ -1927,17 +1927,17 @@ dynamic dispatch, authentication, and enrollment details.</p>
 <p>Some endpoint types store additional configuration in a JSON <code>config</code> field.</p>
 <h3 id="resolve-resolve">Resolve (<code>resolve</code>)<a class="headerlink" href="#resolve-resolve" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;allowed_trust_anchors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://ta.example.com&quot;</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;use_entity_collection_allowed_trust_anchors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;grace_period_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3600</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;time_elapsed_grace_factor&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;proactive_resolver&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;enabled&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;concurrency_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;queue_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;response_storage_dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/var/lib/lighthouse/resolver&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;response_storage_store_json&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;response_storage_store_jwt&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="nt">"allowed_trust_anchors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://ta.example.com"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"use_entity_collection_allowed_trust_anchors"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"grace_period_seconds"</span><span class="p">:</span><span class="w"> </span><span class="mi">3600</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"time_elapsed_grace_factor"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"proactive_resolver"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"concurrency_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"queue_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"response_storage_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/var/lib/lighthouse/resolver"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"response_storage_store_json"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"response_storage_store_jwt"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
@@ -1973,19 +1973,19 @@ dynamic dispatch, authentication, and enrollment details.</p>
 </table>
 <h3 id="enroll-enroll">Enroll (<code>enroll</code>)<a class="headerlink" href="#enroll-enroll" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;checker_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;multiple_or&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;checker_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="nt">"checker_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"multiple_or"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"checker_config"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;trust_mark&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;trust_mark_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://tm.example.org&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="nt">&quot;trust_anchors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://ta.example.org&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"trust_mark"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"trust_mark_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://tm.example.org"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"trust_anchors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://ta.example.org"</span><span class="p">]</span>
 <span class="w">      </span><span class="p">}</span>
 <span class="w">    </span><span class="p">},</span>
 <span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;trust_path&quot;</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">&quot;config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="nt">&quot;trust_anchors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://ta2.example.org&quot;</span><span class="p">]</span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"trust_path"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"trust_anchors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://ta2.example.org"</span><span class="p">]</span>
 <span class="w">      </span><span class="p">}</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
@@ -1998,10 +1998,10 @@ trust anchor objects with JWKS). They are resolved live from the
 details.</p>
 <h3 id="entity-collection-entity_collection">Entity Collection (<code>entity_collection</code>)<a class="headerlink" href="#entity-collection-entity_collection" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;allowed_trust_anchors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://ta.example.com&quot;</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">28800</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;concurrency_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;pagination_limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">512</span>
+<span class="w">  </span><span class="nt">"allowed_trust_anchors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://ta.example.com"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"interval_seconds"</span><span class="p">:</span><span class="w"> </span><span class="mi">28800</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"concurrency_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"pagination_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">512</span>
 <span class="p">}</span>
 </code></pre></div>
 <table>

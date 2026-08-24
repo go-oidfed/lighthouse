@@ -2277,22 +2277,22 @@ an external issuer. The spec contains:</p>
 <details class="example">
 <summary>Example published trust mark</summary>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://example.com/tm&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark_issuer&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://example.com/tmi&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;refresh&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;min_lifetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;refresh_grace_period&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">7200</span>
+<span class="w">  </span><span class="nt">"trust_mark_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/tm"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"trust_mark_issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/tmi"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"refresh"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"min_lifetime"</span><span class="p">:</span><span class="w"> </span><span class="mi">300</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"refresh_grace_period"</span><span class="p">:</span><span class="w"> </span><span class="mi">7200</span>
 <span class="p">}</span>
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Example self-issued trust mark</summary>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://example.com/self-issued&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;self_issuance_spec&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;lifetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">86400</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;ref&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://example.com/ref&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;logo_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://example.com/logo&quot;</span>
+<span class="w">  </span><span class="nt">"trust_mark_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/self-issued"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"self_issuance_spec"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"lifetime"</span><span class="p">:</span><span class="w"> </span><span class="mi">86400</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"ref"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/ref"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"logo_uri"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://example.com/logo"</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
@@ -2393,15 +2393,35 @@ operations and database writes for repeated requests. <code>0</code> = no cachin
 <details class="example">
 <summary>Example trust mark spec</summary>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://tm.example.org&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;lifetime&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">86400</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;ref&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://tm.example.org/ref&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;logo_uri&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://tm.example.org/logo&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;eligibility_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;db_only&quot;</span>
+<span class="w">  </span><span class="nt">"trust_mark_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://tm.example.org"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"lifetime"</span><span class="p">:</span><span class="w"> </span><span class="mi">86400</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"ref"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://tm.example.org/ref"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"logo_uri"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://tm.example.org/logo"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"eligibility_config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"db_only"</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
+<details class="example">
+<summary>With a <code>trust_path</code> checker</summary>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"trust_mark_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://tm.example.org"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"eligibility_config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"db_or_check"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"checker"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"trust_path"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"trust_anchors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://ta.example.org"</span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"check_cache_ttl"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The <code>trust_anchors</code> in DB checker configs are <strong>entity ID strings</strong>.
+Inline <code>{"entity_id": ...}</code> objects are also accepted and normalized to
+entity-ID references.</p>
+</details>
 </details>
 <h3 id="trust-mark-subjects">Trust Mark Subjects<a class="headerlink" href="#trust-mark-subjects" title="Permanent link">&para;</a></h3>
 <p>Each spec maintains a list of subjects (entities) that are eligible to receive
@@ -2555,14 +2575,14 @@ issuers, but can also be managed directly via the Admin API.</p>
 <details class="example">
 <summary>Create a type with owner and issuers</summary>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://refeds.org/sirtfi&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Sirtfi compliance&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark_owner&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;entity_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://refeds.org&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;jwks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;keys&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]}</span>
+<span class="w">  </span><span class="nt">"trust_mark_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://refeds.org/sirtfi"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Sirtfi compliance"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"trust_mark_owner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"entity_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://refeds.org"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"jwks"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"keys"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="err">...</span><span class="p">]}</span>
 <span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;trust_mark_issuers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="p">{</span><span class="nt">&quot;issuer&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://issuer.example.org&quot;</span><span class="p">}</span>
+<span class="w">  </span><span class="nt">"trust_mark_issuers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"issuer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://issuer.example.org"</span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>
 </code></pre></div>
@@ -2658,8 +2678,8 @@ Federation Specification.</p>
 <details class="example">
 <summary>Add an issuer to a type (type-centric)</summary>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;issuer&quot;: &quot;https://issuer.example.org&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"issuer": "https://issuer.example.org"}'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/trust-marks/types/1/issuers
 </code></pre></div>
 </details>
@@ -2752,11 +2772,11 @@ the owner's behalf.</p>
 <details class="example">
 <summary>Set the owner of a type (type-centric)</summary>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;entity_id&quot;: &quot;https://refeds.org&quot;,</span>
-<span class="s1">    &quot;jwks&quot;: {&quot;keys&quot;: [{&quot;kty&quot;: &quot;RSA&quot;, &quot;kid&quot;: &quot;key1&quot;, &quot;...&quot;: &quot;...&quot;}]}</span>
-<span class="s1">  }&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "entity_id": "https://refeds.org",</span>
+<span class="s1">    "jwks": {"keys": [{"kty": "RSA", "kid": "key1", "...": "..."}]}</span>
+<span class="s1">  }'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/trust-marks/types/1/owner
 </code></pre></div>
 </details>

@@ -1889,13 +1889,13 @@ propagates to all usages.</p>
 </table>
 <h3 id="creating-a-trust-anchor">Creating a Trust Anchor<a class="headerlink" href="#creating-a-trust-anchor" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;entity_id&quot;: &quot;https://ta.example.com&quot;,</span>
-<span class="s1">    &quot;jwks&quot;: {&quot;keys&quot;: [...]},</span>
-<span class="s1">    &quot;enable_jwks_update&quot;: true,</span>
-<span class="s1">    &quot;key_poll_interval&quot;: 3600</span>
-<span class="s1">  }&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "entity_id": "https://ta.example.com",</span>
+<span class="s1">    "jwks": {"keys": [...]},</span>
+<span class="s1">    "enable_jwks_update": true,</span>
+<span class="s1">    "key_poll_interval": 3600</span>
+<span class="s1">  }'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/trust-anchors
 </code></pre></div>
 <p>See <a href="../../config/db/trust-anchors/">Trust Anchor Configuration Reference</a> for

@@ -1910,8 +1910,8 @@
 <span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">caddy:latest</span>
 <span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 <span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;80:80&quot;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;443:443&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"80:80"</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"443:443"</span>
 <span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./caddy/Caddyfile:/etc/caddy/Caddyfile</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./caddy/data:/data</span>
@@ -1926,20 +1926,20 @@
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>lighthouse.example.com {
-    reverse_proxy lighthouse:7672
-}
+<div class="highlight"><pre><span></span><code>lighthouse.example.com<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>lighthouse:7672
+<span class="p">}</span>
 </code></pre></div>
 <p>For separate admin API access (recommended for production):</p>
-<div class="highlight"><pre><span></span><code># Public federation endpoints
-lighthouse.example.com {
-    reverse_proxy lighthouse:7672
-}
+<div class="highlight"><pre><span></span><code><span class="c1"># Public federation endpoints</span>
+lighthouse.example.com<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>lighthouse:7672
+<span class="p">}</span>
 
-# Admin API (restrict access via firewall or Caddy matchers)
-admin.lighthouse.example.com {
-    reverse_proxy lighthouse:7673
-}
+<span class="c1"># Admin API (restrict access via firewall or Caddy matchers)</span>
+admin.lighthouse.example.com<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>lighthouse:7673
+<span class="p">}</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -1947,7 +1947,7 @@ admin.lighthouse.example.com {
 <span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7672</span>
 
 <span class="c1"># Entity identifier - CHANGE THIS to your domain</span>
-<span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://lighthouse.example.com&quot;</span>
+<span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">"https://lighthouse.example.com"</span>
 
 <span class="c1"># Signing configuration</span>
 <span class="nt">signing</span><span class="p">:</span>
@@ -1955,12 +1955,12 @@ admin.lighthouse.example.com {
 <span class="w">  </span><span class="nt">pk_backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db</span>
 <span class="w">  </span><span class="nt">auto_generate_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">  </span><span class="nt">filesystem</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">key_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/data/keys&quot;</span>
+<span class="w">    </span><span class="nt">key_dir</span><span class="p">:</span><span class="w"> </span><span class="s">"/data/keys"</span>
 
 <span class="c1"># Storage configuration</span>
 <span class="nt">storage</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sqlite</span>
-<span class="w">  </span><span class="nt">data_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/data&quot;</span>
+<span class="w">  </span><span class="nt">data_dir</span><span class="p">:</span><span class="w"> </span><span class="s">"/data"</span>
 
 <span class="c1"># Admin API</span>
 <span class="nt">api</span><span class="p">:</span>
@@ -1998,8 +1998,8 @@ DB-managed options are configured with <code>lhsetup</code> or the Admin API.</p
 <span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">caddy:latest</span>
 <span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 <span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;80:80&quot;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;443:443&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"80:80"</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"443:443"</span>
 <span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./caddy/Caddyfile:/etc/caddy/Caddyfile</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./caddy/data:/data</span>
@@ -2015,7 +2015,7 @@ DB-managed options are configured with <code>lhsetup</code> or the Admin API.</p
 <span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./postgres/data:/var/lib/postgresql/data</span>
 <span class="w">    </span><span class="nt">healthcheck</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;CMD-SHELL&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;pg_isready</span><span class="nv"> </span><span class="s">-U</span><span class="nv"> </span><span class="s">lighthouse&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"CMD-SHELL"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"pg_isready</span><span class="nv"> </span><span class="s">-U</span><span class="nv"> </span><span class="s">lighthouse"</span><span class="p p-Indicator">]</span>
 <span class="w">      </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
 <span class="w">      </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
 <span class="w">      </span><span class="nt">retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
@@ -2027,27 +2027,27 @@ DB-managed options are configured with <code>lhsetup</code> or the Admin API.</p
 <span class="w">      </span><span class="nt">postgres</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_healthy</span>
 <span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">LH_STORAGE_DSN</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;host=postgres</span><span class="nv"> </span><span class="s">user=lighthouse</span><span class="nv"> </span><span class="s">password=changeme</span><span class="nv"> </span><span class="s">dbname=lighthouse</span><span class="nv"> </span><span class="s">sslmode=disable&quot;</span>
+<span class="w">      </span><span class="nt">LH_STORAGE_DSN</span><span class="p">:</span><span class="w"> </span><span class="s">"host=postgres</span><span class="nv"> </span><span class="s">user=lighthouse</span><span class="nv"> </span><span class="s">password=changeme</span><span class="nv"> </span><span class="s">dbname=lighthouse</span><span class="nv"> </span><span class="s">sslmode=disable"</span>
 <span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./lighthouse/config.yaml:/config.yaml:ro</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./lighthouse/data:/data</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code>lighthouse.example.com {
-    reverse_proxy lighthouse:7672
-}
+<div class="highlight"><pre><span></span><code>lighthouse.example.com<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>lighthouse:7672
+<span class="p">}</span>
 </code></pre></div>
 <p>For separate admin API access (recommended for production):</p>
-<div class="highlight"><pre><span></span><code># Public federation endpoints
-lighthouse.example.com {
-    reverse_proxy lighthouse:7672
-}
+<div class="highlight"><pre><span></span><code><span class="c1"># Public federation endpoints</span>
+lighthouse.example.com<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>lighthouse:7672
+<span class="p">}</span>
 
-# Admin API (restrict access via firewall or Caddy matchers)
-admin.lighthouse.example.com {
-    reverse_proxy lighthouse:7673
-}
+<span class="c1"># Admin API (restrict access via firewall or Caddy matchers)</span>
+admin.lighthouse.example.com<span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">reverse_proxy</span><span class="w"> </span>lighthouse:7673
+<span class="p">}</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -2055,7 +2055,7 @@ admin.lighthouse.example.com {
 <span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7672</span>
 
 <span class="c1"># Entity identifier - CHANGE THIS to your domain</span>
-<span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://lighthouse.example.com&quot;</span>
+<span class="nt">entity_id</span><span class="p">:</span><span class="w"> </span><span class="s">"https://lighthouse.example.com"</span>
 
 <span class="c1"># Signing configuration</span>
 <span class="nt">signing</span><span class="p">:</span>
@@ -2063,7 +2063,7 @@ admin.lighthouse.example.com {
 <span class="w">  </span><span class="nt">pk_backend</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db</span>
 <span class="w">  </span><span class="nt">auto_generate_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">  </span><span class="nt">filesystem</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">key_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/data/keys&quot;</span>
+<span class="w">    </span><span class="nt">key_dir</span><span class="p">:</span><span class="w"> </span><span class="s">"/data/keys"</span>
 
 <span class="c1"># Storage configuration</span>
 <span class="nt">storage</span><span class="p">:</span>
@@ -2098,8 +2098,8 @@ DB-managed options are configured with <code>lhsetup</code> or the Admin API.</p
 <p class="admonition-title">Environment Variables</p>
 <p>Configuration can also be passed via environment variables:</p>
 <div class="highlight"><pre><span></span><code><span class="nt">environment</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">LH_STORAGE_DSN</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;host=postgres</span><span class="nv"> </span><span class="s">user=lighthouse</span><span class="nv"> </span><span class="s">password=${DB_PASSWORD}</span><span class="nv"> </span><span class="s">dbname=lighthouse&quot;</span>
-<span class="w">  </span><span class="nt">LH_ENTITY_ID</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://lighthouse.example.com&quot;</span>
+<span class="w">  </span><span class="nt">LH_STORAGE_DSN</span><span class="p">:</span><span class="w"> </span><span class="s">"host=postgres</span><span class="nv"> </span><span class="s">user=lighthouse</span><span class="nv"> </span><span class="s">password=${DB_PASSWORD}</span><span class="nv"> </span><span class="s">dbname=lighthouse"</span>
+<span class="w">  </span><span class="nt">LH_ENTITY_ID</span><span class="p">:</span><span class="w"> </span><span class="s">"https://lighthouse.example.com"</span>
 </code></pre></div>
 <p>See <a href="../../config/static/#environment-variables">Configuration</a> for details.</p>
 </div>
@@ -2124,8 +2124,8 @@ and flags.</p>
 <h4 id="1-create-an-admin-user">1. Create an Admin User<a class="headerlink" href="#1-create-an-admin-user" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><span class="c1"># Via API (basic auth disabled initially if no users exist)</span>
 curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://lighthouse.example.com/api/v1/admin/users<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;username&quot;: &quot;admin&quot;, &quot;password&quot;: &quot;your-secure-password&quot;}&#39;</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"username": "admin", "password": "your-secure-password"}'</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Authentication Behavior</p>
@@ -2134,27 +2134,27 @@ curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </spa
 <h4 id="2-configure-federation-metadata">2. Configure Federation Metadata<a class="headerlink" href="#2-configure-federation-metadata" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>https://lighthouse.example.com/api/v1/admin/entity-configuration/metadata/federation_entity<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-u<span class="w"> </span>admin:your-secure-password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;organization_name&quot;: &quot;Example Organization&quot;,</span>
-<span class="s1">    &quot;homepage_uri&quot;: &quot;https://example.com&quot;,</span>
-<span class="s1">    &quot;contacts&quot;: [&quot;admin@example.com&quot;]</span>
-<span class="s1">  }&#39;</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "organization_name": "Example Organization",</span>
+<span class="s1">    "homepage_uri": "https://example.com",</span>
+<span class="s1">    "contacts": ["admin@example.com"]</span>
+<span class="s1">  }'</span>
 </code></pre></div>
 <h4 id="3-set-authority-hints-if-not-a-trust-anchor">3. Set Authority Hints (if not a Trust Anchor)<a class="headerlink" href="#3-set-authority-hints-if-not-a-trust-anchor" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://lighthouse.example.com/api/v1/admin/entity-configuration/authority-hints<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-u<span class="w"> </span>admin:your-secure-password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;entity_id&quot;: &quot;https://trust-anchor.example.org&quot;}&#39;</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"entity_id": "https://trust-anchor.example.org"}'</span>
 </code></pre></div>
 <h4 id="4-configure-trust-mark-issuance-optional">4. Configure Trust Mark Issuance (optional)<a class="headerlink" href="#4-configure-trust-mark-issuance-optional" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://lighthouse.example.com/api/v1/admin/trust-marks/issuance-spec<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-u<span class="w"> </span>admin:your-secure-password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;trust_mark_type&quot;: &quot;https://lighthouse.example.com/trustmarks/member&quot;,</span>
-<span class="s1">    &quot;lifetime&quot;: &quot;8760h&quot;</span>
-<span class="s1">  }&#39;</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "trust_mark_type": "https://lighthouse.example.com/trustmarks/member",</span>
+<span class="s1">    "lifetime": "8760h"</span>
+<span class="s1">  }'</span>
 </code></pre></div>
 <h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h2>
 <p>Check that LightHouse is running correctly:</p>

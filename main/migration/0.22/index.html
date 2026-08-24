@@ -2145,8 +2145,8 @@ curl<span class="w"> </span>https://localhost:8080/.well-known/openid-federation
 <p>After migration, you can enable automatic JWKS refreshing for individual trust
 anchors via the Admin API:</p>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;entity_id&quot;:&quot;https://ta.example.com&quot;,&quot;enable_jwks_update&quot;:true,&quot;key_poll_interval&quot;:3600}&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"entity_id":"https://ta.example.com","enable_jwks_update":true,"key_poll_interval":3600}'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/trust-anchors/https://ta.example.com
 </code></pre></div>
 <h2 id="what-gets-migrated">What Gets Migrated<a class="headerlink" href="#what-gets-migrated" title="Permanent link">&para;</a></h2>
@@ -2357,14 +2357,14 @@ migration:</p>
 </table>
 <div class="highlight"><pre><span></span><code><span class="c1"># Create the JWKS Update Trigger endpoint</span>
 curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;type&quot;:&quot;jwks_update_trigger&quot;,&quot;path&quot;:&quot;/jwks/update-trigger&quot;,&quot;auth_enabled&quot;:false}&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"type":"jwks_update_trigger","path":"/jwks/update-trigger","auth_enabled":false}'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/federation-endpoints
 
 <span class="c1"># Create the JWKS Update endpoint</span>
 curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;type&quot;:&quot;jwks_update&quot;,&quot;path&quot;:&quot;/jwks/update&quot;}&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"type":"jwks_update","path":"/jwks/update"}'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/federation-endpoints
 </code></pre></div>
 <p>See <a href="../../features/subordinate_jwks_refresh/">Subordinate JWKS Refreshing</a> for

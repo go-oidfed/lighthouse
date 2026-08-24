@@ -2028,12 +2028,12 @@ OpenID Federation Specification. Managed as a JSON object via the Admin API.</p>
 <details class="example">
 <summary>Example constraints object</summary>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;max_path_len&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;naming_constraints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;permitted&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;.example.com&quot;</span><span class="p">],</span>
-<span class="w">    </span><span class="nt">&quot;excluded&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;east.example.com&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="nt">"max_path_len"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"naming_constraints"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"permitted"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">".example.com"</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">"excluded"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"east.example.com"</span><span class="p">]</span>
 <span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;allowed_entity_types&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;openid_provider&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;openid_relying_party&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="nt">"allowed_entity_types"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"openid_provider"</span><span class="p">,</span><span class="w"> </span><span class="s2">"openid_relying_party"</span><span class="p">]</span>
 <span class="p">}</span>
 </code></pre></div>
 </details>
@@ -2149,9 +2149,9 @@ individually marked as critical.</p>
 <details class="example">
 <summary>Example additional claim</summary>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;claim&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;custom_scope&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;read write&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;crit&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="nt">"claim"</span><span class="p">:</span><span class="w"> </span><span class="s2">"custom_scope"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="s2">"read write"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"crit"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
 <span class="p">}</span>
 </code></pre></div>
 </details>
@@ -2236,22 +2236,22 @@ Admin API:</p>
 <details class="example">
 <summary>Create a subordinate</summary>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{</span>
-<span class="s1">    &quot;entity_id&quot;: &quot;https://sub.example.com&quot;,</span>
-<span class="s1">    &quot;status&quot;: &quot;active&quot;,</span>
-<span class="s1">    &quot;jwks&quot;: {&quot;keys&quot;: [...]},</span>
-<span class="s1">    &quot;enable_jwks_update&quot;: true,</span>
-<span class="s1">    &quot;jwks_poll_interval&quot;: 3600</span>
-<span class="s1">  }&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">    "entity_id": "https://sub.example.com",</span>
+<span class="s1">    "status": "active",</span>
+<span class="s1">    "jwks": {"keys": [...]},</span>
+<span class="s1">    "enable_jwks_update": true,</span>
+<span class="s1">    "jwks_poll_interval": 3600</span>
+<span class="s1">  }'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/subordinates
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Update a subordinate (PATCH for partial updates)</summary>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>PATCH<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;enable_jwks_update&quot;: true, &quot;jwks_poll_interval&quot;: 7200}&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"enable_jwks_update": true, "jwks_poll_interval": 7200}'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>https://localhost:8081/api/v1/admin/subordinates/<span class="o">{</span>subordinateID<span class="o">}</span>
 </code></pre></div>
 </details>
