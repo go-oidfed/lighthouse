@@ -4,6 +4,7 @@
 
 - Fixed a bug where the subrodinate fetch endpoint would return valid subordinate statements for non-active entities (e.g. blocked).
 - Fixed a bug where deleting a trust mark type's owner did not release its `entity_id` for reuse.
+- Fixed the trust mark status endpoint reporting expired trust marks as `invalid` instead of `expired`.
 
 ## LightHouse 0.22.1
 

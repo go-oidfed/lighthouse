@@ -139,7 +139,7 @@ func (fed *LightHouse) determineTrustMarkStatus(
 		return model.TrustMarkStatusInvalid, err
 	}
 
-	_, err = jwt.Parse([]byte(trustMarkJWT), jwt.WithKeySet(jwks.Set))
+	_, err = jwt.Parse([]byte(trustMarkJWT), jwt.WithKeySet(jwks.Set), jwt.WithValidate(false))
 	if err != nil {
 		// Signature verification failed
 		return model.TrustMarkStatusInvalid, nil
