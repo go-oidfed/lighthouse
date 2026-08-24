@@ -7,7 +7,7 @@ require (
 	github.com/dgraph-io/badger/v4 v4.9.6
 	github.com/fatih/structs v1.1.0
 	github.com/go-oidfed/lib v0.11.1
-	github.com/gofiber/fiber/v2 v2.52.14
+	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/google/uuid v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lestrrat-go/jwx/v4 v4.2.0
