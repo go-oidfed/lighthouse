@@ -1,6 +1,12 @@
+## LightHouse 0.22.2
+
+### Bug Fixes
+
+- Fixed a bug where the subrodinate fetch endpoint would return valid subordinate statements for non-active entities (e.g. blocked).
+
 ## LightHouse 0.22.1
 
-#### Features
+### Features
 - Added two new Entity Checkers:
   - **`cmd`** — runs an external command per entity; writes the Entity Configuration payload to stdin and exposes `ENTITY_ID`/`ENTITY_TYPES` env vars. Exit 0 allows; non-zero denies (stderr used as description).
   - **`http`** — sends a per-entity HTTP request to a decision service (default `POST`, default body_mode `entity_configuration`). 2xx allows; 4xx denies with status passthrough; 5xx/network errors return 502. Unlike `http_list`, this delegates the decision to the remote service on every request (no caching).
