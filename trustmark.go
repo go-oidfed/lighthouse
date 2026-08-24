@@ -1,6 +1,7 @@
 package lighthouse
 
 import (
+	"maps"
 	"time"
 
 	"github.com/go-oidfed/lib/jwx"
@@ -297,7 +298,10 @@ func (*LightHouse) runChecker(
 	return true, 0, ""
 }
 
-// issueAndSendTrustMarkWithClaims issues a trust mark with merged additional claims.
+// issueAndSendTrustMarkWithClaims issues a trust mark.
+// The claims are either the subject-specific additional claims or the spec's
+// general additional claims (subject claims take precedence); they are not
+// merged. The JTI is always added.
 // If caching is enabled (via TrustMarkSpec.CacheTTL), it will return a cached trust mark if available.
 func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 	ctx *fiber.Ctx,
@@ -319,27 +323,30 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 		}
 	}
 
-	// Get subject-specific additional claims
-	var subjectClaims map[string]any
+	// Determine the base claims for this issuance.
+	// The lib's IssueTrustMarkWithOptions uses SubjectClaims exclusively, so the
+	// chosen claim set (subject-specific if present, otherwise the spec's general
+	// additional_claims) is provided here. They are not merged.
+	var baseClaims map[string]any
 	if dbSpec != nil && config.SpecStore != nil {
-		// Try to get subject-specific claims
+		// Prefer subject-specific claims over the spec's general claims.
 		subject, err := config.SpecStore.GetSubject(dbSpec.TrustMarkType, sub)
-		if err == nil && subject != nil {
-			subjectClaims = subject.AdditionalClaims
+		if err == nil && subject != nil && len(subject.AdditionalClaims) > 0 {
+			baseClaims = subject.AdditionalClaims
+		} else if len(dbSpec.AdditionalClaims) > 0 {
+			baseClaims = dbSpec.AdditionalClaims
 		}
 	}
 
 	// Generate JTI (JWT ID) for this issuance
 	jti := uuid.New().String()
 
-	// Merge JTI into subject claims
-	if subjectClaims == nil {
-		subjectClaims = make(map[string]any)
-	}
+	// Copy the base claims into a fresh map so the stored models are not
+	// mutated, then add the JTI.
+	subjectClaims := make(map[string]any, len(baseClaims)+1)
+	maps.Copy(subjectClaims, baseClaims)
 	subjectClaims["jti"] = jti
 
-	// Use IssueTrustMarkWithOptions which handles claim merging
-	// (spec.Extra claims are already loaded via the TrustMarkSpecProvider)
 	tm, expiresAt, err := fed.IssueTrustMarkWithOptions(
 		trustMarkType, sub, oidfed.IssueTrustMarkOptions{
 			SubjectClaims: subjectClaims,
