@@ -311,7 +311,7 @@ func (h *subordinatePolicyHandlers) putAll(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -335,7 +335,7 @@ func (h *subordinatePolicyHandlers) postAll(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -369,7 +369,7 @@ func (h *subordinatePolicyHandlers) deleteAll(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -415,7 +415,7 @@ func (h *subordinatePolicyHandlers) putEntityType(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -449,7 +449,7 @@ func (h *subordinatePolicyHandlers) postEntityType(c *fiber.Ctx) error {
 	var result oidfed.MetadataPolicy
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -484,7 +484,7 @@ func (h *subordinatePolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -539,7 +539,7 @@ func (h *subordinatePolicyHandlers) putClaim(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -574,7 +574,7 @@ func (h *subordinatePolicyHandlers) postClaim(c *fiber.Ctx) error {
 	var result oidfed.MetadataPolicyEntry
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -615,7 +615,7 @@ func (h *subordinatePolicyHandlers) deleteClaim(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -685,7 +685,7 @@ func (h *subordinatePolicyHandlers) putOperator(c *fiber.Ctx) error {
 	var created bool
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -735,7 +735,7 @@ func (h *subordinatePolicyHandlers) deleteOperator(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}

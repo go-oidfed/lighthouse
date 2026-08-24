@@ -62,7 +62,7 @@ func (h *subordinateConstraintsHandlers) putAll(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -86,7 +86,7 @@ func (h *subordinateConstraintsHandlers) postAll(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -120,7 +120,7 @@ func (h *subordinateConstraintsHandlers) deleteAll(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -163,7 +163,7 @@ func (h *subordinateConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -191,7 +191,7 @@ func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -234,7 +234,7 @@ func (h *subordinateConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) erro
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -262,7 +262,7 @@ func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) e
 
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -306,7 +306,7 @@ func (h *subordinateConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) err
 	var result []string
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -340,7 +340,7 @@ func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) er
 	var result []string
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -375,7 +375,7 @@ func (h *subordinateConstraintsHandlers) deleteAllowedEntityType(c *fiber.Ctx) e
 	var result []string
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			info, err := getSubordinateByDBID(tx.Subordinates, id)
+			info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}

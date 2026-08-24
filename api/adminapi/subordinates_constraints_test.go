@@ -1466,3 +1466,128 @@ func TestSubordinateConstraintsEdgeCases(t *testing.T) {
 		},
 	)
 }
+
+// --- REGRESSION: constraints writes must not freeze the general metadata policy ---
+
+// TestSubordinateConstraintsWriteDoesNotFreezeMetadataPolicy verifies that a
+// constraints write on a subordinate without its own metadata policy does not
+// materialize the general metadata policy as a frozen snapshot on the
+// subordinate (see bug: "PUT /subordinates/{id}/constraints silently freezes
+// that subordinate's metadata policy"). The subordinate must keep live-following
+// the general policy after constraints writes.
+func TestSubordinateConstraintsWriteDoesNotFreezeMetadataPolicy(t *testing.T) {
+	t.Parallel()
+
+	generalPolicy := func(value string) *oidfed.MetadataPolicies {
+		return &oidfed.MetadataPolicies{
+			FederationEntity: oidfed.MetadataPolicy{
+				"organization_name": oidfed.MetadataPolicyEntry{"value": value},
+			},
+		}
+	}
+
+	setGeneralPolicy := func(t *testing.T, backends model.Backends, mp *oidfed.MetadataPolicies) {
+		t.Helper()
+		if err := backends.KV.SetAny(
+			model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy, mp,
+		); err != nil {
+			t.Fatalf("Failed to set general metadata policy: %v", err)
+		}
+	}
+
+	// The value a subordinate's statement resolves to (general fallback applied).
+	resolvedOrganizationName := func(t *testing.T, backends model.Backends, entityID string) any {
+		t.Helper()
+		info, err := backends.Subordinates.Get(entityID)
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
+		if info.MetadataPolicy == nil {
+			t.Fatalf("Expected resolved metadata policy, got nil")
+		}
+		entry := info.MetadataPolicy.FederationEntity["organization_name"]
+		if entry == nil {
+			t.Fatalf("Expected organization_name policy entry, got %+v", info.MetadataPolicy)
+		}
+		return entry["value"]
+	}
+
+	setup := func(t *testing.T) (*fiber.App, model.Backends, string) {
+		t.Helper()
+		app, backends := setupSubordinateConstraintsApp(t)
+		backends.Subordinates.Add(
+			model.ExtendedSubordinateInfo{
+				BasicSubordinateInfo: model.BasicSubordinateInfo{
+					EntityID: "https://constraints-no-freeze.example.org",
+				},
+			},
+		)
+		saved, err := backends.Subordinates.Get("https://constraints-no-freeze.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
+		return app, backends, fmt.Sprintf("%d", saved.ID)
+	}
+
+	t.Run(
+		"PutAll", func(t *testing.T) {
+			t.Parallel()
+			app, backends, id := setup(t)
+			const entityID = "https://constraints-no-freeze.example.org"
+
+			setGeneralPolicy(t, backends, generalPolicy("v1"))
+			if got := resolvedOrganizationName(t, backends, entityID); got != "v1" {
+				t.Fatalf("Expected subordinate to live-follow general policy 'v1', got %v", got)
+			}
+
+			body := fmt.Sprintf(
+				`{"allowed_entity_types": ["%s"]}`, oidfedconst.EntityTypeOpenIDProvider,
+			)
+			req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%s/constraints", id), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, respBody := doRequest(t, app, req)
+			requireStatus(t, resp, respBody, http.StatusOK)
+
+			// The constraints write must not have persisted a metadata policy snapshot.
+			raw, err := backends.Subordinates.GetByDBIDRaw(id)
+			if err != nil {
+				t.Fatalf("Failed to get raw subordinate: %v", err)
+			}
+			if raw.MetadataPolicy != nil {
+				t.Fatalf("Constraints write materialized the general metadata policy onto the subordinate")
+			}
+
+			setGeneralPolicy(t, backends, generalPolicy("v2"))
+			if got := resolvedOrganizationName(t, backends, entityID); got != "v2" {
+				t.Fatalf("Expected subordinate to keep live-following general policy 'v2', got %v", got)
+			}
+		},
+	)
+
+	t.Run(
+		"DeleteAll", func(t *testing.T) {
+			t.Parallel()
+			app, backends, id := setup(t)
+			const entityID = "https://constraints-no-freeze.example.org"
+
+			setGeneralPolicy(t, backends, generalPolicy("v1"))
+
+			req := httptest.NewRequest("DELETE", fmt.Sprintf("/subordinates/%s/constraints", id), http.NoBody)
+			resp, respBody := doRequest(t, app, req)
+			requireStatus(t, resp, respBody, http.StatusNoContent)
+
+			raw, err := backends.Subordinates.GetByDBIDRaw(id)
+			if err != nil {
+				t.Fatalf("Failed to get raw subordinate: %v", err)
+			}
+			if raw.MetadataPolicy != nil {
+				t.Fatalf("Constraints delete materialized the general metadata policy onto the subordinate")
+			}
+
+			setGeneralPolicy(t, backends, generalPolicy("v2"))
+			if got := resolvedOrganizationName(t, backends, entityID); got != "v2" {
+				t.Fatalf("Expected subordinate to keep live-following general policy 'v2', got %v", got)
+			}
+		},
+	)
+}

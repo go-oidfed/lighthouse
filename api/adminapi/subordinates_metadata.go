@@ -61,7 +61,7 @@ func handlePutSubordinateMetadata(storages model.Backends) fiber.Handler {
 		var result *oidfed.Metadata
 		err := storages.InTransaction(
 			func(tx *model.Backends) error {
-				info, err := tx.Subordinates.GetByDBID(id)
+				info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 				if err != nil {
 					return err
 				}
@@ -121,7 +121,7 @@ func handlePutSubordinateMetadataEntityType(storages model.Backends) fiber.Handl
 		var result map[string]any
 		err := storages.InTransaction(
 			func(tx *model.Backends) error {
-				info, err := tx.Subordinates.GetByDBID(id)
+				info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 				if err != nil {
 					return err
 				}
@@ -170,7 +170,7 @@ func handlePostSubordinateMetadataEntityType(storages model.Backends) fiber.Hand
 		var result map[string]any
 		err := storages.InTransaction(
 			func(tx *model.Backends) error {
-				info, err := tx.Subordinates.GetByDBID(id)
+				info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 				if err != nil {
 					return err
 				}
@@ -219,7 +219,7 @@ func handleDeleteSubordinateMetadataEntityType(storages model.Backends) fiber.Ha
 
 		err := storages.InTransaction(
 			func(tx *model.Backends) error {
-				info, err := tx.Subordinates.GetByDBID(id)
+				info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 				if err != nil {
 					return err
 				}
@@ -289,7 +289,7 @@ func handlePutSubordinateMetadataClaim(storages model.Backends) fiber.Handler {
 		var created bool
 		err := storages.InTransaction(
 			func(tx *model.Backends) error {
-				info, err := tx.Subordinates.GetByDBID(id)
+				info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 				if err != nil {
 					return err
 				}
@@ -347,7 +347,7 @@ func handleDeleteSubordinateMetadataClaim(storages model.Backends) fiber.Handler
 
 		err := storages.InTransaction(
 			func(tx *model.Backends) error {
-				info, err := tx.Subordinates.GetByDBID(id)
+				info, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 				if err != nil {
 					return err
 				}

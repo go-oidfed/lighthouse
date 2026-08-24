@@ -148,7 +148,7 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 	var result *model.ExtendedSubordinateInfo
 	err := h.storages.InTransaction(
 		func(tx *model.Backends) error {
-			existing, err := getSubordinateByDBID(tx.Subordinates, id)
+			existing, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
@@ -178,7 +178,14 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 			); err != nil {
 				return err
 			}
-			result = existing
+			// Re-read with general fallbacks so the response is consistent with GET.
+			result, err = tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if result == nil {
+				return model.NotFoundError("subordinate not found")
+			}
 			return nil
 		},
 	)

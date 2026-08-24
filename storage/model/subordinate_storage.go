@@ -36,6 +36,12 @@ type SubordinateStorageBackend interface {
 	UpdateJWKSByEntityID(entityID string, jwks JWKS) error
 	Get(entityID string) (*ExtendedSubordinateInfo, error)
 	GetByDBID(id string) (*ExtendedSubordinateInfo, error)
+	// GetByDBIDRaw retrieves a subordinate by DB primary key without applying
+	// general fallbacks, returning exactly what is persisted for the
+	// subordinate. Write handlers must use this as the base for full-row
+	// updates so that fallback-resolved general values are never silently
+	// materialized into the subordinate's own row.
+	GetByDBIDRaw(id string) (*ExtendedSubordinateInfo, error)
 	GetAll() ([]BasicSubordinateInfo, error)
 	GetByStatus(status Status) ([]BasicSubordinateInfo, error)
 	GetByEntityTypes(entityTypes []string) ([]BasicSubordinateInfo, error)

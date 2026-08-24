@@ -177,6 +177,46 @@ func (s *SubordinateStorage) UpdateStatus(entityID string, status model.Status) 
 
 // Get retrieves a subordinate by entity ID
 func (s *SubordinateStorage) Get(entityID string) (*model.ExtendedSubordinateInfo, error) {
+	dbInfo, err := s.loadByEntityID(entityID)
+	if err != nil {
+		return nil, err
+	}
+	if dbInfo == nil {
+		return nil, nil
+	}
+	if err := s.applyGeneralFallbacks(dbInfo); err != nil {
+		return nil, err
+	}
+	return dbInfo, nil
+}
+
+// GetByDBID retrieves a subordinate by DB primary key
+func (s *SubordinateStorage) GetByDBID(id string) (*model.ExtendedSubordinateInfo, error) {
+	dbInfo, err := s.loadByDBID(id)
+	if err != nil {
+		return nil, err
+	}
+	if dbInfo == nil {
+		return nil, nil
+	}
+	if err := s.applyGeneralFallbacks(dbInfo); err != nil {
+		return nil, err
+	}
+	return dbInfo, nil
+}
+
+// GetByDBIDRaw retrieves a subordinate by DB primary key without applying
+// general fallbacks. It returns exactly what is persisted for the subordinate.
+// Write handlers must use this as the base for full-row updates so that
+// fallback-resolved general values (metadata policy, metadata, constraints)
+// are never silently materialized into the subordinate's own row.
+func (s *SubordinateStorage) GetByDBIDRaw(id string) (*model.ExtendedSubordinateInfo, error) {
+	return s.loadByDBID(id)
+}
+
+// loadByEntityID loads a subordinate row by entity ID with its associations,
+// without applying general fallbacks. Returns nil if the record does not exist.
+func (s *SubordinateStorage) loadByEntityID(entityID string) (*model.ExtendedSubordinateInfo, error) {
 	var dbInfo model.ExtendedSubordinateInfo
 	result := s.db.Where(
 		"entity_id = ?", entityID,
@@ -187,14 +227,12 @@ func (s *SubordinateStorage) Get(entityID string) (*model.ExtendedSubordinateInf
 		}
 		return nil, fmt.Errorf("failed to find entity: %w", result.Error)
 	}
-	if err := s.applyGeneralFallbacks(&dbInfo); err != nil {
-		return nil, err
-	}
 	return &dbInfo, nil
 }
 
-// GetByDBID retrieves a subordinate by DB primary key
-func (s *SubordinateStorage) GetByDBID(id string) (*model.ExtendedSubordinateInfo, error) {
+// loadByDBID loads a subordinate row by DB primary key with its associations,
+// without applying general fallbacks. Returns nil if the record does not exist.
+func (s *SubordinateStorage) loadByDBID(id string) (*model.ExtendedSubordinateInfo, error) {
 	var dbInfo model.ExtendedSubordinateInfo
 	result := s.db.Preload("SubordinateEntityTypes").Preload("SubordinateAdditionalClaims").Preload("JWKS").First(
 		&dbInfo, id,
@@ -204,9 +242,6 @@ func (s *SubordinateStorage) GetByDBID(id string) (*model.ExtendedSubordinateInf
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to find entity: %w", result.Error)
-	}
-	if err := s.applyGeneralFallbacks(&dbInfo); err != nil {
-		return nil, err
 	}
 	return &dbInfo, nil
 }

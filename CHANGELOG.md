@@ -5,6 +5,7 @@
 - Fixed a bug where the subrodinate fetch endpoint would return valid subordinate statements for non-active entities (e.g. blocked).
 - Fixed a bug where deleting a trust mark type's owner did not release its `entity_id` for reuse.
 - Fixed the trust mark status endpoint reporting expired trust marks as `invalid` instead of `expired`.
+- Fixed a bug where writing constraints (or other subordinate-specific values such as metadata or a metadata policy) on a subordinate without its own metadata policy silently materialized the general metadata policy into the subordinate's row, freezing it and decoupling it from future general-policy changes. Subordinate-specific writes now persist only what is explicitly set; unaffected values keep live-following the general policy until explicitly synced via `POST /subordinates/{id}/metadata-policies` or `POST /subordinates/{id}/constraints`.
 
 ## LightHouse 0.22.1
 

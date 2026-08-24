@@ -62,6 +62,25 @@ func getSubordinateByDBID(subordinates model.SubordinateStorageBackend, dbID str
 	return info, nil
 }
 
+// getSubordinateByDBIDForUpdate retrieves a subordinate by database ID without
+// applying general fallbacks, returning an error if not found. It is intended
+// as the base for full-row updates: only explicitly persisted subordinate
+// values are returned, so writing the struct back via Update can never
+// silently materialize the general metadata policy, metadata, or constraints
+// as a frozen snapshot on the subordinate.
+func getSubordinateByDBIDForUpdate(subordinates model.SubordinateStorageBackend, dbID string) (
+	*model.ExtendedSubordinateInfo, error,
+) {
+	info, err := subordinates.GetByDBIDRaw(dbID)
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		return nil, model.NotFoundError("subordinate not found")
+	}
+	return info, nil
+}
+
 // handleSubordinateLookup retrieves a subordinate and handles error responses.
 // Returns (info, true) on success, or (nil, false) if an error response was written.
 func handleSubordinateLookup(

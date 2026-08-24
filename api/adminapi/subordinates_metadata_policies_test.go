@@ -800,6 +800,82 @@ func TestDeleteSubordinateMetadataPolicyByEntityType(t *testing.T) {
 	)
 }
 
+// --- REGRESSION: metadata-policy writes must not freeze general values ---
+
+// TestSubordinateMetadataPolicyWriteDoesNotFreezeGeneralConstraints verifies
+// that a subordinate-specific metadata policy write persists only what was
+// explicitly set and does not materialize general constraints (or unrelated
+// general metadata policy entity types) as a frozen snapshot on the
+// subordinate. See bug: constraints writes silently freezing metadata policy.
+func TestSubordinateMetadataPolicyWriteDoesNotFreezeGeneralConstraints(t *testing.T) {
+	t.Parallel()
+
+	app, backends := setupSubordinateMetadataPoliciesApp(t)
+
+	const entityID = "https://mp-no-freeze.example.org"
+	backends.Subordinates.Add(
+		model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{EntityID: entityID},
+		},
+	)
+	saved, err := backends.Subordinates.Get(entityID)
+	if err != nil {
+		t.Fatalf("Failed to get subordinate: %v", err)
+	}
+
+	setGeneralConstraints := func(types []string) {
+		t.Helper()
+		if err := backends.KV.SetAny(
+			model.KeyValueScopeSubordinateStatement, model.KeyValueKeyConstraints,
+			&oidfed.ConstraintSpecification{AllowedEntityTypes: types},
+		); err != nil {
+			t.Fatalf("Failed to set general constraints: %v", err)
+		}
+	}
+
+	setGeneralConstraints([]string{"openid_provider"})
+
+	// Write a subordinate-specific metadata policy for one entity type.
+	body := `{"organization_name": {"value": "sub-org"}}`
+	req := httptest.NewRequest(
+		"PUT", fmt.Sprintf("/subordinates/%d/metadata-policies/federation_entity", saved.ID),
+		strings.NewReader(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	resp, respBody := doRequest(t, app, req)
+	requireStatus(t, resp, respBody, http.StatusOK)
+
+	// The write must not have materialized the general constraints onto the subordinate.
+	raw, err := backends.Subordinates.GetByDBIDRaw(fmt.Sprintf("%d", saved.ID))
+	if err != nil {
+		t.Fatalf("Failed to get raw subordinate: %v", err)
+	}
+	if raw.Constraints != nil {
+		t.Fatalf("Metadata policy write materialized the general constraints onto the subordinate")
+	}
+
+	// The stored policy must contain only the entity type that was explicitly set.
+	mp := requireMetadataPolicies(t, raw.MetadataPolicy)
+	if mp.OpenIDProvider != nil {
+		t.Fatalf("Metadata policy write snapshot an unrelated general entity type onto the subordinate")
+	}
+	if mp.FederationEntity == nil || mp.FederationEntity["organization_name"]["value"] != "sub-org" {
+		t.Fatalf("Expected federation_entity policy to be stored, got %+v", mp)
+	}
+
+	// Changing the general constraints must still live-follow for the subordinate.
+	setGeneralConstraints([]string{"oauth_client"})
+	resolved, err := backends.Subordinates.Get(entityID)
+	if err != nil {
+		t.Fatalf("Failed to get subordinate: %v", err)
+	}
+	if resolved.Constraints == nil ||
+		len(resolved.Constraints.AllowedEntityTypes) != 1 ||
+		resolved.Constraints.AllowedEntityTypes[0] != "oauth_client" {
+		t.Fatalf("Expected subordinate to keep live-following general constraints, got %+v", resolved.Constraints)
+	}
+}
+
 // --- GET /subordinates/:subordinateID/metadata-policies/:entityType/:claim TESTS ---
 
 func TestGetSubordinateMetadataPolicyByClaim(t *testing.T) {

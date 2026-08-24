@@ -16,6 +16,8 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"gorm.io/gorm"
 
+	oidfed "github.com/go-oidfed/lib"
+
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -605,6 +607,77 @@ func TestPutSubordinateByID(t *testing.T) {
 			assertErrorResponse(t, resp, respBody, http.StatusBadRequest, "invalid_request")
 		},
 	)
+}
+
+// --- REGRESSION: base updates must not freeze the general metadata policy ---
+
+// TestUpdateSubordinateDoesNotFreezeMetadataPolicy verifies that a generic
+// subordinate update (description etc.) does not materialize the general
+// metadata policy as a frozen snapshot on a subordinate without its own policy.
+func TestUpdateSubordinateDoesNotFreezeMetadataPolicy(t *testing.T) {
+	t.Parallel()
+
+	app, backends := setupSubordinateBaseApp(t)
+
+	const entityID = "https://base-update-no-freeze.example.org"
+	backends.Subordinates.Add(
+		model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: entityID,
+			},
+		},
+	)
+	saved, err := backends.Subordinates.Get(entityID)
+	if err != nil {
+		t.Fatalf("Failed to get subordinate: %v", err)
+	}
+
+	setGeneralPolicy := func(value string) {
+		t.Helper()
+		if err := backends.KV.SetAny(
+			model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicy,
+			&oidfed.MetadataPolicies{
+				FederationEntity: oidfed.MetadataPolicy{
+					"organization_name": oidfed.MetadataPolicyEntry{"value": value},
+				},
+			},
+		); err != nil {
+			t.Fatalf("Failed to set general metadata policy: %v", err)
+		}
+	}
+
+	resolvedValue := func() any {
+		t.Helper()
+		info, err := backends.Subordinates.Get(entityID)
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
+		return info.MetadataPolicy.FederationEntity["organization_name"]["value"]
+	}
+
+	setGeneralPolicy("v1")
+	if got := resolvedValue(); got != "v1" {
+		t.Fatalf("Expected subordinate to live-follow general policy 'v1', got %v", got)
+	}
+
+	body := `{"description": "New Description"}`
+	req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d", saved.ID), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, respBody := doRequest(t, app, req)
+	requireStatus(t, resp, respBody, http.StatusOK)
+
+	raw, err := backends.Subordinates.GetByDBIDRaw(fmt.Sprintf("%d", saved.ID))
+	if err != nil {
+		t.Fatalf("Failed to get raw subordinate: %v", err)
+	}
+	if raw.MetadataPolicy != nil {
+		t.Fatalf("Base update materialized the general metadata policy onto the subordinate")
+	}
+
+	setGeneralPolicy("v2")
+	if got := resolvedValue(); got != "v2" {
+		t.Fatalf("Expected subordinate to keep live-following general policy 'v2', got %v", got)
+	}
 }
 
 // --- PATCH /subordinates/:subordinateID TESTS ---
