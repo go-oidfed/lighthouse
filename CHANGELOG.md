@@ -3,6 +3,7 @@
 ### Bug Fixes
 
 - Fixed a bug where the subrodinate fetch endpoint would return valid subordinate statements for non-active entities (e.g. blocked).
+- Fixed a bug where deleting a trust mark type's owner did not release its `entity_id` for reuse.
 
 ## LightHouse 0.22.1
 

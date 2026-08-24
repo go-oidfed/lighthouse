@@ -580,18 +580,35 @@ func (s *TrustMarkTypesStorage) CreateOwner(ident string, req model.AddTrustMark
 			return nil, errors.Wrap(err, "trust_mark_types: get owner failed")
 		}
 	} else {
-		// Create new owner row
-		newOwner := &model.TrustMarkOwner{
-			EntityID: req.EntityID,
-			JWKS:     req.JWKS,
-		}
-		if err = s.db.Create(newOwner).Error; err != nil {
-			if isUniqueConstraintError(err) {
+		// Create new owner row, reactivating a soft-deleted owner with the same
+		// entity_id if one exists so the entity_id can be reused.
+		var existing model.TrustMarkOwner
+		result := s.db.Unscoped().Where("entity_id = ?", req.EntityID).First(&existing)
+		if result.Error == nil {
+			if existing.DeletedAt.Valid {
+				existing.DeletedAt = gorm.DeletedAt{}
+				existing.EntityID = req.EntityID
+				existing.JWKS = req.JWKS
+				if err = s.db.Save(&existing).Error; err != nil {
+					return nil, errors.Wrap(err, "trust_mark_types: owner reactivation failed")
+				}
+				owner = existing
+			} else {
 				return nil, model.AlreadyExistsError("trust mark owner already exists")
 			}
-			return nil, errors.Wrap(err, "trust_mark_types: create owner failed")
+		} else {
+			newOwner := &model.TrustMarkOwner{
+				EntityID: req.EntityID,
+				JWKS:     req.JWKS,
+			}
+			if err = s.db.Create(newOwner).Error; err != nil {
+				if isUniqueConstraintError(err) {
+					return nil, model.AlreadyExistsError("trust mark owner already exists")
+				}
+				return nil, errors.Wrap(err, "trust_mark_types: create owner failed")
+			}
+			owner = *newOwner
 		}
-		owner = *newOwner
 	}
 	// Attach to type
 	item.OwnerID = &owner.ID
@@ -633,6 +650,20 @@ func (s *TrustMarkTypesStorage) UpdateOwner(ident string, req model.AddTrustMark
 			return nil, model.NotFoundError("trust mark owner not found")
 		}
 		return nil, errors.Wrap(err, "trust_mark_types: get owner failed")
+	}
+	// Free the target entity_id if it is held by a soft-deleted owner so that a
+	// previously deleted entity_id can be reused on rename.
+	var stale model.TrustMarkOwner
+	if err = s.db.Unscoped().
+		Where("entity_id = ? AND id <> ?", req.EntityID, owner.ID).
+		First(&stale).Error; err == nil {
+		if stale.DeletedAt.Valid {
+			if err = s.db.Unscoped().Delete(&model.TrustMarkOwner{}, stale.ID).Error; err != nil {
+				return nil, errors.Wrap(err, "trust_mark_types: delete stale owner failed")
+			}
+		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.Wrap(err, "trust_mark_types: resolve owner entity_id failed")
 	}
 	owner.EntityID = req.EntityID
 	owner.JWKS = req.JWKS
