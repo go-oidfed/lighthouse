@@ -317,6 +317,45 @@ func TestFetchEndpoint_CacheHitMiss(t *testing.T) {
 	require.True(t, set)
 }
 
+// TestFetchEndpoint_NonActiveSubordinate verifies that the fetch endpoint does
+// not issue a subordinate statement for a blocked, pending or inactive
+// subordinate: it returns 404 (indistinguishable from an unknown entity) and
+// does not populate the statement cache. Must NOT use t.Parallel() — operates
+// on the global cache.
+func TestFetchEndpoint_NonActiveSubordinate(t *testing.T) {
+	jwks := jwx.NewJWKS()
+	require.NoError(t, jwks.AddKey(testKeyWithKID(t, "key-1")))
+
+	statuses := []model.Status{model.StatusBlocked, model.StatusPending, model.StatusInactive}
+	for _, status := range statuses {
+		status := status
+		t.Run(status.String(), func(t *testing.T) {
+			entityID := "https://fetch-nonactive.example.org/" + status.String()
+			cacheKey := internal.SubordinateStatementCacheKey(entityID)
+			_ = cache.Delete(cacheKey)
+			t.Cleanup(func() { _ = cache.Delete(cacheKey) })
+
+			app, _ := setupFetchTestApp(t, model.ExtendedSubordinateInfo{
+				BasicSubordinateInfo: model.BasicSubordinateInfo{
+					EntityID: entityID,
+					Status:   status,
+				},
+				JWKS: model.JWKS{Keys: jwks},
+			})
+
+			req := httptest.NewRequest("GET", "/fetch?sub="+entityID, nil)
+			resp, body := doRequestRaw(t, app, req)
+			assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+			assert.NotEqual(t, "signed-statement-jwt", string(body))
+
+			var cached []byte
+			set, err := cache.Get(cacheKey, &cached)
+			require.NoError(t, err)
+			assert.False(t, set, "no statement should be cached for a non-active subordinate")
+		})
+	}
+}
+
 // doRequestRaw executes a request against the app and returns the raw response.
 func doRequestRaw(t *testing.T, app *fiber.App, req *http.Request) (*http.Response, []byte) {
 	t.Helper()

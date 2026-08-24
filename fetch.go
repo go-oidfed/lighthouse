@@ -58,6 +58,10 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 			ctx.Status(fiber.StatusNotFound)
 			return ctx.JSON(oidfed.ErrorNotFound("the requested entity identifier is not found"))
 		}
+		if info.Status != model.StatusActive {
+			ctx.Status(fiber.StatusNotFound)
+			return ctx.JSON(oidfed.ErrorNotFound("the requested entity identifier is not found"))
+		}
 		payload := fed.CreateSubordinateStatement(info)
 		jwt, err := fed.SignEntityStatement(payload)
 		if err != nil {
