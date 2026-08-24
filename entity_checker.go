@@ -11,6 +11,8 @@ import (
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/apimodel"
 	"github.com/go-oidfed/lib/jwx"
+
+	"github.com/go-oidfed/lighthouse/internal/utils"
 )
 
 // EntityChecker is an interface used to check if an entity satisfies
@@ -94,6 +96,9 @@ func EntityCheckerFromJSONConfig(checkerType string, config any) (EntityChecker,
 
 	// Convert to yaml.Node by marshaling and unmarshaling
 	if config != nil {
+		// Normalize trust_anchors so both entity-id strings and inline
+		// {"entity_id": ...} objects are accepted.
+		config = utils.NormalizeTrustAnchors(config)
 		yamlBytes, err := yaml.Marshal(config)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to marshal config to yaml")

@@ -1,3 +1,10 @@
+## LightHouse 0.22.3
+
+### Enhancements
+
+- DB-backed entity checker configs (trust mark `eligibility_config` and enroll checkers) now accept `trust_anchors` 
+  given as both the entity-ID string form and the object form; object entries are normalized to entity-ID references.
+
 ## LightHouse 0.22.2
 
 ### Bug Fixes

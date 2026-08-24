@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 
+	"github.com/go-oidfed/lighthouse/internal/utils"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -133,34 +134,7 @@ func ConvertCheckerConfig(node *yaml.Node) (string, any) {
 }
 
 func transformTrustAnchorsInValue(v any) {
-	switch val := v.(type) {
-	case map[string]any:
-		for k, item := range val {
-			if k == "trust_anchors" {
-				if arr, ok := item.([]any); ok {
-					var ids []string
-					for _, entry := range arr {
-						if s, ok := entry.(string); ok {
-							ids = append(ids, s)
-						} else if mp, ok := entry.(map[string]any); ok {
-							if eid, ok := mp["entity_id"].(string); ok {
-								ids = append(ids, eid)
-							}
-						}
-					}
-					if len(ids) > 0 {
-						val[k] = ids
-					}
-				}
-				continue
-			}
-			transformTrustAnchorsInValue(item)
-		}
-	case []any:
-		for _, item := range val {
-			transformTrustAnchorsInValue(item)
-		}
-	}
+	utils.NormalizeTrustAnchors(v)
 }
 
 // ParseJWKSFile reads and parses a JWKS file into a model.JWKS.

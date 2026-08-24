@@ -64,6 +64,12 @@ parameters:
 | `entity_id` | REQUIRED  | The Entity ID of the Trust Anchor                                                |
 | `jwks`      | OPTIONAL  | The Trust Anchor's jwks; if omitted it is obtained from its Entity Configuration |
 
+When configuring checkers through the database (enroll endpoint or trust mark
+`eligibility_config`), `trust_anchors` is stored as a list of **entity ID
+strings**, e.g. `["https://ta.example.org"]`. Inline `{"entity_id": ...}`
+objects are accepted as well and normalized to entity-ID references; inline
+`jwks` in anchors are not used (use `trust_mark_issuer_jwks` instead).
+
 The `trust_mark_owner` claim has the following parameters:
 
 | Claim       | Necessity | Description                           |
@@ -128,6 +134,12 @@ parameters:
 |-------------|-----------|---------------------------------------------------------------------------------|
 | `entity_id` | REQUIRED  | The Entity ID of the Trust Anchor                                               |
 | `jwks`      | OPTIONAL  | The Trust Anchors jwks; if omitted it is obtained from its Entity Configuration |
+
+When configuring checkers through the database (enroll endpoint or trust mark
+`eligibility_config`), `trust_anchors` is stored as a list of **entity ID
+strings**, e.g. `["https://ta.example.org"]`. Inline `{"entity_id": ...}`
+objects are accepted as well and normalized to entity-ID references; inline
+`jwks` in anchors are not used.
 
 
 ### Example

@@ -228,6 +228,28 @@ operations and database writes for repeated requests. `0` = no caching
     }
     ```
 
+    ??? example "With a `trust_path` checker"
+
+        ```json
+        {
+          "trust_mark_type": "https://tm.example.org",
+          "eligibility_config": {
+            "mode": "db_or_check",
+            "checker": {
+              "type": "trust_path",
+              "config": {
+                "trust_anchors": ["https://ta.example.org"]
+              }
+            },
+            "check_cache_ttl": 30
+          }
+        }
+        ```
+
+        The `trust_anchors` in DB checker configs are **entity ID strings**.
+        Inline `{"entity_id": ...}` objects are also accepted and normalized to
+        entity-ID references.
+
 ### Trust Mark Subjects
 
 Each spec maintains a list of subjects (entities) that are eligible to receive
