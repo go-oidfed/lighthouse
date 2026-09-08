@@ -1,3 +1,16 @@
+## LightHouse 0.22.4
+
+### Bug Fixes
+
+- Fixed a bug where issued trust marks were not persisted to the `issued_trust_marks` tracking table. A stale
+  foreign key on `issued_trust_mark_instances.trust_mark_subject_id` (introduced by a removed/now-unused GORM
+  `TrustMarkSubject` association) rejected inserts for subjects that were not pre-registered, leaving their issued
+  trust marks untracked and un-revocable. The dead association was removed and a startup migration now drops the
+  stale constraint on existing databases.
+  - This fixes (potential) empty trust mark listings
+  - This fixes (potential) revocation failures
+  - This fixes (potential) trust mark status queries
+
 ## LightHouse 0.22.3
 
 ### Enhancements

@@ -75,13 +75,12 @@ type TrustMarkSubject struct {
 // Each record tracks a specific trust mark JWT that was issued, enabling
 // revocation checking and status queries per the OIDC Federation spec.
 type IssuedTrustMarkInstance struct {
-	JTI                string           `gorm:"primaryKey" json:"jti"`
-	CreatedAt          int              `json:"created_at"`
-	UpdatedAt          int              `json:"updated_at"`
-	ExpiresAt          int              `gorm:"index" json:"expires_at"`
-	Revoked            bool             `gorm:"index" json:"revoked"`
-	TrustMarkSubjectID uint             `gorm:"index" json:"trust_mark_subject_id"`
-	TrustMarkSubject   TrustMarkSubject `json:"trust_mark_subject"`
+	JTI                string `gorm:"primaryKey" json:"jti"`
+	CreatedAt          int    `json:"created_at"`
+	UpdatedAt          int    `json:"updated_at"`
+	ExpiresAt          int    `gorm:"index" json:"expires_at"`
+	Revoked            bool   `gorm:"index" json:"revoked"`
+	TrustMarkSubjectID uint   `gorm:"index" json:"trust_mark_subject_id"`
 	// TrustMarkType is denormalized for efficient lookups without joins
 	TrustMarkType string `gorm:"size:255;index" json:"trust_mark_type"`
 	// Subject is the entity ID that received this trust mark (denormalized)

@@ -77,6 +77,13 @@ func NewStorage(config Config) (*Storage, error) {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
 
+	// Drop the stale FK constraint on issued_trust_mark_instances.trust_mark_subject_id
+	// if it exists. AutoMigrate above never removes existing constraints, and this
+	// one breaks issuance for subjects that were not pre-registered.
+	if err = migrateIssuedTrustMarkInstanceSubject(db); err != nil {
+		return nil, err
+	}
+
 	// Fill user hash params with defaults if zero values
 	params := config.UsersHash
 	if params.Time == 0 {
