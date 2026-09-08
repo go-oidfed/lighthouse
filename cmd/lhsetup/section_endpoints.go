@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-oidfed/lighthouse/internal/migration"
@@ -50,6 +52,7 @@ func configureEndpoint(
 
 	ep, hasExisting := existing[epType]
 
+	var err error
 	path := ""
 	url := ""
 	authEnabled := false
@@ -83,24 +86,16 @@ func configureEndpoint(
 
 	var authTAEntityIDs []string
 	if newAuthEnabled {
-		fmt.Println("  Available trust anchors:")
-		for i, id := range taEntityIDs {
-			fmt.Printf("    %d. %s\n", i+1, id)
-		}
 		currentTAs := []string{}
 		if hasExisting && len(ep.AuthTrustAnchors) > 0 {
 			for _, ta := range ep.AuthTrustAnchors {
 				currentTAs = append(currentTAs, ta.EntityID)
 			}
 		}
-		fmt.Println("  Enter trust anchor entity IDs (comma-separated, or 'all' for all):")
-		taInput := promptString("Auth trust anchors", fmt.Sprintf("%s", currentTAs))
-		if taInput == "all" {
-			authTAEntityIDs = append(authTAEntityIDs, taEntityIDs...)
-		} else if taInput != "" {
-			for _, id := range splitCommaList(taInput) {
-				authTAEntityIDs = append(authTAEntityIDs, id)
-			}
+		authTAEntityIDs, err = resolveAuthTAInput(taEntityIDs, currentTAs)
+		if err != nil {
+			fmt.Printf("  Error: %s\n", err)
+			return
 		}
 	}
 
@@ -136,6 +131,73 @@ func configureEndpoint(
 		}
 		fmt.Printf("  Created endpoint '%s'.\n", epType)
 	}
+}
+
+// resolveAuthTAInput interactively collects the trust anchor entity IDs to use
+// for endpoint authentication. Existing TAs are offered as a numbered list so
+// the user can pick by index; the user may also type raw entity IDs. Any entity
+// ID that is not yet a stored trust anchor is auto-created (without a JWKS) so
+// that the endpoint's auth trust anchors can be persisted.
+func resolveAuthTAInput(taEntityIDs, currentTAs []string) ([]string, error) {
+	existingSet := make(map[string]bool, len(taEntityIDs))
+	for _, id := range taEntityIDs {
+		existingSet[id] = true
+	}
+
+	fmt.Println("  Available trust anchors:")
+	for i, id := range taEntityIDs {
+		marker := ""
+		for _, c := range currentTAs {
+			if c == id {
+				marker = " (current)"
+				break
+			}
+		}
+		fmt.Printf("    %d. %s%s\n", i+1, id, marker)
+	}
+	if len(taEntityIDs) == 0 {
+		fmt.Println("    (none yet - you can type entity IDs below and they will be created)")
+	}
+	fmt.Println("  Enter trust anchor entity IDs (comma-separated, or indices from the list above, or 'all' for all):")
+	taInput := promptString("Auth trust anchors", strings.Join(currentTAs, ", "))
+	if taInput == "" {
+		return currentTAs, nil
+	}
+
+	raw := splitCommaList(taInput)
+	if len(raw) == 1 && trimSpaces(raw[0]) == "all" {
+		return taEntityIDs, nil
+	}
+
+	selected := make([]string, 0, len(raw))
+	seen := make(map[string]bool)
+	for _, token := range raw {
+		if idx, err := strconv.Atoi(token); err == nil && idx >= 1 && idx <= len(taEntityIDs) {
+			id := taEntityIDs[idx-1]
+			if !seen[id] {
+				selected = append(selected, id)
+				seen[id] = true
+			}
+			continue
+		}
+		// Treat as a raw entity ID. Auto-create if it doesn't exist yet.
+		if !existingSet[token] {
+			if _, err := backends.TrustAnchors.Create(model.AddTrustAnchor{EntityID: token}); err != nil {
+				return nil, fmt.Errorf("failed to create trust anchor '%s': %w", token, err)
+			}
+			fmt.Printf("  Created trust anchor '%s'.\n", token)
+			existingSet[token] = true
+		}
+		if !seen[token] {
+			selected = append(selected, token)
+			seen[token] = true
+		}
+	}
+
+	if len(selected) == 0 {
+		return currentTAs, nil
+	}
+	return selected, nil
 }
 
 func configureResolveEndpoint(ep *model.FederationEndpoint) string {

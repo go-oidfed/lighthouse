@@ -10,6 +10,11 @@
   - This fixes (potential) empty trust mark listings
   - This fixes (potential) revocation failures
   - This fixes (potential) trust mark status queries
+- Fixed `lhsetup` so that providing the entity ID of an existing trust anchor in "Add/update a trust anchor" now
+  updates it instead of failing with a "trust anchor already exists" error.
+- Fixed `lhsetup` so that trust anchors set for authentication on federation endpoints are actually stored. Existing
+  trust anchors can be picked by index from the numbered list, and any entity ID that is not yet a stored trust
+  anchor is auto-created (without a JWKS) before the endpoint is saved.
 
 ## LightHouse 0.22.3
 

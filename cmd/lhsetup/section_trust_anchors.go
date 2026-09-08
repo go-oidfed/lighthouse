@@ -82,7 +82,7 @@ func addTrustAnchor() {
 	}
 
 	existing, err := backends.TrustAnchors.Get(entityID)
-	if err != nil && existing != nil {
+	if err == nil && existing != nil {
 		if _, err := backends.TrustAnchors.Update(entityID, req); err != nil {
 			fmt.Printf("  Error: %s\n", err)
 			return
