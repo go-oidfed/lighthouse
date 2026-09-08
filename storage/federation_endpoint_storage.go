@@ -62,23 +62,6 @@ func (s *FederationEndpointStorage) GetByPath(path string) (*model.FederationEnd
 	return s.findByPath(path)
 }
 
-// findByID finds a federation endpoint by primary key with preloaded auth trust anchors.
-func (s *FederationEndpointStorage) findByID(id uint) (*model.FederationEndpoint, error) {
-	var item model.FederationEndpoint
-	if err := s.db.Preload("AuthTrustAnchors").First(&item, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, model.NotFoundError("federation endpoint not found")
-		}
-		return nil, errors.Wrap(err, "federation_endpoints: get by id failed")
-	}
-	return &item, nil
-}
-
-// GetByID returns a federation endpoint by numeric ID.
-func (s *FederationEndpointStorage) GetByID(id uint) (*model.FederationEndpoint, error) {
-	return s.findByID(id)
-}
-
 // Create creates a new federation endpoint.
 func (s *FederationEndpointStorage) Create(req model.AddFederationEndpoint) (*model.FederationEndpoint, error) {
 	if !model.IsValidFederationEndpointType(req.Type) {

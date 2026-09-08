@@ -94,7 +94,6 @@ type FederationEndpointStore interface {
 	List() ([]FederationEndpoint, error)
 	GetByType(t FederationEndpointType) (*FederationEndpoint, error)
 	GetByPath(path string) (*FederationEndpoint, error)
-	GetByID(id uint) (*FederationEndpoint, error)
 	Create(req AddFederationEndpoint) (*FederationEndpoint, error)
 	Update(t FederationEndpointType, req AddFederationEndpoint) (*FederationEndpoint, error)
 	Delete(t FederationEndpointType) error

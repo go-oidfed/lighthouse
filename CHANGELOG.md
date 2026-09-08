@@ -15,6 +15,12 @@
 - Fixed `lhsetup` so that trust anchors set for authentication on federation endpoints are actually stored. Existing
   trust anchors can be picked by index from the numbered list, and any entity ID that is not yet a stored trust
   anchor is auto-created (without a JWKS) before the endpoint is saved.
+- Fixed the Admin API so trust anchors can be read, updated, and deleted by their internal numeric id via
+  `GET/PUT/DELETE /api/v1/admin/trust-anchors/{id}` (the previous `{entityID}` path parameter could not match URL
+  entity IDs and reported "trust anchor not found"). The OpenAPI spec for this path was updated accordingly.
+- Fixed the OpenAPI spec so endpoint authentication trust anchors (`/federation-endpoints/{type}/auth-trust-anchors`
+  and `AddFederationEndpoint.auth_trust_anchors`) are documented as arrays of trust anchor entity IDs (strings)
+  instead of integers, matching the actual API.
 
 ## LightHouse 0.22.3
 

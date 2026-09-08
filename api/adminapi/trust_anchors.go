@@ -45,7 +45,7 @@ func (h *trustAnchorsHandlers) list(c *fiber.Ctx) error {
 }
 
 func (h *trustAnchorsHandlers) get(c *fiber.Ctx) error {
-	item, err := h.store.Get(c.Params("entityID"))
+	item, err := h.store.Get(c.Params("id"))
 	if err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust anchor not found"))
@@ -84,9 +84,9 @@ func (h *trustAnchorsHandlers) update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.EntityID == "" {
-		req.EntityID = c.Params("entityID")
+		req.EntityID = c.Params("id")
 	}
-	item, err := h.store.Update(c.Params("entityID"), req)
+	item, err := h.store.Update(c.Params("id"), req)
 	if err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust anchor not found"))
@@ -102,18 +102,18 @@ func (h *trustAnchorsHandlers) update(c *fiber.Ctx) error {
 }
 
 func (h *trustAnchorsHandlers) delete(c *fiber.Ctx) error {
-	entityID := c.Params("entityID")
+	id := c.Params("id")
 	// Stop refresher polling for this TA before deleting.
 	if r := h.controller.TAJWKSRefresher(); r != nil {
-		r.Remove(entityID)
+		r.Remove(id)
 	}
-	if err := h.store.Delete(entityID); err != nil {
+	if err := h.store.Delete(id); err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust anchor not found"))
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
-	h.controller.RemoveTrustAnchor(entityID)
+	h.controller.RemoveTrustAnchor(id)
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -169,7 +169,7 @@ func registerTrustAnchors(r fiber.Router, store model.TrustAnchorStore, ctrl Lig
 
 	g.Get("/", h.list)
 	g.Post("/", h.create)
-	g.Get("/:entityID", h.get)
-	g.Put("/:entityID", h.update)
-	g.Delete("/:entityID", h.delete)
+	g.Get("/:id", h.get)
+	g.Put("/:id", h.update)
+	g.Delete("/:id", h.delete)
 }

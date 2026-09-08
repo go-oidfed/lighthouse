@@ -36,11 +36,13 @@ type AddTrustAnchor struct {
 // TrustAnchorStore is the storage interface for trust anchors
 type TrustAnchorStore interface {
 	List() ([]TrustAnchor, error)
-	Get(entityID string) (*TrustAnchor, error)
-	GetByID(id uint) (*TrustAnchor, error)
+	// Get returns a trust anchor by numeric ID or entity_id.
+	Get(ident string) (*TrustAnchor, error)
 	Create(req AddTrustAnchor) (*TrustAnchor, error)
-	Update(entityID string, req AddTrustAnchor) (*TrustAnchor, error)
-	Delete(entityID string) error
+	// Update updates a trust anchor resolved by numeric ID or entity_id.
+	Update(ident string, req AddTrustAnchor) (*TrustAnchor, error)
+	// Delete deletes a trust anchor resolved by numeric ID or entity_id.
+	Delete(ident string) error
 	// GetJWKS returns the stored JWKS for an entity, or nil if none stored.
 	GetJWKS(entityID string) (*jwx.JWKS, error)
 	// UpdateJWKS stores/replaces the JWKS for an entity. If the entity has no

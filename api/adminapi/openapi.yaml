@@ -4259,9 +4259,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AddTrustAnchor'
-  /api/v1/admin/trust-anchors/{entityID}:
+  /api/v1/admin/trust-anchors/{id}:
     summary: Manage a single trust anchor.
-    description: Get, update, or delete a trust anchor by entity ID.
+    description: Get, update, or delete a trust anchor by its internal id.
     get:
       tags:
         - Trust Anchors
@@ -4298,10 +4298,10 @@ paths:
       operationId: deleteTrustAnchor
       summary: Delete a trust anchor
     parameters:
-      - name: entityID
-        description: The entity ID of the trust anchor.
+      - name: id
+        description: The internal id of the trust anchor.
         schema:
-          type: string
+          $ref: '#/components/schemas/InternalID'
         in: path
         required: true
   /api/v1/admin/federation-endpoints:
@@ -4397,8 +4397,11 @@ paths:
           application/json:
             schema:
               type: array
+              description: >
+                Trust anchor entity IDs used for endpoint authentication.
               items:
-                type: integer
+                type: string
+                description: The entity ID of a trust anchor.
     parameters:
       - name: type
         description: The endpoint type.
@@ -4490,11 +4493,11 @@ components:
         config:
           type: string
           description: JSON blob with type-specific configuration.
-        auth_trust_anchor_ids:
+        auth_trust_anchors:
           type: array
           items:
-            type: integer
-          description: Trust anchor IDs used for endpoint authentication.
+            type: string
+          description: Trust anchor entity IDs used for endpoint authentication.
     PublicKeyEntry:
       description: A public key entry managed by the API.
       type: object

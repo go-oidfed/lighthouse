@@ -42,9 +42,9 @@ func (s *TrustAnchorStorage) findByEntityID(entityID string) (*model.TrustAnchor
 	return &item, nil
 }
 
-// Get returns a trust anchor by entity_id.
-func (s *TrustAnchorStorage) Get(entityID string) (*model.TrustAnchor, error) {
-	return s.findByEntityID(entityID)
+// Get returns a trust anchor by numeric ID or entity_id.
+func (s *TrustAnchorStorage) Get(ident string) (*model.TrustAnchor, error) {
+	return s.findByIdent(ident)
 }
 
 // findByID finds a trust anchor by primary key, preload JWKS.
@@ -57,11 +57,6 @@ func (s *TrustAnchorStorage) findByID(id uint) (*model.TrustAnchor, error) {
 		return nil, errors.Wrap(err, "trust_anchors: get by id failed")
 	}
 	return &item, nil
-}
-
-// GetByID returns a trust anchor by numeric ID.
-func (s *TrustAnchorStorage) GetByID(id uint) (*model.TrustAnchor, error) {
-	return s.findByID(id)
 }
 
 // findByIdent resolves a trust anchor by numeric ID (as string) or entity_id.
@@ -118,8 +113,8 @@ func (s *TrustAnchorStorage) Create(req model.AddTrustAnchor) (*model.TrustAncho
 }
 
 // Update updates an existing trust anchor.
-func (s *TrustAnchorStorage) Update(entityID string, req model.AddTrustAnchor) (*model.TrustAnchor, error) {
-	item, err := s.findByEntityID(entityID)
+func (s *TrustAnchorStorage) Update(ident string, req model.AddTrustAnchor) (*model.TrustAnchor, error) {
+	item, err := s.findByIdent(ident)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +131,7 @@ func (s *TrustAnchorStorage) Update(entityID string, req model.AddTrustAnchor) (
 			return nil, err
 		}
 	}
-	return s.findByEntityID(entityID)
+	return s.findByIdent(ident)
 }
 
 // replaceJWKS deletes the old JWKS row (if any) and links a new one.
@@ -164,9 +159,9 @@ func (s *TrustAnchorStorage) replaceJWKS(ta *model.TrustAnchor, jwks *model.JWKS
 	)
 }
 
-// Delete deletes a trust anchor by entity_id, including its JWKS row.
-func (s *TrustAnchorStorage) Delete(entityID string) error {
-	item, err := s.findByEntityID(entityID)
+// Delete deletes a trust anchor by numeric ID or entity_id, including its JWKS row.
+func (s *TrustAnchorStorage) Delete(ident string) error {
+	item, err := s.findByIdent(ident)
 	if err != nil {
 		return err
 	}
