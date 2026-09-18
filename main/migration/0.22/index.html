@@ -2258,7 +2258,7 @@ anchors via the Admin API:</p>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-u<span class="w"> </span>admin:password<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"entity_id":"https://ta.example.com","enable_jwks_update":true,"key_poll_interval":3600}'</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>https://localhost:8081/api/v1/admin/trust-anchors/https://ta.example.com
+<span class="w">  </span>https://localhost:8081/api/v1/admin/trust-anchors/&lt;TA_ID&gt;
 </code></pre></div>
 <h2 id="what-gets-migrated">What Gets Migrated<a class="headerlink" href="#what-gets-migrated" title="Permanent link">&para;</a></h2>
 <h3 id="trust-anchors">Trust Anchors<a class="headerlink" href="#trust-anchors" title="Permanent link">&para;</a></h3>
