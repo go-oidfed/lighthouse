@@ -1,3 +1,18 @@
+## LightHouse 0.22.5
+
+### Enhancements
+
+- Lighthouse now uses a custom user agent string (`LightHouse <version>`)
+  for its outbound HTTP requests.
+
+### Internal
+
+- Upgraded the underlying federation library to 0.11.4.
+- Dependency bumps:
+  - `github.com/lestrrat-go/jwx/v4` 4.4.0 -> 4.5.0
+  - `golang.org/x/crypto` 0.56.0 -> 0.57.0
+  - `gorm.io/driver/postgres` 1.6.2 -> 1.6.3
+
 ## LightHouse 0.22.4
 
 ### Bug Fixes
