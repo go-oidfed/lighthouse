@@ -150,6 +150,8 @@ func NewLightHouse(
 	*LightHouse,
 	error,
 ) {
+	oidfed.SetDefaultUserAgent("LightHouse " + version.VERSION)
+
 	keyManagement, err := initKey(entityID, signingConf, storages)
 	if err != nil {
 		return nil, err
