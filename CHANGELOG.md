@@ -1,3 +1,7 @@
+## LightHouse 0.23.0
+
+- Upgraded to Go **1.27**
+
 ## LightHouse 0.22.5
 
 ### Enhancements
