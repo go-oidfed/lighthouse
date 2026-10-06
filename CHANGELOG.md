@@ -2,6 +2,17 @@
 
 - Upgraded to Go **1.27**
 
+### Enhancements
+
+- Added `lhmigrate keys mldsa` to re-encode ML-DSA private keys written by
+  earlier versions (legacy PKCS#8 encoding) in the interoperable RFC 9935
+  seed-only PKCS#8 encoding. See the [migration guide](docs/migration/0.23.md).
+
+### Internal
+
+- Upgraded the underlying federation library to 0.12.0, which changes the
+  PEM encoding of ML-DSA private keys (see enhancement above).
+
 ## LightHouse 0.22.5
 
 ### Enhancements

@@ -24,7 +24,7 @@ func usage() {
 	_, _ = fmt.Fprintf(
 		os.Stderr, "  all       Run all migration steps in sequence (config, keys, config2db, db, cleanup)\n",
 	)
-	_, _ = fmt.Fprintf(os.Stderr, "  keys      Migrate signing keys (subcommands: public, kms) [alias: signing]\n")
+	_, _ = fmt.Fprintf(os.Stderr, "  keys      Migrate signing keys (subcommands: public, kms, mldsa) [alias: signing]\n")
 	_, _ = fmt.Fprintf(os.Stderr, "  pem-to-db Migrate filesystem KMS private keys to database\n")
 	_, _ = fmt.Fprintf(os.Stderr, "  config2db Migrate config file values to database\n")
 	_, _ = fmt.Fprintf(os.Stderr, "  db        Migrate legacy storage data (JSON/Badger) to GORM-based database\n")
@@ -372,14 +372,10 @@ func kmsCmd(args []string) int {
 	return 0
 }
 
-// keysCmd dispatches to key-related subcommands (public, kms).
+// keysCmd dispatches to key-related subcommands (public, kms, mldsa).
 func keysCmd(args []string) int {
 	if len(args) < 1 {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
-		_, _ = fmt.Fprintf(
-			os.Stderr,
-			"\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n",
-		)
+		printKeysUsage(os.Stderr)
 		return 2
 	}
 	sub := args[0]
@@ -388,18 +384,24 @@ func keysCmd(args []string) int {
 		return publicCmd(args[1:])
 	case "kms":
 		return kmsCmd(args[1:])
+	case "mldsa":
+		return mldsaKeysCmd(args[1:])
 	case "-h", "--help", "help":
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: lhmigrate keys <public|kms> [options]\n")
-		_, _ = fmt.Fprintf(
-			os.Stderr,
-			"\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n",
-		)
+		printKeysUsage(os.Stderr)
 		return 0
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "unknown keys subcommand: %s\n", sub)
-		_, _ = fmt.Fprintf(os.Stderr, "Use 'lhmigrate keys <public|kms> -h' for help.\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Use 'lhmigrate keys <public|kms|mldsa> -h' for help.\n")
 		return 2
 	}
+}
+
+func printKeysUsage(w *os.File) {
+	_, _ = fmt.Fprintf(w, "Usage: lhmigrate keys <public|kms|mldsa> [options]\n")
+	_, _ = fmt.Fprintf(
+		w,
+		"\nSubcommands:\n  public   Migrate legacy public key storage (keys.jwks + history) to filesystem or DB\n  kms      Migrate legacy private key files (<type>_<alg>.pem) to filesystem KMS\n  mldsa    Re-encode ML-DSA private keys to the RFC 9935 seed-only PKCS#8 encoding\n",
+	)
 }
 
 // dbCmd delegates to the database migration implementation in db.go
