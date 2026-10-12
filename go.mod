@@ -1,12 +1,12 @@
 module github.com/go-oidfed/lighthouse
 
-go 1.26.0
+go 1.27.0
 
 require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.6
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.11.4
+	github.com/go-oidfed/lib v0.12.0
 	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/google/uuid v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -31,7 +31,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
-	filippo.io/mldsa v0.0.0-20260711112038-ff3f469cee29 // indirect
+	filippo.io/mldsa v1.0.0 // indirect
 	github.com/TwiN/gocache/v2 v2.4.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
@@ -56,10 +56,10 @@ require (
 	github.com/jarcoal/httpmock v1.4.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/jwx-go/compsig/v4 v4.0.5 // indirect
+	github.com/jwx-go/compsig/v4 v4.0.6 // indirect
 	github.com/jwx-go/ed448/v4 v4.0.5 // indirect
 	github.com/jwx-go/es256k/v4 v4.0.4 // indirect
-	github.com/jwx-go/mldsa/v4 v4.0.5 // indirect
+	github.com/jwx-go/mldsa/v4 v4.0.6 // indirect
 	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/lestrrat-go/dsig v1.4.0 // indirect
 	github.com/lestrrat-go/dsig-circl-ed448 v1.0.0 // indirect
@@ -71,13 +71,13 @@ require (
 	github.com/mattn/go-runewidth v0.0.30 // indirect
 	github.com/mattn/go-sqlite3 v1.14.44 // indirect
 	github.com/miekg/pkcs11 v1.1.2 // indirect
-	github.com/molecule-man/go-brrr v1.1.1 // indirect
+	github.com/molecule-man/go-brrr v1.2.0 // indirect
 	github.com/scylladb/go-set v1.0.3-0.20200225121959-cc7b2070d91e // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.74.0 // indirect
+	github.com/valyala/fasthttp v1.75.0 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
