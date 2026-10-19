@@ -45,30 +45,30 @@ func TestGetTimeSeries_SqliteHourBuckets(t *testing.T) {
 	base := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
 	logs := []*stats.RequestLog{
 		{
-			Timestamp: base,
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  base,
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 10,
 		},
 		{
-			Timestamp: base.Add(5 * time.Minute),
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  base.Add(5 * time.Minute),
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 20,
 		},
 		{
-			Timestamp: base.Add(1 * time.Hour),
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  base.Add(1 * time.Hour),
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 500,
 			DurationMs: 30,
 		},
 		{
-			Timestamp: base.Add(1 * time.Hour).Add(2 * time.Minute),
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  base.Add(1 * time.Hour).Add(2 * time.Minute),
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 40,
 		},
@@ -99,23 +99,23 @@ func TestGetTimeSeries_SqliteDayBuckets(t *testing.T) {
 	day2 := time.Date(2026, 7, 2, 2, 15, 0, 0, time.UTC)
 	logs := []*stats.RequestLog{
 		{
-			Timestamp: day1,
-			Endpoint: "resolve",
-			Method: "GET",
+			Timestamp:  day1,
+			Endpoint:   "resolve",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 5,
 		},
 		{
-			Timestamp: day1.Add(3 * time.Hour),
-			Endpoint: "resolve",
-			Method: "GET",
+			Timestamp:  day1.Add(3 * time.Hour),
+			Endpoint:   "resolve",
+			Method:     "GET",
 			StatusCode: 404,
 			DurationMs: 7,
 		},
 		{
-			Timestamp: day2,
-			Endpoint: "resolve",
-			Method: "GET",
+			Timestamp:  day2,
+			Endpoint:   "resolve",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 9,
 		},
@@ -144,23 +144,23 @@ func TestGetTimeSeries_SqliteEndpointFilter(t *testing.T) {
 	ts := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
 	logs := []*stats.RequestLog{
 		{
-			Timestamp: ts,
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  ts,
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 10,
 		},
 		{
-			Timestamp: ts,
-			Endpoint: "resolve",
-			Method: "GET",
+			Timestamp:  ts,
+			Endpoint:   "resolve",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 10,
 		},
 		{
-			Timestamp: ts,
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  ts,
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 500,
 			DurationMs: 10,
 		},
@@ -195,23 +195,23 @@ func TestGetDailyStats_SqliteRange(t *testing.T) {
 	}
 	rows := []stats.DailyStats{
 		{
-			Date: midnight(2026, 7, 19),
-			Endpoint: "fetch",
-			StatusCode: 200,
+			Date:         midnight(2026, 7, 19),
+			Endpoint:     "fetch",
+			StatusCode:   200,
 			RequestCount: 2814,
 		},
 		{
-			Date: midnight(2026, 7, 20),
-			Endpoint: "fetch",
-			StatusCode: 200,
+			Date:         midnight(2026, 7, 20),
+			Endpoint:     "fetch",
+			StatusCode:   200,
 			RequestCount: 4830,
 		},
 		{
-			Date: midnight(2026, 7, 23),
-			Endpoint: "fetch",
-			StatusCode: 500,
+			Date:         midnight(2026, 7, 23),
+			Endpoint:     "fetch",
+			StatusCode:   500,
 			RequestCount: 12,
-			ErrorCount: 12,
+			ErrorCount:   12,
 		},
 	}
 	for i := range rows {
@@ -253,43 +253,46 @@ func TestAggregateAndBackfillDailyStats_Sqlite(t *testing.T) {
 	require.NoError(t, db.Migrator().CreateTable(&stats.DailyStats{}))
 	s := NewStatsStorage(db)
 
-	day := func(y, m, d, hour int) time.Time {
-		return time.Date(y, time.Month(m), d, hour, 0, 0, 0, time.UTC)
+	day := func(offsetDays, hour int) time.Time {
+		// Relative to today so the backfill horizon (yesterday - retention)
+		// always covers the test days, regardless of when the test runs.
+		now := time.Now().UTC()
+		return time.Date(now.Year(), now.Month(), now.Day(), hour, 0, 0, 0, time.UTC).AddDate(0, 0, offsetDays)
 	}
 	// Logs across two days; one day is pre-aggregated to exercise the skip path.
 	insertLogs(
 		t, s,
 		&stats.RequestLog{
-			Timestamp: day(2026, 7, 18, 10),
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  day(-11, 10),
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 5,
 		},
 		&stats.RequestLog{
-			Timestamp: day(2026, 7, 18, 22),
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  day(-11, 22),
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 500,
 			DurationMs: 7,
 		},
 		&stats.RequestLog{
-			Timestamp: day(2026, 7, 19, 1),
-			Endpoint: "fetch",
-			Method: "GET",
+			Timestamp:  day(-10, 1),
+			Endpoint:   "fetch",
+			Method:     "GET",
 			StatusCode: 200,
 			DurationMs: 9,
 		},
 	)
-	require.NoError(t, s.AggregateDailyStats(day(2026, 7, 18, 0)))
+	require.NoError(t, s.AggregateDailyStats(day(-11, 0)))
 
-	exists18, err := s.HasDailyStatsForDate(day(2026, 7, 18, 0))
+	exists18, err := s.HasDailyStatsForDate(day(-11, 0))
 	require.NoError(t, err)
 	require.True(t, exists18, "pre-aggregated day should report existing rows")
-	exists19, err := s.HasDailyStatsForDate(day(2026, 7, 19, 0))
+	exists19, err := s.HasDailyStatsForDate(day(-10, 0))
 	require.NoError(t, err)
 	require.False(t, exists19, "not-yet-aggregated day should report no rows")
-	exists20, err := s.HasDailyStatsForDate(day(2026, 7, 20, 0))
+	exists20, err := s.HasDailyStatsForDate(day(-9, 0))
 	require.NoError(t, err)
 	require.False(t, exists20, "day with no logs should report no rows")
 
@@ -298,17 +301,15 @@ func TestAggregateAndBackfillDailyStats_Sqlite(t *testing.T) {
 	agg.Backfill(context.Background())
 
 	// After backfill, 07-19 has rows; 07-18 is unchanged (skipped, not overwritten).
-	exists19After, err := s.HasDailyStatsForDate(day(2026, 7, 19, 0))
+	exists19After, err := s.HasDailyStatsForDate(day(-10, 0))
 	require.NoError(t, err)
 	require.True(t, exists19After, "backfilled day should now report existing rows")
 
-	from, err := time.Parse(time.RFC3339, "2026-07-01T00:00:00Z")
-	require.NoError(t, err)
-	to, err := time.Parse(time.RFC3339, "2026-07-31T23:59:59Z")
-	require.NoError(t, err)
+	from := day(-11, 0).AddDate(0, 0, -10)
+	to := day(-10, 0).AddDate(0, 0, 12)
 	got, err := s.GetDailyStats(from, to)
 	require.NoError(t, err)
-	// 07-18: two endpoint/status combos; 07-19: one combo.
+	// Aggregated day: two endpoint/status combos; backfilled day: one combo.
 	require.Len(t, got, 3, "expected 3 daily rows across the two aggregated days")
 }
 
