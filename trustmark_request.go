@@ -99,7 +99,7 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 		}
 
 		fed.registerEndpoint(
-			model.EndpointTypeTrustMarkRequest, endpoint.Path, fiber.MethodPost, handler, auth.Middleware(),
+			model.EndpointTypeTrustMarkRequest, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth(),
 		)
 		if fed.fedMetadata.Extra == nil {
 			fed.fedMetadata.Extra = make(map[string]any)

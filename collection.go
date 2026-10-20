@@ -110,7 +110,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 		}
 
 		fed.registerEndpoint(
-			model.EndpointTypeEntityCollection, endpoint.Path, fiber.MethodPost, handler, auth.Middleware(),
+			model.EndpointTypeEntityCollection, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth(),
 		)
 		fed.fedMetadata.FederationCollectionEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

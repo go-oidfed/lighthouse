@@ -105,7 +105,7 @@ func (fed *LightHouse) AddResolveEndpoint(
 			return errors.Wrap(err, "failed to create auth middleware for resolve endpoint")
 		}
 
-		fed.registerEndpoint(model.EndpointTypeResolve, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
+		fed.registerEndpoint(model.EndpointTypeResolve, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationResolveEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {

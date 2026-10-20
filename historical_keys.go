@@ -68,7 +68,7 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) error {
 			return errors.Wrap(err, "failed to create auth middleware for historical keys endpoint")
 		}
 
-		fed.registerEndpoint(model.EndpointTypeHistoricalKeys, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
+		fed.registerEndpoint(model.EndpointTypeHistoricalKeys, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationHistoricalLKeysEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {

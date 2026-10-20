@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"slices"
 	"time"
 
@@ -68,59 +69,115 @@ func NewPrivateKeyJWTAuth(
 	}, nil
 }
 
-// Middleware returns the Fiber middleware handler for private_key_jwt authentication
+// ErrResponseWritten is returned by EndpointAuth when authentication failed
+// and a complete error response has already been written to the client. The
+// federation endpoint dispatcher must stop processing the request when it
+// receives this sentinel; it is never itself sent to the client.
+var ErrResponseWritten = errors.New("authentication error response already written")
+
+// Authenticate performs private_key_jwt client authentication and returns the
+// authenticated client's entity ID and entity statement on success.
+//
+// On failure it writes a complete OAuth 2.0 error response (JSON body, e.g.
+// {"error":"invalid_client", ...}) directly to the client and returns
+// ErrResponseWritten. Callers must not write further response data in that
+// case.
+func (a *PrivateKeyJWTAuth) Authenticate(ctx *fiber.Ctx) (string, *oidfed.EntityStatement, error) {
+	startTime := time.Now()
+
+	// Extract client assertion from request
+	clientAssertion := ctx.FormValue("client_assertion")
+	assertionType := ctx.FormValue("client_assertion_type")
+
+	// Validate client_assertion_type
+	if assertionType != oidfedconst.OAuthClientAssertionJWTBearer {
+		a.logger.Debug().Str("assertion_type", assertionType).Msg("missing or invalid client_assertion_type")
+		return "", nil, a.writeAuthErrorResponse(
+			ctx, fiber.StatusBadRequest, oidfed.ErrorInvalidRequest(
+				"missing or invalid client_assertion_type, expected: "+oidfedconst.OAuthClientAssertionJWTBearer,
+			),
+		)
+	}
+
+	// Validate client_assertion is present
+	if clientAssertion == "" {
+		a.logger.Debug().Msg("missing client_assertion parameter")
+		return "", nil, a.writeAuthErrorResponse(
+			ctx, fiber.StatusBadRequest, oidfed.ErrorInvalidRequest("missing client_assertion parameter"),
+		)
+	}
+
+	// Parse and validate the JWT
+	clientEntityID, entityStatement, err := a.validateAssertion(clientAssertion)
+	if err != nil {
+		// Convert AuthError to proper OAuth 2.0 error response
+		if authErr, ok := err.(*AuthError); ok {
+			status := a.getErrorStatus(authErr.Code)
+			return "", nil, a.writeAuthErrorResponse(
+				ctx, status, &oidfed.Error{
+					Error:            authErr.Code,
+					ErrorDescription: authErr.Description,
+				},
+			)
+		}
+		// For non-AuthError, return server error
+		a.logger.Error().Err(err).Msg("unexpected authentication error")
+		return "", nil, a.writeAuthErrorResponse(
+			ctx, fiber.StatusInternalServerError, oidfed.ErrorServerError("authentication failed"),
+		)
+	}
+
+	// Set context values for downstream handlers
+	ctx.Locals("client_entity_id", clientEntityID)
+	ctx.Locals("client_entity_statement", entityStatement)
+	ctx.Locals("auth_method", oidfedconst.AuthMethodPrivateKeyJWT)
+
+	a.logger.Debug().
+		Str("client_entity_id", clientEntityID).
+		Int64("duration_ms", time.Since(startTime).Milliseconds()).
+		Msg("successful private_key_jwt authentication")
+
+	return clientEntityID, entityStatement, nil
+}
+
+// writeAuthErrorResponse sends an OAuth 2.0 error response and returns
+// ErrResponseWritten so callers can distinguish "failed, response already
+// sent" from a success.
+func (*PrivateKeyJWTAuth) writeAuthErrorResponse(ctx *fiber.Ctx, status int, e *oidfed.Error) error {
+	_ = ctx.Status(status).JSON(e)
+	return ErrResponseWritten
+}
+
+// EndpointAuth authenticates the request for a federation endpoint served by
+// the endpoint dispatcher (dispatch in endpoint_registry.go). It is NOT a
+// conventional fiber route middleware: the dispatcher invokes it directly and
+// must treat ErrResponseWritten as "stop, response already sent" and nil as
+// "authenticated, proceed with the endpoint handler".
+func (a *PrivateKeyJWTAuth) EndpointAuth() fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		_, _, err := a.Authenticate(ctx)
+		return err
+	}
+}
+
+// Middleware returns a conventional fiber route middleware for private_key_jwt
+// authentication, for use in normal handler chains
+// (e.g. app.Post("/path", auth.Middleware(), handler)).
+//
+// On success it sets the client context values and calls ctx.Next(). On
+// failure the Authenticate core has already written the error response and it
+// returns nil so fiber does not invoke a further error handler or overwrite
+// the response.
 func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
-		startTime := time.Now()
-
-		// Extract client assertion from request
-		clientAssertion := ctx.FormValue("client_assertion")
-		assertionType := ctx.FormValue("client_assertion_type")
-
-		// Validate client_assertion_type
-		if assertionType != oidfedconst.OAuthClientAssertionJWTBearer {
-			a.logger.Debug().Str("assertion_type", assertionType).Msg("missing or invalid client_assertion_type")
-			return ctx.Status(fiber.StatusBadRequest).JSON(
-				oidfed.ErrorInvalidRequest("missing or invalid client_assertion_type, expected: " + oidfedconst.OAuthClientAssertionJWTBearer),
-			)
+		_, _, err := a.Authenticate(ctx)
+		if errors.Is(err, ErrResponseWritten) {
+			// Error response was already sent to the client.
+			return nil
 		}
-
-		// Validate client_assertion is present
-		if clientAssertion == "" {
-			a.logger.Debug().Msg("missing client_assertion parameter")
-			return ctx.Status(fiber.StatusBadRequest).JSON(
-				oidfed.ErrorInvalidRequest("missing client_assertion parameter"),
-			)
-		}
-
-		// Parse and validate the JWT
-		clientEntityID, entityStatement, err := a.validateAssertion(clientAssertion)
 		if err != nil {
-			// Convert AuthError to proper OAuth 2.0 error response
-			if authErr, ok := err.(*AuthError); ok {
-				status := a.getErrorStatus(authErr.Code)
-				return ctx.Status(status).JSON(
-					oidfed.Error{
-						Error:            authErr.Code,
-						ErrorDescription: authErr.Description,
-					},
-				)
-			}
-			// For non-AuthError, return server error
-			a.logger.Error().Err(err).Msg("unexpected authentication error")
-			return ctx.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError("authentication failed"))
+			return err
 		}
-
-		// Set context values for downstream handlers
-		ctx.Locals("client_entity_id", clientEntityID)
-		ctx.Locals("client_entity_statement", entityStatement)
-		ctx.Locals("auth_method", oidfedconst.AuthMethodPrivateKeyJWT)
-
-		a.logger.Debug().
-			Str("client_entity_id", clientEntityID).
-			Int64("duration_ms", time.Since(startTime).Milliseconds()).
-			Msg("successful private_key_jwt authentication")
-
 		return ctx.Next()
 	}
 }

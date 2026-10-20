@@ -89,7 +89,7 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 			return errors.Wrap(err, "failed to create auth middleware for trust marked entities listing endpoint")
 		}
 
-		fed.registerEndpoint(model.EndpointTypeTrustMarkListing, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
+		fed.registerEndpoint(model.EndpointTypeTrustMarkListing, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationTrustMarkListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {

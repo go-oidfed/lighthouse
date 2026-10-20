@@ -37,7 +37,7 @@ func (fed *LightHouse) AddSubordinateListingEndpoint(
 			return errors.Wrap(err, "failed to create auth middleware for subordinate listing endpoint")
 		}
 
-		fed.registerEndpoint(model.EndpointTypeList, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
+		fed.registerEndpoint(model.EndpointTypeList, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {

@@ -2,6 +2,7 @@
 
 - Upgraded to Go **1.27**
 
+
 ### Enhancements
 
 - Added `lhmigrate keys mldsa` to re-encode ML-DSA private keys written by
@@ -17,6 +18,15 @@
 
 - Upgraded the underlying federation library to 0.13.0, which changes the
   PEM encoding of ML-DSA private keys (see enhancement above).
+
+### Bug Fixes
+
+- Fixed authenticated federation endpoint requests failing with a spurious
+  `404 Cannot <method> <path>` although client authentication succeeded
+  (affected all endpoints with `auth_enabled: true`, e.g. the trust mark
+  status endpoint). See issue #123.
+- Fixed authentication error responses (e.g. `401 invalid_client`) being
+  overwritten by the endpoint handler's own response body.
 
 ## LightHouse 0.22.5
 

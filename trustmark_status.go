@@ -61,7 +61,7 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 			model.EndpointTypeTrustMarkStatus, endpoint.Path, fiber.MethodPost,
 			func(ctx *fiber.Ctx) error {
 				return fed.handleTrustMarkStatusRequest(ctx, config)
-			}, auth.Middleware(),
+			}, auth.EndpointAuth(),
 		)
 		fed.fedMetadata.FederationTrustMarkStatusEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

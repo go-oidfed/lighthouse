@@ -2,6 +2,7 @@ package lighthouse
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/internal"
+	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -374,6 +376,11 @@ func (fed *LightHouse) dispatch(ctx *fiber.Ctx) error {
 
 	if ep.Auth != nil {
 		if err := ep.Auth(ctx); err != nil {
+			if errors.Is(err, middleware.ErrResponseWritten) {
+				// Authentication failed and a complete error response has
+				// already been written to the client; stop processing.
+				return nil
+			}
 			return err
 		}
 	}

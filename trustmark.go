@@ -88,7 +88,7 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 			return errors.Wrap(err, "failed to create auth middleware for trust mark endpoint")
 		}
 
-		fed.registerEndpoint(model.EndpointTypeTrustMark, endpoint.Path, fiber.MethodPost, handler, auth.Middleware())
+		fed.registerEndpoint(model.EndpointTypeTrustMark, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationTrustMarkEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {

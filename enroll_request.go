@@ -104,7 +104,7 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 		}
 
 		fed.registerEndpoint(
-			model.EndpointTypeEnrollRequest, endpoint.Path, fiber.MethodPost, handler, auth.Middleware(),
+			model.EndpointTypeEnrollRequest, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth(),
 		)
 		fed.fedMetadata.Extra["federation_enroll_request_endpoint_auth_methods"] = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

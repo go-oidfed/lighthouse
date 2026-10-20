@@ -136,7 +136,7 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 			return errors.Wrap(err, "failed to create auth middleware for jwks_update_trigger endpoint")
 		}
 		fed.registerEndpoint(
-			model.EndpointTypeJwksUpdateTrigger, endpoint.Path, fiber.MethodPost, handler, auth.Middleware(),
+			model.EndpointTypeJwksUpdateTrigger, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth(),
 		)
 		fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateTriggerEndpointAuthMethods] = []string{
 			oidfedconst.AuthMethodPrivateKeyJWT,
