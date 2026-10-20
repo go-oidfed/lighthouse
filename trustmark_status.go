@@ -169,9 +169,9 @@ func (fed *LightHouse) determineTrustMarkStatus(
 	// Get status from the instance store
 	status, err := config.InstanceStore.GetStatus(jti)
 	if err != nil {
-		// Instance not found - this trust mark was not issued by us (or before tracking was enabled)
 		var notFound model.NotFoundError
-		if isNotFound := err; isNotFound != nil {
+		if errors.As(err, &notFound) {
+			// Instance not found - this trust mark was not issued by us (or before tracking was enabled)
 			// Try to determine status from the JWT itself
 			if parsedTM.ExpiresAt != nil && time.Now().After(parsedTM.ExpiresAt.Time) {
 				return model.TrustMarkStatusExpired, nil
@@ -179,7 +179,6 @@ func (fed *LightHouse) determineTrustMarkStatus(
 			// We verified the signature, so it's valid but we don't track it
 			return model.TrustMarkStatusActive, nil
 		}
-		_ = notFound // suppress unused warning
 		return "", err
 	}
 

@@ -1,6 +1,7 @@
 package lighthouse
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -209,4 +210,59 @@ func TestDetermineTrustMarkStatus_Revoked(t *testing.T) {
 	status, err := fed.determineTrustMarkStatus(tm, TrustMarkStatusConfig{InstanceStore: instanceStore})
 	require.NoError(t, err)
 	assert.Equal(t, model.TrustMarkStatusRevoked, status)
+}
+
+// errorStatusInstanceStore returns a non-NotFound error from GetStatus to
+// simulate a storage failure.
+type errorStatusInstanceStore struct {
+	model.IssuedTrustMarkInstanceStore
+}
+
+func (errorStatusInstanceStore) GetStatus(jti string) (model.TrustMarkInstanceStatus, error) {
+	return "", errors.New("instance store unavailable")
+}
+
+// TestDetermineTrustMarkStatus_InstanceStoreError verifies that a storage error
+// that is not a NotFoundError is propagated to the caller instead of being
+// classified as "not tracked". Regression test for the always-true
+// `if isNotFound := err; isNotFound != nil` condition, which swallowed every
+// GetStatus error and reported the mark as active.
+func TestDetermineTrustMarkStatus_InstanceStoreError(t *testing.T) {
+	fed := newTrustMarkStatusTestLightHouse(t)
+	tm, _, err := fed.IssueTrustMarkWithOptions(
+		trustMarkStatusTestType, trustMarkStatusTestSubject, oidfed.IssueTrustMarkOptions{
+			Lifetime:      time.Hour,
+			SubjectClaims: map[string]any{"jti": "test-error-jti"},
+		},
+	)
+	require.NoError(t, err)
+
+	status, err := fed.determineTrustMarkStatus(tm, TrustMarkStatusConfig{
+		InstanceStore: errorStatusInstanceStore{},
+	})
+	require.Error(t, err)
+	assert.Empty(t, status)
+}
+
+// TestDetermineTrustMarkStatus_UntrackedInstance verifies that a mark whose JTI
+// is not tracked in the instance store falls back to JWT-based determination:
+// the signature verified and it is not expired, so it is reported as active.
+func TestDetermineTrustMarkStatus_UntrackedInstance(t *testing.T) {
+	fed := newTrustMarkStatusTestLightHouse(t)
+	tm, _, err := fed.IssueTrustMarkWithOptions(
+		trustMarkStatusTestType, trustMarkStatusTestSubject, oidfed.IssueTrustMarkOptions{
+			Lifetime:      time.Hour,
+			SubjectClaims: map[string]any{"jti": "test-untracked-jti"},
+		},
+	)
+	require.NoError(t, err)
+
+	store := newTestStorage(t)
+	backends, err := store.Backends(storage.JTIStorageDB)
+	require.NoError(t, err)
+
+	// No instance record with this JTI exists - the store returns NotFoundError
+	status, err := fed.determineTrustMarkStatus(tm, TrustMarkStatusConfig{InstanceStore: backends.TrustMarkInstances})
+	require.NoError(t, err)
+	assert.Equal(t, model.TrustMarkStatusActive, status)
 }
