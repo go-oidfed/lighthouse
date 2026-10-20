@@ -254,12 +254,12 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		if authEnabled && len(authTAs) == 0 {
 			authTAs = defaultTAEntityIDs
 		}
-		cfg := migration.ResolveDBConfigJSON{
+		cfg := model.ResolveDBConfigJSON{
 			AllowedTrustAnchors:                    m.config.Endpoints.Resolve.AllowedTrustAnchors,
 			UseEntityCollectionAllowedTrustAnchors: m.config.Endpoints.Resolve.UseEntityCollectionAllowedTrustAnchors,
 			GracePeriodSeconds:                     int64(m.config.Endpoints.Resolve.GracePeriod.Duration().Seconds()),
 			TimeElapsedGraceFactor:                 m.config.Endpoints.Resolve.TimeElapsedGraceFactor,
-			ProactiveResolver: &migration.ProactiveResolverDBConfigJSON{
+			ProactiveResolver: &model.ProactiveResolverDBConfigJSON{
 				Enabled:                  m.config.Endpoints.Resolve.ProactiveResolver.Enabled,
 				ConcurrencyLimit:         m.config.Endpoints.Resolve.ProactiveResolver.ConcurrencyLimit,
 				QueueSize:                m.config.Endpoints.Resolve.ProactiveResolver.QueueSize,
@@ -316,7 +316,7 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		checkerType, checkerConfig := migration.ConvertCheckerConfig(&m.config.Endpoints.Enroll.Checker)
 		cfgJSON := ""
 		if checkerType != "" {
-			cfg := migration.EnrollDBConfigJSON{
+			cfg := model.EnrollDBConfigJSON{
 				CheckerType:   checkerType,
 				CheckerConfig: checkerConfig,
 			}
@@ -341,7 +341,7 @@ func (m *configMigrator) migrateEndpoints() []migrationResult {
 		if authEnabled && len(authTAs) == 0 {
 			authTAs = defaultTAEntityIDs
 		}
-		cfg := migration.CollectionDBConfigJSON{
+		cfg := model.CollectionDBConfigJSON{
 			AllowedTrustAnchors: m.config.Endpoints.EntityCollection.AllowedTrustAnchors,
 			IntervalSeconds:     int64(m.config.Endpoints.EntityCollection.Interval.Duration().Seconds()),
 			ConcurrencyLimit:    m.config.Endpoints.EntityCollection.ConcurrencyLimit,

@@ -201,7 +201,7 @@ func resolveAuthTAInput(taEntityIDs, currentTAs []string) ([]string, error) {
 }
 
 func configureResolveEndpoint(ep *model.FederationEndpoint) string {
-	var cfg migration.ResolveDBConfigJSON
+	var cfg model.ResolveDBConfigJSON
 	if ep != nil && ep.Config != "" {
 		_ = json.Unmarshal([]byte(ep.Config), &cfg)
 	}
@@ -221,7 +221,7 @@ func configureResolveEndpoint(ep *model.FederationEndpoint) string {
 
 	if promptBool("Configure proactive resolver?", false) {
 		if cfg.ProactiveResolver == nil {
-			cfg.ProactiveResolver = &migration.ProactiveResolverDBConfigJSON{}
+			cfg.ProactiveResolver = &model.ProactiveResolverDBConfigJSON{}
 		}
 		cfg.ProactiveResolver.Enabled = promptBool("  Enabled?", cfg.ProactiveResolver.Enabled)
 		cfg.ProactiveResolver.ConcurrencyLimit = promptInt("  Concurrency limit", cfg.ProactiveResolver.ConcurrencyLimit)
@@ -238,7 +238,7 @@ func configureResolveEndpoint(ep *model.FederationEndpoint) string {
 }
 
 func configureEnrollEndpoint(ep *model.FederationEndpoint) string {
-	var cfg migration.EnrollDBConfigJSON
+	var cfg model.EnrollDBConfigJSON
 	if ep != nil && ep.Config != "" {
 		_ = json.Unmarshal([]byte(ep.Config), &cfg)
 	}
@@ -273,7 +273,7 @@ func configureEnrollEndpoint(ep *model.FederationEndpoint) string {
 }
 
 func configureCollectionEndpoint(ep *model.FederationEndpoint) string {
-	var cfg migration.CollectionDBConfigJSON
+	var cfg model.CollectionDBConfigJSON
 	if ep != nil && ep.Config != "" {
 		_ = json.Unmarshal([]byte(ep.Config), &cfg)
 	}

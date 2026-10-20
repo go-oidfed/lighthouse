@@ -280,7 +280,7 @@ func (fed *LightHouse) startBackgroundServicesForEndpoints() {
 			continue
 		}
 		if ep.Type == model.EndpointTypeEntityCollection {
-			var cfg collectionDBConfig
+			var cfg model.CollectionDBConfigJSON
 			if ep.Config != "" {
 				if err := json.Unmarshal([]byte(ep.Config), &cfg); err != nil {
 					log.Error().Err(err).Str("type", string(ep.Type)).
@@ -425,7 +425,7 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 		return fed.AddSubordinateListingEndpoint(endpointConf, fed.storages.Subordinates, fed.storages.TrustMarks)
 
 	case model.EndpointTypeResolve:
-		var cfg resolveDBConfig
+		var cfg model.ResolveDBConfigJSON
 		if ep.Config != "" {
 			if err := json.Unmarshal([]byte(ep.Config), &cfg); err != nil {
 				return fmt.Errorf("failed to parse resolve config: %w", err)
@@ -501,7 +501,7 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 		return fed.AddHistoricalKeysEndpoint(endpointConf)
 
 	case model.EndpointTypeEnroll:
-		var cfg enrollDBConfig
+		var cfg model.EnrollDBConfigJSON
 		if ep.Config != "" {
 			if err := json.Unmarshal([]byte(ep.Config), &cfg); err != nil {
 				return fmt.Errorf("failed to parse enroll config: %w", err)
@@ -521,7 +521,7 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 		return fed.AddEnrollRequestEndpoint(endpointConf, fed.storages.Subordinates)
 
 	case model.EndpointTypeEntityCollection:
-		var cfg collectionDBConfig
+		var cfg model.CollectionDBConfigJSON
 		if ep.Config != "" {
 			if err := json.Unmarshal([]byte(ep.Config), &cfg); err != nil {
 				return fmt.Errorf("failed to parse entity_collection config: %w", err)
@@ -594,42 +594,9 @@ func (fed *LightHouse) resolveCollectionAllowedTAs() ([]string, error) {
 	if collectionEP.Config == "" {
 		return nil, nil
 	}
-	var cfg collectionDBConfig
+	var cfg model.CollectionDBConfigJSON
 	if err := json.Unmarshal([]byte(collectionEP.Config), &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse entity_collection config: %w", err)
 	}
 	return cfg.AllowedTrustAnchors, nil
-}
-
-// DB config structs for type-specific endpoint configuration stored as JSON
-// in the FederationEndpoint.Config column.
-
-type resolveDBConfig struct {
-	AllowedTrustAnchors                    []string                   `json:"allowed_trust_anchors,omitempty"`
-	UseEntityCollectionAllowedTrustAnchors bool                       `json:"use_entity_collection_allowed_trust_anchors,omitempty"`
-	GracePeriodSeconds                     int64                      `json:"grace_period_seconds,omitempty"`
-	TimeElapsedGraceFactor                 float64                    `json:"time_elapsed_grace_factor,omitempty"`
-	ProactiveResolver                      *proactiveResolverDBConfig `json:"proactive_resolver,omitempty"`
-}
-
-type proactiveResolverDBConfig struct {
-	Enabled                  bool   `json:"enabled"`
-	ConcurrencyLimit         int    `json:"concurrency_limit,omitempty"`
-	QueueSize                int    `json:"queue_size,omitempty"`
-	ResponseStorageDir       string `json:"response_storage_dir,omitempty"`
-	ResponseStorageStoreJSON bool   `json:"response_storage_store_json,omitempty"`
-	ResponseStorageStoreJWT  bool   `json:"response_storage_store_jwt,omitempty"`
-}
-
-type enrollDBConfig struct {
-	CheckerType   string `json:"checker_type,omitempty"`
-	CheckerConfig any    `json:"checker_config,omitempty"`
-}
-
-type collectionDBConfig struct {
-	AllowedTrustAnchors        []string `json:"allowed_trust_anchors,omitempty"`
-	IntervalSeconds            int64    `json:"interval_seconds,omitempty"`
-	ConcurrencyLimit           int      `json:"concurrency_limit,omitempty"`
-	PaginationLimit            int      `json:"pagination_limit,omitempty"`
-	DisableDelegatedCollection bool     `json:"disable_delegated_collection,omitempty"`
 }
