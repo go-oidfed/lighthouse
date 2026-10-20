@@ -2033,7 +2033,8 @@ details.</p>
 <span class="w">  </span><span class="nt">"allowed_trust_anchors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"https://ta.example.com"</span><span class="p">],</span>
 <span class="w">  </span><span class="nt">"interval_seconds"</span><span class="p">:</span><span class="w"> </span><span class="mi">28800</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"concurrency_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"pagination_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">512</span>
+<span class="w">  </span><span class="nt">"pagination_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"disable_delegated_collection"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
 <span class="p">}</span>
 </code></pre></div>
 <table>
@@ -2059,6 +2060,10 @@ details.</p>
 <tr>
 <td><code>pagination_limit</code></td>
 <td>Maximum page size for paginated requests.</td>
+</tr>
+<tr>
+<td><code>disable_delegated_collection</code></td>
+<td>When <code>true</code>, the collector does not use a subordinate's published <code>federation_collection_endpoint</code> to enumerate its subtree and instead falls back to recursive subordinate listing. Default <code>false</code> (delegation enabled).</td>
 </tr>
 </tbody>
 </table>
