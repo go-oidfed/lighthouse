@@ -24,7 +24,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 	if fed.fedMetadata.Extra == nil {
 		fed.fedMetadata.Extra = make(map[string]any)
 	}
-	fed.fedMetadata.Extra["federation_collection_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+	fed.fedMetadata.FederationCollectionEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
 		return nil
 	}
@@ -70,7 +70,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 			)
 		}
 		if wantedButNotSupported := slices.Subtract(
-			req.UIClaims, []string{
+			req.InfoClaims, []string{
 				"display_name",
 				"description",
 				"keywords",
@@ -112,7 +112,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 		fed.registerEndpoint(
 			model.EndpointTypeEntityCollection, endpoint.Path, fiber.MethodPost, handler, auth.Middleware(),
 		)
-		fed.fedMetadata.Extra["federation_collection_endpoint_auth_methods"] = []string{oidfedconst.AuthMethodPrivateKeyJWT}
+		fed.fedMetadata.FederationCollectionEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
 	} else {
 		fed.registerEndpoint(model.EndpointTypeEntityCollection, endpoint.Path, fiber.MethodGet, handler, nil)

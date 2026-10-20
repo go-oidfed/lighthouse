@@ -7,10 +7,15 @@
 - Added `lhmigrate keys mldsa` to re-encode ML-DSA private keys written by
   earlier versions (legacy PKCS#8 encoding) in the interoperable RFC 9935
   seed-only PKCS#8 encoding. See the [migration guide](docs/migration/0.23.md).
+- Added a `disable_delegated_collection` config option to the entity
+  collection endpoint. When `true`, collection does not use a subordinate's
+  published `federation_collection_endpoint` to enumerate its subtree
+  (delegation), falling back to recursive subordinate listing. Default is
+  `false` (delegation enabled).
 
 ### Internal
 
-- Upgraded the underlying federation library to 0.12.0, which changes the
+- Upgraded the underlying federation library to 0.13.0, which changes the
   PEM encoding of ML-DSA private keys (see enhancement above).
 
 ## LightHouse 0.22.5

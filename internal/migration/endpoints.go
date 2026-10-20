@@ -43,10 +43,11 @@ type EnrollDBConfigJSON struct {
 // CollectionDBConfigJSON is the JSON config struct for the entity collection
 // endpoint's type-specific config.
 type CollectionDBConfigJSON struct {
-	AllowedTrustAnchors []string `json:"allowed_trust_anchors,omitempty"`
-	IntervalSeconds     int64    `json:"interval_seconds,omitempty"`
-	ConcurrencyLimit    int      `json:"concurrency_limit,omitempty"`
-	PaginationLimit     int      `json:"pagination_limit,omitempty"`
+	AllowedTrustAnchors        []string `json:"allowed_trust_anchors,omitempty"`
+	IntervalSeconds            int64    `json:"interval_seconds,omitempty"`
+	ConcurrencyLimit           int      `json:"concurrency_limit,omitempty"`
+	PaginationLimit            int      `json:"pagination_limit,omitempty"`
+	DisableDelegatedCollection bool     `json:"disable_delegated_collection,omitempty"`
 }
 
 // StrPtrOrNil returns a *string for a non-empty s, or nil for empty.

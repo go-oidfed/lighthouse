@@ -287,6 +287,9 @@ func configureCollectionEndpoint(ep *model.FederationEndpoint) string {
 
 	cfg.ConcurrencyLimit = promptInt("Concurrency limit", cfg.ConcurrencyLimit)
 	cfg.PaginationLimit = promptInt("Pagination limit", cfg.PaginationLimit)
+	cfg.DisableDelegatedCollection = promptBool(
+		"Disable delegated (subordinate collection endpoint) collection?", cfg.DisableDelegatedCollection,
+	)
 
 	b, _ := json.Marshal(cfg)
 	return string(b)

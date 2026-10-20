@@ -527,9 +527,12 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 				return fmt.Errorf("failed to parse entity_collection config: %w", err)
 			}
 		}
-		var collector oidfed.EntityCollector = &oidfed.SimpleEntityCollector{}
+		var collector oidfed.EntityCollector = &oidfed.SimpleEntityCollector{
+			DisableSubordinateCollectionEndpoints: cfg.DisableDelegatedCollection,
+		}
 		if cfg.IntervalSeconds > 0 {
 			pec := &oidfed.PeriodicEntityCollector{
+				Collector:    collector,
 				TrustAnchors: cfg.AllowedTrustAnchors,
 				Interval:     time.Duration(cfg.IntervalSeconds) * time.Second,
 				Concurrency:  cfg.ConcurrencyLimit,
@@ -624,8 +627,9 @@ type enrollDBConfig struct {
 }
 
 type collectionDBConfig struct {
-	AllowedTrustAnchors []string `json:"allowed_trust_anchors,omitempty"`
-	IntervalSeconds     int64    `json:"interval_seconds,omitempty"`
-	ConcurrencyLimit    int      `json:"concurrency_limit,omitempty"`
-	PaginationLimit     int      `json:"pagination_limit,omitempty"`
+	AllowedTrustAnchors        []string `json:"allowed_trust_anchors,omitempty"`
+	IntervalSeconds            int64    `json:"interval_seconds,omitempty"`
+	ConcurrencyLimit           int      `json:"concurrency_limit,omitempty"`
+	PaginationLimit            int      `json:"pagination_limit,omitempty"`
+	DisableDelegatedCollection bool     `json:"disable_delegated_collection,omitempty"`
 }

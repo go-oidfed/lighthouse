@@ -108,27 +108,29 @@ details.
   "allowed_trust_anchors": ["https://ta.example.com"],
   "interval_seconds": 28800,
   "concurrency_limit": 4,
-  "pagination_limit": 512
+  "pagination_limit": 512,
+  "disable_delegated_collection": false
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `allowed_trust_anchors` | Trust anchor entity IDs permitted in requests. |
-| `interval_seconds` | When `> 0`, starts a background periodic collector. |
-| `concurrency_limit` | How many periodic collection tasks may run in parallel. |
-| `pagination_limit` | Maximum page size for paginated requests. |
+| Field                          | Description                                                                                                                                                                                                                |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `allowed_trust_anchors`        | Trust anchor entity IDs permitted in requests.                                                                                                                                                                             |
+| `interval_seconds`             | When `> 0`, starts a background periodic collector.                                                                                                                                                                        |
+| `concurrency_limit`            | How many periodic collection tasks may run in parallel.                                                                                                                                                                    |
+| `pagination_limit`             | Maximum page size for paginated requests.                                                                                                                                                                                  |
+| `disable_delegated_collection` | When `true`, the collector does not use a subordinate's published `federation_collection_endpoint` to enumerate its subtree and instead falls back to recursive subordinate listing. Default `false` (delegation enabled). |
 
 ## Management
 
-| Tool | Command |
-|------|---------|
-| Admin API | `GET /api/v1/admin/federation-endpoints` (list) |
-| Admin API | `POST /api/v1/admin/federation-endpoints` (create) |
-| Admin API | `GET/PUT/DELETE /api/v1/admin/federation-endpoints/{type}` |
+| Tool                 | Command                                                            |
+|----------------------|--------------------------------------------------------------------|
+| Admin API            | `GET /api/v1/admin/federation-endpoints` (list)                    |
+| Admin API            | `POST /api/v1/admin/federation-endpoints` (create)                 |
+| Admin API            | `GET/PUT/DELETE /api/v1/admin/federation-endpoints/{type}`         |
 | Admin API (auth TAs) | `PUT /api/v1/admin/federation-endpoints/{type}/auth-trust-anchors` |
-| lhsetup | `lhsetup --only=endpoints` |
-| config2db | `lhmigrate config2db --only=endpoints` |
+| lhsetup              | `lhsetup --only=endpoints`                                         |
+| config2db            | `lhmigrate config2db --only=endpoints`                             |
 
 !!! note "New endpoint types"
     `jwks_update_trigger` and `jwks_update` have no equivalent in the old config
