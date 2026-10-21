@@ -1,3 +1,9 @@
+## LightHouse 0.23.1
+
+### Bugfixes
+
+- Fixed application of metadata policy for custom entity types
+
 ## LightHouse 0.23.0
 
 - Upgraded to Go **1.27**
