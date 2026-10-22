@@ -39,35 +39,34 @@ type kmsInfo struct {
 	Rotation    kms.KeyRotationConfig `json:"rotation"`
 }
 
-func addKeysToSet(set jwx.JWKS, keys public.PublicKeyEntryList) error {
-	for _, pub := range keys {
-		k, err := pub.JWK()
-		if err != nil {
-			return err
-		}
-		_ = set.AddKey(k)
-	}
-	return nil
-}
-
 // jwksHandlers groups handlers for JWKS endpoints.
 type jwksHandlers struct {
 	keyManagement KeyManagement
 }
 
 func (h *jwksHandlers) getJWKS(c *fiber.Ctx) error {
-	set := jwx.NewJWKS()
-	addValidKeys := func(pkStorage public.PublicKeyStorage) error {
+	collectValid := func(pkStorage public.PublicKeyStorage) (public.PublicKeyEntryList, error) {
 		list, err := pkStorage.GetValid()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return addKeysToSet(set, list)
+		return list, nil
 	}
-	if err := addValidKeys(h.keyManagement.KMSManagedPKs); err != nil {
+	kmsList, err := collectValid(h.keyManagement.KMSManagedPKs)
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
-	if err := addValidKeys(h.keyManagement.APIManagedPKs); err != nil {
+	apiList, err := collectValid(h.keyManagement.APIManagedPKs)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
+	}
+	// Merge into a single, kid-unique JWKS (PublicKeyEntryList.JWKS dedupes by
+	// KID, preferring earliest nbf then earliest iat on collision).
+	combined := make(public.PublicKeyEntryList, 0, len(kmsList)+len(apiList))
+	combined = append(combined, kmsList...)
+	combined = append(combined, apiList...)
+	set, err := combined.JWKS()
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	return c.JSON(set)
@@ -107,6 +106,9 @@ func (h *publicKeyHandlers) create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("provided 'kid' does not match key"))
 	}
 	if err := h.apiManagedPKs.Add(req); err != nil {
+		if _, ok := errors.AsType[public.DuplicateKIDError](err); ok {
+			return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest("a key with this kid already exists"))
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	created, err := h.apiManagedPKs.Get(kid)

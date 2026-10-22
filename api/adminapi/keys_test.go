@@ -203,6 +203,22 @@ func TestPostPublicKey(t *testing.T) {
 
 		assertStatus(t, resp, bodyBytes, http.StatusBadRequest)
 	})
+
+	t.Run("DuplicateKID", func(t *testing.T) {
+		t.Parallel()
+		app, _, _ := setupPublicKeyApp(t)
+		injectTestKey(t, app, "dup-key")
+
+		// Posting a second key with the same kid must be rejected as a conflict,
+		// not silently ignored and not a server error.
+		body := newTestKeyBody("dup-key")
+		req := httptest.NewRequest("POST", "/entity-configuration/keys", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, bodyBytes := doRequest(t, app, req)
+
+		requireStatus(t, resp, bodyBytes, http.StatusConflict)
+	})
 }
 
 func TestGetPublicKeys(t *testing.T) {

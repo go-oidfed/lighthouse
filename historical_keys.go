@@ -3,6 +3,7 @@ package lighthouse
 import (
 	"github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
+	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
@@ -30,15 +31,17 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) error {
 			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 		}
-		allEntries := append(kmsHistory, apiHistory...)
-		keys := jwx.NewJWKS()
-		for _, k := range allEntries {
-			kk, err := k.JWK()
-			if err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			_ = keys.AddKey(kk)
+		// Merge the two storages into a single, kid-unique JWKS. A KID must
+		// uniquely identify a key, so a collision across storages is collapsed
+		// deterministically (earliest nbf, then earliest iat) rather than
+		// emitting an invalid signed JWKS.
+		allEntries := make(public.PublicKeyEntryList, 0, len(kmsHistory)+len(apiHistory))
+		allEntries = append(allEntries, kmsHistory...)
+		allEntries = append(allEntries, apiHistory...)
+		keys, err := allEntries.JWKS()
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 		}
 
 		jwt, err := signer.JWT(

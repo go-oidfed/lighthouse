@@ -1,3 +1,25 @@
+## LightHouse 0.23.2
+
+### Bugfixes
+
+- A `kid` must uniquely identify a key in a JWKS. Two keys sharing a `kid`
+  could previously be stored and published together in an Entity Configuration
+  or signed JWKS, producing an invalid value.
+  - `DBPublicKeyStorage.Add` now returns a `public.DuplicateKIDError` when a
+    key's `kid` is already present (previously it silently did nothing);
+    `AddAll` rejects conflicting batches atomically (adding none).
+  - The Entity Configuration, admin `GET /entity-configuration/jwks`, and
+    historical keys JWKS sets now merge the KMS-managed and API-managed
+    storages into a single kid-unique set via `PublicKeyEntryList.JWKS()`
+    (which keeps the deterministic earliest-`nbf`/earliest-`iat` winner on a
+    collision), instead of blindly appending every key.
+  - Migrations (`NewDBPublicKeyStorageFromStorage`,
+    `NewFilesystemPublicKeyStorageFromStorage`) now fail loudly on a legacy
+    source containing duplicate `kid` claims rather than silently dropping
+    keys.
+  - The admin API returns **409** (`invalid_request`) when a key with an
+    already-present `kid` is posted, instead of a generic 500.
+
 ## LightHouse 0.23.1
 
 ### Bugfixes

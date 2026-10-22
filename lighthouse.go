@@ -14,6 +14,7 @@ import (
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
+	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v2"
@@ -234,16 +235,14 @@ func createVersatileSigner(keyManagement adminapi.KeyManagement) (jwx.VersatileS
 			if err != nil {
 				return jwx.JWKS{}, err
 			}
-			allEntries := append(kmsHistory, apiHistory...)
-			set := jwx.NewJWKS()
-			for _, k := range allEntries {
-				kk, err := k.JWK()
-				if err != nil {
-					return jwx.JWKS{}, err
-				}
-				_ = set.AddKey(kk)
-			}
-			return set, nil
+			// Merge the two storages into a single, kid-unique JWKS. A KID must
+			// uniquely identify a key, so a collision across the KMS-managed and
+			// API-managed storages is collapsed deterministically (earliest nbf,
+			// then earliest iat) rather than publishing an invalid entity config.
+			allEntries := make(public.PublicKeyEntryList, 0, len(kmsHistory)+len(apiHistory))
+			allEntries = append(allEntries, kmsHistory...)
+			allEntries = append(allEntries, apiHistory...)
+			return allEntries.JWKS()
 		},
 	), nil
 }

@@ -118,7 +118,8 @@ func (D *DBPublicKeyStorage) GetValid() (out public.PublicKeyEntryList, err erro
 	return
 }
 
-// Add inserts a new key if the KID is unused.
+// Add inserts a new key. Adding a key whose KID is already present returns a
+// public.DuplicateKIDError, so that no two keys may share a KID in a JWKS.
 func (D *DBPublicKeyStorage) Add(entry public.PublicKeyEntry) error {
 	// Ensure KID is set
 	if entry.KID == "" && entry.Key.Key != nil {
@@ -128,31 +129,88 @@ func (D *DBPublicKeyStorage) Add(entry public.PublicKeyEntry) error {
 	if entry.KID == "" {
 		return errors.New("missing kid for public key entry")
 	}
-	// Check existence
+	// Check existence; a KID uniquely identifies a key, so a conflict is an
+	// error, not a silent no-op.
 	var existing public.PublicKeyEntry
 	res := D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Where("kid = ?", entry.KID).First(&existing)
 	if res.Error == nil {
-		// Already exists, do nothing
-		return nil
+		return public.DuplicateKIDError{KID: entry.KID}
 	}
 	if !errors.Is(res.Error, gorm.ErrRecordNotFound) {
 		return errors.Wrap(res.Error, "DBPublicKeyStorage: Add: error during existence check")
 	}
 	res.Error = nil
-	return errors.Wrap(
-		D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Create(&entry).Error, "DBPublicKeyStorage: add failed",
-	)
-
-}
-
-// AddAll adds multiple keys.
-func (D *DBPublicKeyStorage) AddAll(list []public.PublicKeyEntry) error {
-	for _, e := range list {
-		if err := D.Add(e); err != nil {
-			return err
+	if err := D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).Create(&entry).Error; err != nil {
+		// A unique-constraint violation (e.g. from a concurrent Add) is
+		// surfaced as a duplicate-KID error rather than a generic failure.
+		if isUniqueConstraintErr(err) {
+			return public.DuplicateKIDError{KID: entry.KID}
 		}
+		return errors.Wrap(err, "DBPublicKeyStorage: add failed")
 	}
 	return nil
+}
+
+// AddAll adds multiple keys atomically. If any entry collides with an existing
+// KID or two entries in the batch share a KID, it returns a
+// public.DuplicateKIDError and adds none of them.
+func (D *DBPublicKeyStorage) AddAll(list []public.PublicKeyEntry) error {
+	// Determine KIDs up front, rejecting empty and intra-batch duplicates
+	// before touching the database.
+	kids := make([]string, 0, len(list))
+	seen := make(map[string]struct{}, len(list))
+	for _, e := range list {
+		kid := e.KID
+		if kid == "" && e.Key.Key != nil {
+			kid, _ = jwk.Get[string](e.Key.Key, "kid")
+		}
+		if kid == "" {
+			continue
+		}
+		if _, dup := seen[kid]; dup {
+			return public.DuplicateKIDError{KID: kid}
+		}
+		seen[kid] = struct{}{}
+		kids = append(kids, kid)
+	}
+	// Reject any KID already present in storage.
+	if len(kids) > 0 {
+		var existing int64
+		if err := D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).
+			Where("kid IN ?", kids).Count(&existing).Error; err != nil {
+			return errors.WithStack(err)
+		}
+		if existing > 0 {
+			// Find the first conflicting kid for a precise error.
+			for _, kid := range kids {
+				var row public.PublicKeyEntry
+				res := D.db.Session(&gorm.Session{NewDB: true}).Table(D.tbl).
+					Where("kid = ?", kid).First(&row)
+				if res.Error == nil {
+					return public.DuplicateKIDError{KID: kid}
+				}
+			}
+		}
+	}
+	// All validated: insert inside a transaction so the batch is atomic.
+	return errors.WithStack(D.db.Transaction(func(tx *gorm.DB) error {
+		for _, e := range list {
+			if e.KID == "" && e.Key.Key != nil {
+				kid, _ := jwk.Get[string](e.Key.Key, "kid")
+				e.KID = kid
+			}
+			if e.KID == "" {
+				continue
+			}
+			if err := tx.Table(D.tbl).Create(&e).Error; err != nil {
+				if isUniqueConstraintErr(err) {
+					return public.DuplicateKIDError{KID: e.KID}
+				}
+				return errors.Wrap(err, "DBPublicKeyStorage: add failed")
+			}
+		}
+		return nil
+	}))
 }
 
 // Update updates editable metadata for a key.
