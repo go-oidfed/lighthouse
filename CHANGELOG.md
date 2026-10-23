@@ -1,4 +1,28 @@
-## LightHouse 0.23.2
+## LightHouse 0.24.0
+
+### Features
+
+- **Outbound JWKS sync to superiors (`authority_hints[].jwks_sync`).**
+  When LightHouse rotates its own federation keys it can notify each superior
+  (authority hint) so the superior keeps the stored JWKS fresh. Two modes map
+  onto the go-oidfed lib hooks: `push` (`JWKSUpdateHook`, posts a signed JWK Set
+  to the superior's `federation_jwks_update_endpoint`) and `trigger`
+  (`TriggerUpdateHook`, POSTs the entity_id authenticated with `private_key_jwt`
+  to the superior's `federation_jwks_update_trigger_endpoint`). Omitted/`none` =
+  no syncing (default).
+  - Configured per authority hint in the DB; the Admin API
+    (`POST`/`PUT`/`DELETE /api/v1/admin/entity-configuration/authority-hints`)
+    and `lhsetup` accept a `jwks_sync` object with `mode`, `jwt_lifetime`
+    (push), `timeout`, and `headers`.
+  - Hooks are re-attached at runtime after each authority-hint mutation, so
+    `jwks_sync` changes take effect without a restart. Endpoint URLs and
+    algorithms are resolved dynamically from each superior's Entity
+    Configuration.
+  - Hooks fire on scheduled and manual rotation (KMS `db`, `filesystem`,
+    `pkcs11`); first-boot key seeding does not notify superiors. This is
+    outbound-only and never published in the entity configuration.
+  - The federation KMS is now loaded without starting automatic rotation;
+    `NewLightHouse` attaches hooks and then starts rotation.
 
 ### Bugfixes
 

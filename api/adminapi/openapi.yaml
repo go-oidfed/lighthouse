@@ -4649,6 +4649,12 @@ components:
         description:
           type: string
           description: Optional human-readable description for this AuthorityHint.
+        jwks_sync:
+          $ref: '#/components/schemas/JWKSSyncConf'
+          description: >-
+            Optional outbound-only directive to sync LightHouse's rotated
+            federation keys to this superior. Never published in the entity
+            configuration. Omitted/null means no syncing (default).
     AddAuthorityHint:
       title: Root Type for AddAuthorityHint
       description: Data to add an authority hint
@@ -4661,8 +4667,51 @@ components:
         description:
           type: string
           description: Optional human-readable description for this AuthorityHint.
+        jwks_sync:
+          $ref: '#/components/schemas/JWKSSyncConf'
+          description: Optional outbound JWKS sync configuration for this superior.
       example:
         entity_id: https://authority.example.com
+    JWKSSyncMode:
+      description: >-
+        Sync mechanism for notifying this superior when LightHouse rotates its
+        federation keys. none = disabled (default).
+      enum:
+        - none
+        - push
+        - trigger
+      type: string
+    JWKSSyncConf:
+      title: JWKSSyncConf
+      description: >-
+        Outbound-only configuration to notify a superior when LightHouse's
+        federation keys rotate. push posts a signed JWK Set to the superior's
+        federation_jwks_update_endpoint; trigger POSTs this entity_id to the
+        superior's federation_jwks_update_trigger_endpoint (private_key_jwt
+        authenticated). Endpoint URLs and algorithms are resolved dynamically
+        from the superior's entity configuration.
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/JWKSSyncMode'
+        jwt_lifetime:
+          type: integer
+          format: int64
+          description: >-
+            Lifetime (exp - iat), in seconds, of the signed JWKS JWT in push
+            mode. Default 600 (10 minutes). Ignored in other modes.
+        timeout:
+          type: integer
+          format: int64
+          description: HTTP client timeout for the sync request, in seconds (default 20).
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Additional HTTP headers set on the sync request.
+      example:
+        mode: trigger
+        timeout: 20
     SignatureAlgorithm:
       description: The signature algorithm to use in JOSE/JWA format
       enum:

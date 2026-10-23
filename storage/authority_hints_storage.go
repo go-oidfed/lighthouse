@@ -32,6 +32,7 @@ func (s *AuthorityHintsStorage) Create(hint model.AddAuthorityHint) (*model.Auth
 			existing.DeletedAt = gorm.DeletedAt{}
 			existing.EntityID = hint.EntityID
 			existing.Description = hint.Description
+			existing.JWKSSync = hint.JWKSSync
 			if err := s.db.Save(&existing).Error; err != nil {
 				return nil, errors.Wrap(err, "authority_hints: reactivation failed")
 			}
@@ -43,6 +44,7 @@ func (s *AuthorityHintsStorage) Create(hint model.AddAuthorityHint) (*model.Auth
 	item := &model.AuthorityHint{
 		EntityID:    hint.EntityID,
 		Description: hint.Description,
+		JWKSSync:    hint.JWKSSync,
 	}
 	if err := s.db.Create(item).Error; err != nil {
 		if isUniqueConstraintError(err) {
@@ -82,6 +84,7 @@ func (s *AuthorityHintsStorage) Update(ident string, update model.AddAuthorityHi
 	}
 	item.EntityID = update.EntityID
 	item.Description = update.Description
+	item.JWKSSync = update.JWKSSync
 	if err = s.db.Save(item).Error; err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, model.AlreadyExistsError("authority hint already exists")

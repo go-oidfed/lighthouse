@@ -5,14 +5,31 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // registerAuthorityHints wires handlers using an AuthorityHintsStore abstraction.
-func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
+// applyHook, when non-nil, is invoked after any successful mutation (create,
+// update, delete) so that outbound JWKS-sync hooks can be re-attached at
+// runtime; a non-nil error is logged but does not fail the already-persisted
+// request.
+func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, applyHook func() error) {
 	g := r.Group("/entity-configuration/authority-hints")
 	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
+
+	validate := func(req *model.AddAuthorityHint) error {
+		if req.EntityID == "" {
+			return errors.New("entity_id is required")
+		}
+		if req.JWKSSync != nil {
+			if err := req.JWKSSync.Validate(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
 	g.Get(
 		"/", func(c *fiber.Ctx) error {
@@ -30,8 +47,8 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-			if req.EntityID == "" {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
+			if err := validate(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 			}
 			item, err := store.Create(req)
 			if err != nil {
@@ -40,6 +57,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
+			reapplyAuthorizationHintsHook(applyHook, item.EntityID)
 			return c.Status(fiber.StatusCreated).JSON(item)
 		},
 	)
@@ -60,8 +78,8 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-			if req.EntityID == "" {
-				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
+			if err := validate(&req); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 			}
 			item, err := store.Update(c.Params("authorityHintID"), req)
 			if err != nil {
@@ -73,6 +91,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 				}
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 			}
+			reapplyAuthorizationHintsHook(applyHook, item.EntityID)
 			return c.JSON(item)
 		},
 	)
@@ -82,7 +101,23 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore) {
 			if err := store.Delete(c.Params("authorityHintID")); err != nil {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("authority hint not found"))
 			}
+			reapplyAuthorizationHintsHook(applyHook, c.Params("authorityHintID"))
 			return c.SendStatus(fiber.StatusNoContent)
 		},
 	)
+}
+
+// reapplyAuthorizationHintsHook invokes the runtime hook applier (if set) and
+// logs any failure. The DB mutation has already been committed; a failed
+// re-application means the running process keeps its previous hook set until
+// the next mutation or restart.
+func reapplyAuthorizationHintsHook(applyHook func() error, entityID string) {
+	if applyHook == nil {
+		return
+	}
+	if err := applyHook(); err != nil {
+		log.Error().Err(err).
+			Str("entity_id", entityID).
+			Msg("authority hints: failed to re-apply JWKS sync hooks; changes will take effect after the next mutation or restart")
+	}
 }

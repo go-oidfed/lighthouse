@@ -45,10 +45,14 @@ func (m *mockAuthorityHintsStore) Delete(ident string) error {
 	return m.deleteFn(ident)
 }
 
-func setupAuthorityHintsTestApp(t *testing.T, store smodel.AuthorityHintsStore) *fiber.App {
+func setupAuthorityHintsTestApp(t *testing.T, store smodel.AuthorityHintsStore, applyHook ...func() error) *fiber.App {
 	t.Helper()
 	app := fiber.New()
-	registerAuthorityHints(app, store)
+	var hook func() error
+	if len(applyHook) > 0 {
+		hook = applyHook[0]
+	}
+	registerAuthorityHints(app, store, hook)
 	return app
 }
 
@@ -363,4 +367,133 @@ func TestAuthorityHintsDelete(t *testing.T) {
 		requireStatus(t, resp, bodyBytes, http.StatusNotFound)
 		requireEntityConfigurationCache(t, true, cacheValue)
 	})
+}
+
+// TestAuthorityHintsCreateJWKSSync must NOT use t.Parallel() (uses the global EC cache).
+func TestAuthorityHintsCreateJWKSSync(t *testing.T) {
+	cacheValue := []byte("cached-entity-config")
+
+	t.Run("PersistsSyncAndReappliesHook", func(t *testing.T) {
+		var gotInput smodel.AddAuthorityHint
+		applierCalls := 0
+		setEntityConfigurationCache(t, cacheValue)
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			createFn: func(item smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
+				gotInput = item
+				return &smodel.AuthorityHint{ID: 12, EntityID: item.EntityID, JWKSSync: item.JWKSSync}, nil
+			},
+		}, func() error {
+			applierCalls++
+			return nil
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/entity-configuration/authority-hints/",
+			strings.NewReader(`{"entity_id":"https://superior.example","jwks_sync":{"mode":"push","timeout":20,"jwt_lifetime":600}}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, body := doRequest(t, app, req)
+		requireStatus(t, resp, body, http.StatusCreated)
+
+		if gotInput.JWKSSync == nil || gotInput.JWKSSync.Mode != smodel.JWKSSyncPush {
+			t.Fatalf("expected push jwks_sync in create input, got %+v", gotInput.JWKSSync)
+		}
+		if applierCalls != 1 {
+			t.Fatalf("expected applier to be invoked once, got %d", applierCalls)
+		}
+		var got smodel.AuthorityHint
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
+		if got.JWKSSync == nil || got.JWKSSync.Mode != smodel.JWKSSyncPush {
+			t.Fatalf("expected jwks_sync in response, got %+v", got.JWKSSync)
+		}
+		requireEntityConfigurationCache(t, false, nil)
+	})
+
+	t.Run("TriggerModeValid", func(t *testing.T) {
+		setEntityConfigurationCache(t, cacheValue)
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			createFn: func(item smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
+				return &smodel.AuthorityHint{ID: 13, EntityID: item.EntityID, JWKSSync: item.JWKSSync}, nil
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/entity-configuration/authority-hints/",
+			strings.NewReader(`{"entity_id":"https://superior.example","jwks_sync":{"mode":"trigger"}}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, bodyBytes := doRequest(t, app, req)
+		requireStatus(t, resp, bodyBytes, http.StatusCreated)
+	})
+
+	t.Run("InvalidModeRejected", func(t *testing.T) {
+		setEntityConfigurationCache(t, cacheValue)
+		applierCalls := 0
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			createFn: func(_ smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
+				t.Fatalf("create should not be called for invalid jwks_sync mode")
+				return nil, nil
+			},
+		}, func() error {
+			applierCalls++
+			return nil
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/entity-configuration/authority-hints/",
+			strings.NewReader(`{"entity_id":"https://superior.example","jwks_sync":{"mode":"bogus"}}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, bodyBytes := doRequest(t, app, req)
+		requireStatus(t, resp, bodyBytes, http.StatusBadRequest)
+		if applierCalls != 0 {
+			t.Fatalf("applier must not run on rejected input, got %d calls", applierCalls)
+		}
+		requireEntityConfigurationCache(t, true, cacheValue)
+	})
+
+	t.Run("ApplierErrorStillSucceeds", func(t *testing.T) {
+		setEntityConfigurationCache(t, cacheValue)
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			createFn: func(item smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
+				return &smodel.AuthorityHint{ID: 14, EntityID: item.EntityID, JWKSSync: item.JWKSSync}, nil
+			},
+		}, func() error {
+			return errors.New("re-attach failed")
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/entity-configuration/authority-hints/",
+			strings.NewReader(`{"entity_id":"https://superior.example","jwks_sync":{"mode":"trigger"}}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, bodyBytes := doRequest(t, app, req)
+		requireStatus(t, resp, bodyBytes, http.StatusCreated)
+	})
+}
+
+// TestAuthorityHintsDeleteReappliesHook must NOT use t.Parallel().
+func TestAuthorityHintsDeleteReappliesHook(t *testing.T) {
+	cacheValue := []byte("cached-entity-config")
+	applierCalls := 0
+	setEntityConfigurationCache(t, cacheValue)
+	app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+		deleteFn: func(string) error { return nil },
+	}, func() error {
+		applierCalls++
+		return nil
+	})
+
+	req := httptest.NewRequest(http.MethodDelete, "/entity-configuration/authority-hints/11", http.NoBody)
+	resp, bodyBytes := doRequest(t, app, req)
+	requireStatus(t, resp, bodyBytes, http.StatusNoContent)
+	if applierCalls != 1 {
+		t.Fatalf("expected applier to be invoked once, got %d", applierCalls)
+	}
 }

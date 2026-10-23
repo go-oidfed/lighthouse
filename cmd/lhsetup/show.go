@@ -171,12 +171,18 @@ func showMetadataPolicyCrit() {
 func showAuthorityHints() {
 	printHeader("Authority Hints")
 
-	hints, err := storage.GetAuthorityHints(backends.AuthorityHints)
+	hints, err := backends.AuthorityHints.List()
 	if err != nil {
 		fmt.Printf("  Error: %s\n", err)
 		return
 	}
-	printList("Authority hints", hints)
+	for _, h := range hints {
+		mode := string(model.JWKSSyncNone)
+		if h.JWKSSync != nil && h.JWKSSync.Mode != "" {
+			mode = string(h.JWKSSync.Mode)
+		}
+		fmt.Printf("  - %s  (jwks_sync: %s)\n", h.EntityID, mode)
+	}
 }
 
 func showExtraEntityConfig() {

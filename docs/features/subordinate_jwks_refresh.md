@@ -20,6 +20,13 @@ make sense).
 | JWKS Update Trigger endpoint    | Subordinate → LH | Subordinate POSTs a trigger    | LH fetches the EC          |
 | JWKS Update endpoint            | Subordinate → LH | Subordinate POSTs its new keys | Subordinate sends the keys |
 
+!!! note "LightHouse as a subordinate"
+
+    When LightHouse itself has a superior authority hint, it can notify that
+    superior on its own key rotations using the same two mechanisms — see the
+    [`jwks_sync`](../config/db/entity-configuration.md#authority-hints-authority_hints)
+    option on authority hints.
+
 
 ## Periodic Refreshing
 

@@ -28,9 +28,22 @@ type Options struct {
 	// TrustMarkConfigInvalidator is called when entity configuration trust marks are modified
 	// to invalidate any cached configurations. Can be nil if not using trust mark refresh.
 	TrustMarkConfigInvalidator TrustMarkConfigInvalidator
+	// JWKSUpdateHookApplier, when non-nil, is invoked after each authority-hint
+	// mutation so that outbound JWKS-sync hooks can be re-attached at runtime.
+	// A returned error is logged, not returned to the API client (the DB write
+	// already succeeded).
+	JWKSUpdateHookApplier func() error
 	// Actor holds configuration for actor extraction from requests.
 	// The actor is recorded in subordinate event history.
 	Actor ActorConfig
+}
+
+// jwksUpdateHookApplier returns the configured JWKS-sync hook applier (nil-safe).
+func (o *Options) jwksUpdateHookApplier() func() error {
+	if o == nil {
+		return nil
+	}
+	return o.JWKSUpdateHookApplier
 }
 
 // Register mounts all admin API routes under the provided group.
@@ -133,7 +146,7 @@ func Register(
 	// Entity Configuration
 	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV, fedEntity)
 	// Authority Hints
-	registerAuthorityHints(r, storages.AuthorityHints)
+	registerAuthorityHints(r, storages.AuthorityHints, opts.jwksUpdateHookApplier())
 	// Keys (with transaction support for key rotation)
 	registerKeys(r, keyManagement, storages.KV, storages)
 	// Entity Configuration Trust Marks

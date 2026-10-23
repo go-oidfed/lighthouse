@@ -165,6 +165,25 @@ func NewLightHouse(
 
 	generalSigner := jwx.NewGeneralJWTSigner(versatileSigner, keyManagement.BasicKeys.GetAlgs())
 
+	// Outbound JWKS-sync hooks tell configured superior authority hints when
+	// this Lighthouse's federation keys rotate. They are rebuilt and re-attached
+	// here at boot and, via jwksUpdateHookApplier, after every authority-hint
+	// mutation so jwks_sync changes take effect at runtime without a restart.
+	jwksUpdateHookApplier := func() error {
+		return applyAuthorityHintJWKSSyncHooks(
+			entityID, versatileSigner, storages.KV, storages.AuthorityHints, keyManagement,
+		)
+	}
+	if err := jwksUpdateHookApplier(); err != nil {
+		return nil, err
+	}
+	// Start automatic key rotation now that hooks are attached. initKey loads
+	// the KMS but intentionally does not start rotation (see jws.go).
+	if err := startAutomaticKeyRotation(storages.KV, keyManagement); err != nil {
+		return nil, err
+	}
+	admin.JWKSUpdateHookApplier = jwksUpdateHookApplier
+
 	server, err := initFiberServer(serverConf)
 	if err != nil {
 		return nil, err
@@ -467,6 +486,7 @@ func initAdminAPI(
 			UsersEnabled:               admin.UsersEnabled,
 			Port:                       admin.Port,
 			TrustMarkConfigInvalidator: trustMarkConfigProvider,
+			JWKSUpdateHookApplier:      admin.JWKSUpdateHookApplier,
 			Actor: adminapi.ActorConfig{
 				Header: admin.ActorHeader,
 				Source: adminapi.ActorSource(admin.ActorSource),
@@ -848,6 +868,10 @@ type AdminAPIOptions struct {
 	CORS CORSConf
 	// TLS holds TLS configuration for the admin API.
 	TLS TLSConf
+	// JWKSUpdateHookApplier, when set by NewLightHouse, re-attaches outbound
+	// JWKS-sync hooks after authority-hint mutations so changes take effect at
+	// runtime without a restart.
+	JWKSUpdateHookApplier func() error
 }
 
 // corsConfigFromConf converts a CORSConf to a Fiber CORS middleware configuration.

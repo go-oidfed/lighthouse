@@ -220,9 +220,9 @@ func initKey(entityID string, c SigningConf, storages model.Backends) (
 	if err = errors.Wrap(keyManagement.BasicKeys.Load(), "could not load kms"); err != nil {
 		return
 	}
-	if keyManagement.Keys != nil && rotationConf.Enabled {
-		err = errors.Wrap(keyManagement.Keys.StartAutomaticRotation(), "could not start automatic key rotation")
-		return
-	}
+	// Automatic key rotation is intentionally NOT started here: JWKS-sync hooks
+	// (key_rotation_hooks.go) must be attached to the rotation config first, and
+	// they need the VersatileSigner that only exists after initKey returns. The
+	// caller (NewLightHouse) attaches hooks and then starts rotation.
 	return
 }

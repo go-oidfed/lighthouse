@@ -86,6 +86,86 @@ for details.
 Entity IDs of Federation Entities that are direct superiors to this entity.
 These are published in the `authority_hints` claim of the Entity Configuration.
 
+Each hint may opt into **outbound JWKS syncing**: when LightHouse rotates its
+own **federation** keys it can notify the superior so the superior can 
+update the JWKS included in the subordinate statement. This is configured per hint via the
+optional `jwks_sync` block and is independent for each hint. It never affects
+the published `authority_hints` claim and applies only to
+federation keys, never to OIDC signing keys.
+
+`jwks_sync.mode` selects one of two mechanisms:
+
+| Mode      | lib hook            | What happens                                                                                                                       |
+|-----------|---------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `none`    | —                   | No syncing (default; omitted `jwks_sync` is equivalent).                                                                           |
+| `push`    | `JWKSUpdateHook`    | LightHouse pushes a signed JWK Set (`application/jwk-set+jwt`) to the superior's `federation_jwks_update_endpoint`.                |
+| `trigger` | `TriggerUpdateHook` | LightHouse POSTs its entity_id (authenticated with `private_key_jwt`) to the superior's `federation_jwks_update_trigger_endpoint`. |
+
+In both modes the target endpoint URL, the acceptable signing algorithms, and
+the trigger auth requirement are resolved dynamically from the superior's
+Entity Configuration at the time of each rotation (served from the EC cache).
+The signed JWK Set (push) and the
+`private_key_jwt` assertion (trigger) are signed with LightHouse's federation
+signing key.
+
+!!! note "When hooks fire"
+
+    Hooks fire whenever the federation KMS generates or rotates a signing key —
+    both scheduled automatic rotations and manual operations (`POST
+    /api/v1/admin/kms/rotate`, rotating a key via the public key admin API).
+    The initial key seeding at first boot (no key file exists yet) happens
+    before hooks are attached and does **not** notify superiors. Hooks require a
+    rotation-capable KMS (`db`, `filesystem`, or `pkcs11`); the single-key-file
+    mode never fires them.
+
+!!! note "Runtime changes"
+
+    `jwks_sync` changes made via the Admin API (`POST`/`PUT`/`DELETE` on
+    authority hints) take effect immediately on the running process: the hooks
+    are re-attached after each mutation, without a restart. A failed re-attach
+    is logged; the change still applies on the next mutation or restart.
+
+Example:
+
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{
+  "entity_id": "https://superior.example.com",
+  "jwks_sync": { "mode": "trigger", "timeout": 20 }
+}' https://localhost:8081/api/v1/admin/entity-configuration/authority-hints
+```
+
+#### `jwks_sync.mode`
+
+<span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">none</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+One of `none`, `push`, or `trigger` (see the table above).
+
+#### `jwks_sync.jwt_lifetime`
+
+<span class="badge badge-purple" title="Value Type">integer (seconds)</span>
+<span class="badge badge-blue" title="Default Value">600</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The lifetime (`exp` - `iat`) of the signed JWK Set JWT sent in `push` mode,
+in seconds. Ignored in other modes.
+
+#### `jwks_sync.timeout`
+
+<span class="badge badge-purple" title="Value Type">integer (seconds)</span>
+<span class="badge badge-blue" title="Default Value">20</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+The HTTP client timeout for the sync request, in seconds.
+
+#### `jwks_sync.headers`
+
+<span class="badge badge-purple" title="Value Type">map of string to string</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+
+Additional HTTP headers set on the sync request.
+
 | Tool      | Command                                                              |
 |-----------|----------------------------------------------------------------------|
 | Admin API | `GET/POST/DELETE /api/v1/admin/entity-configuration/authority-hints` |

@@ -3,6 +3,8 @@ package storage
 import (
 	"os"
 	"testing"
+
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // TestSQLiteConnection tests connecting to a SQLite database
@@ -148,5 +150,70 @@ func TestStorageCreation(t *testing.T) {
 	trustStorage := sqliteStorage.TrustMarkedEntitiesStorage()
 	if trustStorage == nil {
 		t.Fatal("TrustMarkedEntitiesStorage() returned nil")
+	}
+}
+
+// TestAuthorityHintJWKSSyncRoundTrip verifies the jwks_sync JSON column
+// persists and round-trips through the AuthorityHintsStorage.
+func TestAuthorityHintJWKSSyncRoundTrip(t *testing.T) {
+	if os.Getenv("RUN_INTEGRATION_TESTS") != "true" {
+		t.Skip("Skipping integration test. Set RUN_INTEGRATION_TESTS=true to run")
+	}
+
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	st, err := NewStorage(Config{Driver: DriverSQLite, DataDir: tempDir})
+	if err != nil {
+		t.Fatalf("Failed to create SQLite storage: %v", err)
+	}
+	store := st.AuthorityHintsStorage()
+
+	created, err := store.Create(model.AddAuthorityHint{
+		EntityID: "https://superior.example",
+		JWKSSync: &model.JWKSSyncConf{
+			Mode:        model.JWKSSyncPush,
+			JWTLifetime: 600,
+			Timeout:     20,
+			Headers:     map[string]string{"X-Custom": "yes"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	got, err := store.Get("https://superior.example")
+	if err != nil {
+		t.Fatalf("get failed: %v", err)
+	}
+	if got.JWKSSync == nil || got.JWKSSync.Mode != model.JWKSSyncPush {
+		t.Fatalf("expected push jwks_sync, got %+v", got.JWKSSync)
+	}
+	if got.JWKSSync.Timeout != 20 {
+		t.Fatalf("timeout = %d, want 20", got.JWKSSync.Timeout)
+	}
+	if got.JWKSSync.JWTLifetime != 600 {
+		t.Fatalf("jwt_lifetime = %d, want 600", got.JWKSSync.JWTLifetime)
+	}
+	if got.JWKSSync.Headers["X-Custom"] != "yes" {
+		t.Fatalf("headers = %v", got.JWKSSync.Headers)
+	}
+
+	// Update to trigger mode and confirm it replaces the stored config.
+	if _, err := store.Update(created.EntityID, model.AddAuthorityHint{
+		EntityID: created.EntityID,
+		JWKSSync: &model.JWKSSyncConf{Mode: model.JWKSSyncTrigger},
+	}); err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+	got2, err := store.Get("https://superior.example")
+	if err != nil {
+		t.Fatalf("get after update failed: %v", err)
+	}
+	if got2.JWKSSync == nil || got2.JWKSSync.Mode != model.JWKSSyncTrigger {
+		t.Fatalf("expected trigger after update, got %+v", got2.JWKSSync)
 	}
 }
