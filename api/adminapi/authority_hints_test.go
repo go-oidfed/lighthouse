@@ -497,3 +497,56 @@ func TestAuthorityHintsDeleteReappliesHook(t *testing.T) {
 		t.Fatalf("expected applier to be invoked once, got %d", applierCalls)
 	}
 }
+
+// TestAuthorityHintsUpdateWithoutEntityID must NOT use t.Parallel().
+// It uses the global entity configuration cache via setEntityConfigurationCache.
+// Updating an existing hint must not require resupplying entity_id: omitting it
+// lets callers change jwks_sync without a conflict (the existing value is
+// preserved by the storage layer).
+func TestAuthorityHintsUpdateWithoutEntityID(t *testing.T) {
+	cacheValue := []byte("cached-entity-config")
+	var gotID string
+	var gotInput smodel.AddAuthorityHint
+	applierCalls := 0
+	setEntityConfigurationCache(t, cacheValue)
+	app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+		updateFn: func(ident string, item smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
+			gotID = ident
+			gotInput = item
+			return &smodel.AuthorityHint{ID: 7, EntityID: "https://existing.example", JWKSSync: item.JWKSSync}, nil
+		},
+	}, func() error {
+		applierCalls++
+		return nil
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/entity-configuration/authority-hints/7",
+		strings.NewReader(`{"jwks_sync":{"mode":"push","timeout":25,"jwt_lifetime":700}}`),
+	)
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	resp, body := doRequest(t, app, req)
+	requireStatus(t, resp, body, http.StatusOK)
+
+	if gotID != "7" {
+		t.Fatalf("expected authority hint id %q, got %q", "7", gotID)
+	}
+	if gotInput.EntityID != "" {
+		t.Fatalf("entity_id must be absent from update input, got %q", gotInput.EntityID)
+	}
+	if gotInput.JWKSSync == nil || gotInput.JWKSSync.Mode != smodel.JWKSSyncPush || gotInput.JWKSSync.Timeout != 25 || gotInput.JWKSSync.JWTLifetime != 700 {
+		t.Fatalf("unexpected jwks_sync in update input: %+v", gotInput.JWKSSync)
+	}
+	if applierCalls != 1 {
+		t.Fatalf("expected applier to be invoked once, got %d", applierCalls)
+	}
+	var got smodel.AuthorityHint
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if got.JWKSSync == nil || got.JWKSSync.Mode != smodel.JWKSSyncPush {
+		t.Fatalf("expected jwks_sync in response, got %+v", got.JWKSSync)
+	}
+	requireEntityConfigurationCache(t, false, nil)
+}

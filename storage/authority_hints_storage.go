@@ -82,7 +82,12 @@ func (s *AuthorityHintsStorage) Update(ident string, update model.AddAuthorityHi
 	if err != nil {
 		return nil, err
 	}
-	item.EntityID = update.EntityID
+	// entity_id is the unique key; when omitted from an update the existing
+	// value is kept so callers can change other fields (e.g. jwks_sync)
+	// without resupplying it.
+	if update.EntityID != "" {
+		item.EntityID = update.EntityID
+	}
 	item.Description = update.Description
 	item.JWKSSync = update.JWKSSync
 	if err = s.db.Save(item).Error; err != nil {

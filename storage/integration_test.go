@@ -216,4 +216,22 @@ func TestAuthorityHintJWKSSyncRoundTrip(t *testing.T) {
 	if got2.JWKSSync == nil || got2.JWKSSync.Mode != model.JWKSSyncTrigger {
 		t.Fatalf("expected trigger after update, got %+v", got2.JWKSSync)
 	}
+
+	// Update with entity_id omitted must keep the existing value (so callers
+	// can change jwks_sync without resupplying the unique key).
+	if _, err := store.Update(created.EntityID, model.AddAuthorityHint{
+		JWKSSync: &model.JWKSSyncConf{Mode: model.JWKSSyncNone},
+	}); err != nil {
+		t.Fatalf("update without entity_id failed: %v", err)
+	}
+	got3, err := store.Get("https://superior.example")
+	if err != nil {
+		t.Fatalf("get after entity_id-less update failed: %v", err)
+	}
+	if got3.EntityID != "https://superior.example" {
+		t.Fatalf("entity_id was not preserved on update, got %q", got3.EntityID)
+	}
+	if got3.JWKSSync == nil || got3.JWKSSync.Mode != model.JWKSSyncNone {
+		t.Fatalf("expected jwks_sync none after update, got %+v", got3.JWKSSync)
+	}
 }

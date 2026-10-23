@@ -125,7 +125,7 @@ signing key.
     are re-attached after each mutation, without a restart. A failed re-attach
     is logged; the change still applies on the next mutation or restart.
 
-Example:
+Example (create):
 
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{
@@ -133,6 +133,23 @@ curl -X POST -H "Content-Type: application/json" -d '{
   "jwks_sync": { "mode": "trigger", "timeout": 20 }
 }' https://localhost:8081/api/v1/admin/entity-configuration/authority-hints
 ```
+
+To add or change `jwks_sync` on an **existing** hint, update it with
+`PUT /api/v1/admin/entity-configuration/authority-hints/{authorityHintID}`
+(`authorityHintID` is the numeric hint id or the entity_id). `entity_id` is
+required to create a hint but **optional on update** — omit it to keep the
+existing value unchanged:
+
+```bash
+# Changing only jwks_sync; entity_id is left untouched (no conflict).
+curl -X PUT -H "Content-Type: application/json" -d '{
+  "jwks_sync": { "mode": "push", "timeout": 20, "jwt_lifetime": 600 }
+}' https://localhost:8081/api/v1/admin/entity-configuration/authority-hints/123
+```
+
+Disable syncing again by setting `jwks_sync.mode` to `none` (or delete the
+hint with `DELETE`). A `POST` to the collection re-creates a hint and therefore
+409s if the entity_id already exists.
 
 #### `jwks_sync.mode`
 
@@ -168,7 +185,7 @@ Additional HTTP headers set on the sync request.
 
 | Tool      | Command                                                              |
 |-----------|----------------------------------------------------------------------|
-| Admin API | `GET/POST/DELETE /api/v1/admin/entity-configuration/authority-hints` |
+| Admin API | `GET/POST/PUT/DELETE /api/v1/admin/entity-configuration/authority-hints` |
 | lhsetup   | `lhsetup --only=authority_hints` (add/remove)                        |
 | config2db | `lhmigrate config2db --only=authority_hints`                         |
 

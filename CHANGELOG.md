@@ -43,6 +43,14 @@
     keys.
   - The admin API returns **409** (`invalid_request`) when a key with an
     already-present `kid` is posted, instead of a generic 500.
+  - Updating an existing authority hint's `jwks_sync` no longer requires
+    resupplying `entity_id`: on `PUT
+    /api/v1/admin/entity-configuration/authority-hints/{id}` an omitted
+    `entity_id` keeps the stored value. Previously the handler rejected an
+    empty `entity_id` (400) while including the existing value was the only way
+    forward, and a `POST` to the collection (the documented path) 409s once the
+    hint already exists — leaving no clean way to enable sync on an existing
+    hint.
 
 ## LightHouse 0.23.1
 

@@ -897,11 +897,15 @@ paths:
       description: Gets the details of a single instance of an `AuthorityHint`.
     put:
       requestBody:
-        description: Updated `AuthorityHint` information.
+        description: >-
+          Updated `AuthorityHint` information. `entity_id` is optional on
+          update: omit it (or send the same value) to keep the existing value,
+          e.g. to change only `jwks_sync`. Supplying a different `entity_id`
+          that already belongs to another hint returns 409.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddAuthorityHint'
+              $ref: '#/components/schemas/UpdateAuthorityHint'
         required: true
       tags:
         - Authority Hints
@@ -4672,6 +4676,26 @@ components:
           description: Optional outbound JWKS sync configuration for this superior.
       example:
         entity_id: https://authority.example.com
+    UpdateAuthorityHint:
+      title: Root Type for UpdateAuthorityHint
+      description: >-
+        Data to update an authority hint. `entity_id` is optional: omit it (or
+        send the same value) to keep the existing value; supplying a different
+        `entity_id` that already belongs to another hint returns 409.
+      type: object
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+        description:
+          type: string
+          description: Optional human-readable description for this AuthorityHint.
+        jwks_sync:
+          $ref: '#/components/schemas/JWKSSyncConf'
+          description: Optional outbound JWKS sync configuration for this superior.
+      example:
+        jwks_sync:
+          mode: trigger
+          timeout: 20
     JWKSSyncMode:
       description: >-
         Sync mechanism for notifying this superior when LightHouse rotates its

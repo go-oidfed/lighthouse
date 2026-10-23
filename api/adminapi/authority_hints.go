@@ -19,8 +19,12 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 	g := r.Group("/entity-configuration/authority-hints")
 	withCacheWipe := g.Use(entityConfigurationCacheInvalidationMiddleware)
 
-	validate := func(req *model.AddAuthorityHint) error {
-		if req.EntityID == "" {
+	// validate checks an AddAuthorityHint body. entity_id is required to
+	// create a hint but optional on update (PUT): when omitted the existing
+	// value is preserved, so callers can change jwks_sync without resupplying
+	// (and risking a conflict on) the entity_id.
+	validate := func(req *model.AddAuthorityHint, requireEntityID bool) error {
+		if requireEntityID && req.EntityID == "" {
 			return errors.New("entity_id is required")
 		}
 		if req.JWKSSync != nil {
@@ -47,7 +51,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-			if err := validate(&req); err != nil {
+			if err := validate(&req, true); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 			}
 			item, err := store.Create(req)
@@ -78,7 +82,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 			if err := c.BodyParser(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
-			if err := validate(&req); err != nil {
+			if err := validate(&req, false); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 			}
 			item, err := store.Update(c.Params("authorityHintID"), req)
