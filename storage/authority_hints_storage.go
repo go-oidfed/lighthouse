@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -82,12 +83,11 @@ func (s *AuthorityHintsStorage) Update(ident string, update model.AddAuthorityHi
 	if err != nil {
 		return nil, err
 	}
-	// entity_id is the unique key; when omitted from an update the existing
-	// value is kept so callers can change other fields (e.g. jwks_sync)
-	// without resupplying it.
-	if update.EntityID != "" {
-		item.EntityID = update.EntityID
-	}
+	// Full-replacement PUT: entity_id is a required identity field (the
+	// handler enforces presence), so it is always written; changing it to a
+	// value already used by another row surfaces as a unique-constraint
+	// conflict below.
+	item.EntityID = update.EntityID
 	item.Description = update.Description
 	item.JWKSSync = update.JWKSSync
 	if err = s.db.Save(item).Error; err != nil {
@@ -95,6 +95,50 @@ func (s *AuthorityHintsStorage) Update(ident string, update model.AddAuthorityHi
 			return nil, model.AlreadyExistsError("authority hint already exists")
 		}
 		return nil, errors.Wrap(err, "authority_hints: update failed")
+	}
+	return item, nil
+}
+
+// Patch partially updates an authority hint: only fields present in the patch
+// map are changed; absent fields are left untouched. "description" null/string
+// sets or clears the description; "jwks_sync" null clears syncing and an
+// object replaces the sync configuration (mode is validated).
+func (s *AuthorityHintsStorage) Patch(ident string, patch map[string]any) (*model.AuthorityHint, error) {
+	item, err := s.findByIdent(ident)
+	if err != nil {
+		return nil, err
+	}
+	if v, ok := patch["description"]; ok {
+		if v == nil {
+			item.Description = ""
+		} else {
+			desc, ok := v.(string)
+			if !ok {
+				return nil, model.ValidationError("description must be a string")
+			}
+			item.Description = desc
+		}
+	}
+	if v, ok := patch["jwks_sync"]; ok {
+		if v == nil {
+			item.JWKSSync = nil
+		} else {
+			raw, err := json.Marshal(v)
+			if err != nil {
+				return nil, model.ValidationError("jwks_sync must be an object")
+			}
+			var cfg model.JWKSSyncConf
+			if err := json.Unmarshal(raw, &cfg); err != nil {
+				return nil, model.ValidationError("jwks_sync must be an object")
+			}
+			if err := cfg.Validate(); err != nil {
+				return nil, model.ValidationError(err.Error())
+			}
+			item.JWKSSync = &cfg
+		}
+	}
+	if err := s.db.Save(item).Error; err != nil {
+		return nil, errors.Wrap(err, "authority_hints: patch failed")
 	}
 	return item, nil
 }

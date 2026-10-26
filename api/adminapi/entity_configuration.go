@@ -131,6 +131,9 @@ func (h *additionalClaimsHandlers) update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return badRequest(c, "invalid body")
 	}
+	if req.Claim == "" {
+		return badRequest(c, "claim is required")
+	}
 	updated, err := h.store.Update(id, req)
 	if err != nil {
 		if _, ok := errors.AsType[smodel.NotFoundError](err); ok {

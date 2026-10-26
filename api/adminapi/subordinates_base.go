@@ -200,6 +200,65 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+// replace implements the full-replacement PUT for a subordinate: all editable
+// fields are taken from the body unconditionally; fields omitted from the body
+// are reset to their zero/default value. PATCH (update) is the partial
+// variant.
+func (h *subordinatesBaseHandlers) replace(c *fiber.Ctx) error {
+	id := c.Params("subordinateID")
+
+	var body model.ReplaceSubordinate
+	if err := c.BodyParser(&body); err != nil {
+		return writeBadBody(c)
+	}
+
+	var result *model.ExtendedSubordinateInfo
+	err := h.storages.InTransaction(
+		func(tx *model.Backends) error {
+			existing, err := getSubordinateByDBIDForUpdate(tx.Subordinates, id)
+			if err != nil {
+				return err
+			}
+
+			existing.Description = body.Description
+			subordinateEntityTypes := make([]model.SubordinateEntityType, len(body.RegisteredEntityTypes))
+			for i, et := range body.RegisteredEntityTypes {
+				subordinateEntityTypes[i] = model.SubordinateEntityType{EntityType: et}
+			}
+			existing.SubordinateEntityTypes = subordinateEntityTypes
+			existing.EnableJWKSUpdate = body.EnableJWKSUpdate
+			existing.JWKSPollInterval = body.JWKSPollInterval
+			if err = tx.Subordinates.Update(existing.EntityID, *existing); err != nil {
+				return err
+			}
+			if err = RecordEvent(
+				tx.SubordinateEvents, existing.ID, model.EventTypeUpdated, WithStatus(existing.Status),
+				WithActor(GetActor(c)),
+			); err != nil {
+				return err
+			}
+			// Re-read with general fallbacks so the response is consistent with GET.
+			result, err = tx.Subordinates.GetByDBID(id)
+			if err != nil {
+				return err
+			}
+			if result == nil {
+				return model.NotFoundError("subordinate not found")
+			}
+			return nil
+		},
+	)
+
+	if err != nil {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
+			return writeNotFound(c, err.Error())
+		}
+		return writeServerError(c, err)
+	}
+	h.notifySubordinateJWKSRefresher(result.EntityID)
+	return c.JSON(result)
+}
+
 func (h *subordinatesBaseHandlers) delete(c *fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
@@ -448,7 +507,10 @@ func registerSubordinatesBase(r fiber.Router, storages model.Backends, ctrl Ligh
 	g.Get("/", baseH.list)
 	g.Post("/", baseH.create)
 	g.Get("/:subordinateID", baseH.get)
-	withCacheWipe.Put("/:subordinateID", baseH.update)
+	// PUT is a full replacement: every editable field is written from the
+	// body; omitted fields reset to their zero/default value. Partial updates
+	// (merge) use PATCH.
+	withCacheWipe.Put("/:subordinateID", baseH.replace)
 	withCacheWipe.Patch("/:subordinateID", baseH.update)
 	withCacheWipe.Delete("/:subordinateID", baseH.delete)
 	withCacheWipe.Put("/:subordinateID/status", baseH.updateStatus)

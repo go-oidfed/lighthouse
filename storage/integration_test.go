@@ -217,21 +217,141 @@ func TestAuthorityHintJWKSSyncRoundTrip(t *testing.T) {
 		t.Fatalf("expected trigger after update, got %+v", got2.JWKSSync)
 	}
 
-	// Update with entity_id omitted must keep the existing value (so callers
-	// can change jwks_sync without resupplying the unique key).
+	// Update keeps the identity (entity_id is required and always written;
+	// the handler enforces presence, storage trusts the caller).
 	if _, err := store.Update(created.EntityID, model.AddAuthorityHint{
+		EntityID: created.EntityID,
 		JWKSSync: &model.JWKSSyncConf{Mode: model.JWKSSyncNone},
 	}); err != nil {
-		t.Fatalf("update without entity_id failed: %v", err)
+		t.Fatalf("update failed: %v", err)
 	}
 	got3, err := store.Get("https://superior.example")
 	if err != nil {
-		t.Fatalf("get after entity_id-less update failed: %v", err)
+		t.Fatalf("get after update failed: %v", err)
 	}
 	if got3.EntityID != "https://superior.example" {
-		t.Fatalf("entity_id was not preserved on update, got %q", got3.EntityID)
+		t.Fatalf("entity_id must be preserved when resupplied, got %q", got3.EntityID)
 	}
 	if got3.JWKSSync == nil || got3.JWKSSync.Mode != model.JWKSSyncNone {
 		t.Fatalf("expected jwks_sync none after update, got %+v", got3.JWKSSync)
+	}
+
+	// Renaming via update moves the row to the new unique entity_id.
+	if _, err := store.Update(created.EntityID, model.AddAuthorityHint{
+		EntityID: "https://superior-renamed.example",
+	}); err != nil {
+		t.Fatalf("rename failed: %v", err)
+	}
+	if _, err := store.Get("https://superior.example"); err == nil {
+		t.Fatalf("old entity_id must no longer resolve after rename")
+	}
+	renamed, err := store.Get("https://superior-renamed.example")
+	if err != nil {
+		t.Fatalf("get after rename failed: %v", err)
+	}
+	if renamed.JWKSSync != nil {
+		t.Fatalf("replacement PUT without jwks_sync must reset syncing, got %+v", renamed.JWKSSync)
+	}
+
+	// Renaming onto another hint's entity_id must surface a conflict (409 at
+	// the handler level).
+	if _, err := store.Create(model.AddAuthorityHint{
+		EntityID: "https://taken.example",
+	}); err != nil {
+		t.Fatalf("create second hint failed: %v", err)
+	}
+	if _, err := store.Update("https://superior-renamed.example", model.AddAuthorityHint{
+		EntityID: "https://taken.example",
+	}); err != nil {
+		if _, ok := err.(model.AlreadyExistsError); !ok {
+			t.Fatalf("expected AlreadyExistsError on colliding rename, got %v", err)
+		}
+	} else {
+		t.Fatalf("expected colliding rename to be rejected")
+	}
+}
+
+// TestAuthorityHintPatch verifies the partial-update (PATCH) storage path:
+// only provided fields change, null clears, and invalid input is rejected.
+func TestAuthorityHintPatch(t *testing.T) {
+	if os.Getenv("RUN_INTEGRATION_TESTS") != "true" {
+		t.Skip("Skipping integration test. Set RUN_INTEGRATION_TESTS=true to run")
+	}
+
+	tempDir, err := os.MkdirTemp("", "lighthouse-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	st, err := NewStorage(Config{Driver: DriverSQLite, DataDir: tempDir})
+	if err != nil {
+		t.Fatalf("Failed to create SQLite storage: %v", err)
+	}
+	store := st.AuthorityHintsStorage()
+
+	if _, err := store.Create(model.AddAuthorityHint{
+		EntityID:    "https://patch.example",
+		Description: "original",
+		JWKSSync: &model.JWKSSyncConf{
+			Mode: model.JWKSSyncPush,
+		},
+	}); err != nil {
+		t.Fatalf("create failed: %v", err)
+	}
+
+	// Changing only jwks_sync keeps description and identity.
+	patched, err := store.Patch("https://patch.example", map[string]any{
+		"jwks_sync": map[string]any{"mode": "trigger"},
+	})
+	if err != nil {
+		t.Fatalf("patch jwks_sync failed: %v", err)
+	}
+	if patched.Description != "original" {
+		t.Fatalf("description must be untouched by jwks_sync patch, got %q", patched.Description)
+	}
+	if patched.JWKSSync == nil || patched.JWKSSync.Mode != model.JWKSSyncTrigger {
+		t.Fatalf("expected trigger after patch, got %+v", patched.JWKSSync)
+	}
+
+	// Changing only description keeps jwks_sync and identity.
+	patched, err = store.Patch("https://patch.example", map[string]any{"description": "updated"})
+	if err != nil {
+		t.Fatalf("patch description failed: %v", err)
+	}
+	if patched.Description != "updated" {
+		t.Fatalf("expected description updated, got %q", patched.Description)
+	}
+	if patched.JWKSSync == nil || patched.JWKSSync.Mode != model.JWKSSyncTrigger {
+		t.Fatalf("jwks_sync must be untouched by description patch, got %+v", patched.JWKSSync)
+	}
+
+	// null jwks_sync clears syncing.
+	patched, err = store.Patch("https://patch.example", map[string]any{"jwks_sync": nil})
+	if err != nil {
+		t.Fatalf("patch clear jwks_sync failed: %v", err)
+	}
+	if patched.JWKSSync != nil {
+		t.Fatalf("expected jwks_sync cleared, got %+v", patched.JWKSSync)
+	}
+
+	// Empty patch is a no-op.
+	patched, err = store.Patch("https://patch.example", map[string]any{})
+	if err != nil {
+		t.Fatalf("patch no-op failed: %v", err)
+	}
+	if patched.Description != "updated" {
+		t.Fatalf("expected description untouched, got %q", patched.Description)
+	}
+
+	// Invalid input is rejected.
+	if _, err := store.Patch("https://patch.example", map[string]any{"jwks_sync": map[string]any{"mode": "bogus"}}); err == nil {
+		t.Fatalf("expected error for unknown jwks_sync mode")
+	}
+	if _, err := store.Patch("https://patch.example", map[string]any{"description": 42}); err == nil {
+		t.Fatalf("expected error for non-string description")
+	}
+	if _, err := store.Patch("missing", map[string]any{"description": "x"}); err == nil {
+		t.Fatalf("expected not-found error for unknown hint")
 	}
 }

@@ -84,7 +84,7 @@ func (h *trustAnchorsHandlers) update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.EntityID == "" {
-		req.EntityID = c.Params("id")
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
 	}
 	item, err := h.store.Update(c.Params("id"), req)
 	if err != nil {

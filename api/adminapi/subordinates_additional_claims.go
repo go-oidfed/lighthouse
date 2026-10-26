@@ -151,6 +151,9 @@ func handleUpdateSubordinateAdditionalClaim(storages model.Backends) fiber.Handl
 		if err := c.BodyParser(&req); err != nil {
 			return writeBadBody(c)
 		}
+		if req.Claim == "" {
+			return writeBadRequest(c, "claim is required")
+		}
 
 		var result *model.SubordinateAdditionalClaim
 		err := storages.InTransaction(
@@ -367,6 +370,9 @@ func handleUpdateGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
 		var req model.AddAdditionalClaim
 		if err := c.BodyParser(&req); err != nil {
 			return writeBadBody(c)
+		}
+		if req.Claim == "" {
+			return writeBadRequest(c, "claim is required")
 		}
 		claims, err := loadGeneralAdditionalClaims(kv)
 		if err != nil {

@@ -38,6 +38,9 @@ func (s *staticHintsStore) Get(string) (*model.AuthorityHint, error) { return ni
 func (s *staticHintsStore) Update(string, model.AddAuthorityHint) (*model.AuthorityHint, error) {
 	return nil, nil
 }
+func (s *staticHintsStore) Patch(string, map[string]any) (*model.AuthorityHint, error) {
+	return nil, nil
+}
 func (s *staticHintsStore) Delete(string) error { return nil }
 
 // signECWithMetadata builds a signed Entity Configuration for entityID, signed

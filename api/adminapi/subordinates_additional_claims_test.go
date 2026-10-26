@@ -360,7 +360,7 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 			}
 		}
 
-		body := `{"value": "new_value", "crit": true}`
+		body := `{"claim": "target_claim", "value": "new_value", "crit": true}`
 		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/additional-claims/%d", saved.ID, claimID), strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, bodyBytes := doRequest(t, app, req)
@@ -410,6 +410,34 @@ func TestSubordinateAdditionalClaimByID(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		resp, bodyBytes := doRequest(t, app, req)
 
+		assertStatus(t, resp, bodyBytes, http.StatusBadRequest)
+	})
+
+	t.Run("PUT MissingClaim", func(t *testing.T) {
+		// claim is a required identity field and is never derived from the
+		// row id.
+		t.Parallel()
+		app, backends := setupSubordinateAdditionalClaimsApp(t)
+		backends.Subordinates.Add(model.ExtendedSubordinateInfo{
+			BasicSubordinateInfo: model.BasicSubordinateInfo{
+				EntityID: "https://claim-missing-put.example.org",
+			},
+			SubordinateAdditionalClaims: []model.SubordinateAdditionalClaim{
+				{Claim: "existing_claim", Value: "old"},
+			},
+		})
+		saved, err := backends.Subordinates.Get("https://claim-missing-put.example.org")
+		if err != nil {
+			t.Fatalf("Failed to get subordinate: %v", err)
+		}
+		claims, err := backends.Subordinates.ListAdditionalClaims(fmt.Sprintf("%d", saved.ID))
+		if err != nil {
+			t.Fatalf("Failed to list claims: %v", err)
+		}
+
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/additional-claims/%d", saved.ID, claims[0].ID), strings.NewReader(`{"value":"new"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, bodyBytes := doRequest(t, app, req)
 		assertStatus(t, resp, bodyBytes, http.StatusBadRequest)
 	})
 
@@ -719,7 +747,7 @@ func TestGeneralAdditionalClaimByID(t *testing.T) {
 			t.Fatalf("Failed to set KV value: %v", err)
 		}
 
-		body := `{"value": "new_global_val", "crit": true}`
+		body := `{"claim": "target_global", "value": "new_global_val", "crit": true}`
 		req := httptest.NewRequest("PUT", "/subordinates/additional-claims/1", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		resp, bodyBytes := doRequest(t, app, req)

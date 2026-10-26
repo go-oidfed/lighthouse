@@ -81,7 +81,10 @@ func (h *federationEndpointsHandlers) update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.Type == "" {
-		req.Type = t
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("type is required"))
+	}
+	if model.FederationEndpointType(req.Type) != t {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("type does not match the endpoint type in the path"))
 	}
 	// Validate the config JSON blob if provided.
 	if req.Config != "" {

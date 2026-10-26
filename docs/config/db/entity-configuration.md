@@ -120,10 +120,11 @@ signing key.
 
 !!! note "Runtime changes"
 
-    `jwks_sync` changes made via the Admin API (`POST`/`PUT`/`DELETE` on
-    authority hints) take effect immediately on the running process: the hooks
-    are re-attached after each mutation, without a restart. A failed re-attach
-    is logged; the change still applies on the next mutation or restart.
+    `jwks_sync` changes made via the Admin API (`POST`/`PUT`/`PATCH`/`DELETE`
+    on authority hints) take effect immediately on the running process: the
+    hooks are re-attached after each mutation, without a restart. A failed
+    re-attach is logged; the change still applies on the next mutation or
+    restart.
 
 Example (create):
 
@@ -134,22 +135,35 @@ curl -X POST -H "Content-Type: application/json" -d '{
 }' https://localhost:8081/api/v1/admin/entity-configuration/authority-hints
 ```
 
-To add or change `jwks_sync` on an **existing** hint, update it with
-`PUT /api/v1/admin/entity-configuration/authority-hints/{authorityHintID}`
-(`authorityHintID` is the numeric hint id or the entity_id). `entity_id` is
-required to create a hint but **optional on update** — omit it to keep the
-existing value unchanged:
+To add or change `jwks_sync` on an **existing** hint without touching anything
+else, use `PATCH /api/v1/admin/entity-configuration/authority-hints/{authorityHintID}`
+(`authorityHintID` is the numeric hint id or the entity_id):
 
 ```bash
-# Changing only jwks_sync; entity_id is left untouched (no conflict).
-curl -X PUT -H "Content-Type: application/json" -d '{
+# Changing only jwks_sync; description and entity_id are left untouched.
+curl -X PATCH -H "Content-Type: application/json" -d '{
   "jwks_sync": { "mode": "push", "timeout": 20, "jwt_lifetime": 600 }
 }' https://localhost:8081/api/v1/admin/entity-configuration/authority-hints/123
 ```
 
-Disable syncing again by setting `jwks_sync.mode` to `none` (or delete the
-hint with `DELETE`). A `POST` to the collection re-creates a hint and therefore
-409s if the entity_id already exists.
+`PUT` is the **full replacement** variant: `entity_id` is a required identity
+field — send the same value to keep it, a new value to rename (409 if it
+collides with another hint) — and `description`/`jwks_sync` omitted from the
+body are reset (empty description, no syncing):
+
+```bash
+# Full replacement; description and jwks_sync are taken from the body.
+curl -X PUT -H "Content-Type: application/json" -d '{
+  "entity_id": "https://superior.example.com",
+  "description": "Superior",
+  "jwks_sync": { "mode": "trigger", "timeout": 20 }
+}' https://localhost:8081/api/v1/admin/entity-configuration/authority-hints/123
+```
+
+Disable syncing again by setting `jwks_sync.mode` to `none` (PATCH/PUT) or
+`jwks_sync: null` (PATCH; clears the stored config), or delete the hint with
+`DELETE`. A `POST` to the collection creates a hint and therefore 409s if the
+entity_id already exists.
 
 #### `jwks_sync.mode`
 

@@ -157,3 +157,14 @@ type UpdateSubordinate struct {
 	EnableJWKSUpdate      *bool    `json:"enable_jwks_update,omitempty"`
 	JWKSPollInterval      *int64   `json:"jwks_poll_interval,omitempty"`
 }
+
+// ReplaceSubordinate is the payload for a full-replacement PUT of a
+// subordinate's settings (PATCH UpdateSubordinate is the partial variant).
+// PUT semantics: every field is written from the body; fields omitted from the
+// body are reset to their zero/default value.
+type ReplaceSubordinate struct {
+	Description           string   `json:"description,omitempty"`
+	RegisteredEntityTypes []string `json:"registered_entity_types,omitempty"`
+	EnableJWKSUpdate      bool     `json:"enable_jwks_update,omitempty"`
+	JWKSPollInterval      int64    `json:"jwks_poll_interval,omitempty"`
+}

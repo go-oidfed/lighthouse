@@ -118,6 +118,7 @@ func (s *TrustAnchorStorage) Update(ident string, req model.AddTrustAnchor) (*mo
 	if err != nil {
 		return nil, err
 	}
+	item.EntityID = req.EntityID
 	item.EnableJWKSUpdate = req.EnableJWKSUpdate
 	item.KeyPollInterval = req.KeyPollInterval
 	if err = s.db.Save(item).Error; err != nil {

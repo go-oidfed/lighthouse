@@ -43,14 +43,22 @@
     keys.
   - The admin API returns **409** (`invalid_request`) when a key with an
     already-present `kid` is posted, instead of a generic 500.
-  - Updating an existing authority hint's `jwks_sync` no longer requires
-    resupplying `entity_id`: on `PUT
-    /api/v1/admin/entity-configuration/authority-hints/{id}` an omitted
-    `entity_id` keeps the stored value. Previously the handler rejected an
-    empty `entity_id` (400) while including the existing value was the only way
-    forward, and a `POST` to the collection (the documented path) 409s once the
-    hint already exists — leaving no clean way to enable sync on an existing
-    hint.
+  - **PUT/PATCH contract.** `PUT` is now consistently a full replacement:
+    identity fields (`entity_id`, endpoint `type`, issuer, `trust_mark_type`,
+    additional-claim names)
+    are **required** in the body (never derived from the URL path or DB id)
+    and may be changed — a value colliding with another resource returns 409;
+    optional data fields omitted from the body are reset to their
+    zero/default. `PATCH` is the partial-update verb. Affected routes:
+    - `PATCH …/authority-hints/{id}`), to enable/disable
+      `jwks_sync` on an existing hint is a one-field PATCH
+    - `PUT …/subordinates/{id}` is a true full replacement (`ReplaceSubordinate`);
+      the old partial-update behavior lives on as `PATCH`, which was already
+      the documented preference.
+    - `PUT …/trust-anchors/{id}`, `PUT …/federation-endpoints/{type}`,
+      `PUT …/trust-marks/issuers/{id}` now require their identity field and
+      no longer auto-derive it from the path; renames write through (409 on
+      collision).
 
 ## LightHouse 0.23.1
 

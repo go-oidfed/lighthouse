@@ -2,9 +2,22 @@ openapi: 3.0.2
 info:
   title: Federation Admin
   version: 0.1.0
-  description: >-
+  description: |-
     This API enables management of federated entity data and metadata within an OpenID Federation
     environment.
+
+    ## PUT vs PATCH semantics
+
+    `PUT` replaces the addressed resource as a whole. Identity fields (e.g.
+    `entity_id`, endpoint `type`) are **required** in the body and are never
+    derived from the URL path; sending the same value keeps the identity,
+    sending a new value renames the resource (a value already used by another
+    resource returns **409**), and omitting them returns **400**. Optional data
+    fields may be omitted and are then reset to their zero/default value.
+
+    `PATCH` partially updates a resource: only fields present in the body
+    change, omitted fields are left untouched, and `null` clears a field.
+    Identity cannot be changed via `PATCH`; use `PUT` to rename.
   license:
     name: MIT License
     url: https://opensource.org/licenses/MIT
@@ -249,6 +262,10 @@ paths:
       summary: Get KMS rotation options
     put:
       requestBody:
+        description: >-
+          Replaces the rotation options (full replacement PUT): omitted
+          optional fields are reset to their defaults (e.g. `enabled` =
+          false). For partial updates use PATCH.
         content:
           application/json:
             schema:
@@ -503,10 +520,15 @@ paths:
       summary: Get an additional claim row
     put:
       requestBody:
+        description: >-
+          Replaces the additional claim row (full replacement PUT). `claim`
+          is a required identity field and may be changed (409 if it collides
+          with another claim in the same scope). Omitted `value`/`crit` are
+          reset to their defaults.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddAdditionalClaim'
+              $ref: '#/components/schemas/UpdateAdditionalClaim'
         required: true
       tags:
         - Entity Configuration
@@ -898,10 +920,11 @@ paths:
     put:
       requestBody:
         description: >-
-          Updated `AuthorityHint` information. `entity_id` is optional on
-          update: omit it (or send the same value) to keep the existing value,
-          e.g. to change only `jwks_sync`. Supplying a different `entity_id`
-          that already belongs to another hint returns 409.
+          Replaces the authority hint (full replacement PUT). `entity_id` is a
+          required identity field: send the same value to keep it or a new
+          value to rename (409 if it collides with another hint). `description`
+          and `jwks_sync` omitted from the body are reset. To change only some
+          fields, use PATCH.
         content:
           application/json:
             schema:
@@ -920,11 +943,43 @@ paths:
           $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: updateAuthorityHint
       summary: Update an AuthorityHint
-      description: Updates an existing `AuthorityHint`.
+      description: Replaces an `AuthorityHint` (full replacement PUT).
+    patch:
+      requestBody:
+        description: >-
+          Partially updates an authority hint: only fields present in the body
+          are changed; omitted fields are left untouched. `entity_id` cannot
+          be changed here (use PUT to rename). `jwks_sync: null` clears
+          syncing; `description: null` clears the description.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchAuthorityHint'
+        required: true
+      tags:
+        - Authority Hints
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorityHint'
+          description: Successful response.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+      operationId: patchAuthorityHint
+      summary: Patch an AuthorityHint
+      description: Partially updates an existing `AuthorityHint`.
     delete:
       tags:
         - Authority Hints
@@ -1252,10 +1307,15 @@ paths:
       summary: Get a general additional claim row
     put:
       requestBody:
+        description: >-
+          Replaces the additional claim row (full replacement PUT). `claim`
+          is a required identity field and may be changed (409 if it collides
+          with another claim in the same scope). Omitted `value`/`crit` are
+          reset to their defaults.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddAdditionalClaim'
+              $ref: '#/components/schemas/UpdateAdditionalClaim'
         required: true
       tags:
         - Subordinates
@@ -1386,10 +1446,15 @@ paths:
       summary: Get a subordinate additional claim row
     put:
       requestBody:
+        description: >-
+          Replaces the additional claim row (full replacement PUT). `claim`
+          is a required identity field and may be changed (409 if it collides
+          with another claim in the same scope). Omitted `value`/`crit` are
+          reset to their defaults.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddAdditionalClaim'
+              $ref: '#/components/schemas/UpdateAdditionalClaim'
 
         required: true
       tags:
@@ -1545,11 +1610,13 @@ paths:
       description: Gets the details of a single instance of a `TrustMarkType`.
     put:
       requestBody:
-        description: Updated `TrustMarkType` information.
+        description: >-
+          Replaces the trust mark type (full replacement PUT).
+          `trust_mark_type` is required and may be changed (409 on collision).
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustMarkType'
+              $ref: '#/components/schemas/UpdateTrustMarkType'
         required: true
       tags:
         - Federation Trust Marks
@@ -1744,10 +1811,13 @@ paths:
       tags:
         - Federation Trust Marks
       requestBody:
+        description: >-
+          Replaces the trust mark owner (full replacement PUT). `entity_id`
+          is required and may be changed (409 on collision).
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustMarkOwnerCreate'
+              $ref: '#/components/schemas/UpdateTrustMarkOwner'
         required: true
       responses:
         '200':
@@ -1883,10 +1953,14 @@ paths:
       tags:
         - Federation Trust Marks
       requestBody:
+        description: >-
+          Replaces the trust mark issuer (full replacement PUT). `issuer` is
+          required and may be changed (409 on collision); `description`
+          omitted is cleared.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustMarkIssuerCreate'
+              $ref: '#/components/schemas/UpdateTrustMarkIssuer'
         required: true
       responses:
         '200':
@@ -2069,11 +2143,14 @@ paths:
       description: Gets the details of a single instance of a `TrustMarkSpec`.
     put:
       requestBody:
-        description: Updated `TrustMarkSpec` information.
+        description: >-
+          Replaces the TrustMarkSpec (full replacement PUT). `trust_mark_type`
+          is required and may be changed (409 on collision); omitted optional
+          fields are reset to their defaults. For partial updates use PATCH.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustMarkSpec'
+              $ref: '#/components/schemas/UpdateTrustMarkSpec'
         required: true
       tags:
         - Trust Mark Issuance
@@ -2220,11 +2297,14 @@ paths:
       description: Gets the details of a single instance of a `TrustMarkSubject`.
     put:
       requestBody:
-        description: Updated `TrustMarkSubject` information.
+        description: >-
+          Replaces the TrustMarkSubject (full replacement PUT). `entity_id` is
+          required and may be changed (409 on collision); omitted optional
+          fields are reset to their defaults.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustMarkSubject'
+              $ref: '#/components/schemas/UpdateTrustMarkSubject'
         required: true
       tags:
         - Trust Mark Issuance
@@ -2422,11 +2502,13 @@ paths:
       summary: Get trust mark type owner
     put:
       requestBody:
-        description: Updated `TrustMarkOwner` information.
+        description: >-
+          Replaces the trust mark type owner (full replacement PUT).
+          `entity_id` is required and may be changed (409 on collision).
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustMarkOwnerCreate'
+              $ref: '#/components/schemas/UpdateTrustMarkOwner'
         required: true
       tags:
         - Federation Trust Marks
@@ -2781,10 +2863,14 @@ paths:
       tags:
         - Subordinates
       requestBody:
+        description: >-
+          Replaces the subordinate's settings (full replacement PUT): every
+          field is written from the body and fields omitted are reset to their
+          defaults. For partial updates use PATCH.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateSubordinate'
+              $ref: '#/components/schemas/ReplaceSubordinate'
         required: true
       responses:
         '200':
@@ -2792,7 +2878,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SubordinateDetails'
-          description: Successfully updated subordinate details.
+          description: Successfully replaced subordinate details.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
@@ -2802,12 +2888,12 @@ paths:
       operationId: updateSubordinateDetails
       summary: Update subordinate details
       description: |
-        Updates fields of an existing subordinate. The request body uses partial-update
-        semantics: only fields that are present in the body are changed; omitted fields
-        are left unchanged. `null` clears a nullable field.
-
-        `PATCH` is the preferred verb for partial updates (see `patchSubordinateDetails`).
-        `PUT` is retained for backward compatibility and accepts the same partial-update body.
+        Replaces the subordinate's settings. Every editable field is taken
+        from the body; fields omitted from the body are reset to their
+        defaults (empty description, no registered entity types, JWKS update
+        disabled, poll interval 0 = derived from the Entity Configuration
+        expiration time). This is the full-replacement variant of the partial
+        `PATCH` operation (`patchSubordinateDetails`).
     patch:
       tags:
         - Subordinates
@@ -2838,8 +2924,8 @@ paths:
         are left unchanged. Set `jwks_poll_interval` to `0` to clear it (resetting the
         poll interval to be derived from the Entity Configuration expiration time).
 
-        This is the preferred verb for partial updates. `PUT` accepts the same body for
-        backward compatibility.
+        This is the preferred verb for partial updates; `PUT` is the full-replacement
+        variant (`updateSubordinateDetails`).
     delete:
       tags:
         - Subordinates
@@ -4286,11 +4372,15 @@ paths:
           description: Trust anchor not found.
       operationId: updateTrustAnchor
       summary: Update a trust anchor
+      description: Replaces the trust anchor (full replacement PUT).
       requestBody:
+        description: >-
+          Replaces the trust anchor. `entity_id` is required and may be
+          changed; omitted optional fields are reset to their defaults.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddTrustAnchor'
+              $ref: '#/components/schemas/UpdateTrustAnchor'
     delete:
       tags:
         - Trust Anchors
@@ -4357,11 +4447,16 @@ paths:
           description: Federation endpoint not found.
       operationId: updateFederationEndpoint
       summary: Update a federation endpoint
+      description: Replaces the federation endpoint (full replacement PUT).
       requestBody:
+        description: >-
+          Replaces the federation endpoint. `type` is required and must match
+          the endpoint type in the path; omitted optional fields are reset to
+          their defaults.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddFederationEndpoint'
+              $ref: '#/components/schemas/UpdateFederationEndpoint'
     delete:
       tags:
         - Federation Endpoints
@@ -4679,10 +4774,14 @@ components:
     UpdateAuthorityHint:
       title: Root Type for UpdateAuthorityHint
       description: >-
-        Data to update an authority hint. `entity_id` is optional: omit it (or
-        send the same value) to keep the existing value; supplying a different
-        `entity_id` that already belongs to another hint returns 409.
+        Data to replace an authority hint (PUT). `entity_id` is a required
+        identity field: send the same value to keep it, a new value to rename
+        (409 if it collides with another hint), and never omit it. `description`
+        and `jwks_sync` omitted from the body are reset (empty description, no
+        syncing). To change only some fields, use PATCH (PatchAuthorityHint).
       type: object
+      required:
+        - entity_id
       properties:
         entity_id:
           $ref: '#/components/schemas/EntityID'
@@ -4693,9 +4792,269 @@ components:
           $ref: '#/components/schemas/JWKSSyncConf'
           description: Optional outbound JWKS sync configuration for this superior.
       example:
+        entity_id: https://superior.example.com
         jwks_sync:
           mode: trigger
           timeout: 20
+    PatchAuthorityHint:
+      title: Root Type for PatchAuthorityHint
+      description: >-
+        Partial update for an authority hint (PATCH): only fields present in
+        the body are changed; omitted fields are left untouched. `entity_id`
+        cannot be changed via PATCH — use PUT to rename. `jwks_sync: null`
+        clears syncing; `description: null` clears the description.
+      type: object
+      properties:
+        description:
+          type: string
+          nullable: true
+          description: Optional human-readable description for this AuthorityHint.
+        jwks_sync:
+          $ref: '#/components/schemas/JWKSSyncConf'
+          nullable: true
+          description: Optional outbound JWKS sync configuration for this superior.
+    UpdateTrustAnchor:
+      description: >-
+        Request payload to update a trust anchor (PUT, full replacement).
+        `entity_id` is a required identity field and may be changed; a value
+        already used by another trust anchor returns 409. Optional fields
+        omitted from the body are reset to their defaults.
+      type: object
+      required:
+        - entity_id
+      properties:
+        entity_id:
+          type: string
+          description: The entity ID of the trust anchor.
+        jwks:
+          type: object
+          description: JWKS for the trust anchor; when set, replaces the stored JWKS.
+        enable_jwks_update:
+          type: boolean
+          description: Enable automatic JWKS refreshing for this trust anchor.
+          default: false
+        key_poll_interval:
+          type: integer
+          description: Polling interval in seconds (0 = derive from EC expiration).
+          default: 0
+    UpdateFederationEndpoint:
+      description: >-
+        Request payload to update a federation endpoint (PUT, full
+        replacement). `type` is a required identity field and must match the
+        endpoint type in the path. Optional fields omitted from the body are
+        reset to their defaults.
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: >
+            Endpoint type. One of: fetch, list, resolve, trust_mark,
+            trust_mark_status, trust_mark_listing, historical_keys, enroll,
+            enroll_request, trust_mark_request, entity_collection,
+            jwks_update_trigger, jwks_update.
+          enum:
+            - fetch
+            - list
+            - resolve
+            - trust_mark
+            - trust_mark_status
+            - trust_mark_listing
+            - historical_keys
+            - enroll
+            - enroll_request
+            - trust_mark_request
+            - entity_collection
+            - jwks_update_trigger
+            - jwks_update
+        path:
+          type: string
+          description: Internal path for the endpoint (nullable; null = disabled).
+        url:
+          type: string
+          description: External URL for the endpoint (nullable; auto-derived from path if null).
+        auth_enabled:
+          type: boolean
+          description: Enable private_key_jwt authentication for this endpoint.
+          default: false
+        config:
+          type: string
+          description: JSON blob with type-specific configuration.
+        auth_trust_anchors:
+          type: array
+          items:
+            type: string
+          description: Trust anchor entity IDs used for endpoint authentication.
+    UpdateTrustMarkType:
+      description: >-
+        Data to update a trust mark type (PUT, full replacement).
+        `trust_mark_type` is a required identity field; sending a new value
+        renames the type (409 on collision with an existing type).
+      type: object
+      required:
+        - trust_mark_type
+      properties:
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+        trust_mark_owner:
+          description: Optional owner to set for this trust mark type.
+          $ref: '#/components/schemas/UpdateTrustMarkOwner'
+    UpdateTrustMarkOwner:
+      description: >-
+        Data to update a trust mark owner (PUT, full replacement). `entity_id`
+        is a required identity field; sending a new value renames the owner
+        (409 on collision). `jwks` omitted from the body resets the stored
+        JWKS.
+      type: object
+      required:
+        - entity_id
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID of the owner.
+        jwks:
+          $ref: '#/components/schemas/Jwks'
+          description: The JWKS of the owner.
+    UpdateTrustMarkIssuer:
+      description: >-
+        Data to update a trust mark issuer (PUT, full replacement). `issuer`
+        is a required identity field; sending a new value renames the issuer
+        (409 on collision). `description` omitted from the body is cleared.
+      type: object
+      required:
+        - issuer
+      properties:
+        issuer:
+          type: string
+          description: The issuer identifier (Entity ID).
+        description:
+          type: string
+          description: Optional human-readable description for this issuer.
+    UpdateTrustMarkSpec:
+      description: >-
+        Data to update a TrustMarkSpec (PUT, full replacement).
+        `trust_mark_type` is a required identity field; renamed values collide
+        with existing specs (409). Optional fields omitted from the body are
+        reset to their defaults. For partial updates use PATCH
+        (PatchTrustMarkSpec).
+      type: object
+      required:
+        - trust_mark_type
+      properties:
+        trust_mark_type:
+          type: string
+          description: The trust mark type identifier.
+          example: https://example.org/trust-marks/foobar
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkSpec.
+        lifetime:
+          type: integer
+          minimum: 0
+          description: Lifetime of the trust mark, in seconds.
+          example: 86400
+        ref:
+          type: string
+          format: uri
+          description: URL reference with details about the trust mark type.
+          example: https://example.org/specs/trust-marks/foobar
+        logo_uri:
+          type: string
+          format: uri
+          description: URL to the logo associated with this trust mark type.
+          example: https://example.org/assets/foobar-logo.png
+        delegation_jwt:
+          type: string
+          description: The delegation JWT issued by the trust mark owner if this trust mark uses delegation.
+        additional_claims:
+          type: object
+          additionalProperties: true
+          description: General additional claims (simple key-value map).
+        eligibility_config:
+          $ref: '#/components/schemas/EligibilityConfig'
+          description: Configuration for determining trust mark eligibility.
+        cache_ttl:
+          type: integer
+          minimum: 0
+          default: 0
+          description: |
+            How long to cache issued trust marks for this type, in seconds.
+            Set to 0 (default) to disable caching.
+          example: 300
+    UpdateTrustMarkSubject:
+      description: >-
+        Data to update a TrustMarkSubject (PUT, full replacement). `entity_id`
+        is a required identity field; sending a new value renames the subject
+        (409 on collision). Optional fields omitted from the body are reset.
+      type: object
+      required:
+        - entity_id
+      properties:
+        entity_id:
+          $ref: '#/components/schemas/EntityID'
+          description: The Entity ID (identifier) of the subject.
+        status:
+          type: string
+          description: Current status of the subject.
+          example: active
+        description:
+          type: string
+          description: Optional human-readable description for this TrustMarkSubject.
+        additional_claims:
+          type: object
+          additionalProperties: true
+          description: Per-subject additional claims that override general claims.
+    UpdateAdditionalClaim:
+      description: >-
+        Data to replace an additional claim row (PUT, full replacement).
+        `claim` is a required identity field: send the same value to keep it
+        or a new value to rename (409 if a claim with that name already
+        exists in the same scope). `value` and `crit` omitted from the body
+        are reset to their defaults (value = null, crit = false).
+      type: object
+      required:
+        - claim
+      properties:
+        claim:
+          type: string
+          description: The claim name (identity; renaming is supported).
+        value:
+          description: The claim value (arbitrary JSON)
+        crit:
+          type: boolean
+          description: Whether the claim is critical
+    ReplaceSubordinate:
+      description: >-
+        Data to fully replace a subordinate's settings (PUT). Every field is
+        written from the body; fields omitted from the body are reset to their
+        defaults (empty description, no registered entity types, JWKS update
+        disabled, poll interval 0 = derived from the Entity Configuration
+        expiration). For partial updates use PATCH (UpdateSubordinate).
+      type: object
+      properties:
+        description:
+          type: string
+          description: Optional human-readable description for this Subordinate.
+        registered_entity_types:
+          description: Entity types the subordinate is registered for.
+          type: array
+          items:
+            type: string
+        enable_jwks_update:
+          type: boolean
+          description: >
+            Whether periodic JWKS refreshing (approach A) is enabled for this
+            subordinate.
+          default: false
+        jwks_poll_interval:
+          type: integer
+          description: >
+            Per-subordinate poll interval in seconds for JWKS refreshing.
+            0 (or omitted) means the interval is derived from the Entity
+            Configuration expiration time.
+          default: 0
     JWKSSyncMode:
       description: >-
         Sync mechanism for notifying this superior when LightHouse rotates its
@@ -5283,7 +5642,7 @@ components:
         enable_jwks_update: true
         jwks_poll_interval: 3600
     UpdateSubordinate:
-      description: Data to update a subordinate entity.
+      description: Data to partially update a subordinate entity (PATCH).
       type: object
       properties:
         description:

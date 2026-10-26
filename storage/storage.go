@@ -934,9 +934,10 @@ func (s *TrustMarkIssuersStorage) Update(ident string, req model.AddTrustMarkIss
 	if err != nil {
 		return nil, err
 	}
-	if req.Issuer != "" {
-		item.Issuer = req.Issuer
-	}
+	// entity_id-style identity: issuer is a required field on PUT (handler
+	// enforces presence), so it is always written; a rename colliding with
+	// another issuer surfaces as a unique-constraint conflict below.
+	item.Issuer = req.Issuer
 	item.Description = req.Description
 	if err = s.db.Save(item).Error; err != nil {
 		if isUniqueConstraintError(err) {

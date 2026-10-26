@@ -86,7 +86,7 @@ func TestTrustAnchorGetUpdateDelete(t *testing.T) {
 
 	t.Run(
 		"UpdateByNumericID", func(t *testing.T) {
-			body := `{"enable_jwks_update": false, "key_poll_interval": 600}`
+			body := `{"entity_id": "https://updated-ta.example.org", "enable_jwks_update": false, "key_poll_interval": 600}`
 			req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/admin/trust-anchors/%d", created.ID), strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			resp, respBody := doRequest(t, app, req)
@@ -96,12 +96,27 @@ func TestTrustAnchorGetUpdateDelete(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to reload trust anchor: %v", err)
 			}
+			if updated.EntityID != "https://updated-ta.example.org" {
+				t.Errorf("expected entity_id renamed, got %q", updated.EntityID)
+			}
 			if updated.EnableJWKSUpdate {
 				t.Errorf("expected EnableJWKSUpdate=false, got true")
 			}
 			if updated.KeyPollInterval != 600 {
 				t.Errorf("expected KeyPollInterval=600, got %d", updated.KeyPollInterval)
 			}
+		},
+	)
+
+	t.Run(
+		"UpdateRequiresEntityID", func(t *testing.T) {
+			// entity_id is a required identity field on PUT; it is never
+			// derived from the path or DB id.
+			body := `{"enable_jwks_update": false, "key_poll_interval": 600}`
+			req := httptest.NewRequest("PUT", fmt.Sprintf("/api/v1/admin/trust-anchors/%d", created.ID), strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, respBody := doRequest(t, app, req)
+			requireStatus(t, resp, respBody, http.StatusBadRequest)
 		},
 	)
 

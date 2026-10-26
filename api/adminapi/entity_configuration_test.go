@@ -715,6 +715,66 @@ func TestPutAdditionalClaimByID(t *testing.T) {
 	)
 
 	t.Run(
+		"MissingClaim", func(t *testing.T) {
+			// claim is a required identity field and is never derived from
+			// the row id.
+			t.Parallel()
+			app := setupEntityConfigTestApp(
+				newStubFedEntity(),
+				&mockAdditionalClaimsStore{
+					updateFn: func(_ string, _ smodel.AddAdditionalClaim) (
+						*smodel.EntityConfigurationAdditionalClaim, error,
+					) {
+						t.Fatalf("update must not be called when claim is missing")
+						return nil, nil
+					},
+				},
+				&mockKeyValueStore{},
+			)
+
+			req := httptest.NewRequest("PUT", "/entity-configuration/additional-claims/5", strings.NewReader(`{"value":"ACME"}`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+			requireStatus(t, resp, bodyBytes, 400)
+		},
+	)
+
+	t.Run(
+		"Rename_RealStore", func(t *testing.T) {
+			t.Parallel()
+			app, store := setupRealEntityConfigClaimsApp(t)
+
+			seeded, err := store.Create(smodel.AddAdditionalClaim{Claim: "old_name", Value: "v1"})
+			if err != nil {
+				t.Fatalf("failed to seed claim: %v", err)
+			}
+			if _, err := store.Create(smodel.AddAdditionalClaim{Claim: "taken_name", Value: "v2"}); err != nil {
+				t.Fatalf("failed to seed second claim: %v", err)
+			}
+
+			// Rename to a fresh claim name.
+			path := "/entity-configuration/additional-claims/" + strconv.FormatUint(uint64(seeded.ID), 10)
+			req := httptest.NewRequest("PUT", path, strings.NewReader(`{"claim":"renamed_name","value":"v3"}`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes := doRequest(t, app, req)
+			requireStatus(t, resp, bodyBytes, 200)
+			stored, err := store.Get(strconv.FormatUint(uint64(seeded.ID), 10))
+			if err != nil {
+				t.Fatalf("failed to reload renamed claim: %v", err)
+			}
+			if stored.Claim != "renamed_name" {
+				t.Fatalf("expected claim renamed, got %q", stored.Claim)
+			}
+
+			// Rename onto a claim name that is already taken -> 409.
+			req = httptest.NewRequest("PUT", path, strings.NewReader(`{"claim":"taken_name"}`))
+			req.Header.Set("Content-Type", "application/json")
+			resp, bodyBytes = doRequest(t, app, req)
+			requireStatus(t, resp, bodyBytes, 409)
+		},
+	)
+
+	t.Run(
 		"SuccessWithObjectValue_RealStore", func(t *testing.T) {
 			t.Parallel()
 			app, store := setupRealEntityConfigClaimsApp(t)

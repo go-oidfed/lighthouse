@@ -84,5 +84,6 @@ type AuthorityHintsStore interface {
 	Create(hint AddAuthorityHint) (*AuthorityHint, error)
 	Get(ident string) (*AuthorityHint, error)
 	Update(ident string, update AddAuthorityHint) (*AuthorityHint, error)
+	Patch(ident string, patch map[string]any) (*AuthorityHint, error)
 	Delete(ident string) error
 }

@@ -22,6 +22,7 @@ type mockAuthorityHintsStore struct {
 	createFn func(smodel.AddAuthorityHint) (*smodel.AuthorityHint, error)
 	getFn    func(string) (*smodel.AuthorityHint, error)
 	updateFn func(string, smodel.AddAuthorityHint) (*smodel.AuthorityHint, error)
+	patchFn  func(string, map[string]any) (*smodel.AuthorityHint, error)
 	deleteFn func(string) error
 }
 
@@ -39,6 +40,10 @@ func (m *mockAuthorityHintsStore) Get(ident string) (*smodel.AuthorityHint, erro
 
 func (m *mockAuthorityHintsStore) Update(ident string, item smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
 	return m.updateFn(ident, item)
+}
+
+func (m *mockAuthorityHintsStore) Patch(ident string, patch map[string]any) (*smodel.AuthorityHint, error) {
+	return m.patchFn(ident, patch)
 }
 
 func (m *mockAuthorityHintsStore) Delete(ident string) error {
@@ -498,55 +503,150 @@ func TestAuthorityHintsDeleteReappliesHook(t *testing.T) {
 	}
 }
 
-// TestAuthorityHintsUpdateWithoutEntityID must NOT use t.Parallel().
-// It uses the global entity configuration cache via setEntityConfigurationCache.
-// Updating an existing hint must not require resupplying entity_id: omitting it
-// lets callers change jwks_sync without a conflict (the existing value is
-// preserved by the storage layer).
-func TestAuthorityHintsUpdateWithoutEntityID(t *testing.T) {
+// TestAuthorityHintsUpdateRequiresEntityID must NOT use t.Parallel().
+// PUT is a full replacement: entity_id is a required identity field and is
+// never derived from the path or DB id.
+func TestAuthorityHintsUpdateRequiresEntityID(t *testing.T) {
 	cacheValue := []byte("cached-entity-config")
-	var gotID string
-	var gotInput smodel.AddAuthorityHint
-	applierCalls := 0
 	setEntityConfigurationCache(t, cacheValue)
 	app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
-		updateFn: func(ident string, item smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
-			gotID = ident
-			gotInput = item
-			return &smodel.AuthorityHint{ID: 7, EntityID: "https://existing.example", JWKSSync: item.JWKSSync}, nil
+		updateFn: func(string, smodel.AddAuthorityHint) (*smodel.AuthorityHint, error) {
+			t.Fatalf("update must not be called when entity_id is missing")
+			return nil, nil
 		},
-	}, func() error {
-		applierCalls++
-		return nil
 	})
 
 	req := httptest.NewRequest(
 		http.MethodPut,
 		"/entity-configuration/authority-hints/7",
-		strings.NewReader(`{"jwks_sync":{"mode":"push","timeout":25,"jwt_lifetime":700}}`),
+		strings.NewReader(`{"jwks_sync":{"mode":"push"}}`),
 	)
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, body := doRequest(t, app, req)
-	requireStatus(t, resp, body, http.StatusOK)
+	requireStatus(t, resp, body, http.StatusBadRequest)
+	requireEntityConfigurationCache(t, true, cacheValue)
+}
 
-	if gotID != "7" {
-		t.Fatalf("expected authority hint id %q, got %q", "7", gotID)
-	}
-	if gotInput.EntityID != "" {
-		t.Fatalf("entity_id must be absent from update input, got %q", gotInput.EntityID)
-	}
-	if gotInput.JWKSSync == nil || gotInput.JWKSSync.Mode != smodel.JWKSSyncPush || gotInput.JWKSSync.Timeout != 25 || gotInput.JWKSSync.JWTLifetime != 700 {
-		t.Fatalf("unexpected jwks_sync in update input: %+v", gotInput.JWKSSync)
-	}
-	if applierCalls != 1 {
-		t.Fatalf("expected applier to be invoked once, got %d", applierCalls)
-	}
-	var got smodel.AuthorityHint
-	if err := json.Unmarshal(body, &got); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-	if got.JWKSSync == nil || got.JWKSSync.Mode != smodel.JWKSSyncPush {
-		t.Fatalf("expected jwks_sync in response, got %+v", got.JWKSSync)
-	}
-	requireEntityConfigurationCache(t, false, nil)
+// TestAuthorityHintsPatch must NOT use t.Parallel().
+// PATCH partially updates a hint: only provided fields change, entity_id is
+// not accepted.
+func TestAuthorityHintsPatch(t *testing.T) {
+	cacheValue := []byte("cached-entity-config")
+
+	t.Run("JWKSSyncOnly", func(t *testing.T) {
+		var gotID string
+		var gotPatch map[string]any
+		applierCalls := 0
+		setEntityConfigurationCache(t, cacheValue)
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			patchFn: func(ident string, patch map[string]any) (*smodel.AuthorityHint, error) {
+				gotID = ident
+				gotPatch = patch
+				return &smodel.AuthorityHint{ID: 7, EntityID: "https://existing.example", JWKSSync: &smodel.JWKSSyncConf{Mode: smodel.JWKSSyncPush}}, nil
+			},
+		}, func() error {
+			applierCalls++
+			return nil
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPatch,
+			"/entity-configuration/authority-hints/7",
+			strings.NewReader(`{"jwks_sync":{"mode":"push","timeout":25}}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, body := doRequest(t, app, req)
+		requireStatus(t, resp, body, http.StatusOK)
+
+		if gotID != "7" {
+			t.Fatalf("expected authority hint id %q, got %q", "7", gotID)
+		}
+		if _, present := gotPatch["description"]; present {
+			t.Fatalf("description must be absent from the patch, got %v", gotPatch)
+		}
+		sync, ok := gotPatch["jwks_sync"].(map[string]any)
+		if !ok || sync["mode"] != "push" || sync["timeout"] != float64(25) {
+			t.Fatalf("unexpected jwks_sync in patch: %v", gotPatch["jwks_sync"])
+		}
+		if applierCalls != 1 {
+			t.Fatalf("expected applier to be invoked once, got %d", applierCalls)
+		}
+		var got smodel.AuthorityHint
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
+		if got.JWKSSync == nil || got.JWKSSync.Mode != smodel.JWKSSyncPush {
+			t.Fatalf("expected jwks_sync in response, got %+v", got.JWKSSync)
+		}
+		requireEntityConfigurationCache(t, false, nil)
+	})
+
+	t.Run("DescriptionOnly", func(t *testing.T) {
+		var gotPatch map[string]any
+		setEntityConfigurationCache(t, cacheValue)
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			patchFn: func(_ string, patch map[string]any) (*smodel.AuthorityHint, error) {
+				gotPatch = patch
+				return &smodel.AuthorityHint{ID: 7, EntityID: "https://existing.example", Description: "new"}, nil
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPatch,
+			"/entity-configuration/authority-hints/7",
+			strings.NewReader(`{"description":"new"}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, body := doRequest(t, app, req)
+		requireStatus(t, resp, body, http.StatusOK)
+		if _, present := gotPatch["jwks_sync"]; present {
+			t.Fatalf("jwks_sync must be absent from the patch, got %v", gotPatch)
+		}
+		if gotPatch["description"] != "new" {
+			t.Fatalf("unexpected description in patch: %v", gotPatch["description"])
+		}
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		setEntityConfigurationCache(t, cacheValue)
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			patchFn: func(string, map[string]any) (*smodel.AuthorityHint, error) {
+				return nil, smodel.NotFoundError("missing")
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPatch,
+			"/entity-configuration/authority-hints/missing",
+			strings.NewReader(`{"description":"new"}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, body := doRequest(t, app, req)
+		requireStatus(t, resp, body, http.StatusNotFound)
+	})
+
+	t.Run("InvalidSyncModeRejected", func(t *testing.T) {
+		applierCalls := 0
+		setEntityConfigurationCache(t, cacheValue)
+		app := setupAuthorityHintsTestApp(t, &mockAuthorityHintsStore{
+			patchFn: func(string, map[string]any) (*smodel.AuthorityHint, error) {
+				return nil, smodel.ValidationError("jwks_sync: unknown mode (supported: none, push, trigger)")
+			},
+		}, func() error {
+			applierCalls++
+			return nil
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPatch,
+			"/entity-configuration/authority-hints/7",
+			strings.NewReader(`{"jwks_sync":{"mode":"bogus"}}`),
+		)
+		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+		resp, body := doRequest(t, app, req)
+		requireStatus(t, resp, body, http.StatusBadRequest)
+		if applierCalls != 0 {
+			t.Fatalf("applier must not run on rejected input, got %d calls", applierCalls)
+		}
+	})
 }

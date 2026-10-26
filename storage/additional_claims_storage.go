@@ -125,9 +125,16 @@ func (s *AdditionalClaimsStorage) Update(
 	if err != nil {
 		return nil, err
 	}
+	// claim is a required identity field (the handler enforces presence);
+	// changing it renames the row — a value already used by another row
+	// surfaces as a unique-constraint conflict below.
+	row.Claim = item.Claim
 	row.Value = item.Value
 	row.Crit = item.Crit
 	if err := s.db.Save(row).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, model.AlreadyExistsError("additional claim already exists")
+		}
 		return nil, errors.Wrap(err, "additional_claims: update failed")
 	}
 	return row, nil

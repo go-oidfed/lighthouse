@@ -200,6 +200,9 @@ func (h *globalTrustMarkIssuersHandlers) update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
+	if req.Issuer == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("issuer is required"))
+	}
 	item, err := h.issuers.Update(c.Params("issuerID"), req)
 	if err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
