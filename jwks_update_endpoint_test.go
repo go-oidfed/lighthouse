@@ -284,3 +284,273 @@ func TestJwksUpdateTriggerEndpoint_ECFetchFailure_Returns502ServerError(t *testi
 	assert.Equal(t, http.StatusBadGateway, resp.StatusCode)
 	assertErrBody(t, body, "server_error")
 }
+
+// expiresStoredJWKS returns a signing key plus a stored JWKS containing its
+// public key with its thumbprint kid and an `exp` claim strictly in the past.
+// The thumbprint kid matches the kid the signing helpers emit in the JWT
+// header, so signature verification would succeed for a non-expired key.
+func expiresStoredJWKS(t *testing.T) (jwx.SigningKey, jwx.JWKS) {
+	t.Helper()
+	sk := rsaKey(t)
+	pub, err := jwk.PublicKeyOf(sk)
+	require.NoError(t, err)
+	require.NoError(t, jwk.AssignKeyID(pub))
+	require.NoError(t, pub.Set("exp", unixtime.Unixtime{Time: time.Now().Add(-time.Hour)}))
+	set := jwx.NewJWKS()
+	require.NoError(t, set.AddKey(pub))
+	return sk, set
+}
+
+// signECConfig signs an Entity Configuration for iss/sub with sk, embedding the
+// given keys and exp. The header carries the signing key's thumbprint kid.
+func signECConfig(
+	t *testing.T, sk jwx.SigningKey, iss, sub string, exp time.Time, embedded jwx.JWKS,
+) []byte {
+	t.Helper()
+	signer := jwx.NewSingleKeyVersatileSigner(sk, jwa.RS256())
+	gs := jwx.NewGeneralJWTSigner(signer, []jwa.SignatureAlgorithm{jwa.RS256()})
+	headers := jws.NewHeaders()
+	pub, err := jwk.PublicKeyOf(sk)
+	require.NoError(t, err)
+	require.NoError(t, jwk.AssignKeyID(pub))
+	kid, _ := pub.KeyID()
+	_ = headers.Set(jws.KeyIDKey, kid)
+	now := time.Now()
+	jwtBytes, err := gs.JWTWithHeaders(
+		oidfed.EntityStatementPayload{
+			Issuer:    iss,
+			Subject:   sub,
+			IssuedAt:  unixtime.Unixtime{Time: now},
+			ExpiresAt: unixtime.Unixtime{Time: exp},
+			JWKS:      embedded,
+		},
+		headers,
+		oidfedconst.JWTTypeEntityStatement,
+	)
+	require.NoError(t, err)
+	return jwtBytes
+}
+
+// signEntityConfigurationFull signs an Entity Configuration for entityID with
+// sk, embedding the given keys and exp. The header carries the signing key's
+// thumbprint kid.
+func signEntityConfigurationFull(
+	t *testing.T, sk jwx.SigningKey, entityID string, exp time.Time, embedded jwx.JWKS,
+) []byte {
+	t.Helper()
+	return signECConfig(t, sk, entityID, entityID, exp, embedded)
+}
+
+// signEntityConfigurationExp is signEntityConfiguration with a caller-supplied
+// expiration for the signed Entity Configuration.
+func signEntityConfigurationExp(
+	t *testing.T, sk jwx.SigningKey, entityID string, exp time.Time,
+) []byte {
+	t.Helper()
+	return signEntityConfigurationFull(t, sk, entityID, exp, pubJWKS(t, sk))
+}
+
+// TestJwksUpdateEndpoint_ExpiredStoredKey_Returns401InvalidClient verifies
+// that the jwks_update endpoint rejects a signed JWK Set whose signature was
+// made with an expired (but still stored) federation key. An expired key must
+// never verify a signed JWK Set.
+func TestJwksUpdateEndpoint_ExpiredStoredKey_Returns401InvalidClient(t *testing.T) {
+	expiredSK, expiredStored := expiresStoredJWKS(t)
+	entityID := "https://sub-expired-update.example"
+
+	app := setupJwksUpdateTestApp(t, model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+		},
+		JWKS: model.NewJWKS(expiredStored),
+	})
+
+	newKeys := jwksWithKid(t, "new-kid")
+	signed := signJWKSet(t, expiredSK, newKeys, entityID, entityID)
+
+	req := httptest.NewRequest("POST", "/jwks-update", bytes.NewReader(signed))
+	req.Header.Set("Content-Type", oidfedconst.ContentTypeJWKS)
+	resp, body := doRequestRaw(t, app, req)
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assertErrBody(t, body, "invalid_client")
+	assert.Contains(t, string(body), "expired",
+		"rejection must be due to the signing key being expired")
+}
+
+// TestJwksUpdateTriggerEndpoint_ExpiredStoredKey_Returns401InvalidClient
+// verifies that the trigger endpoint rejects an Entity Configuration whose
+// signature was made with an expired (but still stored) federation key.
+func TestJwksUpdateTriggerEndpoint_ExpiredStoredKey_Returns401InvalidClient(t *testing.T) {
+	expiredSK, expiredStored := expiresStoredJWKS(t)
+
+	var entityID string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", oidfedconst.ContentTypeEntityStatement)
+		// EC is time-valid but signed with the expired stored key.
+		_, _ = w.Write(signEntityConfiguration(t, expiredSK, entityID))
+	}))
+	t.Cleanup(srv.Close)
+	entityID = srv.URL
+
+	app := setupJwksUpdateTriggerTestApp(t, model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+		},
+		JWKS: model.NewJWKS(expiredStored),
+	})
+
+	req := httptest.NewRequest(
+		"POST", "/jwks-trigger",
+		bytes.NewReader([]byte("sub="+entityID)),
+	)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, body := doRequestRaw(t, app, req)
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assertErrBody(t, body, "invalid_client")
+	assert.Contains(t, string(body), "expired",
+		"rejection must be due to the signing key being expired")
+}
+
+// TestJwksUpdateTriggerEndpoint_ExpiredEC_Returns502ServerError verifies that
+// an Entity Configuration that is already expired is rejected even though its
+// signature would verify against a valid stored key.
+func TestJwksUpdateTriggerEndpoint_ExpiredEC_Returns502ServerError(t *testing.T) {
+	sk := rsaKey(t)
+	storedKeys := pubJWKS(t, sk)
+
+	var entityID string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", oidfedconst.ContentTypeEntityStatement)
+		_, _ = w.Write(signEntityConfigurationExp(t, sk, entityID, time.Now().Add(-time.Hour)))
+	}))
+	t.Cleanup(srv.Close)
+	entityID = srv.URL
+
+	app := setupJwksUpdateTriggerTestApp(t, model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+		},
+		JWKS: model.NewJWKS(storedKeys),
+	})
+
+	req := httptest.NewRequest(
+		"POST", "/jwks-trigger",
+		bytes.NewReader([]byte("sub="+entityID)),
+	)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, body := doRequestRaw(t, app, req)
+
+	assert.Equal(t, http.StatusBadGateway, resp.StatusCode)
+	assertErrBody(t, body, "server_error")
+	assert.Contains(t, string(body), "time-valid",
+		"rejection must be due to the EC being expired")
+}
+
+// TestJwksUpdateEndpoint_ValidStoredKey_Returns204 verifies that a signed JWK
+// Set made with a non-expired stored key is still accepted (positive control
+// for the expired-key rejection).
+func TestJwksUpdateEndpoint_ValidStoredKey_Returns204(t *testing.T) {
+	sk := rsaKey(t)
+	storedKeys := pubJWKS(t, sk)
+	entityID := "https://sub-valid-update.example"
+
+	app := setupJwksUpdateTestApp(t, model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+		},
+		JWKS: model.NewJWKS(storedKeys),
+	})
+
+	newKeys := jwksWithKid(t, "rotated-key")
+	signed := signJWKSet(t, sk, newKeys, entityID, entityID)
+
+	req := httptest.NewRequest("POST", "/jwks-update", bytes.NewReader(signed))
+	req.Header.Set("Content-Type", oidfedconst.ContentTypeJWKS)
+	resp, respBody := doRequestRaw(t, app, req)
+
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode,
+		"body: %s", string(respBody))
+}
+
+// TestJwksUpdateTriggerEndpoint_ValidKeys_Rotates verifies that an EC signed
+// with a non-expired stored key, embedding a rotated key, is accepted and
+// updates the stored JWKS (positive control for the expired-key/EC rejection).
+func TestJwksUpdateTriggerEndpoint_ValidKeys_Rotates(t *testing.T) {
+	sk := rsaKey(t)
+	storedKeys := pubJWKS(t, sk)
+
+	var entityID string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", oidfedconst.ContentTypeEntityStatement)
+		_, _ = w.Write(signEntityConfigurationFull(
+			t, sk, entityID, time.Now().Add(time.Hour), jwksWithKid(t, "rotated-key"),
+		))
+	}))
+	t.Cleanup(srv.Close)
+	entityID = srv.URL
+
+	app := setupJwksUpdateTriggerTestApp(t, model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+		},
+		JWKS: model.NewJWKS(storedKeys),
+	})
+
+	req := httptest.NewRequest(
+		"POST", "/jwks-trigger",
+		bytes.NewReader([]byte("sub="+entityID)),
+	)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, body := doRequestRaw(t, app, req)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "body: %s", string(body))
+	assert.Contains(t, string(body), `"changed":true`)
+}
+
+// TestJwksUpdateTriggerEndpoint_WrongIssSub_Returns502ServerError verifies
+// that an Entity Configuration whose signature and exp are valid but whose
+// `iss`/`sub` do not match the expected subordinate entity ID is rejected.
+func TestJwksUpdateTriggerEndpoint_WrongIssSub_Returns502ServerError(t *testing.T) {
+	sk := rsaKey(t)
+	storedKeys := pubJWKS(t, sk)
+
+	var entityID string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", oidfedconst.ContentTypeEntityStatement)
+		// Valid signature (signed with the stored key) + future exp, but the
+		// EC claims an issuer that is not the expected subordinate.
+		_, _ = w.Write(signECConfig(
+			t, sk, "https://evil.example", entityID, time.Now().Add(time.Hour),
+			jwksWithKid(t, "new-key"),
+		))
+	}))
+	t.Cleanup(srv.Close)
+	entityID = srv.URL
+
+	app := setupJwksUpdateTriggerTestApp(t, model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{
+			EntityID: entityID,
+			Status:   model.StatusActive,
+		},
+		JWKS: model.NewJWKS(storedKeys),
+	})
+
+	req := httptest.NewRequest(
+		"POST", "/jwks-trigger",
+		bytes.NewReader([]byte("sub="+entityID)),
+	)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, body := doRequestRaw(t, app, req)
+
+	assert.Equal(t, http.StatusBadGateway, resp.StatusCode)
+	assertErrBody(t, body, "server_error")
+	assert.Contains(t, string(body), "do not match",
+		"rejection must be due to the issuer/subject mismatch")
+}

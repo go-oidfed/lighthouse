@@ -1,6 +1,7 @@
 package lighthouse
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -26,6 +27,11 @@ var (
 	// signature cannot be verified against the subordinate's currently stored
 	// JWKS. This is an authenticity failure and maps to 401 invalid_client.
 	errECSignatureFailed = errors.New("entity configuration signature verification failed")
+	// errECExpired is returned when the fetched Entity Configuration is not
+	// time-valid (issued in the future or already expired). An expired EC must
+	// never be accepted. This maps to 502 server_error like other stale EC
+	// content.
+	errECExpired = errors.New("entity configuration is not time-valid")
 )
 
 // subordinateJWKSRefreshStorage adapts model.SubordinateStorageBackend to the
@@ -144,13 +150,35 @@ func (fed *LightHouse) RefreshSubordinateJWKSFromEC(entityID string) (changed bo
 	if err != nil {
 		return false, errors.Wrap(errECFetchFailed, err.Error())
 	}
+	// An Entity Configuration must be self-issued for the subordinate we are
+	// refreshing: both `iss` and `sub` must equal the expected entity ID.
+	// Rejecting a mismatched document prevents adopting a JWKS whose issuer
+	// is not the subordinate.
+	if ec.Issuer != entityID || ec.Subject != entityID {
+		return false, errors.Wrap(errECFetchFailed,
+			fmt.Sprintf("EC issuer/subject (%q/%q) do not match expected entity id %q",
+				ec.Issuer, ec.Subject, entityID))
+	}
 	if ec.ExpiresAt.IsZero() || ec.ExpiresAt.Unix() == 0 {
 		return false, errors.Wrap(errECFetchFailed, "exp is required")
 	}
+	// An Entity Configuration that is not yet valid or already expired must
+	// never be accepted.
+	if !ec.TimeValid() {
+		return false, errors.Wrap(errECExpired,
+			fmt.Sprintf("iat=%v exp=%v", ec.IssuedAt.Time, ec.ExpiresAt.Time))
+	}
 
-	// Verify the EC signature against the currently stored JWKS.
+	// Verify the EC signature against the currently stored JWKS, using only
+	// non-expired keys. An expired key must never be used to verify an Entity
+	// Configuration: the subordinate must publish its new key signed with a
+	// still-valid old key before the old key expires.
 	if info.JWKS.Keys.Set != nil && info.JWKS.Keys.Len() > 0 {
-		if !ec.Verify(info.JWKS.Keys) {
+		storedKeys := info.JWKS.Keys.WithoutExpired(time.Now())
+		if storedKeys.Set == nil || storedKeys.Len() == 0 {
+			return false, errors.Wrap(errECSignatureFailed, "all stored keys are expired")
+		}
+		if !ec.Verify(storedKeys) {
 			return false, errors.Wrap(errECSignatureFailed, "against stored JWKS")
 		}
 	}

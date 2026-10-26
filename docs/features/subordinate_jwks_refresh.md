@@ -68,10 +68,16 @@ curl -X PATCH -u admin:password \
 
 1. LightHouse fetches the subordinate's Entity Configuration at
    `/.well-known/openid-federation`.
-2. The fetched EC's signature is verified against the **currently stored** JWKS.
-   If verification fails, the JWKS is **not** updated.
-3. If the KIDs have changed, the new JWKS is stored in the database.
-4. The next subordinate statement LightHouse issues will contain the new keys.
+2. The EC's `iss` and `sub` claims must **both equal the subordinate's entity
+   ID** (the EC must be self-issued for the subordinate being refreshed). A
+   mismatched document is rejected and the JWKS is not updated.
+3. The fetched EC is checked for time validity: an EC that is **not yet valid
+   or already expired is rejected** and the JWKS is not updated.
+4. The fetched EC's signature is verified against the **currently stored**
+   JWKS, using only keys that are **not expired**. If verification fails (or
+   only expired keys remain), the JWKS is **not** updated.
+5. If the KIDs have changed, the new JWKS is stored in the database.
+6. The next subordinate statement LightHouse issues will contain the new keys.
 
 ### Polling Interval
 
@@ -178,7 +184,8 @@ The endpoint URL is published in the `federation_entity` metadata under
     The `jwks_update` endpoint does **not** use `private_key_jwt` client
     authentication. Authenticity is established by the signature on the signed
     JWK Set, which must be verifiable with one of the subordinate's currently
-    known federation keys. `auth_enabled` is ignored for this endpoint type.
+    known federation keys that is **not expired**. `auth_enabled` is ignored
+    for this endpoint type.
 
 ### Request
 
@@ -234,9 +241,25 @@ expired at issuance time:
 - Keys without an `exp` claim (or with a zero `exp`) are **always included**.
 
 Filtering is **publish-only**: the stored JWKS retains all keys, including
-expired ones, so that incoming Entity Configurations and signed JWK Sets can
-still be verified against historical keys during a rotation. Only the published
-statement reflects the filtered set.
+expired ones, so the published statement can differ from what is stored. Only
+the published statement reflects the filtered set.
+
+!!! note "Expired keys are not usable for verification"
+    Retained expired keys are **publish-only** — they are never used to verify
+    incoming material. Both the EC refresh/trigger path and the
+    `federation_jwks_update_endpoint` match the incoming signature only against
+    the **non-expired** stored keys. So the rotation contract is: the
+    subordinate must publish its new key (or signed JWK Set) **signed with an
+    old key that is still valid** — before the old key expires. Signing with an
+    expired key is rejected (401 `invalid_client` at both endpoints).
+
+!!! note "Expired or mismatched Entity Configurations are rejected"
+    A fetched Entity Configuration that is **not yet valid or already expired**
+    is rejected (502 `server_error` at the trigger endpoint), even if its
+    signature would verify with a valid stored key. The same applies when the
+    EC's `iss`/`sub` claims do not equal the subordinate's entity ID. The
+    subordinate must keep its `.well-known/openid-federation` EC from expiring
+    and self-issued.
 
 If every key in the stored JWKS is expired, LightHouse publishes an **empty**
 `jwks` (the statement is still issued, not errored) and logs a warning. A

@@ -43,22 +43,37 @@
     keys.
   - The admin API returns **409** (`invalid_request`) when a key with an
     already-present `kid` is posted, instead of a generic 500.
-  - **PUT/PATCH contract.** `PUT` is now consistently a full replacement:
-    identity fields (`entity_id`, endpoint `type`, issuer, `trust_mark_type`,
-    additional-claim names)
-    are **required** in the body (never derived from the URL path or DB id)
-    and may be changed — a value colliding with another resource returns 409;
-    optional data fields omitted from the body are reset to their
-    zero/default. `PATCH` is the partial-update verb. Affected routes:
-    - `PATCH …/authority-hints/{id}`), to enable/disable
-      `jwks_sync` on an existing hint is a one-field PATCH
-    - `PUT …/subordinates/{id}` is a true full replacement (`ReplaceSubordinate`);
-      the old partial-update behavior lives on as `PATCH`, which was already
-      the documented preference.
-    - `PUT …/trust-anchors/{id}`, `PUT …/federation-endpoints/{type}`,
-      `PUT …/trust-marks/issuers/{id}` now require their identity field and
-      no longer auto-derive it from the path; renames write through (409 on
-      collision).
+- **PUT/PATCH contract.** `PUT` is now consistently a full replacement:
+  identity fields (`entity_id`, endpoint `type`, issuer, `trust_mark_type`,
+  additional-claim names)
+  are **required** in the body (never derived from the URL path or DB id)
+  and may be changed — a value colliding with another resource returns 409;
+  optional data fields omitted from the body are reset to their
+  zero/default. `PATCH` is the partial-update verb. Affected routes:
+  - `PATCH …/authority-hints/{id}`), to enable/disable
+    `jwks_sync` on an existing hint is a one-field PATCH
+  - `PUT …/subordinates/{id}` is a true full replacement (`ReplaceSubordinate`);
+    the old partial-update behavior lives on as `PATCH`, which was already
+    the documented preference.
+  - `PUT …/trust-anchors/{id}`, `PUT …/federation-endpoints/{type}`,
+    `PUT …/trust-marks/issuers/{id}` now require their identity field and
+    no longer auto-derive it from the path; renames write through (409 on
+    collision).
+
+- Subordinate JWKS refreshing no longer accepts expired material.
+  - An expired (or not-yet-valid) Entity Configuration is rejected: the
+    `federation_jwks_update_trigger_endpoint` (and periodic refresh) refuse a
+    fetched EC that is not time-valid (502 `server_error`).
+  - Expired stored federation keys are excluded from verification. Both the
+    EC refresh/trigger path and the `federation_jwks_update_endpoint` verify
+    the incoming signature only against non-expired stored keys (401
+    `invalid_client` when only expired keys remain), so a subordinate must
+    publish its new key (or signed JWK Set) signed with an old key that is
+    still valid. The stored JWKS still retains expired keys for publishing
+    history, but they are publish-only and no longer usable for verification.
+  - A fetched Entity Configuration whose `iss`/`sub` do not equal the
+    subordinate's entity ID is rejected (502 `server_error`) — an EC must be
+    self-issued for the subordinate being refreshed.
 
 ## LightHouse 0.23.1
 

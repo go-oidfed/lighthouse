@@ -93,6 +93,12 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 				ctx.Status(fiber.StatusBadGateway)
 				return ctx.JSON(oidfed.ErrorServerError("failed to refresh JWKS: " + err.Error()))
 			}
+			// An expired or not-yet-valid EC is stale upstream content and is
+			// rejected: 502 server_error.
+			if stderrors.Is(err, errECExpired) {
+				ctx.Status(fiber.StatusBadGateway)
+				return ctx.JSON(oidfed.ErrorServerError("failed to refresh JWKS: " + err.Error()))
+			}
 			// Anything else (internal store errors, etc.) is a server fault.
 			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError("failed to refresh JWKS: " + err.Error()))

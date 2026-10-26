@@ -1,6 +1,8 @@
 package lighthouse
 
 import (
+	"time"
+
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/oidfedconst"
@@ -76,7 +78,10 @@ func (fed *LightHouse) AddJWKSUpdateEndpoint(
 		}
 
 		// Verify the signed JWK Set signature against the subordinate's
-		// currently stored federation JWKS. This enforces that the update is
+		// currently stored federation JWKS, using only non-expired keys. An
+		// expired key must never be used to verify a signed JWK Set: the
+		// subordinate must publish its new keys signed with a still-valid old
+		// key before the old key expires. This enforces that the update is
 		// signed with one of the old federation keys known to Lighthouse. The
 		// signature on the signed JWK Set is the client-auth mechanism for this
 		// endpoint, so a verification failure is an authentication failure
@@ -89,7 +94,16 @@ func (fed *LightHouse) AddJWKSUpdateEndpoint(
 				),
 			)
 		}
-		if !signed.Verify(info.JWKS.Keys) {
+		storedKeys := info.JWKS.Keys.WithoutExpired(time.Now())
+		if storedKeys.Set == nil || storedKeys.Len() == 0 {
+			ctx.Status(fiber.StatusUnauthorized)
+			return ctx.JSON(
+				oidfed.ErrorInvalidClient(
+					"all stored federation keys are expired; cannot verify the signed JWK Set",
+				),
+			)
+		}
+		if !signed.Verify(storedKeys) {
 			ctx.Status(fiber.StatusUnauthorized)
 			return ctx.JSON(
 				oidfed.ErrorInvalidClient(
