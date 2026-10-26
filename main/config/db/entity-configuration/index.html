@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1307,6 +1307,56 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Authority Hints (authority_hints)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#jwks_syncmode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        jwks_sync.mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jwks_syncjwt_lifetime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        jwks_sync.jwt_lifetime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jwks_synctimeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        jwks_sync.timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jwks_syncheaders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        jwks_sync.headers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1975,6 +2025,112 @@ for details.</p>
 <p><span class="badge badge-purple" title="Value Type">list of URIs</span></p>
 <p>Entity IDs of Federation Entities that are direct superiors to this entity.
 These are published in the <code>authority_hints</code> claim of the Entity Configuration.</p>
+<p>Each hint may opt into <strong>outbound JWKS syncing</strong>: when LightHouse rotates its
+own <strong>federation</strong> keys it can notify the superior so the superior can 
+update the JWKS included in the subordinate statement. This is configured per hint via the
+optional <code>jwks_sync</code> block and is independent for each hint. It never affects
+the published <code>authority_hints</code> claim and applies only to
+federation keys, never to OIDC signing keys.</p>
+<p><code>jwks_sync.mode</code> selects one of two mechanisms:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>lib hook</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code></td>
+<td>—</td>
+<td>No syncing (default; omitted <code>jwks_sync</code> is equivalent).</td>
+</tr>
+<tr>
+<td><code>push</code></td>
+<td><code>JWKSUpdateHook</code></td>
+<td>LightHouse pushes a signed JWK Set (<code>application/jwk-set+jwt</code>) to the superior's <code>federation_jwks_update_endpoint</code>.</td>
+</tr>
+<tr>
+<td><code>trigger</code></td>
+<td><code>TriggerUpdateHook</code></td>
+<td>LightHouse POSTs its entity_id (authenticated with <code>private_key_jwt</code>) to the superior's <code>federation_jwks_update_trigger_endpoint</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>In both modes the target endpoint URL, the acceptable signing algorithms, and
+the trigger auth requirement are resolved dynamically from the superior's
+Entity Configuration at the time of each rotation (served from the EC cache).
+The signed JWK Set (push) and the
+<code>private_key_jwt</code> assertion (trigger) are signed with LightHouse's federation
+signing key.</p>
+<div class="admonition note">
+<p class="admonition-title">When hooks fire</p>
+<p>Hooks fire whenever the federation KMS generates or rotates a signing key —
+both scheduled automatic rotations and manual operations (<code>POST
+/api/v1/admin/kms/rotate</code>, rotating a key via the public key admin API).
+The initial key seeding at first boot (no key file exists yet) happens
+before hooks are attached and does <strong>not</strong> notify superiors. Hooks require a
+rotation-capable KMS (<code>db</code>, <code>filesystem</code>, or <code>pkcs11</code>); the single-key-file
+mode never fires them.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Runtime changes</p>
+<p><code>jwks_sync</code> changes made via the Admin API (<code>POST</code>/<code>PUT</code>/<code>PATCH</code>/<code>DELETE</code>
+on authority hints) take effect immediately on the running process: the
+hooks are re-attached after each mutation, without a restart. A failed
+re-attach is logged; the change still applies on the next mutation or
+restart.</p>
+</div>
+<p>Example (create):</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">  "entity_id": "https://superior.example.com",</span>
+<span class="s1">  "jwks_sync": { "mode": "trigger", "timeout": 20 }</span>
+<span class="s1">}'</span><span class="w"> </span>https://localhost:8081/api/v1/admin/entity-configuration/authority-hints
+</code></pre></div>
+<p>To add or change <code>jwks_sync</code> on an <strong>existing</strong> hint without touching anything
+else, use <code>PATCH /api/v1/admin/entity-configuration/authority-hints/{authorityHintID}</code>
+(<code>authorityHintID</code> is the numeric hint id or the entity_id):</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Changing only jwks_sync; description and entity_id are left untouched.</span>
+curl<span class="w"> </span>-X<span class="w"> </span>PATCH<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">  "jwks_sync": { "mode": "push", "timeout": 20, "jwt_lifetime": 600 }</span>
+<span class="s1">}'</span><span class="w"> </span>https://localhost:8081/api/v1/admin/entity-configuration/authority-hints/123
+</code></pre></div>
+<p><code>PUT</code> is the <strong>full replacement</strong> variant: <code>entity_id</code> is a required identity
+field — send the same value to keep it, a new value to rename (409 if it
+collides with another hint) — and <code>description</code>/<code>jwks_sync</code> omitted from the
+body are reset (empty description, no syncing):</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Full replacement; description and jwks_sync are taken from the body.</span>
+curl<span class="w"> </span>-X<span class="w"> </span>PUT<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{</span>
+<span class="s1">  "entity_id": "https://superior.example.com",</span>
+<span class="s1">  "description": "Superior",</span>
+<span class="s1">  "jwks_sync": { "mode": "trigger", "timeout": 20 }</span>
+<span class="s1">}'</span><span class="w"> </span>https://localhost:8081/api/v1/admin/entity-configuration/authority-hints/123
+</code></pre></div>
+<p>Disable syncing again by setting <code>jwks_sync.mode</code> to <code>none</code> (PATCH/PUT) or
+<code>jwks_sync: null</code> (PATCH; clears the stored config), or delete the hint with
+<code>DELETE</code>. A <code>POST</code> to the collection creates a hint and therefore 409s if the
+entity_id already exists.</p>
+<h4 id="jwks_syncmode"><code>jwks_sync.mode</code><a class="headerlink" href="#jwks_syncmode" title="Permanent link">&para;</a></h4>
+<p><span class="badge badge-purple" title="Value Type">string</span>
+<span class="badge badge-blue" title="Default Value">none</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span></p>
+<p>One of <code>none</code>, <code>push</code>, or <code>trigger</code> (see the table above).</p>
+<h4 id="jwks_syncjwt_lifetime"><code>jwks_sync.jwt_lifetime</code><a class="headerlink" href="#jwks_syncjwt_lifetime" title="Permanent link">&para;</a></h4>
+<p><span class="badge badge-purple" title="Value Type">integer (seconds)</span>
+<span class="badge badge-blue" title="Default Value">600</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span></p>
+<p>The lifetime (<code>exp</code> - <code>iat</code>) of the signed JWK Set JWT sent in <code>push</code> mode,
+in seconds. Ignored in other modes.</p>
+<h4 id="jwks_synctimeout"><code>jwks_sync.timeout</code><a class="headerlink" href="#jwks_synctimeout" title="Permanent link">&para;</a></h4>
+<p><span class="badge badge-purple" title="Value Type">integer (seconds)</span>
+<span class="badge badge-blue" title="Default Value">20</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span></p>
+<p>The HTTP client timeout for the sync request, in seconds.</p>
+<h4 id="jwks_syncheaders"><code>jwks_sync.headers</code><a class="headerlink" href="#jwks_syncheaders" title="Permanent link">&para;</a></h4>
+<p><span class="badge badge-purple" title="Value Type">map of string to string</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span></p>
+<p>Additional HTTP headers set on the sync request.</p>
 <table>
 <thead>
 <tr>
@@ -1985,7 +2141,7 @@ These are published in the <code>authority_hints</code> claim of the Entity Conf
 <tbody>
 <tr>
 <td>Admin API</td>
-<td><code>GET/POST/DELETE /api/v1/admin/entity-configuration/authority-hints</code></td>
+<td><code>GET/POST/PUT/DELETE /api/v1/admin/entity-configuration/authority-hints</code></td>
 </tr>
 <tr>
 <td>lhsetup</td>
@@ -2160,10 +2316,10 @@ individual claims via the Admin API if you need to mark them as critical.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "content.code.copy", "content.code.annotate", "content.tooltips"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "main", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "content.code.copy", "content.code.annotate", "content.tooltips"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "main", "provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../../assets/_markdown_exec_pyodide.js"></script>
       

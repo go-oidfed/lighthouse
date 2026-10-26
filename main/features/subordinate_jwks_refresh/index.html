@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -1997,6 +1997,13 @@ make sense).</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">LightHouse as a subordinate</p>
+<p>When LightHouse itself has a superior authority hint, it can notify that
+superior on its own key rotations using the same two mechanisms — see the
+<a href="../../config/db/entity-configuration/#authority-hints-authority_hints"><code>jwks_sync</code></a>
+option on authority hints.</p>
+</div>
 <h2 id="periodic-refreshing">Periodic Refreshing<a class="headerlink" href="#periodic-refreshing" title="Permanent link">&para;</a></h2>
 <p>LightHouse periodically polls the subordinate's Entity Configuration and updates
 the stored JWKS when the keys change. This is opt-in per subordinate.</p>
@@ -2028,8 +2035,14 @@ curl<span class="w"> </span>-X<span class="w"> </span>PATCH<span class="w"> </sp
 <ol>
 <li>LightHouse fetches the subordinate's Entity Configuration at
    <code>/.well-known/openid-federation</code>.</li>
-<li>The fetched EC's signature is verified against the <strong>currently stored</strong> JWKS.
-   If verification fails, the JWKS is <strong>not</strong> updated.</li>
+<li>The EC's <code>iss</code> and <code>sub</code> claims must <strong>both equal the subordinate's entity
+   ID</strong> (the EC must be self-issued for the subordinate being refreshed). A
+   mismatched document is rejected and the JWKS is not updated.</li>
+<li>The fetched EC is checked for time validity: an EC that is <strong>not yet valid
+   or already expired is rejected</strong> and the JWKS is not updated.</li>
+<li>The fetched EC's signature is verified against the <strong>currently stored</strong>
+   JWKS, using only keys that are <strong>not expired</strong>. If verification fails (or
+   only expired keys remain), the JWKS is <strong>not</strong> updated.</li>
 <li>If the KIDs have changed, the new JWKS is stored in the database.</li>
 <li>The next subordinate statement LightHouse issues will contain the new keys.</li>
 </ol>
@@ -2129,7 +2142,8 @@ encoded as a signed JWK Set. This reuses the signed JWK Set format defined for
 <p>The <code>jwks_update</code> endpoint does <strong>not</strong> use <code>private_key_jwt</code> client
 authentication. Authenticity is established by the signature on the signed
 JWK Set, which must be verifiable with one of the subordinate's currently
-known federation keys. <code>auth_enabled</code> is ignored for this endpoint type.</p>
+known federation keys that is <strong>not expired</strong>. <code>auth_enabled</code> is ignored
+for this endpoint type.</p>
 </div>
 <h3 id="request_1">Request<a class="headerlink" href="#request_1" title="Permanent link">&para;</a></h3>
 <p><code>POST</code> with content type <code>application/jwk-set+jwt</code>. The body is a signed JWT
@@ -2220,9 +2234,27 @@ expired at issuance time:</p>
 <li>Keys without an <code>exp</code> claim (or with a zero <code>exp</code>) are <strong>always included</strong>.</li>
 </ul>
 <p>Filtering is <strong>publish-only</strong>: the stored JWKS retains all keys, including
-expired ones, so that incoming Entity Configurations and signed JWK Sets can
-still be verified against historical keys during a rotation. Only the published
-statement reflects the filtered set.</p>
+expired ones, so the published statement can differ from what is stored. Only
+the published statement reflects the filtered set.</p>
+<div class="admonition note">
+<p class="admonition-title">Expired keys are not usable for verification</p>
+<p>Retained expired keys are <strong>publish-only</strong> — they are never used to verify
+incoming material. Both the EC refresh/trigger path and the
+<code>federation_jwks_update_endpoint</code> match the incoming signature only against
+the <strong>non-expired</strong> stored keys. So the rotation contract is: the
+subordinate must publish its new key (or signed JWK Set) <strong>signed with an
+old key that is still valid</strong> — before the old key expires. Signing with an
+expired key is rejected (401 <code>invalid_client</code> at both endpoints).</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Expired or mismatched Entity Configurations are rejected</p>
+<p>A fetched Entity Configuration that is <strong>not yet valid or already expired</strong>
+is rejected (502 <code>server_error</code> at the trigger endpoint), even if its
+signature would verify with a valid stored key. The same applies when the
+EC's <code>iss</code>/<code>sub</code> claims do not equal the subordinate's entity ID. The
+subordinate must keep its <code>.well-known/openid-federation</code> EC from expiring
+and self-issued.</p>
+</div>
 <p>If every key in the stored JWKS is expired, LightHouse publishes an <strong>empty</strong>
 <code>jwks</code> (the statement is still issued, not errored) and logs a warning. A
 downstream verifier will fail to verify the subordinate's statements until new
@@ -2364,10 +2396,10 @@ cap is applied and the statement keeps its configured lifetime.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "content.code.copy", "content.code.annotate", "content.tooltips"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "main", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "content.code.copy", "content.code.annotate", "content.tooltips"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "main", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../../assets/_markdown_exec_pyodide.js"></script>
       
