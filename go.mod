@@ -6,7 +6,7 @@ require (
 	github.com/adam-hanna/arrayOperations v1.0.1
 	github.com/dgraph-io/badger/v4 v4.9.6
 	github.com/fatih/structs v1.1.0
-	github.com/go-oidfed/lib v0.13.4-0.20261030112350-b4c3d893956c
+	github.com/go-oidfed/lib v0.13.4-0.20261102101314-c88907697291
 	github.com/gofiber/fiber/v2 v2.52.16
 	github.com/google/uuid v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -41,7 +41,7 @@ require (
 	github.com/dgraph-io/ristretto/v2 v2.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse-keypont/crypto11 v1.6.8 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.7 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-resty/resty/v2 v2.17.2 // indirect
@@ -78,7 +78,6 @@ require (
 	github.com/thales-e-security/pool v0.0.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.77.0 // indirect
-	github.com/valyala/fastjson v1.6.10 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
