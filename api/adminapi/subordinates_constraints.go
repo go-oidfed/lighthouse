@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -39,7 +39,7 @@ type subordinateConstraintsHandlers struct {
 	storages model.Backends
 }
 
-func (h *subordinateConstraintsHandlers) getAll(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) getAll(c fiber.Ctx) error {
 	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
 	if !ok {
 		return nil
@@ -50,10 +50,10 @@ func (h *subordinateConstraintsHandlers) getAll(c *fiber.Ctx) error {
 	return c.JSON(info.Constraints)
 }
 
-func (h *subordinateConstraintsHandlers) putAll(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) putAll(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	var body oidfed.ConstraintSpecification
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	if body.MaxPathLength != nil && *body.MaxPathLength < 0 {
@@ -79,7 +79,7 @@ func (h *subordinateConstraintsHandlers) putAll(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *subordinateConstraintsHandlers) postAll(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) postAll(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	var result *oidfed.ConstraintSpecification
 	store := &generalConstraintsStore{kv: h.storages.KV}
@@ -115,7 +115,7 @@ func (h *subordinateConstraintsHandlers) postAll(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(result)
 }
 
-func (h *subordinateConstraintsHandlers) deleteAll(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) deleteAll(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	err := h.storages.InTransaction(
@@ -137,7 +137,7 @@ func (h *subordinateConstraintsHandlers) deleteAll(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *subordinateConstraintsHandlers) getMaxPathLength(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) getMaxPathLength(c fiber.Ctx) error {
 	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
 	if !ok {
 		return nil
@@ -148,7 +148,7 @@ func (h *subordinateConstraintsHandlers) getMaxPathLength(c *fiber.Ctx) error {
 	return c.JSON(*info.Constraints.MaxPathLength)
 }
 
-func (h *subordinateConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) putMaxPathLength(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	if len(c.Body()) == 0 {
 		return writeBadRequest(c, "empty body")
@@ -186,7 +186,7 @@ func (h *subordinateConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
 	return c.JSON(mpl)
 }
 
-func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	err := h.storages.InTransaction(
@@ -214,7 +214,7 @@ func (h *subordinateConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *subordinateConstraintsHandlers) getNamingConstraints(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) getNamingConstraints(c fiber.Ctx) error {
 	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
 	if !ok {
 		return nil
@@ -225,10 +225,10 @@ func (h *subordinateConstraintsHandlers) getNamingConstraints(c *fiber.Ctx) erro
 	return c.JSON(info.Constraints.NamingConstraints)
 }
 
-func (h *subordinateConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) putNamingConstraints(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	var body oidfed.NamingConstraints
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -257,7 +257,7 @@ func (h *subordinateConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) erro
 	return c.JSON(body)
 }
 
-func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	err := h.storages.InTransaction(
@@ -285,7 +285,7 @@ func (h *subordinateConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) e
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *subordinateConstraintsHandlers) getAllowedEntityTypes(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) getAllowedEntityTypes(c fiber.Ctx) error {
 	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
 	if !ok {
 		return nil
@@ -296,10 +296,10 @@ func (h *subordinateConstraintsHandlers) getAllowedEntityTypes(c *fiber.Ctx) err
 	return c.JSON(info.Constraints.AllowedEntityTypes)
 }
 
-func (h *subordinateConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) putAllowedEntityTypes(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	var body []string
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -330,7 +330,7 @@ func (h *subordinateConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) err
 	return c.JSON(result)
 }
 
-func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	if len(c.Body()) == 0 {
 		return writeBadRequest(c, "empty body")
@@ -368,7 +368,7 @@ func (h *subordinateConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) er
 	return c.Status(fiber.StatusCreated).JSON(result)
 }
 
-func (h *subordinateConstraintsHandlers) deleteAllowedEntityType(c *fiber.Ctx) error {
+func (h *subordinateConstraintsHandlers) deleteAllowedEntityType(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	entityType := c.Params("entityType")
 
@@ -421,7 +421,7 @@ type generalConstraintsHandlers struct {
 	store *generalConstraintsStore
 }
 
-func (h *generalConstraintsHandlers) getAll(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) getAll(c fiber.Ctx) error {
 	cs, found, err := h.store.load()
 	if err != nil {
 		return writeServerError(c, err)
@@ -432,9 +432,9 @@ func (h *generalConstraintsHandlers) getAll(c *fiber.Ctx) error {
 	return c.JSON(cs)
 }
 
-func (h *generalConstraintsHandlers) putAll(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) putAll(c fiber.Ctx) error {
 	var body oidfed.ConstraintSpecification
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	if body.MaxPathLength != nil && *body.MaxPathLength < 0 {
@@ -446,7 +446,7 @@ func (h *generalConstraintsHandlers) putAll(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *generalConstraintsHandlers) getAllowedEntityTypes(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) getAllowedEntityTypes(c fiber.Ctx) error {
 	cs, found, err := h.store.load()
 	if err != nil {
 		return writeServerError(c, err)
@@ -457,9 +457,9 @@ func (h *generalConstraintsHandlers) getAllowedEntityTypes(c *fiber.Ctx) error {
 	return c.JSON(cs.AllowedEntityTypes)
 }
 
-func (h *generalConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) putAllowedEntityTypes(c fiber.Ctx) error {
 	var body []string
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	cs, _, err := h.store.load()
@@ -476,7 +476,7 @@ func (h *generalConstraintsHandlers) putAllowedEntityTypes(c *fiber.Ctx) error {
 	return c.JSON(cs.AllowedEntityTypes)
 }
 
-func (h *generalConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) postAllowedEntityTypes(c fiber.Ctx) error {
 	if len(c.Body()) == 0 {
 		return writeBadRequest(c, "empty body")
 	}
@@ -498,7 +498,7 @@ func (h *generalConstraintsHandlers) postAllowedEntityTypes(c *fiber.Ctx) error 
 	return c.Status(fiber.StatusCreated).JSON(cs.AllowedEntityTypes)
 }
 
-func (h *generalConstraintsHandlers) deleteAllowedEntityType(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) deleteAllowedEntityType(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 	cs, found, err := h.store.load()
 	if err != nil {
@@ -526,7 +526,7 @@ func (h *generalConstraintsHandlers) deleteAllowedEntityType(c *fiber.Ctx) error
 	return c.JSON(cs.AllowedEntityTypes)
 }
 
-func (h *generalConstraintsHandlers) getMaxPathLength(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) getMaxPathLength(c fiber.Ctx) error {
 	cs, found, err := h.store.load()
 	if err != nil {
 		return writeServerError(c, err)
@@ -537,7 +537,7 @@ func (h *generalConstraintsHandlers) getMaxPathLength(c *fiber.Ctx) error {
 	return c.JSON(*cs.MaxPathLength)
 }
 
-func (h *generalConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) putMaxPathLength(c fiber.Ctx) error {
 	if len(c.Body()) == 0 {
 		return writeBadRequest(c, "empty body")
 	}
@@ -562,7 +562,7 @@ func (h *generalConstraintsHandlers) putMaxPathLength(c *fiber.Ctx) error {
 	return c.JSON(mpl)
 }
 
-func (h *generalConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) deleteMaxPathLength(c fiber.Ctx) error {
 	cs, found, err := h.store.load()
 	if err != nil {
 		return writeServerError(c, err)
@@ -577,7 +577,7 @@ func (h *generalConstraintsHandlers) deleteMaxPathLength(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *generalConstraintsHandlers) getNamingConstraints(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) getNamingConstraints(c fiber.Ctx) error {
 	cs, found, err := h.store.load()
 	if err != nil {
 		return writeServerError(c, err)
@@ -588,9 +588,9 @@ func (h *generalConstraintsHandlers) getNamingConstraints(c *fiber.Ctx) error {
 	return c.JSON(cs.NamingConstraints)
 }
 
-func (h *generalConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) putNamingConstraints(c fiber.Ctx) error {
 	var body oidfed.NamingConstraints
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	cs, _, err := h.store.load()
@@ -607,7 +607,7 @@ func (h *generalConstraintsHandlers) putNamingConstraints(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *generalConstraintsHandlers) deleteNamingConstraints(c *fiber.Ctx) error {
+func (h *generalConstraintsHandlers) deleteNamingConstraints(c fiber.Ctx) error {
 	cs, found, err := h.store.load()
 	if err != nil {
 		return writeServerError(c, err)

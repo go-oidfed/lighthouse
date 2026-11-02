@@ -12,7 +12,7 @@ import (
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/unixtime"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/zachmann/go-utils/duration"
@@ -44,7 +44,7 @@ type jwksHandlers struct {
 	keyManagement KeyManagement
 }
 
-func (h *jwksHandlers) getJWKS(c *fiber.Ctx) error {
+func (h *jwksHandlers) getJWKS(c fiber.Ctx) error {
 	collectValid := func(pkStorage public.PublicKeyStorage) (public.PublicKeyEntryList, error) {
 		list, err := pkStorage.GetValid()
 		if err != nil {
@@ -79,7 +79,7 @@ type publicKeyHandlers struct {
 	kvStorage     smodel.KeyValueStore
 }
 
-func (h *publicKeyHandlers) list(c *fiber.Ctx) error {
+func (h *publicKeyHandlers) list(c fiber.Ctx) error {
 	keys, err := h.apiManagedPKs.GetAll()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -87,9 +87,9 @@ func (h *publicKeyHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(keys)
 }
 
-func (h *publicKeyHandlers) create(c *fiber.Ctx) error {
+func (h *publicKeyHandlers) create(c fiber.Ctx) error {
 	var req public.PublicKeyEntry
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.Key.Key == nil {
@@ -122,10 +122,10 @@ type updateKeyReq struct {
 	Exp *unixtime.Unixtime `json:"exp"`
 }
 
-func (h *publicKeyHandlers) update(c *fiber.Ctx) error {
+func (h *publicKeyHandlers) update(c fiber.Ctx) error {
 	kid := c.Params("kid")
 	var req updateKeyReq
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	err := h.apiManagedPKs.Update(kid, public.UpdateablePublicKeyMetadata{ExpiresAt: req.Exp})
@@ -156,10 +156,10 @@ type rotateKeyReq struct {
 	OldKeyExp *unixtime.Unixtime `json:"old_key_exp"`
 }
 
-func (h *publicKeyHandlers) rotate(c *fiber.Ctx) error {
+func (h *publicKeyHandlers) rotate(c fiber.Ctx) error {
 	oldKid := c.Params("kid")
 	var req rotateKeyReq
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.Key.Key == nil {
@@ -217,9 +217,9 @@ func (h *publicKeyHandlers) rotate(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(created)
 }
 
-func (h *publicKeyHandlers) delete(c *fiber.Ctx) error {
+func (h *publicKeyHandlers) delete(c fiber.Ctx) error {
 	kid := c.Params("kid")
-	revoke := c.QueryBool("revoke", false)
+	revoke := fiber.Query[bool](c, "revoke", false)
 	reason := c.Query("reason")
 	if revoke {
 		_ = h.apiManagedPKs.Revoke(kid, reason)
@@ -235,7 +235,7 @@ type kmsHandlers struct {
 	kvStorage     smodel.KeyValueStore
 }
 
-func (h *kmsHandlers) getInfo(c *fiber.Ctx) error {
+func (h *kmsHandlers) getInfo(c fiber.Ctx) error {
 	info, err := h.buildKMSInfo()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -243,7 +243,7 @@ func (h *kmsHandlers) getInfo(c *fiber.Ctx) error {
 	return c.JSON(info)
 }
 
-func (h *kmsHandlers) putAlg(c *fiber.Ctx) error {
+func (h *kmsHandlers) putAlg(c fiber.Ctx) error {
 	if h.keyManagement.Keys == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing signing alg dynamically"))
 	}
@@ -291,7 +291,7 @@ func (h *kmsHandlers) putAlg(c *fiber.Ctx) error {
 	return c.JSON(info)
 }
 
-func (h *kmsHandlers) putRSAKeyLen(c *fiber.Ctx) error {
+func (h *kmsHandlers) putRSAKeyLen(c fiber.Ctx) error {
 	if h.keyManagement.Keys == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support changing RSA key length dynamically"))
 	}
@@ -312,7 +312,7 @@ func (h *kmsHandlers) putRSAKeyLen(c *fiber.Ctx) error {
 	return c.JSON(info)
 }
 
-func (h *kmsHandlers) getRotation(c *fiber.Ctx) error {
+func (h *kmsHandlers) getRotation(c fiber.Ctx) error {
 	if h.keyManagement.Keys == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
 	}
@@ -323,12 +323,12 @@ func (h *kmsHandlers) getRotation(c *fiber.Ctx) error {
 	return c.JSON(rot)
 }
 
-func (h *kmsHandlers) putRotation(c *fiber.Ctx) error {
+func (h *kmsHandlers) putRotation(c fiber.Ctx) error {
 	if h.keyManagement.Keys == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
 	}
 	var cfg kms.KeyRotationConfig
-	if err := c.BodyParser(&cfg); err != nil {
+	if err := c.Bind().Body(&cfg); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if err := storage.SetKeyRotation(h.kvStorage, cfg); err != nil {
@@ -340,7 +340,7 @@ func (h *kmsHandlers) putRotation(c *fiber.Ctx) error {
 	return c.JSON(cfg)
 }
 
-func (h *kmsHandlers) patchRotation(c *fiber.Ctx) error {
+func (h *kmsHandlers) patchRotation(c fiber.Ctx) error {
 	if h.keyManagement.Keys == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
 	}
@@ -349,7 +349,7 @@ func (h *kmsHandlers) patchRotation(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
 	var patch map[string]any
-	if err = c.BodyParser(&patch); err != nil {
+	if err = c.Bind().Body(&patch); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if v, ok := patch["enabled"].(bool); ok {
@@ -376,11 +376,11 @@ func (h *kmsHandlers) patchRotation(c *fiber.Ctx) error {
 	return c.JSON(current)
 }
 
-func (h *kmsHandlers) triggerRotate(c *fiber.Ctx) error {
+func (h *kmsHandlers) triggerRotate(c fiber.Ctx) error {
 	if h.keyManagement.Keys == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("kms does not support rotation"))
 	}
-	revoke := c.QueryBool("revoke", false)
+	revoke := fiber.Query[bool](c, "revoke", false)
 	reason := c.Query("reason")
 	if err := h.keyManagement.Keys.RotateAllKeys(revoke, reason); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))

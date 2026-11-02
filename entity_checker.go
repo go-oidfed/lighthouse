@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/apimodel"
 	"github.com/go-oidfed/lib/jwx"
 

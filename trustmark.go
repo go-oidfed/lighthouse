@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -100,7 +100,7 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 	if fed.trustMarkConfigProvider != nil {
 		fed.trustMarkConfigProvider.SetTrustMarkEndpoint(trustMarkEndpointURL)
 	}
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		return fed.handleTrustMarkRequest(ctx, config)
 	}
 
@@ -117,7 +117,7 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 
 // handleTrustMarkRequest handles a trust mark request with the new eligibility system
 func (fed *LightHouse) handleTrustMarkRequest(
-	ctx *fiber.Ctx,
+	ctx fiber.Ctx,
 	config TrustMarkEndpointConfig,
 ) error {
 	var req trustMarkQueryRequest
@@ -321,7 +321,7 @@ func (*LightHouse) runChecker(
 // merged. The JTI is always added.
 // If caching is enabled (via TrustMarkSpec.CacheTTL), it will return a cached trust mark if available.
 func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
-	ctx *fiber.Ctx,
+	ctx fiber.Ctx,
 	trustMarkType, sub string,
 	dbSpec *model.TrustMarkSpec,
 	config TrustMarkEndpointConfig,

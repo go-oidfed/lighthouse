@@ -7,7 +7,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -82,7 +82,7 @@ var ErrResponseWritten = errors.New("authentication error response already writt
 // {"error":"invalid_client", ...}) directly to the client and returns
 // ErrResponseWritten. Callers must not write further response data in that
 // case.
-func (a *PrivateKeyJWTAuth) Authenticate(ctx *fiber.Ctx) (string, *oidfed.EntityStatement, error) {
+func (a *PrivateKeyJWTAuth) Authenticate(ctx fiber.Ctx) (string, *oidfed.EntityStatement, error) {
 	startTime := time.Now()
 
 	// Extract client assertion from request
@@ -143,7 +143,7 @@ func (a *PrivateKeyJWTAuth) Authenticate(ctx *fiber.Ctx) (string, *oidfed.Entity
 // writeAuthErrorResponse sends an OAuth 2.0 error response and returns
 // ErrResponseWritten so callers can distinguish "failed, response already
 // sent" from a success.
-func (*PrivateKeyJWTAuth) writeAuthErrorResponse(ctx *fiber.Ctx, status int, e *oidfed.Error) error {
+func (*PrivateKeyJWTAuth) writeAuthErrorResponse(ctx fiber.Ctx, status int, e *oidfed.Error) error {
 	_ = ctx.Status(status).JSON(e)
 	return ErrResponseWritten
 }
@@ -154,7 +154,7 @@ func (*PrivateKeyJWTAuth) writeAuthErrorResponse(ctx *fiber.Ctx, status int, e *
 // must treat ErrResponseWritten as "stop, response already sent" and nil as
 // "authenticated, proceed with the endpoint handler".
 func (a *PrivateKeyJWTAuth) EndpointAuth() fiber.Handler {
-	return func(ctx *fiber.Ctx) error {
+	return func(ctx fiber.Ctx) error {
 		_, _, err := a.Authenticate(ctx)
 		return err
 	}
@@ -169,7 +169,7 @@ func (a *PrivateKeyJWTAuth) EndpointAuth() fiber.Handler {
 // returns nil so fiber does not invoke a further error handler or overwrite
 // the response.
 func (a *PrivateKeyJWTAuth) Middleware() fiber.Handler {
-	return func(ctx *fiber.Ctx) error {
+	return func(ctx fiber.Ctx) error {
 		_, _, err := a.Authenticate(ctx)
 		if errors.Is(err, ErrResponseWritten) {
 			// Error response was already sent to the client.

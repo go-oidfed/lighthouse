@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	istats "github.com/go-oidfed/lighthouse/internal/stats"
 	"github.com/go-oidfed/lighthouse/storage/model"

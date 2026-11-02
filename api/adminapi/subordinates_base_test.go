@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"gorm.io/gorm"
 

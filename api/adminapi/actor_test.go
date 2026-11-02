@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // setupActorTestApp creates a Fiber app with the actor middleware and a test endpoint
@@ -17,7 +17,7 @@ func setupActorTestApp(t *testing.T, cfg ActorConfig, preMiddleware ...fiber.Han
 		app.Use(mw)
 	}
 	app.Use(actorMiddleware(cfg))
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		actor := GetActor(c)
 		return c.JSON(fiber.Map{"actor": actor})
 	})
@@ -27,7 +27,7 @@ func setupActorTestApp(t *testing.T, cfg ActorConfig, preMiddleware ...fiber.Han
 // simulateAuthMiddleware returns a middleware that sets the auth username in Locals,
 // simulating what the real authMiddleware does after successful authentication.
 func simulateAuthMiddleware(username string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if username != "" {
 			SetAuthUsername(c, username)
 		}
@@ -204,7 +204,7 @@ func TestActorMiddleware_CustomHeader(t *testing.T) {
 func TestGetActor_NoMiddleware(t *testing.T) {
 	t.Parallel()
 	app := fiber.New()
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		actor := GetActor(c)
 		return c.JSON(fiber.Map{"actor": actor})
 	})
@@ -221,7 +221,7 @@ func TestGetActor_NoMiddleware(t *testing.T) {
 func TestSetAuthUsername_And_GetAuthUsername(t *testing.T) {
 	t.Parallel()
 	app := fiber.New()
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		SetAuthUsername(c, "testuser")
 		username := getAuthUsername(c)
 		return c.JSON(fiber.Map{"username": username})

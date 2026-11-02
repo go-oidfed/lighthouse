@@ -5,7 +5,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -34,7 +34,7 @@ func registerSubordinateKeys(
 }
 
 func handleGetSubordinateJWKS(subordinates model.SubordinateStorageBackend) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		info, ok := handleSubordinateLookup(c, subordinates)
 		if !ok {
 			return nil
@@ -48,10 +48,10 @@ func handleGetSubordinateJWKS(subordinates model.SubordinateStorageBackend) fibe
 }
 
 func handlePutSubordinateJWKS(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		var body model.JWKS
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return writeBadBody(c)
 		}
 		if body.Keys.Set != nil {
@@ -95,7 +95,7 @@ func handlePutSubordinateJWKS(storages model.Backends) fiber.Handler {
 }
 
 func handlePostSubordinateJWK(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		// Parse single JWK from body
 		var jwkMap map[string]any
@@ -148,7 +148,7 @@ func handlePostSubordinateJWK(storages model.Backends) fiber.Handler {
 }
 
 func handleDeleteSubordinateJWK(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		kid := c.Params("kid")
 

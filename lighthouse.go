@@ -5,25 +5,27 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/jwx/keymanagement/kms"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
-	"github.com/gofiber/fiber/v2/middleware/compress"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	fiberlogger "github.com/gofiber/fiber/v3/middleware/logger"
+	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
@@ -47,12 +49,12 @@ const MaximumSubordinateStatementCachePeriod = 8 * time.Hour
 
 // parseRequest populates req from query parameters (GET) and, for POST requests,
 // also from the request body (form or JSON).
-func parseRequest(ctx *fiber.Ctx, req any) error {
-	if err := ctx.QueryParser(req); err != nil {
+func parseRequest(ctx fiber.Ctx, req any) error {
+	if err := ctx.Bind().Query(req); err != nil {
 		return err
 	}
 	if ctx.Method() == fiber.MethodPost {
-		if err := ctx.BodyParser(req); err != nil {
+		if err := ctx.Bind().Body(req); err != nil {
 			return err
 		}
 	}
@@ -136,7 +138,6 @@ var FiberServerConfig = fiber.Config{
 	ReadBufferSize: 8192,
 	// WriteBufferSize: 4096,
 	ErrorHandler: handleError,
-	Network:      "tcp",
 }
 
 // NewLightHouse creates a new LightHouse
@@ -268,15 +269,15 @@ func createVersatileSigner(keyManagement adminapi.KeyManagement) (jwx.VersatileS
 
 func initFiberServer(serverConf ServerConf) (*fiber.App, error) {
 	if tps := serverConf.TrustedProxies; len(tps) > 0 {
-		FiberServerConfig.TrustedProxies = serverConf.TrustedProxies
-		FiberServerConfig.EnableTrustedProxyCheck = true
+		FiberServerConfig.TrustProxyConfig.Proxies = serverConf.TrustedProxies
+		FiberServerConfig.TrustProxy = true
 		FiberServerConfig.ProxyHeader = serverConf.ForwardedIPHeader
 	}
 
 	server := fiber.New(FiberServerConfig)
 	server.Use(recover.New())
 	server.Use(compress.New())
-	server.Use(fiberlogger.New(fiberlogger.Config{Output: serverConf.AccessLogWriter}))
+	server.Use(fiberlogger.New(fiberlogger.Config{Stream: serverConf.AccessLogWriter}))
 	server.Use(requestid.New())
 
 	if serverConf.CORS.Enabled {
@@ -405,7 +406,7 @@ func buildDynamicFederationEntity(
 
 func registerEntityConfigurationEndpoint(server *fiber.App, entity *LightHouse) {
 	server.Get(
-		oidfedconst.FederationSuffix, func(ctx *fiber.Ctx) error {
+		oidfedconst.FederationSuffix, func(ctx fiber.Ctx) error {
 			var cached []byte
 			set, err := cache.Get(internal.CacheKeyEntityConfiguration, &cached)
 			if err != nil {
@@ -459,7 +460,7 @@ func initAdminAPI(
 		adminAPIServer = fiber.New(FiberServerConfig)
 		adminAPIServer.Use(recover.New())
 		adminAPIServer.Use(compress.New())
-		adminAPIServer.Use(fiberlogger.New(fiberlogger.Config{Output: serverConf.AccessLogWriter}))
+		adminAPIServer.Use(fiberlogger.New(fiberlogger.Config{Stream: serverConf.AccessLogWriter}))
 		adminAPIServer.Use(requestid.New())
 
 		if admin.CORS.Enabled {
@@ -508,7 +509,7 @@ func (fed *LightHouse) HttpHandlerFunc() http.HandlerFunc {
 // Listen starts an http server at the specific address for serving all the
 // necessary endpoints
 func (fed *LightHouse) Listen(addr string) error {
-	return fed.server.Listen(addr)
+	return fed.server.Listen(addr, fiber.ListenConfig{ListenerNetwork: "tcp"})
 }
 
 // SetJTICleanupStop sets the cleanup stop function
@@ -619,13 +620,16 @@ func (fed *LightHouse) Start() {
 
 	// Admin API server
 	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
+		adminAddr := net.JoinHostPort(conf.IPListen, strconv.Itoa(conf.AdminAPIPort))
 		if adminTLS {
 			log.Info().Int("port", conf.AdminAPIPort).Msg("starting admin api server with TLS")
 			go func() {
-				if err := fed.adminAPIServer.ListenTLS(
-					fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
-					fed.serverConf.AdminTLS.Cert,
-					fed.serverConf.AdminTLS.Key,
+				if err := fed.adminAPIServer.Listen(
+					adminAddr,
+					fiber.ListenConfig{
+						CertFile:    fed.serverConf.AdminTLS.Cert,
+						CertKeyFile: fed.serverConf.AdminTLS.Key,
+					},
 				); err != nil {
 					log.Fatal().Err(err).Send()
 				}
@@ -633,9 +637,7 @@ func (fed *LightHouse) Start() {
 		} else {
 			log.Info().Int("port", conf.AdminAPIPort).Msg("starting admin api server")
 			go func() {
-				if err := fed.adminAPIServer.Listen(
-					fmt.Sprintf("%s:%d", conf.IPListen, conf.AdminAPIPort),
-				); err != nil {
+				if err := fed.adminAPIServer.Listen(adminAddr); err != nil {
 					log.Fatal().Err(err).Send()
 				}
 			}()
@@ -643,7 +645,7 @@ func (fed *LightHouse) Start() {
 	}
 	if !conf.TLS.Enabled {
 		log.Info().Int("port", conf.Port).Msg("TLS is disabled starting http server")
-		if err := fed.server.Listen(fmt.Sprintf("%s:%d", conf.IPListen, conf.Port)); err != nil {
+		if err := fed.server.Listen(net.JoinHostPort(conf.IPListen, strconv.Itoa(conf.Port)), fiber.ListenConfig{ListenerNetwork: "tcp"}); err != nil {
 			log.Fatal().Err(err).Send()
 		}
 		return
@@ -653,24 +655,24 @@ func (fed *LightHouse) Start() {
 		// HTTP redirect server only needs to run in one process
 		httpServer := fiber.New(FiberServerConfig)
 		httpServer.All(
-			"*", func(ctx *fiber.Ctx) error {
+			"*", func(ctx fiber.Ctx) error {
 				//goland:noinspection HttpUrlsUsage
-				return ctx.Redirect(
-					strings.Replace(ctx.Request().URI().String(), "http://", "https://", 1),
-					fiber.StatusPermanentRedirect,
-				)
+				return ctx.Redirect().Status(fiber.StatusPermanentRedirect).To(strings.Replace(ctx.Request().URI().String(), "http://", "https://", 1))
 			},
 		)
 		log.Info().Msg("TLS and http redirect enabled, starting redirect server on port 80")
 		go func() {
-			if err := httpServer.Listen(conf.IPListen + ":80"); err != nil {
+			if err := httpServer.Listen(net.JoinHostPort(conf.IPListen, "80"), fiber.ListenConfig{ListenerNetwork: "tcp"}); err != nil {
 				log.Fatal().Err(err).Send()
 			}
 		}()
 	}
 	time.Sleep(time.Millisecond) // This is just for a more pretty output with the tls header printed after the http one
 	log.Info().Msg("TLS enabled, starting https server on port 443")
-	if err := fed.server.ListenTLS(conf.IPListen+":443", conf.TLS.Cert, conf.TLS.Key); err != nil {
+	if err := fed.server.Listen(net.JoinHostPort(conf.IPListen, "443"), fiber.ListenConfig{
+		CertFile:    conf.TLS.Cert,
+		CertKeyFile: conf.TLS.Key,
+	}); err != nil {
 		log.Fatal().Err(err).Send()
 	}
 }
@@ -877,11 +879,24 @@ type AdminAPIOptions struct {
 // corsConfigFromConf converts a CORSConf to a Fiber CORS middleware configuration.
 func corsConfigFromConf(conf CORSConf) cors.Config {
 	return cors.Config{
-		AllowOrigins:     conf.AllowOrigins,
-		AllowMethods:     conf.AllowMethods,
-		AllowHeaders:     conf.AllowHeaders,
+		AllowOrigins:     splitCommaList(conf.AllowOrigins),
+		AllowMethods:     splitCommaList(conf.AllowMethods),
+		AllowHeaders:     splitCommaList(conf.AllowHeaders),
 		AllowCredentials: conf.AllowCredentials,
-		ExposeHeaders:    conf.ExposeHeaders,
+		ExposeHeaders:    splitCommaList(conf.ExposeHeaders),
 		MaxAge:           conf.MaxAge,
 	}
+}
+
+// splitCommaList splits a comma-separated config list (trimming spaces) into
+// the []string form the Fiber v3 CORS middleware expects.
+func splitCommaList(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }

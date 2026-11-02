@@ -1,7 +1,7 @@
 package lighthouse
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"gopkg.in/yaml.v3"
 
 	oidfed "github.com/go-oidfed/lib"

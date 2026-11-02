@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // setupUsersApp creates a Fiber app with users routes registered and no auth middleware.

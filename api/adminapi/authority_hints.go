@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -37,7 +37,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 	}
 
 	g.Get(
-		"/", func(c *fiber.Ctx) error {
+		"/", func(c fiber.Ctx) error {
 			items, err := store.List()
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -47,9 +47,9 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 	)
 
 	withCacheWipe.Post(
-		"/", func(c *fiber.Ctx) error {
+		"/", func(c fiber.Ctx) error {
 			var req model.AddAuthorityHint
-			if err := c.BodyParser(&req); err != nil {
+			if err := c.Bind().Body(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			if err := validate(&req); err != nil {
@@ -68,7 +68,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 	)
 
 	g.Get(
-		"/:authorityHintID", func(c *fiber.Ctx) error {
+		"/:authorityHintID", func(c fiber.Ctx) error {
 			item, err := store.Get(c.Params("authorityHintID"))
 			if err != nil {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("authority hint not found"))
@@ -78,9 +78,9 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 	)
 
 	withCacheWipe.Put(
-		"/:authorityHintID", func(c *fiber.Ctx) error {
+		"/:authorityHintID", func(c fiber.Ctx) error {
 			var req model.AddAuthorityHint
-			if err := c.BodyParser(&req); err != nil {
+			if err := c.Bind().Body(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			if err := validate(&req); err != nil {
@@ -102,9 +102,9 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 	)
 
 	withCacheWipe.Patch(
-		"/:authorityHintID", func(c *fiber.Ctx) error {
+		"/:authorityHintID", func(c fiber.Ctx) error {
 			var patch map[string]any
-			if err := c.BodyParser(&patch); err != nil {
+			if err := c.Bind().Body(&patch); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			item, err := store.Patch(c.Params("authorityHintID"), patch)
@@ -123,7 +123,7 @@ func registerAuthorityHints(r fiber.Router, store model.AuthorityHintsStore, app
 	)
 
 	withCacheWipe.Delete(
-		"/:authorityHintID", func(c *fiber.Ctx) error {
+		"/:authorityHintID", func(c fiber.Ctx) error {
 			if err := store.Delete(c.Params("authorityHintID")); err != nil {
 				return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("authority hint not found"))
 			}

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	slices2 "slices"
 
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/apimodel"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 	"tideland.dev/go/slices"
 
@@ -51,7 +51,7 @@ func (fed *LightHouse) AddEntityCollectionEndpoint(
 		}
 	}
 	fed.fedMetadata.FederationCollectionEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		var req apimodel.EntityCollectionRequest
 		if err := parseRequest(ctx, &req); err != nil {
 			ctx.Status(fiber.StatusBadRequest)

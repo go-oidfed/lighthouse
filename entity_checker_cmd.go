@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"

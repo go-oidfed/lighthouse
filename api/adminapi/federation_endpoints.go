@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -17,7 +17,7 @@ type federationEndpointsHandlers struct {
 	controller LighthouseController
 }
 
-func (h *federationEndpointsHandlers) list(c *fiber.Ctx) error {
+func (h *federationEndpointsHandlers) list(c fiber.Ctx) error {
 	list, err := h.store.List()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -25,7 +25,7 @@ func (h *federationEndpointsHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(list)
 }
 
-func (h *federationEndpointsHandlers) getByType(c *fiber.Ctx) error {
+func (h *federationEndpointsHandlers) getByType(c fiber.Ctx) error {
 	t := model.FederationEndpointType(c.Params("type"))
 	if !model.IsValidFederationEndpointType(t) {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid endpoint type"))
@@ -40,9 +40,9 @@ func (h *federationEndpointsHandlers) getByType(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (h *federationEndpointsHandlers) create(c *fiber.Ctx) error {
+func (h *federationEndpointsHandlers) create(c fiber.Ctx) error {
 	var req model.AddFederationEndpoint
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if !model.IsValidFederationEndpointType(req.Type) {
@@ -71,13 +71,13 @@ func (h *federationEndpointsHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(item)
 }
 
-func (h *federationEndpointsHandlers) update(c *fiber.Ctx) error {
+func (h *federationEndpointsHandlers) update(c fiber.Ctx) error {
 	t := model.FederationEndpointType(c.Params("type"))
 	if !model.IsValidFederationEndpointType(t) {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid endpoint type"))
 	}
 	var req model.AddFederationEndpoint
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.Type == "" {
@@ -109,7 +109,7 @@ func (h *federationEndpointsHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (h *federationEndpointsHandlers) delete(c *fiber.Ctx) error {
+func (h *federationEndpointsHandlers) delete(c fiber.Ctx) error {
 	t := model.FederationEndpointType(c.Params("type"))
 	if !model.IsValidFederationEndpointType(t) {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid endpoint type"))
@@ -124,13 +124,13 @@ func (h *federationEndpointsHandlers) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *federationEndpointsHandlers) setAuthTrustAnchors(c *fiber.Ctx) error {
+func (h *federationEndpointsHandlers) setAuthTrustAnchors(c fiber.Ctx) error {
 	t := model.FederationEndpointType(c.Params("type"))
 	if !model.IsValidFederationEndpointType(t) {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid endpoint type"))
 	}
 	var entityIDs []string
-	if err := c.BodyParser(&entityIDs); err != nil {
+	if err := c.Bind().Body(&entityIDs); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body: expected array of trust anchor entity IDs"))
 	}
 	tas, err := h.store.SetAuthTrustAnchors(t, entityIDs)

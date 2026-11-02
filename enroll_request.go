@@ -1,10 +1,10 @@
 package lighthouse
 
 import (
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/middleware"
@@ -47,7 +47,7 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 		}
 	}
 	fed.fedMetadata.Extra["federation_enroll_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		var req enrollRequest
 		if err := parseRequest(ctx, &req); err != nil {
 			ctx.Status(fiber.StatusBadRequest)

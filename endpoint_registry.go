@@ -11,7 +11,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/internal"
@@ -340,7 +340,7 @@ func (fed *LightHouse) unregisterEndpoint(t model.FederationEndpointType) {
 
 // dispatch is the catch-all handler that serves all federation endpoints from
 // the registry. It is registered once on the fiber server.
-func (fed *LightHouse) dispatch(ctx *fiber.Ctx) error {
+func (fed *LightHouse) dispatch(ctx fiber.Ctx) error {
 	path := ctx.Path()
 
 	// Skip well-known and admin paths — they have their own routes.

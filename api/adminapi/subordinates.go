@@ -15,7 +15,7 @@ package adminapi
 
 import (
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )

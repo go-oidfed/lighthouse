@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -39,7 +39,7 @@ func registerSubordinateAdditionalClaims(
 }
 
 func handleListSubordinateAdditionalClaims(subordinates model.SubordinateStorageBackend) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		claims, err := subordinates.ListAdditionalClaims(id)
 		if err != nil {
@@ -53,10 +53,10 @@ func handleListSubordinateAdditionalClaims(subordinates model.SubordinateStorage
 }
 
 func handlePutSubordinateAdditionalClaims(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		var req []model.AddAdditionalClaim
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return writeBadBody(c)
 		}
 
@@ -88,10 +88,10 @@ func handlePutSubordinateAdditionalClaims(storages model.Backends) fiber.Handler
 }
 
 func handlePostSubordinateAdditionalClaim(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		var req model.AddAdditionalClaim
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return writeBadBody(c)
 		}
 
@@ -129,7 +129,7 @@ func handlePostSubordinateAdditionalClaim(storages model.Backends) fiber.Handler
 }
 
 func handleGetSubordinateAdditionalClaim(subordinates model.SubordinateStorageBackend) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		subID := c.Params("subordinateID")
 		claimID := c.Params("additionalClaimsID")
 		claim, err := subordinates.GetAdditionalClaim(subID, claimID)
@@ -144,11 +144,11 @@ func handleGetSubordinateAdditionalClaim(subordinates model.SubordinateStorageBa
 }
 
 func handleUpdateSubordinateAdditionalClaim(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		subID := c.Params("subordinateID")
 		claimID := c.Params("additionalClaimsID")
 		var req model.AddAdditionalClaim
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return writeBadBody(c)
 		}
 		if req.Claim == "" {
@@ -189,7 +189,7 @@ func handleUpdateSubordinateAdditionalClaim(storages model.Backends) fiber.Handl
 }
 
 func handleDeleteSubordinateAdditionalClaim(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		subID := c.Params("subordinateID")
 		claimID := c.Params("additionalClaimsID")
 
@@ -279,7 +279,7 @@ func nextGeneralAdditionalClaimID(claims []generalAdditionalClaim) int {
 }
 
 func handleListGeneralAdditionalClaims(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		claims, err := loadGeneralAdditionalClaims(kv)
 		if err != nil {
 			return writeServerError(c, err)
@@ -289,9 +289,9 @@ func handleListGeneralAdditionalClaims(kv model.KeyValueStore) fiber.Handler {
 }
 
 func handlePutGeneralAdditionalClaims(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req []model.AddAdditionalClaim
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return writeBadBody(c)
 		}
 		claims := make([]generalAdditionalClaim, len(req))
@@ -311,9 +311,9 @@ func handlePutGeneralAdditionalClaims(kv model.KeyValueStore) fiber.Handler {
 }
 
 func handlePostGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var req model.AddAdditionalClaim
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return writeBadBody(c)
 		}
 		claims, err := loadGeneralAdditionalClaims(kv)
@@ -341,7 +341,7 @@ func handlePostGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
 }
 
 func handleGetGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		idStr := c.Params("additionalClaimsID")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
@@ -361,14 +361,14 @@ func handleGetGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
 }
 
 func handleUpdateGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		idStr := c.Params("additionalClaimsID")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid additionalClaimsID"))
 		}
 		var req model.AddAdditionalClaim
-		if err := c.BodyParser(&req); err != nil {
+		if err := c.Bind().Body(&req); err != nil {
 			return writeBadBody(c)
 		}
 		if req.Claim == "" {
@@ -407,7 +407,7 @@ func handleUpdateGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
 }
 
 func handleDeleteGeneralAdditionalClaim(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		idStr := c.Params("additionalClaimsID")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {

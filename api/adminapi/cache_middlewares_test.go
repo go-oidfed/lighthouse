@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-oidfed/lib/cache"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/require"
 
 	"github.com/go-oidfed/lighthouse/internal"
@@ -55,7 +55,7 @@ func TestEntityConfigurationCacheInvalidationMiddleware(t *testing.T) {
 	t.Run("SuccessDeletesCache", func(t *testing.T) {
 		setEntityConfigurationCache(t, cacheValue)
 		app := fiber.New()
-		app.Post("/entity-config", entityConfigurationCacheInvalidationMiddleware, func(c *fiber.Ctx) error {
+		app.Post("/entity-config", entityConfigurationCacheInvalidationMiddleware, func(c fiber.Ctx) error {
 			return c.SendStatus(http.StatusNoContent)
 		})
 
@@ -68,7 +68,7 @@ func TestEntityConfigurationCacheInvalidationMiddleware(t *testing.T) {
 	t.Run("FailureKeepsCache", func(t *testing.T) {
 		setEntityConfigurationCache(t, cacheValue)
 		app := fiber.New()
-		app.Post("/entity-config", entityConfigurationCacheInvalidationMiddleware, func(c *fiber.Ctx) error {
+		app.Post("/entity-config", entityConfigurationCacheInvalidationMiddleware, func(c fiber.Ctx) error {
 			return c.SendStatus(http.StatusBadRequest)
 		})
 
@@ -83,7 +83,7 @@ func TestEntityConfigurationCacheInvalidationMiddleware(t *testing.T) {
 	// 	setEntityConfigurationCache(t, cacheValue)
 	//
 	// 	app := fiber.New()
-	// 	app.Post("/entity-config", entityConfigurationCacheInvalidationMiddleware, func(c *fiber.Ctx) error {
+	// 	app.Post("/entity-config", entityConfigurationCacheInvalidationMiddleware, func(c fiber.Ctx) error {
 	// 		return c.Redirect("/other", fiber.StatusMovedPermanently)
 	// 	})
 	//
@@ -144,7 +144,7 @@ func TestSubordinateStatementsCacheInvalidationMiddleware(t *testing.T) {
 		app.Delete(
 			"/subordinates/:subordinateID",
 			subordinateStatementsCacheInvalidationMiddleware(store),
-			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) },
+			func(c fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) },
 		)
 
 		req := httptest.NewRequest(http.MethodDelete, "/subordinates/"+dbID1, http.NoBody)
@@ -162,7 +162,7 @@ func TestSubordinateStatementsCacheInvalidationMiddleware(t *testing.T) {
 		app.Post(
 			"/subordinates",
 			subordinateStatementsCacheInvalidationMiddleware(nil),
-			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusCreated) },
+			func(c fiber.Ctx) error { return c.SendStatus(http.StatusCreated) },
 		)
 
 		req := httptest.NewRequest(http.MethodPost, "/subordinates", http.NoBody)
@@ -181,7 +181,7 @@ func TestSubordinateStatementsCacheInvalidationMiddleware(t *testing.T) {
 		app.Delete(
 			"/subordinates/:subordinateID",
 			subordinateStatementsCacheInvalidationMiddleware(store),
-			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) },
+			func(c fiber.Ctx) error { return c.SendStatus(http.StatusNoContent) },
 		)
 
 		// Use a nonexistent DB ID — lookup fails, middleware falls back to Clear all.
@@ -201,7 +201,7 @@ func TestSubordinateStatementsCacheInvalidationMiddleware(t *testing.T) {
 		app.Delete(
 			"/subordinates/:subordinateID",
 			subordinateStatementsCacheInvalidationMiddleware(store),
-			func(c *fiber.Ctx) error { return c.SendStatus(http.StatusInternalServerError) },
+			func(c fiber.Ctx) error { return c.SendStatus(http.StatusInternalServerError) },
 		)
 
 		req := httptest.NewRequest(http.MethodDelete, "/subordinates/"+dbID1, http.NoBody)

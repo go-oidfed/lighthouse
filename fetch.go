@@ -5,7 +5,7 @@ import (
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -47,7 +47,7 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 		}
 	}
 	fed.fedMetadata.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		var req fetchRequest
 		if err := parseRequest(ctx, &req); err != nil {
 			ctx.Status(fiber.StatusBadRequest)

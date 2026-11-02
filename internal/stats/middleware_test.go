@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func newTestApp(t *testing.T, buffer *RingBuffer) *fiber.App {
 			// Use the same error handler as the real server so the test reflects
 			// production behaviour: the status is applied by the ErrorHandler
 			// *after* the middleware chain returns.
-			ErrorHandler: func(c *fiber.Ctx, err error) error {
+			ErrorHandler: func(c fiber.Ctx, err error) error {
 				// Mirrors lighthouse.httpErrorHandler: the status is applied here,
 				// *after* the middleware chain returns.
 				code := fiber.StatusInternalServerError
@@ -49,7 +49,7 @@ func TestMiddleware_RecordsNotFoundStatusForUnmatchedRoute(t *testing.T) {
 	// No routes are registered, so every request yields fiber.ErrNotFound.
 
 	req := httptest.NewRequest(fiber.MethodGet, "/this-path-does-not-exist-at-all", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 	// Sanity: the client really does receive a 404 (set by the ErrorHandler).
 	assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
@@ -70,13 +70,13 @@ func TestMiddleware_RecordsOKStatusForRegisteredRoute(t *testing.T) {
 	buffer := NewRingBuffer(100, 0.8)
 	app := newTestApp(t, buffer)
 	app.Get(
-		"/ping", func(c *fiber.Ctx) error {
+		"/ping", func(c fiber.Ctx) error {
 			return c.SendString("pong")
 		},
 	)
 
 	req := httptest.NewRequest(fiber.MethodGet, "/ping", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 	_, _ = io.Copy(io.Discard, resp.Body)
@@ -93,13 +93,13 @@ func TestMiddleware_RecordsExplicitFiberErrorStatus(t *testing.T) {
 	buffer := NewRingBuffer(100, 0.8)
 	app := newTestApp(t, buffer)
 	app.Get(
-		"/fail", func(*fiber.Ctx) error {
+		"/fail", func(fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusServiceUnavailable, "downstream gone")
 		},
 	)
 
 	req := httptest.NewRequest(fiber.MethodGet, "/fail", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusServiceUnavailable, resp.StatusCode)
 	_ = resp.Body.Close()
@@ -114,13 +114,13 @@ func TestMiddleware_RecordsGenericErrorAsInternalServerError(t *testing.T) {
 	buffer := NewRingBuffer(100, 0.8)
 	app := newTestApp(t, buffer)
 	app.Get(
-		"/boom", func(*fiber.Ctx) error {
+		"/boom", func(fiber.Ctx) error {
 			return assert.AnError // a non-fiber error
 		},
 	)
 
 	req := httptest.NewRequest(fiber.MethodGet, "/boom", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 	assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
 	_ = resp.Body.Close()

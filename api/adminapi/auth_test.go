@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // mockUsersStore is a custom mock for model.UsersStore
@@ -80,7 +80,7 @@ func TestParseBasicAuth(t *testing.T) {
 	t.Parallel()
 	setupApp := func() *fiber.App {
 		app := fiber.New()
-		app.Get("/test", func(c *fiber.Ctx) error {
+		app.Get("/test", func(c fiber.Ctx) error {
 			username, password, ok := parseBasicAuth(c)
 			if !ok {
 				return c.SendStatus(http.StatusUnauthorized)
@@ -246,7 +246,7 @@ func TestAuthMiddleware(t *testing.T) {
 	setupAuthApp := func(store model.UsersStore) *fiber.App {
 		app := fiber.New()
 		app.Use(authMiddleware(store))
-		app.Get("/test", func(c *fiber.Ctx) error {
+		app.Get("/test", func(c fiber.Ctx) error {
 			return c.SendStatus(http.StatusOK)
 		})
 		return app

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jws"
@@ -301,7 +301,8 @@ func TestTrustMarkStatus_AuthFailure_Returns401(t *testing.T) {
 	resp, respBody := doRequestRaw(t, app, req)
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "body: %s", string(respBody))
-	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"), "body: %s", string(respBody))
+	// Fiber v3 appends "; charset=utf-8" to the JSON content type.
+	assert.Equal(t, "application/json; charset=utf-8", resp.Header.Get("Content-Type"), "body: %s", string(respBody))
 	var errBody struct {
 		Error            string `json:"error"`
 		ErrorDescription string `json:"error_description"`

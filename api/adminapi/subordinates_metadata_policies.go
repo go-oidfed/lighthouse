@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -47,7 +47,7 @@ type generalPolicyHandlers struct {
 	store *generalMetadataPolicyStore
 }
 
-func (h *generalPolicyHandlers) getAll(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) getAll(c fiber.Ctx) error {
 	mp, _, err := h.store.load()
 	if err != nil {
 		return writeServerError(c, err)
@@ -55,9 +55,9 @@ func (h *generalPolicyHandlers) getAll(c *fiber.Ctx) error {
 	return c.JSON(mp)
 }
 
-func (h *generalPolicyHandlers) putAll(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) putAll(c fiber.Ctx) error {
 	var mp oidfed.MetadataPolicies
-	if err := c.BodyParser(&mp); err != nil {
+	if err := c.Bind().Body(&mp); err != nil {
 		return writeBadBody(c)
 	}
 	if err := h.store.save(&mp); err != nil {
@@ -66,7 +66,7 @@ func (h *generalPolicyHandlers) putAll(c *fiber.Ctx) error {
 	return c.JSON(mp)
 }
 
-func (h *generalPolicyHandlers) getEntityType(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) getEntityType(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	mp, found, err := h.store.load()
 	if err != nil {
@@ -82,10 +82,10 @@ func (h *generalPolicyHandlers) getEntityType(c *fiber.Ctx) error {
 	return c.JSON(policy)
 }
 
-func (h *generalPolicyHandlers) putEntityType(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) putEntityType(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	var body oidfed.MetadataPolicy
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	mp, _, err := h.store.load()
@@ -99,10 +99,10 @@ func (h *generalPolicyHandlers) putEntityType(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *generalPolicyHandlers) postEntityType(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) postEntityType(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	var body oidfed.MetadataPolicy
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	mp, _, err := h.store.load()
@@ -121,7 +121,7 @@ func (h *generalPolicyHandlers) postEntityType(c *fiber.Ctx) error {
 	return c.JSON(existing)
 }
 
-func (h *generalPolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) deleteEntityType(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	mp, _, err := h.store.load()
 	if err != nil {
@@ -132,7 +132,7 @@ func (h *generalPolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *generalPolicyHandlers) getClaim(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) getClaim(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	mp, found, err := h.store.load()
@@ -153,11 +153,11 @@ func (h *generalPolicyHandlers) getClaim(c *fiber.Ctx) error {
 	return c.JSON(ops)
 }
 
-func (h *generalPolicyHandlers) putClaim(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) putClaim(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	var body oidfed.MetadataPolicyEntry
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	mp, _, err := h.store.load()
@@ -171,11 +171,11 @@ func (h *generalPolicyHandlers) putClaim(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *generalPolicyHandlers) postClaim(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) postClaim(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	var body oidfed.MetadataPolicyEntry
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 	mp, _, err := h.store.load()
@@ -194,7 +194,7 @@ func (h *generalPolicyHandlers) postClaim(c *fiber.Ctx) error {
 	return c.JSON(existing)
 }
 
-func (h *generalPolicyHandlers) deleteClaim(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) deleteClaim(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	mp, _ := h.store.loadRaw()
@@ -210,7 +210,7 @@ func (h *generalPolicyHandlers) deleteClaim(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *generalPolicyHandlers) getOperator(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) getOperator(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	op := oidfed.PolicyOperatorName(c.Params("operator"))
@@ -232,12 +232,12 @@ func (h *generalPolicyHandlers) getOperator(c *fiber.Ctx) error {
 	return c.JSON(val)
 }
 
-func (h *generalPolicyHandlers) putOperator(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) putOperator(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	op := oidfed.PolicyOperatorName(c.Params("operator"))
 	var val any
-	if err := c.BodyParser(&val); err != nil {
+	if err := c.Bind().Body(&val); err != nil {
 		return writeBadBody(c)
 	}
 	mp, _, err := h.store.load()
@@ -264,7 +264,7 @@ func (h *generalPolicyHandlers) putOperator(c *fiber.Ctx) error {
 	return c.Status(status).JSON(val)
 }
 
-func (h *generalPolicyHandlers) deleteOperator(c *fiber.Ctx) error {
+func (h *generalPolicyHandlers) deleteOperator(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	op := oidfed.PolicyOperatorName(c.Params("operator"))
@@ -291,7 +291,7 @@ type subordinatePolicyHandlers struct {
 	storages model.Backends
 }
 
-func (h *subordinatePolicyHandlers) getAll(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) getAll(c fiber.Ctx) error {
 	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
 	if !ok {
 		return nil
@@ -302,10 +302,10 @@ func (h *subordinatePolicyHandlers) getAll(c *fiber.Ctx) error {
 	return c.JSON(info.MetadataPolicy)
 }
 
-func (h *subordinatePolicyHandlers) putAll(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) putAll(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	var body oidfed.MetadataPolicies
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -328,7 +328,7 @@ func (h *subordinatePolicyHandlers) putAll(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *subordinatePolicyHandlers) postAll(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) postAll(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	var result *oidfed.MetadataPolicies
 	store := &generalMetadataPolicyStore{kv: h.storages.KV}
@@ -364,7 +364,7 @@ func (h *subordinatePolicyHandlers) postAll(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(result)
 }
 
-func (h *subordinatePolicyHandlers) deleteAll(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) deleteAll(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	err := h.storages.InTransaction(
@@ -389,7 +389,7 @@ func (h *subordinatePolicyHandlers) deleteAll(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *subordinatePolicyHandlers) getEntityType(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) getEntityType(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
 	if !ok {
@@ -405,11 +405,11 @@ func (h *subordinatePolicyHandlers) getEntityType(c *fiber.Ctx) error {
 	return c.JSON(policy)
 }
 
-func (h *subordinatePolicyHandlers) putEntityType(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) putEntityType(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 	var body oidfed.MetadataPolicy
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -438,11 +438,11 @@ func (h *subordinatePolicyHandlers) putEntityType(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *subordinatePolicyHandlers) postEntityType(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) postEntityType(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 	var body oidfed.MetadataPolicy
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -478,7 +478,7 @@ func (h *subordinatePolicyHandlers) postEntityType(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
-func (h *subordinatePolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) deleteEntityType(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 
@@ -507,7 +507,7 @@ func (h *subordinatePolicyHandlers) deleteEntityType(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *subordinatePolicyHandlers) getClaim(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) getClaim(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	info, ok := handleSubordinateLookup(c, h.storages.Subordinates)
@@ -528,12 +528,12 @@ func (h *subordinatePolicyHandlers) getClaim(c *fiber.Ctx) error {
 	return c.JSON(ops)
 }
 
-func (h *subordinatePolicyHandlers) putClaim(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) putClaim(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	var body oidfed.MetadataPolicyEntry
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -562,12 +562,12 @@ func (h *subordinatePolicyHandlers) putClaim(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *subordinatePolicyHandlers) postClaim(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) postClaim(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	var body oidfed.MetadataPolicyEntry
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -608,7 +608,7 @@ func (h *subordinatePolicyHandlers) postClaim(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
-func (h *subordinatePolicyHandlers) deleteClaim(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) deleteClaim(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 	claim := c.Params("claim")
@@ -646,7 +646,7 @@ func (h *subordinatePolicyHandlers) deleteClaim(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *subordinatePolicyHandlers) getOperator(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) getOperator(c fiber.Ctx) error {
 	et := c.Params("entityType")
 	claim := c.Params("claim")
 	op := oidfed.PolicyOperatorName(c.Params("operator"))
@@ -672,7 +672,7 @@ func (h *subordinatePolicyHandlers) getOperator(c *fiber.Ctx) error {
 	return c.JSON(v)
 }
 
-func (h *subordinatePolicyHandlers) putOperator(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) putOperator(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 	claim := c.Params("claim")
@@ -727,7 +727,7 @@ func (h *subordinatePolicyHandlers) putOperator(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *subordinatePolicyHandlers) deleteOperator(c *fiber.Ctx) error {
+func (h *subordinatePolicyHandlers) deleteOperator(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	et := c.Params("entityType")
 	claim := c.Params("claim")
@@ -795,7 +795,7 @@ func (h *metadataPolicyCritHandlers) save(operators []string) error {
 	return h.kv.SetAny(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyMetadataPolicyCrit, operators)
 }
 
-func (h *metadataPolicyCritHandlers) getAll(c *fiber.Ctx) error {
+func (h *metadataPolicyCritHandlers) getAll(c fiber.Ctx) error {
 	operators, err := h.load()
 	if err != nil {
 		return writeServerError(c, err)
@@ -803,9 +803,9 @@ func (h *metadataPolicyCritHandlers) getAll(c *fiber.Ctx) error {
 	return c.JSON(operators)
 }
 
-func (h *metadataPolicyCritHandlers) putAll(c *fiber.Ctx) error {
+func (h *metadataPolicyCritHandlers) putAll(c fiber.Ctx) error {
 	var operators []string
-	if err := c.BodyParser(&operators); err != nil {
+	if err := c.Bind().Body(&operators); err != nil {
 		return writeBadBody(c)
 	}
 	if err := h.save(operators); err != nil {
@@ -814,9 +814,9 @@ func (h *metadataPolicyCritHandlers) putAll(c *fiber.Ctx) error {
 	return c.JSON(operators)
 }
 
-func (h *metadataPolicyCritHandlers) post(c *fiber.Ctx) error {
+func (h *metadataPolicyCritHandlers) post(c fiber.Ctx) error {
 	var operator string
-	if err := c.BodyParser(&operator); err != nil {
+	if err := c.Bind().Body(&operator); err != nil {
 		return writeBadBody(c)
 	}
 	operators, err := h.load()
@@ -833,7 +833,7 @@ func (h *metadataPolicyCritHandlers) post(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(operator)
 }
 
-func (h *metadataPolicyCritHandlers) delete(c *fiber.Ctx) error {
+func (h *metadataPolicyCritHandlers) delete(c fiber.Ctx) error {
 	operator := c.Params("operator")
 	operators, err := h.load()
 	if err != nil {

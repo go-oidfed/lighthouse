@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // MiddlewareConfig contains configuration for the stats middleware.
@@ -38,7 +38,7 @@ type MiddlewareConfig struct {
 // Middleware creates a Fiber middleware that captures request statistics.
 // The middleware runs after the handler to capture response status and timing.
 func Middleware(cfg MiddlewareConfig) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		path := c.Path()
 		// Force string copy to avoid sharing memory with Fiber's unsafe buffer
 		path = strings.Clone(path)
@@ -151,7 +151,7 @@ func shouldTrack(endpoint string, tracked map[string]bool) bool {
 }
 
 // captureQueryParams extracts query parameters from the request.
-func captureQueryParams(c *fiber.Ctx) map[string]string {
+func captureQueryParams(c fiber.Ctx) map[string]string {
 	params := make(map[string]string)
 
 	queryArgs := c.Request().URI().QueryArgs()

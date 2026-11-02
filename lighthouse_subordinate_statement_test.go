@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jws"
@@ -359,7 +359,7 @@ func TestFetchEndpoint_NonActiveSubordinate(t *testing.T) {
 // doRequestRaw executes a request against the app and returns the raw response.
 func doRequestRaw(t *testing.T, app *fiber.App, req *http.Request) (*http.Response, []byte) {
 	t.Helper()
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)

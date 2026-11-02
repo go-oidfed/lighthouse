@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +51,7 @@ func TestPrivateKeyJWTAuth_Middleware_ConventionalStack(t *testing.T) {
 
 	handlerRan := false
 	app := fiber.New()
-	app.Post("/protected", auth.Middleware(), func(c *fiber.Ctx) error {
+	app.Post("/protected", auth.Middleware(), func(c fiber.Ctx) error {
 		handlerRan = true
 		return c.SendString("secret")
 	})
@@ -61,7 +61,7 @@ func TestPrivateKeyJWTAuth_Middleware_ConventionalStack(t *testing.T) {
 		strings.NewReader("client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer&client_assertion=not-a-jwt"),
 	)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 
 	assert.False(t, handlerRan, "handler must not run when authentication fails")

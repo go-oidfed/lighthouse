@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -16,7 +16,7 @@ type trustMarkSpecHandlers struct {
 	store model.TrustMarkSpecStore
 }
 
-func (h *trustMarkSpecHandlers) list(c *fiber.Ctx) error {
+func (h *trustMarkSpecHandlers) list(c fiber.Ctx) error {
 	items, err := h.store.List()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -24,9 +24,9 @@ func (h *trustMarkSpecHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(items)
 }
 
-func (h *trustMarkSpecHandlers) create(c *fiber.Ctx) error {
+func (h *trustMarkSpecHandlers) create(c fiber.Ctx) error {
 	var spec model.AddTrustMarkSpec
-	if err := c.BodyParser(&spec); err != nil {
+	if err := c.Bind().Body(&spec); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	if spec.TrustMarkType == "" {
@@ -39,7 +39,7 @@ func (h *trustMarkSpecHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(created)
 }
 
-func (h *trustMarkSpecHandlers) get(c *fiber.Ctx) error {
+func (h *trustMarkSpecHandlers) get(c fiber.Ctx) error {
 	item, err := h.store.Get(c.Params("trustMarkSpecID"))
 	if err != nil {
 		return h.handleError(c, err)
@@ -47,9 +47,9 @@ func (h *trustMarkSpecHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (h *trustMarkSpecHandlers) update(c *fiber.Ctx) error {
+func (h *trustMarkSpecHandlers) update(c fiber.Ctx) error {
 	var spec model.AddTrustMarkSpec
-	if err := c.BodyParser(&spec); err != nil {
+	if err := c.Bind().Body(&spec); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	if spec.TrustMarkType == "" {
@@ -62,9 +62,9 @@ func (h *trustMarkSpecHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *trustMarkSpecHandlers) patch(c *fiber.Ctx) error {
+func (h *trustMarkSpecHandlers) patch(c fiber.Ctx) error {
 	var updates map[string]any
-	if err := c.BodyParser(&updates); err != nil {
+	if err := c.Bind().Body(&updates); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	patched, err := h.store.Patch(c.Params("trustMarkSpecID"), updates)
@@ -74,14 +74,14 @@ func (h *trustMarkSpecHandlers) patch(c *fiber.Ctx) error {
 	return c.JSON(patched)
 }
 
-func (h *trustMarkSpecHandlers) delete(c *fiber.Ctx) error {
+func (h *trustMarkSpecHandlers) delete(c fiber.Ctx) error {
 	if err := h.store.Delete(c.Params("trustMarkSpecID")); err != nil {
 		return h.handleError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (*trustMarkSpecHandlers) handleError(c *fiber.Ctx, err error) error {
+func (*trustMarkSpecHandlers) handleError(c fiber.Ctx, err error) error {
 	if notFound, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
 	}
@@ -96,7 +96,7 @@ type trustMarkSubjectHandlers struct {
 	store model.TrustMarkSpecStore
 }
 
-func (h *trustMarkSubjectHandlers) list(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) list(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	var statusFilter *model.Status
 	if statusStr := c.Query("status"); statusStr != "" {
@@ -113,10 +113,10 @@ func (h *trustMarkSubjectHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(subjects)
 }
 
-func (h *trustMarkSubjectHandlers) create(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) create(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	var subject model.AddTrustMarkSubject
-	if err := c.BodyParser(&subject); err != nil {
+	if err := c.Bind().Body(&subject); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	if subject.EntityID == "" {
@@ -132,7 +132,7 @@ func (h *trustMarkSubjectHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(created)
 }
 
-func (h *trustMarkSubjectHandlers) get(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) get(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 	subject, err := h.store.GetSubject(specID, subjectID)
@@ -142,11 +142,11 @@ func (h *trustMarkSubjectHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(subject)
 }
 
-func (h *trustMarkSubjectHandlers) update(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) update(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 	var subject model.AddTrustMarkSubject
-	if err := c.BodyParser(&subject); err != nil {
+	if err := c.Bind().Body(&subject); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	if subject.EntityID == "" {
@@ -159,7 +159,7 @@ func (h *trustMarkSubjectHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *trustMarkSubjectHandlers) delete(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) delete(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 	if err := h.store.DeleteSubject(specID, subjectID); err != nil {
@@ -168,7 +168,7 @@ func (h *trustMarkSubjectHandlers) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *trustMarkSubjectHandlers) updateStatus(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) updateStatus(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 
@@ -187,7 +187,7 @@ func (h *trustMarkSubjectHandlers) updateStatus(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *trustMarkSubjectHandlers) getAdditionalClaims(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) getAdditionalClaims(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 	subject, err := h.store.GetSubject(specID, subjectID)
@@ -200,11 +200,11 @@ func (h *trustMarkSubjectHandlers) getAdditionalClaims(c *fiber.Ctx) error {
 	return c.JSON(subject.AdditionalClaims)
 }
 
-func (h *trustMarkSubjectHandlers) putAdditionalClaims(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) putAdditionalClaims(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 	var claims map[string]any
-	if err := c.BodyParser(&claims); err != nil {
+	if err := c.Bind().Body(&claims); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	subject, err := h.store.GetSubject(specID, subjectID)
@@ -224,7 +224,7 @@ func (h *trustMarkSubjectHandlers) putAdditionalClaims(c *fiber.Ctx) error {
 	return c.JSON(updated.AdditionalClaims)
 }
 
-func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
+func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 
@@ -258,7 +258,7 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c *fiber.Ctx) error {
 	return c.JSON(updated.AdditionalClaims)
 }
 
-func (*trustMarkSubjectHandlers) handleError(c *fiber.Ctx, err error) error {
+func (*trustMarkSubjectHandlers) handleError(c fiber.Ctx, err error) error {
 	if notFound, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(string(notFound)))
 	}

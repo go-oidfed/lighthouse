@@ -6,7 +6,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/middleware"
@@ -69,7 +69,7 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 	fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateTriggerEndpoint] = endpoint.ValidateURL(
 		fed.FederationEntity.EntityID(),
 	)
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		var target string
 		if endpoint.AuthEnabled {
 			// The private_key_jwt middleware stores the authenticated client

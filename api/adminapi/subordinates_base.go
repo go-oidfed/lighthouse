@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -23,9 +23,9 @@ type listSubordinatesRequest struct {
 	EntityType []string      `query:"entity_type"`
 }
 
-func (h *subordinatesBaseHandlers) list(c *fiber.Ctx) error {
+func (h *subordinatesBaseHandlers) list(c fiber.Ctx) error {
 	var req listSubordinatesRequest
-	if err := c.QueryParser(&req); err != nil {
+	if err := c.Bind().Query(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 
@@ -59,10 +59,10 @@ func (h *subordinatesBaseHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(infos)
 }
 
-func (h *subordinatesBaseHandlers) create(c *fiber.Ctx) error {
+func (h *subordinatesBaseHandlers) create(c fiber.Ctx) error {
 	var req model.AddSubordinate
 	req.Status = DefaultSubordinateStatus
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return writeBadBody(c)
 	}
 	if req.EntityID == "" {
@@ -125,7 +125,7 @@ func (h *subordinatesBaseHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(stored)
 }
 
-func (h *subordinatesBaseHandlers) get(c *fiber.Ctx) error {
+func (h *subordinatesBaseHandlers) get(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 	info, err := h.storages.Subordinates.GetByDBID(id)
 	if err != nil {
@@ -137,11 +137,11 @@ func (h *subordinatesBaseHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(*info)
 }
 
-func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
+func (h *subordinatesBaseHandlers) update(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	var body model.UpdateSubordinate
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -204,11 +204,11 @@ func (h *subordinatesBaseHandlers) update(c *fiber.Ctx) error {
 // fields are taken from the body unconditionally; fields omitted from the body
 // are reset to their zero/default value. PATCH (update) is the partial
 // variant.
-func (h *subordinatesBaseHandlers) replace(c *fiber.Ctx) error {
+func (h *subordinatesBaseHandlers) replace(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	var body model.ReplaceSubordinate
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return writeBadBody(c)
 	}
 
@@ -259,7 +259,7 @@ func (h *subordinatesBaseHandlers) replace(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
-func (h *subordinatesBaseHandlers) delete(c *fiber.Ctx) error {
+func (h *subordinatesBaseHandlers) delete(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	var entityID string
@@ -291,7 +291,7 @@ func (h *subordinatesBaseHandlers) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *subordinatesBaseHandlers) updateStatus(c *fiber.Ctx) error {
+func (h *subordinatesBaseHandlers) updateStatus(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	statusStr := strings.TrimSpace(string(c.Body()))
@@ -369,7 +369,7 @@ type eventResponse struct {
 	Actor     *string `json:"actor,omitempty"`
 }
 
-func (h *historyHandlers) getHistory(c *fiber.Ctx) error {
+func (h *historyHandlers) getHistory(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
 	info, err := h.subordinates.GetByDBID(id)
@@ -417,7 +417,7 @@ func (h *historyHandlers) getHistory(c *fiber.Ctx) error {
 
 // parseQueryOpts parses query parameters for event history requests.
 // Returns (opts, true) on success, or (zero, false) if an error response was written.
-func (*historyHandlers) parseQueryOpts(c *fiber.Ctx) (model.EventQueryOpts, bool) {
+func (*historyHandlers) parseQueryOpts(c fiber.Ctx) (model.EventQueryOpts, bool) {
 	var opts model.EventQueryOpts
 
 	if limitStr := c.Query("limit"); limitStr != "" {

@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -14,13 +14,13 @@ import (
 // If there is at least one user, it requires HTTP Basic authentication
 // and validates credentials using UsersStore.
 func authMiddleware(users model.UsersStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// If no users are configured, allow access
 		count, err := users.Count()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(
 				fiber.Map{
-					"error": "server_error",
+					"error":             "server_error",
 					"error_description": err.Error(),
 				},
 			)
@@ -35,7 +35,7 @@ func authMiddleware(users model.UsersStore) fiber.Handler {
 			c.Set("WWW-Authenticate", "Basic realm=admin")
 			return c.Status(fiber.StatusUnauthorized).JSON(
 				fiber.Map{
-					"error": "invalid_client",
+					"error":             "invalid_client",
 					"error_description": "missing credentials",
 				},
 			)
@@ -45,7 +45,7 @@ func authMiddleware(users model.UsersStore) fiber.Handler {
 			c.Set("WWW-Authenticate", "Basic realm=admin")
 			return c.Status(fiber.StatusUnauthorized).JSON(
 				fiber.Map{
-					"error": "invalid_client",
+					"error":             "invalid_client",
 					"error_description": "invalid credentials",
 				},
 			)
@@ -58,7 +58,7 @@ func authMiddleware(users model.UsersStore) fiber.Handler {
 }
 
 // parseBasicAuth extracts Basic auth credentials from request headers
-func parseBasicAuth(c *fiber.Ctx) (username, password string, ok bool) {
+func parseBasicAuth(c fiber.Ctx) (username, password string, ok bool) {
 	auth := string(c.Request().Header.Peek("Authorization"))
 	if auth == "" {
 		return "", "", false

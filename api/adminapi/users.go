@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -14,7 +14,7 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 	g := r.Group("/users")
 
 	g.Get(
-		"/", func(c *fiber.Ctx) error {
+		"/", func(c fiber.Ctx) error {
 			list, err := users.List()
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -29,9 +29,9 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 		DisplayName string `json:"display_name"`
 	}
 	g.Post(
-		"/", func(c *fiber.Ctx) error {
+		"/", func(c fiber.Ctx) error {
 			var req createReq
-			if err := c.BodyParser(&req); err != nil {
+			if err := c.Bind().Body(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			if req.Username == "" || req.Password == "" {
@@ -54,10 +54,10 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 		Disabled    *bool   `json:"disabled"`
 	}
 	g.Put(
-		"/:username", func(c *fiber.Ctx) error {
+		"/:username", func(c fiber.Ctx) error {
 			username := c.Params("username")
 			var req updateReq
-			if err := c.BodyParser(&req); err != nil {
+			if err := c.Bind().Body(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			u, err := users.Update(username, req.DisplayName, req.Password, req.Disabled)
@@ -72,7 +72,7 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 	)
 
 	g.Get(
-		"/:username", func(c *fiber.Ctx) error {
+		"/:username", func(c fiber.Ctx) error {
 			username := c.Params("username")
 			u, err := users.Get(username)
 			if err != nil {
@@ -86,7 +86,7 @@ func registerUsers(r fiber.Router, users model.UsersStore) {
 	)
 
 	g.Delete(
-		"/:username", func(c *fiber.Ctx) error {
+		"/:username", func(c fiber.Ctx) error {
 			username := c.Params("username")
 			if err := users.Delete(username); err != nil {
 				if _, ok := errors.AsType[model.NotFoundError](err); ok {

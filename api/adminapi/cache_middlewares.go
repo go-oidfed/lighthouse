@@ -2,7 +2,7 @@ package adminapi
 
 import (
 	"github.com/go-oidfed/lib/cache"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -11,7 +11,7 @@ import (
 // entityConfigurationCacheInvalidationMiddleware clears the cached entity configuration JWT
 // for requests that successfully modify entity configuration state.
 // It should be attached only to non-GET routes.
-func entityConfigurationCacheInvalidationMiddleware(c *fiber.Ctx) error {
+func entityConfigurationCacheInvalidationMiddleware(c fiber.Ctx) error {
 	if err := c.Next(); err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func entityConfigurationCacheInvalidationMiddleware(c *fiber.Ctx) error {
 // no :subordinateID is present (collection-level routes), all subordinate
 // statement cache entries are cleared.
 func subordinateStatementsCacheInvalidationMiddleware(subordinates model.SubordinateStorageBackend) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if err := c.Next(); err != nil {
 			return err
 		}

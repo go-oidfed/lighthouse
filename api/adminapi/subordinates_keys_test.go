@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-oidfed/lib/jwx"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 
 	"github.com/go-oidfed/lighthouse/storage/model"

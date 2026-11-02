@@ -5,7 +5,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -13,33 +13,33 @@ import (
 // Common HTTP error response helpers
 
 // writeNotFound returns a 404 JSON error response.
-func writeNotFound(c *fiber.Ctx, msg string) error {
+func writeNotFound(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(msg))
 }
 
 // writeServerError returns a 500 JSON error response.
-func writeServerError(c *fiber.Ctx, err error) error {
+func writeServerError(c fiber.Ctx, err error) error {
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 }
 
 // writeBadBody returns a 400 JSON error response for invalid request bodies.
-func writeBadBody(c *fiber.Ctx) error {
+func writeBadBody(c fiber.Ctx) error {
 	return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 }
 
 // writeBadRequest returns a 400 JSON error response with a custom message.
-func writeBadRequest(c *fiber.Ctx, msg string) error {
+func writeBadRequest(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(msg))
 }
 
 // writeConflict returns a 409 JSON error response.
-func writeConflict(c *fiber.Ctx, msg string) error {
+func writeConflict(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(msg))
 }
 
 // handleTxError handles errors from transactional operations.
 // It maps NotFoundError to 404 responses and other errors to 500 responses.
-func handleTxError(c *fiber.Ctx, err error) error {
+func handleTxError(c fiber.Ctx, err error) error {
 	if _, ok := errors.AsType[model.NotFoundError](err); ok {
 		return writeNotFound(c, err.Error())
 	}
@@ -84,7 +84,7 @@ func getSubordinateByDBIDForUpdate(subordinates model.SubordinateStorageBackend,
 // handleSubordinateLookup retrieves a subordinate and handles error responses.
 // Returns (info, true) on success, or (nil, false) if an error response was written.
 func handleSubordinateLookup(
-	c *fiber.Ctx, subordinates model.SubordinateStorageBackend,
+	c fiber.Ctx, subordinates model.SubordinateStorageBackend,
 ) (*model.ExtendedSubordinateInfo, bool) {
 	id := c.Params("subordinateID")
 	info, err := getSubordinateByDBID(subordinates, id)

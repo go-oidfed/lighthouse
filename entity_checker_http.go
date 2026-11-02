@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"

@@ -2,10 +2,10 @@ package lighthouse
 
 import (
 	arrays "github.com/adam-hanna/arrayOperations"
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/middleware"
@@ -44,7 +44,7 @@ func (fed *LightHouse) AddSubordinateListingEndpoint(
 		}
 	}
 	fed.fedMetadata.FederationListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		return handleSubordinateListing(ctx, store, trustMarkStore)
 	}
 
@@ -67,7 +67,7 @@ type SubordinateListingRequest struct {
 }
 
 func handleSubordinateListing(
-	ctx *fiber.Ctx, subordinates model.SubordinateStorageBackend,
+	ctx fiber.Ctx, subordinates model.SubordinateStorageBackend,
 	trustMarkedEntitiesStorage model.TrustMarkedEntitiesStorageBackend,
 ) error {
 	var req SubordinateListingRequest

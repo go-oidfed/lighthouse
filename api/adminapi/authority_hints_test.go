@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/go-oidfed/lib/cache"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/internal"
 	smodel "github.com/go-oidfed/lighthouse/storage/model"

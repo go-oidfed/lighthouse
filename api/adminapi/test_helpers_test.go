@@ -8,13 +8,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // doRequest executes an HTTP request against a Fiber app and returns the response and body.
 func doRequest(t *testing.T, app *fiber.App, req *http.Request) (*http.Response, []byte) {
 	t.Helper()
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("Request %s %s failed: %v", req.Method, req.URL.Path, err)
 	}

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage"
 	smodel "github.com/go-oidfed/lighthouse/storage/model"
@@ -40,19 +40,19 @@ func (m *metadataStore) save(meta map[string]map[string]json.RawMessage) error {
 }
 
 // Error response helpers
-func serverError(c *fiber.Ctx, msg string) error {
+func serverError(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(msg))
 }
 
-func badRequest(c *fiber.Ctx, msg string) error {
+func badRequest(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(msg))
 }
 
-func notFound(c *fiber.Ctx, msg string) error {
+func notFound(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(msg))
 }
 
-func conflict(c *fiber.Ctx, msg string) error {
+func conflict(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(msg))
 }
 
@@ -61,7 +61,7 @@ type entityConfigHandlers struct {
 	fedEntity oidfed.FederationEntity
 }
 
-func (h *entityConfigHandlers) get(c *fiber.Ctx) error {
+func (h *entityConfigHandlers) get(c fiber.Ctx) error {
 	payload, err := h.fedEntity.EntityConfigurationPayload()
 	if err != nil {
 		return serverError(c, err.Error())
@@ -74,7 +74,7 @@ type additionalClaimsHandlers struct {
 	store smodel.AdditionalClaimsStore
 }
 
-func (h *additionalClaimsHandlers) list(c *fiber.Ctx) error {
+func (h *additionalClaimsHandlers) list(c fiber.Ctx) error {
 	values, err := h.store.List()
 	if err != nil {
 		return serverError(c, err.Error())
@@ -82,9 +82,9 @@ func (h *additionalClaimsHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(values)
 }
 
-func (h *additionalClaimsHandlers) set(c *fiber.Ctx) error {
+func (h *additionalClaimsHandlers) set(c fiber.Ctx) error {
 	var req []smodel.AddAdditionalClaim
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return badRequest(c, "invalid body")
 	}
 	updated, err := h.store.Set(req)
@@ -97,9 +97,9 @@ func (h *additionalClaimsHandlers) set(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *additionalClaimsHandlers) create(c *fiber.Ctx) error {
+func (h *additionalClaimsHandlers) create(c fiber.Ctx) error {
 	var req smodel.AddAdditionalClaim
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return badRequest(c, "invalid body")
 	}
 	row, err := h.store.Create(req)
@@ -112,7 +112,7 @@ func (h *additionalClaimsHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(row)
 }
 
-func (h *additionalClaimsHandlers) get(c *fiber.Ctx) error {
+func (h *additionalClaimsHandlers) get(c fiber.Ctx) error {
 	idStr := c.Params("additionalClaimsID")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -125,10 +125,10 @@ func (h *additionalClaimsHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(row)
 }
 
-func (h *additionalClaimsHandlers) update(c *fiber.Ctx) error {
+func (h *additionalClaimsHandlers) update(c fiber.Ctx) error {
 	id := c.Params("additionalClaimsID")
 	var req smodel.AddAdditionalClaim
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return badRequest(c, "invalid body")
 	}
 	if req.Claim == "" {
@@ -147,7 +147,7 @@ func (h *additionalClaimsHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(updated)
 }
 
-func (h *additionalClaimsHandlers) delete(c *fiber.Ctx) error {
+func (h *additionalClaimsHandlers) delete(c fiber.Ctx) error {
 	idStr := c.Params("additionalClaimsID")
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
@@ -164,7 +164,7 @@ type lifetimeHandlers struct {
 	kv smodel.KeyValueStore
 }
 
-func (h *lifetimeHandlers) get(c *fiber.Ctx) error {
+func (h *lifetimeHandlers) get(c fiber.Ctx) error {
 	var seconds int
 	found, err := h.kv.GetAs(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyLifetime, &seconds)
 	if err != nil {
@@ -176,7 +176,7 @@ func (h *lifetimeHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(seconds)
 }
 
-func (h *lifetimeHandlers) put(c *fiber.Ctx) error {
+func (h *lifetimeHandlers) put(c fiber.Ctx) error {
 	if len(c.Body()) == 0 {
 		return badRequest(c, "empty body")
 	}
@@ -201,7 +201,7 @@ type metadataHandlers struct {
 	kv    smodel.KeyValueStore
 }
 
-func (h *metadataHandlers) getAll(c *fiber.Ctx) error {
+func (h *metadataHandlers) getAll(c fiber.Ctx) error {
 	rawAll, err := h.kv.Get(smodel.KeyValueScopeEntityConfiguration, smodel.KeyValueKeyMetadata)
 	if err != nil {
 		return serverError(c, err.Error())
@@ -216,9 +216,9 @@ func (h *metadataHandlers) getAll(c *fiber.Ctx) error {
 	return c.JSON(meta)
 }
 
-func (h *metadataHandlers) putAll(c *fiber.Ctx) error {
+func (h *metadataHandlers) putAll(c fiber.Ctx) error {
 	var meta oidfed.Metadata
-	if err := c.BodyParser(&meta); err != nil {
+	if err := c.Bind().Body(&meta); err != nil {
 		return badRequest(c, "invalid body")
 	}
 	buf, _ := json.Marshal(meta)
@@ -228,7 +228,7 @@ func (h *metadataHandlers) putAll(c *fiber.Ctx) error {
 	return c.JSON(meta)
 }
 
-func (h *metadataHandlers) getClaim(c *fiber.Ctx) error {
+func (h *metadataHandlers) getClaim(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 	claim := c.Params("claim")
 
@@ -245,7 +245,7 @@ func (h *metadataHandlers) getClaim(c *fiber.Ctx) error {
 	return notFound(c, "metadata not found")
 }
 
-func (h *metadataHandlers) putClaim(c *fiber.Ctx) error {
+func (h *metadataHandlers) putClaim(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 	claim := c.Params("claim")
 
@@ -269,7 +269,7 @@ func (h *metadataHandlers) putClaim(c *fiber.Ctx) error {
 	return c.Send(c.Body())
 }
 
-func (h *metadataHandlers) deleteClaim(c *fiber.Ctx) error {
+func (h *metadataHandlers) deleteClaim(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 	claim := c.Params("claim")
 
@@ -289,7 +289,7 @@ func (h *metadataHandlers) deleteClaim(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *metadataHandlers) getEntityType(c *fiber.Ctx) error {
+func (h *metadataHandlers) getEntityType(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 
 	meta, err := h.store.load()
@@ -303,10 +303,10 @@ func (h *metadataHandlers) getEntityType(c *fiber.Ctx) error {
 	return c.JSON(claims)
 }
 
-func (h *metadataHandlers) putEntityType(c *fiber.Ctx) error {
+func (h *metadataHandlers) putEntityType(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 	var body map[string]json.RawMessage
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return badRequest(c, "invalid body")
 	}
 
@@ -322,10 +322,10 @@ func (h *metadataHandlers) putEntityType(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *metadataHandlers) postEntityType(c *fiber.Ctx) error {
+func (h *metadataHandlers) postEntityType(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 	var body map[string]json.RawMessage
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return badRequest(c, "invalid body")
 	}
 
@@ -344,7 +344,7 @@ func (h *metadataHandlers) postEntityType(c *fiber.Ctx) error {
 	return c.JSON(body)
 }
 
-func (h *metadataHandlers) deleteEntityType(c *fiber.Ctx) error {
+func (h *metadataHandlers) deleteEntityType(c fiber.Ctx) error {
 	entityType := c.Params("entityType")
 
 	meta, err := h.store.load()

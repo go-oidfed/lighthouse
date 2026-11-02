@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/stretchr/testify/assert"
@@ -110,7 +110,7 @@ func requestTrustMark(t *testing.T, app *fiber.App, trustMarkType, sub string) s
 		"/tm?sub="+url.QueryEscape(sub)+"&trust_mark_type="+url.QueryEscape(trustMarkType),
 		nil,
 	)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)

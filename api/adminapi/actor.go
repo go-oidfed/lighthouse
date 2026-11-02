@@ -1,7 +1,7 @@
 package adminapi
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // ActorSource defines the preferred source for actor extraction.
@@ -41,7 +41,7 @@ func actorMiddleware(cfg ActorConfig) fiber.Handler {
 		cfg.Source = ActorSourceBasicAuth
 	}
 
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		actor := extractActor(c, cfg)
 		if actor != "" {
 			c.Locals(localsKeyActor, actor)
@@ -52,7 +52,7 @@ func actorMiddleware(cfg ActorConfig) fiber.Handler {
 
 // extractActor extracts the actor from the request based on configuration.
 // It tries the preferred source first, then falls back to the other source.
-func extractActor(c *fiber.Ctx, cfg ActorConfig) string {
+func extractActor(c fiber.Ctx, cfg ActorConfig) string {
 	var primary, fallback string
 
 	// Get values from both sources
@@ -78,7 +78,7 @@ func extractActor(c *fiber.Ctx, cfg ActorConfig) string {
 
 // getAuthUsername retrieves the authenticated username from Fiber's Locals.
 // This is set by the auth middleware when basic auth is used.
-func getAuthUsername(c *fiber.Ctx) string {
+func getAuthUsername(c fiber.Ctx) string {
 	if username, ok := c.Locals(localsKeyAuthUsername).(string); ok {
 		return username
 	}
@@ -86,7 +86,7 @@ func getAuthUsername(c *fiber.Ctx) string {
 }
 
 // getHeaderValue retrieves the value of the specified header from the request.
-func getHeaderValue(c *fiber.Ctx, header string) string {
+func getHeaderValue(c fiber.Ctx, header string) string {
 	if header == "" {
 		return ""
 	}
@@ -95,7 +95,7 @@ func getHeaderValue(c *fiber.Ctx, header string) string {
 
 // GetActor retrieves the actor from Fiber's Locals.
 // Returns an empty string if no actor is set.
-func GetActor(c *fiber.Ctx) string {
+func GetActor(c fiber.Ctx) string {
 	if actor, ok := c.Locals(localsKeyActor).(string); ok {
 		return actor
 	}
@@ -104,6 +104,6 @@ func GetActor(c *fiber.Ctx) string {
 
 // SetAuthUsername stores the authenticated username in Fiber's Locals.
 // This should be called by the auth middleware after successful authentication.
-func SetAuthUsername(c *fiber.Ctx, username string) {
+func SetAuthUsername(c fiber.Ctx, username string) {
 	c.Locals(localsKeyAuthUsername, username)
 }

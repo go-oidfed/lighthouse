@@ -3,7 +3,7 @@ package adminapi
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/internal/stats"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -35,7 +35,7 @@ func (api *StatsAPI) RegisterRoutes(r fiber.Router) {
 
 // parseTimeRange extracts from/to time parameters from the request.
 // Defaults to last 24 hours if not specified.
-func parseTimeRange(c *fiber.Ctx) (from, to time.Time) {
+func parseTimeRange(c fiber.Ctx) (from, to time.Time) {
 	now := time.Now().UTC()
 	to = now
 	from = now.Add(-24 * time.Hour)
@@ -61,8 +61,8 @@ func parseTimeRange(c *fiber.Ctx) (from, to time.Time) {
 }
 
 // parseLimit extracts the limit parameter, defaulting to 10.
-func parseLimit(c *fiber.Ctx) int {
-	limit := c.QueryInt("limit", 10)
+func parseLimit(c fiber.Ctx) int {
+	limit := fiber.Query[int](c, "limit", 10)
 	if limit <= 0 {
 		limit = 10
 	}
@@ -74,7 +74,7 @@ func parseLimit(c *fiber.Ctx) int {
 
 // getSummary returns overall statistics for the given time range.
 // GET /stats/summary?from=2024-01-01&to=2024-01-31
-func (api *StatsAPI) getSummary(c *fiber.Ctx) error {
+func (api *StatsAPI) getSummary(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 
 	summary, err := api.storage.GetSummary(from, to)
@@ -93,7 +93,7 @@ func (api *StatsAPI) getSummary(c *fiber.Ctx) error {
 
 // getTopEndpoints returns the top endpoints by request count.
 // GET /stats/top/endpoints?from=&to=&limit=10
-func (api *StatsAPI) getTopEndpoints(c *fiber.Ctx) error {
+func (api *StatsAPI) getTopEndpoints(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	limit := parseLimit(c)
 
@@ -114,7 +114,7 @@ func (api *StatsAPI) getTopEndpoints(c *fiber.Ctx) error {
 
 // getTopUserAgents returns the top user agents by request count.
 // GET /stats/top/user-agents?from=&to=&limit=10
-func (api *StatsAPI) getTopUserAgents(c *fiber.Ctx) error {
+func (api *StatsAPI) getTopUserAgents(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	limit := parseLimit(c)
 
@@ -135,7 +135,7 @@ func (api *StatsAPI) getTopUserAgents(c *fiber.Ctx) error {
 
 // getTopClients returns the top client IPs by request count.
 // GET /stats/top/clients?from=&to=&limit=10
-func (api *StatsAPI) getTopClients(c *fiber.Ctx) error {
+func (api *StatsAPI) getTopClients(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	limit := parseLimit(c)
 
@@ -156,7 +156,7 @@ func (api *StatsAPI) getTopClients(c *fiber.Ctx) error {
 
 // getTopCountries returns the top countries by request count.
 // GET /stats/top/countries?from=&to=&limit=10
-func (api *StatsAPI) getTopCountries(c *fiber.Ctx) error {
+func (api *StatsAPI) getTopCountries(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	limit := parseLimit(c)
 
@@ -177,7 +177,7 @@ func (api *StatsAPI) getTopCountries(c *fiber.Ctx) error {
 
 // getTopParams returns the top query parameters for an endpoint.
 // GET /stats/top/params?from=&to=&endpoint=fetch&limit=10
-func (api *StatsAPI) getTopParams(c *fiber.Ctx) error {
+func (api *StatsAPI) getTopParams(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	limit := parseLimit(c)
 	endpoint := c.Query("endpoint")
@@ -200,7 +200,7 @@ func (api *StatsAPI) getTopParams(c *fiber.Ctx) error {
 
 // getTimeSeries returns time series data.
 // GET /stats/timeseries?from=&to=&endpoint=&interval=hour
-func (api *StatsAPI) getTimeSeries(c *fiber.Ctx) error {
+func (api *StatsAPI) getTimeSeries(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	endpoint := c.Query("endpoint")
 	interval := stats.ParseInterval(c.Query("interval", "hour"))
@@ -223,7 +223,7 @@ func (api *StatsAPI) getTimeSeries(c *fiber.Ctx) error {
 
 // getLatency returns latency percentiles.
 // GET /stats/latency?from=&to=&endpoint=
-func (api *StatsAPI) getLatency(c *fiber.Ctx) error {
+func (api *StatsAPI) getLatency(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	endpoint := c.Query("endpoint")
 
@@ -244,7 +244,7 @@ func (api *StatsAPI) getLatency(c *fiber.Ctx) error {
 
 // getDailyStats returns aggregated daily statistics.
 // GET /stats/daily?from=&to=
-func (api *StatsAPI) getDailyStats(c *fiber.Ctx) error {
+func (api *StatsAPI) getDailyStats(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 
 	daily, err := api.storage.GetDailyStats(from, to)
@@ -263,7 +263,7 @@ func (api *StatsAPI) getDailyStats(c *fiber.Ctx) error {
 
 // export exports statistics data.
 // GET /stats/export?from=&to=&format=csv|json
-func (api *StatsAPI) export(c *fiber.Ctx) error {
+func (api *StatsAPI) export(c fiber.Ctx) error {
 	from, to := parseTimeRange(c)
 	format := c.Query("format", "csv")
 

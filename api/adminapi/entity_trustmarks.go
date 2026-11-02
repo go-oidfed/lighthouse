@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -17,7 +17,7 @@ type TrustMarkConfigInvalidator interface {
 
 // handleStoreError handles common store errors and returns appropriate HTTP responses.
 // Returns nil if err is nil, otherwise returns an error response.
-func handleStoreError(c *fiber.Ctx, err error, notFoundMsg string) error {
+func handleStoreError(c fiber.Ctx, err error, notFoundMsg string) error {
 	if err == nil {
 		return nil
 	}
@@ -52,7 +52,7 @@ func registerEntityTrustMarks(
 
 	// GET / - List all trust marks
 	g.Get(
-		"/", func(c *fiber.Ctx) error {
+		"/", func(c fiber.Ctx) error {
 			items, err := store.List()
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -63,9 +63,9 @@ func registerEntityTrustMarks(
 
 	// POST / - Create a trust mark
 	withCacheWipe.Post(
-		"/", func(c *fiber.Ctx) error {
+		"/", func(c fiber.Ctx) error {
 			var req model.AddTrustMark
-			if err := c.BodyParser(&req); err != nil {
+			if err := c.Bind().Body(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			item, err := store.Create(req)
@@ -79,7 +79,7 @@ func registerEntityTrustMarks(
 
 	// GET /:trustMarkID - Get a single trust mark
 	g.Get(
-		"/:trustMarkID", func(c *fiber.Ctx) error {
+		"/:trustMarkID", func(c fiber.Ctx) error {
 			item, err := store.Get(c.Params("trustMarkID"))
 			if err != nil {
 				return handleStoreError(c, err, "trust mark not found")
@@ -90,9 +90,9 @@ func registerEntityTrustMarks(
 
 	// PUT /:trustMarkID - Replace a trust mark entirely
 	withCacheWipe.Put(
-		"/:trustMarkID", func(c *fiber.Ctx) error {
+		"/:trustMarkID", func(c fiber.Ctx) error {
 			var req model.AddTrustMark
-			if err := c.BodyParser(&req); err != nil {
+			if err := c.Bind().Body(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			item, err := store.Update(c.Params("trustMarkID"), req)
@@ -106,9 +106,9 @@ func registerEntityTrustMarks(
 
 	// PATCH /:trustMarkID - Partially update a trust mark
 	withCacheWipe.Patch(
-		"/:trustMarkID", func(c *fiber.Ctx) error {
+		"/:trustMarkID", func(c fiber.Ctx) error {
 			var req model.UpdateTrustMark
-			if err := c.BodyParser(&req); err != nil {
+			if err := c.Bind().Body(&req); err != nil {
 				return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 			}
 			item, err := store.Patch(c.Params("trustMarkID"), req)
@@ -122,7 +122,7 @@ func registerEntityTrustMarks(
 
 	// DELETE /:trustMarkID - Delete a trust mark
 	withCacheWipe.Delete(
-		"/:trustMarkID", func(c *fiber.Ctx) error {
+		"/:trustMarkID", func(c fiber.Ctx) error {
 			if err := store.Delete(c.Params("trustMarkID")); err != nil {
 				return handleStoreError(c, err, "trust mark not found")
 			}

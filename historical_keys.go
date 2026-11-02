@@ -1,12 +1,12 @@
 package lighthouse
 
 import (
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/jwx/keymanagement/public"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/middleware"
@@ -43,7 +43,7 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) error {
 	}
 	fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	signer := fed.GeneralJWTSigner.Typed(oidfedconst.JWTTypeJWKS)
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		kmsHistory, err := fed.keyManagement.KMSManagedPKs.GetHistorical()
 		if err != nil {
 			ctx.Status(fiber.StatusInternalServerError)

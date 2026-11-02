@@ -5,7 +5,7 @@ import (
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog/log"
 	"github.com/zachmann/go-utils/duration"
 
@@ -36,7 +36,7 @@ type trustAnchorsHandlers struct {
 	controller LighthouseController
 }
 
-func (h *trustAnchorsHandlers) list(c *fiber.Ctx) error {
+func (h *trustAnchorsHandlers) list(c fiber.Ctx) error {
 	list, err := h.store.List()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -44,7 +44,7 @@ func (h *trustAnchorsHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(list)
 }
 
-func (h *trustAnchorsHandlers) get(c *fiber.Ctx) error {
+func (h *trustAnchorsHandlers) get(c fiber.Ctx) error {
 	item, err := h.store.Get(c.Params("id"))
 	if err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
@@ -55,9 +55,9 @@ func (h *trustAnchorsHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (h *trustAnchorsHandlers) create(c *fiber.Ctx) error {
+func (h *trustAnchorsHandlers) create(c fiber.Ctx) error {
 	var req model.AddTrustAnchor
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.EntityID == "" {
@@ -78,9 +78,9 @@ func (h *trustAnchorsHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(item)
 }
 
-func (h *trustAnchorsHandlers) update(c *fiber.Ctx) error {
+func (h *trustAnchorsHandlers) update(c fiber.Ctx) error {
 	var req model.AddTrustAnchor
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.EntityID == "" {
@@ -101,7 +101,7 @@ func (h *trustAnchorsHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (h *trustAnchorsHandlers) delete(c *fiber.Ctx) error {
+func (h *trustAnchorsHandlers) delete(c fiber.Ctx) error {
 	id := c.Params("id")
 	// Stop refresher polling for this TA before deleting.
 	if r := h.controller.TAJWKSRefresher(); r != nil {

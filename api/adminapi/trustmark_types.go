@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -18,7 +18,7 @@ func (h *trustMarkTypesHandlers) store() model.TrustMarkTypesStore {
 	return h.storages.TrustMarkTypes
 }
 
-func (h *trustMarkTypesHandlers) list(c *fiber.Ctx) error {
+func (h *trustMarkTypesHandlers) list(c fiber.Ctx) error {
 	items, err := h.store().List()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
@@ -26,9 +26,9 @@ func (h *trustMarkTypesHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(items)
 }
 
-func (h *trustMarkTypesHandlers) create(c *fiber.Ctx) error {
+func (h *trustMarkTypesHandlers) create(c fiber.Ctx) error {
 	var req model.AddTrustMarkType
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
 	if req.TrustMarkType == "" {
@@ -44,7 +44,7 @@ func (h *trustMarkTypesHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(item)
 }
 
-func (h *trustMarkTypesHandlers) get(c *fiber.Ctx) error {
+func (h *trustMarkTypesHandlers) get(c fiber.Ctx) error {
 	item, err := h.store().Get(c.Params("trustMarkTypeID"))
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
@@ -52,10 +52,10 @@ func (h *trustMarkTypesHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-func (h *trustMarkTypesHandlers) update(c *fiber.Ctx) error {
+func (h *trustMarkTypesHandlers) update(c fiber.Ctx) error {
 	trustMarkTypeID := c.Params("trustMarkTypeID")
 	var req model.AddTrustMarkType
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.TrustMarkType == "" {
@@ -111,7 +111,7 @@ func (*trustMarkTypesHandlers) updateOwnerInTx(
 	return nil
 }
 
-func (h *trustMarkTypesHandlers) delete(c *fiber.Ctx) error {
+func (h *trustMarkTypesHandlers) delete(c fiber.Ctx) error {
 	if err := h.store().Delete(c.Params("trustMarkTypeID")); err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark type not found"))
@@ -121,7 +121,7 @@ func (h *trustMarkTypesHandlers) delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (*trustMarkTypesHandlers) handleTxError(c *fiber.Ctx, err error) error {
+func (*trustMarkTypesHandlers) handleTxError(c fiber.Ctx, err error) error {
 	if _, ok := errors.AsType[model.NotFoundError](err); ok {
 		return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound(err.Error()))
 	}
@@ -136,7 +136,7 @@ type trustMarkIssuersHandlers struct {
 	store model.TrustMarkTypesStore
 }
 
-func (h *trustMarkIssuersHandlers) list(c *fiber.Ctx) error {
+func (h *trustMarkIssuersHandlers) list(c fiber.Ctx) error {
 	issuers, err := h.store.ListIssuers(c.Params("trustMarkTypeID"))
 	if err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
@@ -147,9 +147,9 @@ func (h *trustMarkIssuersHandlers) list(c *fiber.Ctx) error {
 	return c.JSON(issuers)
 }
 
-func (h *trustMarkIssuersHandlers) set(c *fiber.Ctx) error {
+func (h *trustMarkIssuersHandlers) set(c fiber.Ctx) error {
 	var req []model.AddTrustMarkIssuer
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	issuers, err := h.store.SetIssuers(c.Params("trustMarkTypeID"), req)
@@ -162,9 +162,9 @@ func (h *trustMarkIssuersHandlers) set(c *fiber.Ctx) error {
 	return c.JSON(issuers)
 }
 
-func (h *trustMarkIssuersHandlers) add(c *fiber.Ctx) error {
+func (h *trustMarkIssuersHandlers) add(c fiber.Ctx) error {
 	var issuer model.AddTrustMarkIssuer
-	if err := c.BodyParser(&issuer); err != nil || (issuer.Issuer == "" && issuer.IssuerID == nil) {
+	if err := c.Bind().Body(&issuer); err != nil || (issuer.Issuer == "" && issuer.IssuerID == nil) {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	issuers, err := h.store.AddIssuer(c.Params("trustMarkTypeID"), issuer)
@@ -177,7 +177,7 @@ func (h *trustMarkIssuersHandlers) add(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(issuers)
 }
 
-func (h *trustMarkIssuersHandlers) delete(c *fiber.Ctx) error {
+func (h *trustMarkIssuersHandlers) delete(c fiber.Ctx) error {
 	trustMarkTypeID := c.Params("trustMarkTypeID")
 	issuerIDParam := c.Params("issuerID")
 
@@ -239,7 +239,7 @@ type trustMarkOwnerHandlers struct {
 	store model.TrustMarkTypesStore
 }
 
-func (h *trustMarkOwnerHandlers) get(c *fiber.Ctx) error {
+func (h *trustMarkOwnerHandlers) get(c fiber.Ctx) error {
 	owner, err := h.store.GetOwner(c.Params("trustMarkTypeID"))
 	if err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
@@ -250,9 +250,9 @@ func (h *trustMarkOwnerHandlers) get(c *fiber.Ctx) error {
 	return c.JSON(owner)
 }
 
-func (h *trustMarkOwnerHandlers) update(c *fiber.Ctx) error {
+func (h *trustMarkOwnerHandlers) update(c fiber.Ctx) error {
 	var req model.AddTrustMarkOwner
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.EntityID == "" && req.OwnerID == nil {
@@ -271,9 +271,9 @@ func (h *trustMarkOwnerHandlers) update(c *fiber.Ctx) error {
 	return c.JSON(owner)
 }
 
-func (h *trustMarkOwnerHandlers) create(c *fiber.Ctx) error {
+func (h *trustMarkOwnerHandlers) create(c fiber.Ctx) error {
 	var req model.AddTrustMarkOwner
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("invalid body"))
 	}
 	if req.EntityID == "" {
@@ -292,7 +292,7 @@ func (h *trustMarkOwnerHandlers) create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(owner)
 }
 
-func (h *trustMarkOwnerHandlers) delete(c *fiber.Ctx) error {
+func (h *trustMarkOwnerHandlers) delete(c fiber.Ctx) error {
 	if err := h.store.DeleteOwner(c.Params("trustMarkTypeID")); err != nil {
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return c.Status(fiber.StatusNotFound).JSON(oidfed.ErrorNotFound("trust mark owner not found"))

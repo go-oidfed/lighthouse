@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/go-oidfed/lib/jwx"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/pkg/errors"
 
@@ -71,7 +71,7 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 	if endpoint.AuthEnabled {
 		fed.registerEndpoint(
 			model.EndpointTypeTrustMarkStatus, endpoint.Path, fiber.MethodPost,
-			func(ctx *fiber.Ctx) error {
+			func(ctx fiber.Ctx) error {
 				return fed.handleTrustMarkStatusRequest(ctx, config)
 			}, auth.EndpointAuth(),
 		)
@@ -80,7 +80,7 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 	} else {
 		fed.registerEndpoint(
 			model.EndpointTypeTrustMarkStatus, endpoint.Path, fiber.MethodPost,
-			func(ctx *fiber.Ctx) error {
+			func(ctx fiber.Ctx) error {
 				return fed.handleTrustMarkStatusRequest(ctx, config)
 			}, nil,
 		)
@@ -93,11 +93,11 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 // Request: POST with application/x-www-form-urlencoded body containing trust_mark parameter
 // Response: Signed JWT with application/trust-mark-status-response+jwt content type
 func (fed *LightHouse) handleTrustMarkStatusRequest(
-	ctx *fiber.Ctx,
+	ctx fiber.Ctx,
 	config TrustMarkStatusConfig,
 ) error {
 	var req trustMarkStatusRequest
-	if err := ctx.BodyParser(&req); err != nil {
+	if err := ctx.Bind().Body(&req); err != nil {
 		ctx.Status(fiber.StatusBadRequest)
 		return ctx.JSON(oidfed.ErrorInvalidRequest("could not parse request body: " + err.Error()))
 	}
@@ -199,7 +199,7 @@ func (fed *LightHouse) determineTrustMarkStatus(
 
 // sendTrustMarkStatusResponse creates and sends a signed trust mark status response JWT
 func (fed *LightHouse) sendTrustMarkStatusResponse(
-	ctx *fiber.Ctx,
+	ctx fiber.Ctx,
 	trustMarkJWT string,
 	status model.TrustMarkInstanceStatus,
 ) error {

@@ -5,7 +5,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/unixtime"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage"
@@ -27,7 +27,7 @@ func handleGetSubordinateStatement(
 	kv model.KeyValueStore,
 	fedEntity oidfed.FederationEntity,
 ) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		info, ok := handleSubordinateLookup(c, subordinates)
 		if !ok {
 			return nil

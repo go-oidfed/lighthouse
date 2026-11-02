@@ -6,7 +6,7 @@ import (
 	"maps"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -38,7 +38,7 @@ func registerSubordinateMetadata(
 }
 
 func handleGetSubordinateMetadata(subordinates model.SubordinateStorageBackend) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		info, ok := handleSubordinateLookup(c, subordinates)
 		if !ok {
 			return nil
@@ -51,10 +51,10 @@ func handleGetSubordinateMetadata(subordinates model.SubordinateStorageBackend) 
 }
 
 func handlePutSubordinateMetadata(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		var body oidfed.Metadata
-		if err := c.BodyParser(&body); err != nil {
+		if err := c.Bind().Body(&body); err != nil {
 			return writeBadBody(c)
 		}
 
@@ -95,7 +95,7 @@ func handlePutSubordinateMetadata(storages model.Backends) fiber.Handler {
 }
 
 func handleGetSubordinateMetadataEntityType(subordinates model.SubordinateStorageBackend) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		et := c.Params("entityType")
 		info, ok := handleSubordinateLookup(c, subordinates)
 		if !ok {
@@ -110,7 +110,7 @@ func handleGetSubordinateMetadataEntityType(subordinates model.SubordinateStorag
 }
 
 func handlePutSubordinateMetadataEntityType(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		var body map[string]any
@@ -159,7 +159,7 @@ func handlePutSubordinateMetadataEntityType(storages model.Backends) fiber.Handl
 }
 
 func handlePostSubordinateMetadataEntityType(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		var body map[string]any
@@ -213,7 +213,7 @@ func handlePostSubordinateMetadataEntityType(storages model.Backends) fiber.Hand
 }
 
 func handleDeleteSubordinateMetadataEntityType(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 
@@ -256,7 +256,7 @@ func handleDeleteSubordinateMetadataEntityType(storages model.Backends) fiber.Ha
 }
 
 func handleGetSubordinateMetadataClaim(subordinates model.SubordinateStorageBackend) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		et := c.Params("entityType")
 		claim := c.Params("claim")
 		info, ok := handleSubordinateLookup(c, subordinates)
@@ -276,7 +276,7 @@ func handleGetSubordinateMetadataClaim(subordinates model.SubordinateStorageBack
 }
 
 func handlePutSubordinateMetadataClaim(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		claim := c.Params("claim")
@@ -340,7 +340,7 @@ func handlePutSubordinateMetadataClaim(storages model.Backends) fiber.Handler {
 }
 
 func handleDeleteSubordinateMetadataClaim(storages model.Backends) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		id := c.Params("subordinateID")
 		et := c.Params("entityType")
 		claim := c.Params("claim")

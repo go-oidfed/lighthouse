@@ -31,10 +31,11 @@
   resolution pipeline — trust tree build, signature verification, metadata
   policy, shortest-chain selection, trust mark verification — instead of
   reimplementing it inline. New behavior:
-  - Resolution is bound to the request's context: a client disconnect or
-    deadline aborts the trust tree build and its HTTP fetches instead of
-    running out their own timeout. With go-oidfed/lib 0.14 the build is
-    parallel and bounded (15s).
+  - Resolution is deadline-bounded: go-oidfed/lib 0.14 runs the build in
+    parallel and imposes its own ~15s deadline on the trust tree build and
+    HTTP fetches, aborting them at that bound instead of running out each
+    fetch's timeout. (The request context is not wired into Fiber v3, so the
+    build no longer aborts early on client disconnect.)
   - The response now includes the resolved `trust_anchor` claim.
   - Failure stages are preserved via the library's exported resolver errors
     (`ErrNoTrustChainFound` / `ErrNoTrustChainWithValidMetadata`, matched with
@@ -104,6 +105,10 @@
   - A fetched Entity Configuration whose `iss`/`sub` do not equal the
     subordinate's entity ID is rejected (502 `server_error`) — an EC must be
     self-issued for the subordinate being refreshed.
+
+### Internal
+
+- **Upgraded `github.com/gofier/fiber/v2` → `v3.6.1`.**
 
 ## LightHouse 0.23.1
 

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -23,7 +23,7 @@ func registerGeneralSubordinateLifetime(r fiber.Router, kv model.KeyValueStore) 
 }
 
 func handleGetSubordinateLifetime(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		var seconds int
 		found, err := kv.GetAs(model.KeyValueScopeSubordinateStatement, model.KeyValueKeyLifetime, &seconds)
 		if err != nil {
@@ -37,7 +37,7 @@ func handleGetSubordinateLifetime(kv model.KeyValueStore) fiber.Handler {
 }
 
 func handlePutSubordinateLifetime(kv model.KeyValueStore) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		if len(c.Body()) == 0 {
 			return writeBadRequest(c, "empty body")
 		}

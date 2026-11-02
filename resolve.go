@@ -4,12 +4,12 @@ import (
 	"time"
 
 	go2 "github.com/adam-hanna/arrayOperations"
-	"github.com/go-oidfed/lib"
+	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/apimodel"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/go-oidfed/lib/unixtime"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 
 	"github.com/go-oidfed/lighthouse/middleware"
@@ -29,7 +29,7 @@ func (fed *LightHouse) AddResolveEndpoint(
 		return nil
 	}
 
-	writeResponse := func(ctx *fiber.Ctx, res *oidfed.ResolveResponse) error {
+	writeResponse := func(ctx fiber.Ctx, res *oidfed.ResolveResponse) error {
 		jwt, err := fed.GeneralJWTSigner.ResolveResponseSigner().JWT(res)
 		if err != nil {
 			ctx.Status(fiber.StatusInternalServerError)
@@ -39,7 +39,7 @@ func (fed *LightHouse) AddResolveEndpoint(
 		return ctx.Send(jwt)
 	}
 
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		var req apimodel.ResolveRequest
 		if err := parseRequest(ctx, &req); err != nil {
 			ctx.Status(fiber.StatusBadRequest)
@@ -129,14 +129,14 @@ func (fed *LightHouse) AddResolveEndpoint(
 }
 
 func createResolveResponse(
-	ctx *fiber.Ctx, issuer string,
+	ctx fiber.Ctx, issuer string,
 	req apimodel.ResolveRequest,
 ) (*oidfed.ResolveResponse, error) {
 	// The request's context bounds and cancels the resolution: the lib
 	// threads ResolveRequest.Context through the trust tree build and all
 	// HTTP fetches, so a client disconnect or deadline aborts the
 	// resolution instead of letting it run out its own 15s default.
-	req.Context = ctx.UserContext()
+	req.Context = ctx.Context()
 
 	// LocalMetadataResolver is the library's canonical local resolution
 	// path: it builds the trust tree, verifies signatures, applies
@@ -187,3 +187,5 @@ func createResolveResponse(
 	}
 	return res, nil
 }
+
+// fiber:context-methods migrated

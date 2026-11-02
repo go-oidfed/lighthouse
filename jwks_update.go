@@ -6,7 +6,7 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/cache"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 
 	"github.com/go-oidfed/lighthouse/internal"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -33,7 +33,7 @@ func (fed *LightHouse) AddJWKSUpdateEndpoint(
 	if endpoint.Path == "" {
 		return nil
 	}
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		// Content-Type MUST be application/jwk-set+jwt.
 		if ctx.Get(fiber.HeaderContentType) != oidfedconst.ContentTypeJWKS {
 			ctx.Status(fiber.StatusUnsupportedMediaType)

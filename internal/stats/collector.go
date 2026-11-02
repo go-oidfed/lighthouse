@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/api/stats"
@@ -70,7 +70,7 @@ func NewCollector(cfg stats.Config, storage StorageBackend) (*Collector, error) 
 // Middleware returns a Fiber middleware handler for collecting statistics.
 func (c *Collector) Middleware() fiber.Handler {
 	if c == nil {
-		return func(ctx *fiber.Ctx) error {
+		return func(ctx fiber.Ctx) error {
 			return ctx.Next()
 		}
 	}

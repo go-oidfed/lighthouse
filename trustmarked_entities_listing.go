@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -48,7 +48,7 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 		}
 	}
 	fed.fedMetadata.FederationTrustMarkListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
-	handler := func(ctx *fiber.Ctx) error {
+	handler := func(ctx fiber.Ctx) error {
 		var req trustMarkQueryRequest
 		if err := parseRequest(ctx, &req); err != nil {
 			ctx.Status(fiber.StatusBadRequest)

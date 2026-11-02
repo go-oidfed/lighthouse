@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	oidfed "github.com/go-oidfed/lib"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
@@ -69,7 +69,7 @@ func Register(
 	}
 
 	r.Get(
-		"/openapi.yaml", func(c *fiber.Ctx) error {
+		"/openapi.yaml", func(c fiber.Ctx) error {
 			c.Set(fiber.HeaderContentType, "application/yaml")
 			return c.Send(openapiData)
 		},
@@ -81,14 +81,14 @@ func Register(
 		return errors.Wrap(err, "adminapi: failed to convert openapi.yaml to JSON")
 	}
 	r.Get(
-		"/openapi.json", func(c *fiber.Ctx) error {
+		"/openapi.json", func(c fiber.Ctx) error {
 			c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 			return c.Send(openapiJSON)
 		},
 	)
 
 	r.Get(
-		"/docs", func(c *fiber.Ctx) error {
+		"/docs", func(c fiber.Ctx) error {
 			c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
 			return c.Send(swaggerHTML)
 		},
@@ -96,7 +96,7 @@ func Register(
 
 	// Serve users OpenAPI under a dedicated path
 	r.Get(
-		"/openapi-users.yaml", func(c *fiber.Ctx) error {
+		"/openapi-users.yaml", func(c fiber.Ctx) error {
 			data, err := assets.ReadFile("openapi-users.yaml")
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
@@ -108,7 +108,7 @@ func Register(
 
 	// Serve users OpenAPI spec as JSON
 	r.Get(
-		"/openapi-users.json", func(c *fiber.Ctx) error {
+		"/openapi-users.json", func(c fiber.Ctx) error {
 			data, err := assets.ReadFile("openapi-users.yaml")
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
@@ -124,7 +124,7 @@ func Register(
 
 	// Users docs page
 	r.Get(
-		"/docs/users", func(c *fiber.Ctx) error {
+		"/docs/users", func(c fiber.Ctx) error {
 			html, err := assets.ReadFile("swagger-users.html")
 			if err != nil {
 				return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
