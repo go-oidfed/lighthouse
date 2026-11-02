@@ -40,13 +40,22 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 	endpoint EndpointConf,
 	config TrustMarkStatusConfig,
 ) error {
-	fed.fedMetadata.FederationTrustMarkStatusEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.FederationTrustMarkStatusEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+		}
 		return nil
 	}
-
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
@@ -56,7 +65,10 @@ func (fed *LightHouse) AddTrustMarkStatusEndpoint(
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for trust mark status endpoint")
 		}
+	}
+	fed.fedMetadata.FederationTrustMarkStatusEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 
+	if endpoint.AuthEnabled {
 		fed.registerEndpoint(
 			model.EndpointTypeTrustMarkStatus, endpoint.Path, fiber.MethodPost,
 			func(ctx *fiber.Ctx) error {

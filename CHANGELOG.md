@@ -43,6 +43,19 @@
 
 ### Bugfixes
 
+- **Federation endpoints with broken client-auth config are no longer
+  advertised-but-dead.** Each `Add*Endpoint` built its `private_key_jwt` auth
+  middleware *after* publishing the endpoint URL in the Entity Configuration.
+  If auth was enabled without the required `auth_trust_anchors` (or another
+  middleware prerequisite), the constructor failed and the endpoint was
+  silently skipped from the dispatcher, and every call returned
+  `404 "no endpoint registered for path ..."` while the EC still advertised the
+  URL. The auth middleware is now constructed *before* the URL is published, so
+  such a misconfiguration fails loudly at load time (`failed to load endpoint
+  from DB`) and advertises nothing. Fixed for fetch, list, resolve, entity
+  collection, enroll, enroll request, historical keys, JWKS update triggers,
+  and all trust mark endpoints.
+
 - A `kid` must uniquely identify a key in a JWKS. Two keys sharing a `kid`
   could previously be stored and published together in an Entity Configuration
   or signed JWKS, producing an invalid value.

@@ -15,10 +15,33 @@ import (
 
 // AddHistoricalKeysEndpoint adds the federation historical keys endpoint
 func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) error {
-	fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+		}
 		return nil
 	}
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
+	if endpoint.AuthEnabled {
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for historical keys endpoint")
+		}
+	}
+	fed.fedMetadata.FederationHistoricalLKeysEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	signer := fed.GeneralJWTSigner.Typed(oidfedconst.JWTTypeJWKS)
 	handler := func(ctx *fiber.Ctx) error {
 		kmsHistory, err := fed.keyManagement.KMSManagedPKs.GetHistorical()
@@ -60,17 +83,6 @@ func (fed *LightHouse) AddHistoricalKeysEndpoint(endpoint EndpointConf) error {
 	}
 
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
-			fed.FederationEntity.EntityID(),
-			fed.FederationEntity,
-			endpoint.AuthTrustAnchors,
-			fed.TAResolver(),
-			fed.storages.JTI,
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to create auth middleware for historical keys endpoint")
-		}
-
 		fed.registerEndpoint(model.EndpointTypeHistoricalKeys, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationHistoricalLKeysEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

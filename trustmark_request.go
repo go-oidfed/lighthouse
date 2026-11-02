@@ -23,10 +23,33 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 	if fed.fedMetadata.Extra == nil {
 		fed.fedMetadata.Extra = make(map[string]any)
 	}
-	fed.fedMetadata.Extra["federation_trust_mark_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.Extra["federation_trust_mark_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+		}
 		return nil
 	}
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
+	if endpoint.AuthEnabled {
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for trust mark request endpoint")
+		}
+	}
+	fed.fedMetadata.Extra["federation_trust_mark_request_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	handler := func(ctx *fiber.Ctx) error {
 		var req trustMarkQueryRequest
 		if err := parseRequest(ctx, &req); err != nil {
@@ -87,17 +110,6 @@ func (fed *LightHouse) AddTrustMarkRequestEndpoint(
 	}
 
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
-			fed.FederationEntity.EntityID(),
-			fed.FederationEntity,
-			endpoint.AuthTrustAnchors,
-			fed.TAResolver(),
-			fed.storages.JTI,
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to create auth middleware for trust mark request endpoint")
-		}
-
 		fed.registerEndpoint(
 			model.EndpointTypeTrustMarkRequest, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth(),
 		)

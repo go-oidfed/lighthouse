@@ -21,10 +21,33 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 	endpoint EndpointConf,
 	instanceStore model.IssuedTrustMarkInstanceStore,
 ) error {
-	fed.fedMetadata.FederationTrustMarkListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.FederationTrustMarkListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+		}
 		return nil
 	}
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
+	if endpoint.AuthEnabled {
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for trust marked entities listing endpoint")
+		}
+	}
+	fed.fedMetadata.FederationTrustMarkListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	handler := func(ctx *fiber.Ctx) error {
 		var req trustMarkQueryRequest
 		if err := parseRequest(ctx, &req); err != nil {
@@ -78,17 +101,6 @@ func (fed *LightHouse) AddTrustMarkedEntitiesListingEndpoint(
 	}
 
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
-			fed.FederationEntity.EntityID(),
-			fed.FederationEntity,
-			endpoint.AuthTrustAnchors,
-			fed.TAResolver(),
-			fed.storages.JTI,
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to create auth middleware for trust marked entities listing endpoint")
-		}
-
 		fed.registerEndpoint(model.EndpointTypeTrustMarkListing, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationTrustMarkListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

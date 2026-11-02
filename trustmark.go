@@ -63,21 +63,27 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 	endpoint EndpointConf,
 	config TrustMarkEndpointConfig,
 ) error {
-	trustMarkEndpointURL := endpoint.ValidateURL(fed.FederationEntity.EntityID())
-	fed.fedMetadata.FederationTrustMarkEndpoint = trustMarkEndpointURL
-	// Update the trust mark config provider with the endpoint URL
-	if fed.trustMarkConfigProvider != nil {
-		fed.trustMarkConfigProvider.SetTrustMarkEndpoint(trustMarkEndpointURL)
-	}
 	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			trustMarkEndpointURL := endpoint.ValidateURL(fed.FederationEntity.EntityID())
+			fed.fedMetadata.FederationTrustMarkEndpoint = trustMarkEndpointURL
+			// Update the trust mark config provider with the endpoint URL
+			if fed.trustMarkConfigProvider != nil {
+				fed.trustMarkConfigProvider.SetTrustMarkEndpoint(trustMarkEndpointURL)
+			}
+		}
 		return nil
 	}
-	handler := func(ctx *fiber.Ctx) error {
-		return fed.handleTrustMarkRequest(ctx, config)
-	}
-
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
@@ -87,7 +93,18 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for trust mark endpoint")
 		}
+	}
+	trustMarkEndpointURL := endpoint.ValidateURL(fed.FederationEntity.EntityID())
+	fed.fedMetadata.FederationTrustMarkEndpoint = trustMarkEndpointURL
+	// Update the trust mark config provider with the endpoint URL
+	if fed.trustMarkConfigProvider != nil {
+		fed.trustMarkConfigProvider.SetTrustMarkEndpoint(trustMarkEndpointURL)
+	}
+	handler := func(ctx *fiber.Ctx) error {
+		return fed.handleTrustMarkRequest(ctx, config)
+	}
 
+	if endpoint.AuthEnabled {
 		fed.registerEndpoint(model.EndpointTypeTrustMark, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationTrustMarkEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

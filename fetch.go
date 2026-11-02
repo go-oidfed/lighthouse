@@ -20,10 +20,33 @@ type fetchRequest struct {
 
 // AddFetchEndpoint adds a fetch endpoint
 func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.SubordinateStorageBackend) error {
-	fed.fedMetadata.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+		}
 		return nil
 	}
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
+	if endpoint.AuthEnabled {
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for fetch endpoint")
+		}
+	}
+	fed.fedMetadata.FederationFetchEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	handler := func(ctx *fiber.Ctx) error {
 		var req fetchRequest
 		if err := parseRequest(ctx, &req); err != nil {
@@ -79,17 +102,6 @@ func (fed *LightHouse) AddFetchEndpoint(endpoint EndpointConf, store model.Subor
 	}
 
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
-			fed.FederationEntity.EntityID(),
-			fed.FederationEntity,
-			endpoint.AuthTrustAnchors,
-			fed.TAResolver(),
-			fed.storages.JTI,
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to create auth middleware for fetch endpoint")
-		}
-
 		fed.registerEndpoint(model.EndpointTypeFetch, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationFetchEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()

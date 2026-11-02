@@ -20,8 +20,12 @@ import (
 func (fed *LightHouse) AddResolveEndpoint(
 	endpoint EndpointConf, allowedTrustAnchors []string, proactiveResolver *oidfed.ProactiveResolver,
 ) error {
-	fed.fedMetadata.FederationResolveEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
+		// No local route — e.g. the resolve endpoint is served by an external
+		// resolver. Still publish the configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.FederationResolveEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+		}
 		return nil
 	}
 
@@ -93,8 +97,16 @@ func (fed *LightHouse) AddResolveEndpoint(
 		return nil
 	}
 
+	// Build the auth middleware before advertising anything. If its
+	// prerequisites are missing (e.g. auth_enabled with no auth_trust_anchors),
+	// fail loudly at load time: advertising a resolve endpoint that is never
+	// registered would yield a 404 "no endpoint registered for path ..." on
+	// every call while the EC claims the endpoint exists. The published URL is
+	// only set after the endpoint is actually registered.
+	var auth *middleware.PrivateKeyJWTAuth
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
@@ -112,6 +124,7 @@ func (fed *LightHouse) AddResolveEndpoint(
 		fed.registerEndpoint(model.EndpointTypeResolve, endpoint.Path, fiber.MethodGet, handler, nil)
 	}
 
+	fed.fedMetadata.FederationResolveEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	return nil
 }
 

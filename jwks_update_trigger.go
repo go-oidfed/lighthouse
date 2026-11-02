@@ -38,12 +38,37 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 	if fed.fedMetadata.Extra == nil {
 		fed.fedMetadata.Extra = make(map[string]any)
 	}
+	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateTriggerEndpoint] = endpoint.ValidateURL(
+				fed.FederationEntity.EntityID(),
+			)
+		}
+		return nil
+	}
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
+	if endpoint.AuthEnabled {
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
+			fed.FederationEntity.EntityID(),
+			fed.FederationEntity,
+			endpoint.AuthTrustAnchors,
+			fed.TAResolver(),
+			fed.storages.JTI,
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to create auth middleware for jwks_update_trigger endpoint")
+		}
+	}
 	fed.fedMetadata.Extra[oidfedconst.FederationJWKSUpdateTriggerEndpoint] = endpoint.ValidateURL(
 		fed.FederationEntity.EntityID(),
 	)
-	if endpoint.Path == "" {
-		return nil
-	}
 	handler := func(ctx *fiber.Ctx) error {
 		var target string
 		if endpoint.AuthEnabled {
@@ -131,16 +156,6 @@ func (fed *LightHouse) AddJWKSUpdateTriggerEndpoint(
 	}
 
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
-			fed.FederationEntity.EntityID(),
-			fed.FederationEntity,
-			endpoint.AuthTrustAnchors,
-			fed.TAResolver(),
-			fed.storages.JTI,
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to create auth middleware for jwks_update_trigger endpoint")
-		}
 		fed.registerEndpoint(
 			model.EndpointTypeJwksUpdateTrigger, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth(),
 		)

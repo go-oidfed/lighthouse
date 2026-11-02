@@ -17,16 +17,22 @@ func (fed *LightHouse) AddSubordinateListingEndpoint(
 	endpoint EndpointConf, store model.SubordinateStorageBackend,
 	trustMarkStore model.TrustMarkedEntitiesStorageBackend,
 ) error {
-	fed.fedMetadata.FederationListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
 	if endpoint.Path == "" {
+		// No local route (externally hosted endpoint): still publish a
+		// configured URL in the EC.
+		if endpoint.URL != "" {
+			fed.fedMetadata.FederationListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+		}
 		return nil
 	}
-	handler := func(ctx *fiber.Ctx) error {
-		return handleSubordinateListing(ctx, store, trustMarkStore)
-	}
-
+	// Build the auth middleware before advertising so an auth misconfiguration
+	// (e.g. auth_enabled with no auth_trust_anchors) fails loudly at load time
+	// instead of publishing an EC entry for an endpoint that is never
+	// registered.
+	var auth *middleware.PrivateKeyJWTAuth
 	if endpoint.AuthEnabled {
-		auth, err := middleware.NewPrivateKeyJWTAuth(
+		var err error
+		auth, err = middleware.NewPrivateKeyJWTAuth(
 			fed.FederationEntity.EntityID(),
 			fed.FederationEntity,
 			endpoint.AuthTrustAnchors,
@@ -36,7 +42,13 @@ func (fed *LightHouse) AddSubordinateListingEndpoint(
 		if err != nil {
 			return errors.Wrap(err, "failed to create auth middleware for subordinate listing endpoint")
 		}
+	}
+	fed.fedMetadata.FederationListEndpoint = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+	handler := func(ctx *fiber.Ctx) error {
+		return handleSubordinateListing(ctx, store, trustMarkStore)
+	}
 
+	if endpoint.AuthEnabled {
 		fed.registerEndpoint(model.EndpointTypeList, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
 		fed.fedMetadata.FederationListEndpointAuthMethods = []string{oidfedconst.AuthMethodPrivateKeyJWT}
 		fed.fedMetadata.EndpointAuthSigningAlgValuesSupported = jwx.SupportedAlgsStrings()
