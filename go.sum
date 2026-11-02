@@ -55,6 +55,8 @@ github.com/go-oidfed/lib v0.13.2 h1:D7jKM4oEsvp4543sTlWLGzlxKU/oBS0B8UsrOBwzaIk=
 github.com/go-oidfed/lib v0.13.2/go.mod h1:G3VEwwlEdr37qcFlKPXXrRZ0MtP26HGdSn3eYp7rwQU=
 github.com/go-oidfed/lib v0.13.3 h1:DpiSj+HaQsbyRzoTUuyNiG81YWtvpA7HVXUy80BJzjI=
 github.com/go-oidfed/lib v0.13.3/go.mod h1:G3VEwwlEdr37qcFlKPXXrRZ0MtP26HGdSn3eYp7rwQU=
+github.com/go-oidfed/lib v0.13.4-0.20261030112350-b4c3d893956c h1:Ec1vT0+9Ya7sLWFeb6rMlnBkGINpPxOuUxhPklAbIAo=
+github.com/go-oidfed/lib v0.13.4-0.20261030112350-b4c3d893956c/go.mod h1:G3VEwwlEdr37qcFlKPXXrRZ0MtP26HGdSn3eYp7rwQU=
 github.com/go-resty/resty/v2 v2.17.2 h1:FQW5oHYcIlkCNrMD2lloGScxcHJ0gkjshV3qcQAyHQk=
 github.com/go-resty/resty/v2 v2.17.2/go.mod h1:kCKZ3wWmwJaNc7S29BRtUhJwy7iqmn+2mLtQrOyQlVA=
 github.com/go-sql-driver/mysql v1.10.0 h1:Q+1LV8DkHJvSYAdR83XzuhDaTykuDx0l6fkXxoWCWfw=
@@ -216,6 +218,8 @@ golang.org/x/net v0.0.0-20220722155237-a158d28d115b/go.mod h1:XRhObCWvk6IyKnWLug
 golang.org/x/net v0.6.0/go.mod h1:2Tu9+aMcznHK/AK1HMvgo6xiTLG5rD5rZLDS+rp2Bjs=
 golang.org/x/net v0.61.0 h1:RR+6j/BTBCrggOLugxa+66R8FvoN6MHlzDlZIbN9YFw=
 golang.org/x/net v0.61.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
+golang.org/x/net v0.62.0 h1:18ELalfM5+XNRwzM2nYqXsZQ9ByS1uhj2O/U7+5jqRY=
+golang.org/x/net v0.62.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
 golang.org/x/oauth2 v0.37.0 h1:JUlcxA8oAtauLfiH8FX2/FkAWHAdi0QtGCGc+hofE98=
 golang.org/x/oauth2 v0.37.0/go.mod h1:IxwZNxUULJmpBFf9K/9NTMSIfZZuvuTy1gGxhigP/58=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=

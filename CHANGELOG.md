@@ -24,6 +24,23 @@
   - The federation KMS is now loaded without starting automatic rotation;
     `NewLightHouse` attaches hooks and then starts rotation.
 
+### Enhancements
+
+- **Resolve endpoint now resolves through `LocalMetadataResolver`.**
+  `createResolveResponse` delegates to the library's canonical local
+  resolution pipeline — trust tree build, signature verification, metadata
+  policy, shortest-chain selection, trust mark verification — instead of
+  reimplementing it inline. New behavior:
+  - Resolution is bound to the request's context: a client disconnect or
+    deadline aborts the trust tree build and its HTTP fetches instead of
+    running out their own timeout. With go-oidfed/lib 0.14 the build is
+    parallel and bounded (15s).
+  - The response now includes the resolved `trust_anchor` claim.
+  - Failure stages are preserved via the library's exported resolver errors
+    (`ErrNoTrustChainFound` / `ErrNoTrustChainWithValidMetadata`, matched with
+    `errors.Is`), so the endpoint still answers `404 invalid_trust_chain` and
+    `404 invalid_metadata` as before.
+
 ### Bugfixes
 
 - A `kid` must uniquely identify a key in a JWKS. Two keys sharing a `kid`

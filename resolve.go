@@ -119,56 +119,57 @@ func createResolveResponse(
 	ctx *fiber.Ctx, issuer string,
 	req apimodel.ResolveRequest,
 ) (*oidfed.ResolveResponse, error) {
-	resolver := oidfed.TrustResolver{
-		TrustAnchors:   oidfed.NewTrustAnchorsFromEntityIDs(req.TrustAnchor...),
-		StartingEntity: req.Subject,
-		Types:          req.EntityTypes,
+	// The request's context bounds and cancels the resolution: the lib
+	// threads ResolveRequest.Context through the trust tree build and all
+	// HTTP fetches, so a client disconnect or deadline aborts the
+	// resolution instead of letting it run out its own 15s default.
+	req.Context = ctx.UserContext()
+
+	// LocalMetadataResolver is the library's canonical local resolution
+	// path: it builds the trust tree, verifies signatures, applies
+	// metadata policy, selects the shortest valid chain, and verifies
+	// trust marks — replacing the previous manual TrustResolver +
+	// chain-filter + selection code here. Its sentinel errors separate the
+	// trust path stage from the metadata stage.
+	payload, err := oidfed.LocalMetadataResolver{}.ResolveResponsePayload(req)
+	if err != nil {
+		switch {
+		case errors.Is(err, oidfed.ErrNoTrustChainWithValidMetadata):
+			ctx.Status(fiber.StatusNotFound)
+			return nil, ctx.JSON(
+				oidfed.ErrorInvalidMetadata(
+					"no trust path with valid metadata found between sub and anchor",
+				),
+			)
+		case errors.Is(err, oidfed.ErrNoTrustChainFound):
+			ctx.Status(fiber.StatusNotFound)
+			return nil, ctx.JSON(
+				oidfed.ErrorInvalidTrustChain(
+					"no valid trust path between sub and anchor found",
+				),
+			)
+		default:
+			ctx.Status(fiber.StatusInternalServerError)
+			return nil, ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
 	}
-	chains := resolver.ResolveToValidChainsWithoutVerifyingMetadata()
-	if len(chains) == 0 {
-		ctx.Status(fiber.StatusNotFound)
-		return nil, ctx.JSON(
-			oidfed.ErrorInvalidTrustChain(
-				"no valid trust path between sub and anchor found",
-			),
-		)
-	}
-	chains = chains.Filter(oidfed.TrustChainsFilterValidMetadata)
-	if len(chains) == 0 {
-		ctx.Status(fiber.StatusNotFound)
-		return nil, ctx.JSON(
-			oidfed.ErrorInvalidMetadata(
-				"no trust path with valid metadata found between sub and anchor",
-			),
-		)
-	}
-	selectedChain := chains.Filter(oidfed.TrustChainsFilterMinPathLength)[0]
-	metadata, _ := selectedChain.Metadata()
-	// err cannot be != nil, since ResolveToValidChains only gives chains with valid metadata
-	leaf := selectedChain[0]
-	ta := selectedChain[len(selectedChain)-1]
 	res := &oidfed.ResolveResponse{
-		Issuer:    issuer,
-		Subject:   req.Subject,
-		IssuedAt:  unixtime.Unixtime{Time: time.Now()},
-		ExpiresAt: selectedChain.ExpiresAt(),
-		ResolveResponsePayload: oidfed.ResolveResponsePayload{
-			Metadata:   metadata,
-			TrustChain: selectedChain.Messages(),
-		},
+		Issuer:                 issuer,
+		Subject:                req.Subject,
+		IssuedAt:               unixtime.Unixtime{Time: time.Now()},
+		ExpiresAt:              payload.ValidUntil,
+		ResolveResponsePayload: payload,
 	}
-	if leaf.TrustMarks != nil {
-		verifiedTrustMarks := leaf.TrustMarks.VerifiedFederation(&ta.EntityStatementPayload)
-		res.ResolveResponsePayload.TrustMarks = verifiedTrustMarks
-		for i := range verifiedTrustMarks {
-			mark, err := verifiedTrustMarks[i].TrustMark()
-			if err != nil {
-				ctx.Status(fiber.StatusInternalServerError)
-				return nil, ctx.JSON(oidfed.ErrorServerError(err.Error()))
-			}
-			if mark.ExpiresAt != nil && mark.ExpiresAt.Before(res.ExpiresAt.Time) {
-				res.ExpiresAt = *mark.ExpiresAt
-			}
+	// Trim the response lifetime to the earliest trust mark expiry, as
+	// before; payload.TrustMarks already contains the anchor-verified marks.
+	for i := range payload.TrustMarks {
+		mark, err := payload.TrustMarks[i].TrustMark()
+		if err != nil {
+			ctx.Status(fiber.StatusInternalServerError)
+			return nil, ctx.JSON(oidfed.ErrorServerError(err.Error()))
+		}
+		if mark.ExpiresAt != nil && mark.ExpiresAt.Before(res.ExpiresAt.Time) {
+			res.ExpiresAt = *mark.ExpiresAt
 		}
 	}
 	return res, nil
