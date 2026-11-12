@@ -2975,8 +2975,9 @@ paths:
         the default message of the status event. `jwks` replaces all of the
         subordinate's keys (an empty `keys` list stores an empty set), as
         `PUT .../jwks` does, in the same transaction (recorded as a
-        `jwks_replaced` event before the status event); the keys in the body
-        count when activating.
+        `jwks_replaced` event before the status event, with the message
+        described at `PUT .../jwks`); the keys in the body count when
+        activating.
       requestBody:
         content:
           text/plain:
@@ -3128,6 +3129,16 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: getSubordinateJWKS
     put:
+      description: |
+        Replaces the subordinate's keys and records a `jwks_replaced` event
+        with the message `stored N keys (fingerprint <12 hex digits>,
+        changed|unchanged)` (`stored 1 key (...)` for one key; `stored 0 keys
+        (no fingerprint, ...)` for an empty set): the start of the fingerprint
+        of the stored set and whether it differs from the keys stored before (a
+        subordinate without keys counts as changed, unless the new set is empty
+        too). The fingerprint covers the public key material only and does not
+        depend on the order of the keys, their IDs, `alg` or `use`: it is the
+        SHA-256 over the sorted RFC 7638 thumbprints of the keys.
       requestBody:
         content:
           application/json:

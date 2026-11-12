@@ -71,13 +71,17 @@ func handlePutSubordinateJWKS(storages model.Backends) fiber.Handler {
 				return model.NotFoundError("subordinate not found")
 			}
 
+			old := info.JWKS.Keys
 			updatedJWKS, err := tx.Subordinates.UpdateJWKSByDBID(id, body)
 			if err != nil {
 				return err
 			}
 			result = updatedJWKS
 			// Record JWKS replaced event
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKSReplaced, WithActor(GetActor(c)))
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeJWKSReplaced, WithActor(GetActor(c)),
+				WithMessage(keysStoredMessage(old, body.Keys)),
+			)
 		})
 		if err != nil {
 			return handleTxError(c, err)

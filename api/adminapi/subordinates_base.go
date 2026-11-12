@@ -355,6 +355,7 @@ func (h *subordinatesBaseHandlers) updateStatus(c fiber.Ctx) error {
 				}
 				if err = RecordEvent(
 					tx.SubordinateEvents, existing.ID, model.EventTypeJWKSReplaced, WithActor(GetActor(c)),
+					WithMessage(keysStoredMessage(existing.JWKS.Keys, req.JWKS.Keys)),
 				); err != nil {
 					return err
 				}

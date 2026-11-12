@@ -2015,3 +2015,27 @@ func TestUpdateSubordinateStatusConcurrentSameStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateStatus_WithJWKSRecordsFingerprintMessage(t *testing.T) {
+	t.Parallel()
+	app, backends := setupTransactionalStatusApp(t, "")
+	id := addSubordinate(t, backends, "https://status-fp.example.org", model.StatusPending)
+	a, b, c := newECKey(t, "a"), newECKey(t, "b"), newECKey(t, "c")
+
+	put := func(keys ...jwk.Key) {
+		t.Helper()
+		raw, err := json.Marshal(model.JWKS{Keys: keySet(t, keys...)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, body := putSubordinateStatus(
+			t, app, id, fiber.MIMEApplicationJSON, `{"status":"active","jwks":`+string(raw)+`}`,
+		)
+		requireStatus(t, resp, body, http.StatusOK)
+	}
+	put(a, b)
+	put(b, a)
+	put(a, c)
+
+	checkReplacementSequence(t, jwksReplacedMessages(t, backends, id), []string{"2", "2", "2"})
+}
