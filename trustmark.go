@@ -43,7 +43,13 @@ type TrustMarkEndpointConfig struct {
 	IssuedTrustMarkCache *IssuedTrustMarkCache
 }
 
-// AddTrustMarkEndpoint adds a trust mark endpoint
+// AddTrustMarkEndpoint adds a trust mark endpoint.
+//
+// Deprecated: use AddTrustMarkEndpointWithConfig instead. This wrapper does
+// not attach eligibility or issued trust mark caches, so trust mark requests
+// always hit the database and checkers, and caches created for endpoints
+// loaded from the DB are not shared with handlers registered this way.
+// This function will be removed in a future version.
 func (fed *LightHouse) AddTrustMarkEndpoint(
 	endpoint EndpointConf,
 	store model.TrustMarkedEntitiesStorageBackend,
