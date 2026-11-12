@@ -215,6 +215,8 @@ func Register(
 		r.Use(actorMiddleware(actorCfg))
 	}
 
+	// Version and supported features
+	registerInfo(r, opts, fedEntity, storages.TrustMarkInstances != nil)
 	// Entity Configuration
 	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV, fedEntity)
 	// Authority Hints

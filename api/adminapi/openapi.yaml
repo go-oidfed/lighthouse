@@ -63,6 +63,76 @@ externalDocs:
   description: OpenID Federation 1.0 specification
   url: https://openid.net/specs/openid-federation-1_0.html
 paths:
+  /api/v1/admin/info:
+    get:
+      tags:
+        - Info
+      operationId: getInfo
+      summary: Get the version and the supported features
+      description: |-
+        Returns the version of this LightHouse and the optional parts of the
+        Admin API that are usable now. It is served on the admin port and on
+        the service listener, each with its own authentication.
+
+        A feature is listed only when it can be used at the time of the request:
+
+        - `conditional_status`: `PUT .../status` accepts a JSON body with
+          `if_status` (always).
+        - `events`: the events query (always).
+        - `trust_mark_issuance`: a trust mark can be issued with
+          `"issue": true` when a subject is created or activated (only when
+          this instance can sign trust marks and keeps issued instances).
+        - `trust_mark_instances`: issued trust mark instances can be listed,
+          counted and revoked (whenever instances are kept).
+        - `enroll_check`: `POST .../enroll-check` (only when an enroll
+          endpoint with an entity checker is configured).
+        - `service_tokens`: the deployment has a service listener with
+          tokens.
+        - `actor_delegation`: at least one of those service tokens may act
+          for users with `X-Actor`.
+
+        `service_tokens` and `actor_delegation` describe the deployment's
+        service listener. On the admin port they report that such a listener
+        exists, not that the connection being used accepts tokens.
+      responses:
+        '200':
+          description: The version and the supported features.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - version
+                  - features
+                properties:
+                  version:
+                    type: string
+                    description: The version of this LightHouse.
+                  entity_id:
+                    type: string
+                    description: The entity ID of this LightHouse, when the Admin API has access to it.
+                  features:
+                    type: array
+                    description: The usable optional features, in a fixed order.
+                    items:
+                      type: string
+                      enum:
+                        - conditional_status
+                        - events
+                        - trust_mark_issuance
+                        - trust_mark_instances
+                        - enroll_check
+                        - service_tokens
+                        - actor_delegation
+              example:
+                version: 1.2.3
+                entity_id: https://ta.example.org
+                features:
+                  - conditional_status
+                  - events
+                  - trust_mark_instances
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
   /api/v1/admin/entity-configuration/jwks:
     get:
       tags:
@@ -7711,6 +7781,8 @@ components:
           summary: UUID
           value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
 tags:
+  - name: Info
+    description: The version and the supported features of this instance.
   - name: Entity Configuration
     description: Endpoints related to the entity configuration document.
   - name: Authority Hints
