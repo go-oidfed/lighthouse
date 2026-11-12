@@ -126,6 +126,33 @@ type IssuedTrustMarkInstanceStore interface {
 	DeleteExpired(retentionDays int) (int64, error)
 	// FindSubjectID looks up the TrustMarkSubjectID for a given trust mark type and entity
 	FindSubjectID(trustMarkType, entityID string) (uint, error)
+	// RevokeByTypeAndSubject revokes every unrevoked instance of a trust mark
+	// type issued to an entity, whether or not it is linked to a subject.
+	// Returns the number of revoked instances.
+	RevokeByTypeAndSubject(trustMarkType, entityID string) (int64, error)
+	// List returns the instances matching q, newest first, and the total
+	// number matching it before Limit and Offset apply.
+	List(q InstanceQuery) ([]IssuedTrustMarkInstance, int64, error)
+	// CountByState counts the active and the revoked instances at unix time
+	// now: active ones are not revoked and unexpired (expires_at 0 or after
+	// now); revoked ones are revoked regardless of expiry.
+	CountByState(now int64) (active, revoked int64, err error)
+}
+
+// InstanceQuery filters the issued trust mark instances List returns. Empty
+// fields do not filter.
+type InstanceQuery struct {
+	TrustMarkType string
+	Subject       string
+	// State is TrustMarkStatusActive (not revoked, unexpired),
+	// TrustMarkStatusExpired (not revoked, expired) or TrustMarkStatusRevoked
+	// (revoked, whatever the expiry).
+	State TrustMarkInstanceStatus
+	// Now is the unix time State is judged at.
+	Now int64
+	// Limit is the page size; 0 returns all matches.
+	Limit  int
+	Offset int
 }
 
 // TrustMarkSpecStore provides CRUD for TrustMarkSpec and TrustMarkSubject entities
@@ -147,9 +174,16 @@ type TrustMarkSpecStore interface {
 	DeleteSubject(specIdent, subjectIdent string) error
 	ChangeSubjectStatus(specIdent, subjectIdent string, status Status) (*TrustMarkSubject, error)
 	// TransitionSubjectStatus sets a subject's status to "to" only if it is
-	// currently "from" and reports whether it changed; a transition to blocked
-	// or inactive revokes the subject's issued instances.
+	// currently "from" and reports whether it changed; a transition away from
+	// active revokes the subject's issued instances.
 	TransitionSubjectStatus(specIdent, subjectIdent string, from, to Status) (bool, error)
+	// LockSpec and LockSubject take the write lock on a spec's or a
+	// subject's row with an UPDATE that changes nothing. Called first in a
+	// transaction, they make it wait for (or block) other writers of the row
+	// before it reads anything, instead of failing on a lock upgrade. An
+	// unknown spec or subject is not an error.
+	LockSpec(ident string) error
+	LockSubject(specIdent, subjectIdent string) error
 }
 
 // AddTrustMarkSpec represents the payload for creating or updating a TrustMarkSpec.

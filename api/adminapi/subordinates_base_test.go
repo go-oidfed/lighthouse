@@ -1741,6 +1741,36 @@ func TestUpdateSubordinateStatusObjectBody(t *testing.T) {
 	)
 
 	t.Run(
+		"IssueIsRefusedAndChangesNothing", func(t *testing.T) {
+			t.Parallel()
+			for name, issue := range map[string]string{"True": "true", "False": "false"} {
+				t.Run(
+					name, func(t *testing.T) {
+						t.Parallel()
+						app, backends := setupTransactionalStatusApp(t, "")
+						entityID := "https://issue-" + strings.ToLower(name) + ".example.org"
+						id := addSubordinate(t, backends, entityID, model.StatusPending)
+						resp, body := putSubordinateStatus(
+							t, app, id, fiber.MIMEApplicationJSON, fmt.Sprintf(`{"status":"blocked","issue":%s}`, issue),
+						)
+						assertErrorResponse(t, resp, body, http.StatusBadRequest, "invalid_request")
+						if !strings.Contains(string(body), "issue is not supported") {
+							t.Errorf("error does not name issue: %s", body)
+						}
+						saved, _ := backends.Subordinates.Get(entityID)
+						if saved.Status != model.StatusPending {
+							t.Errorf("Expected status pending to stay, got %s", saved.Status)
+						}
+						if got := statusEventMessages(t, backends, id); len(got) != 0 {
+							t.Errorf("Expected no event, got %v", got)
+						}
+					},
+				)
+			}
+		},
+	)
+
+	t.Run(
 		"InvalidExpectedStatus", func(t *testing.T) {
 			t.Parallel()
 			app, backends := setupTransactionalStatusApp(t, "")

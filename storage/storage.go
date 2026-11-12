@@ -1208,16 +1208,35 @@ func (s *TrustMarkSpecStorage) Patch(ident string, updates map[string]any) (*mod
 	return existing, nil
 }
 
-// Delete deletes a TrustMarkSpec
+// Delete deletes a TrustMarkSpec after revoking the issued instances of all
+// its subjects, in one transaction: if revocation fails nothing is deleted.
 func (s *TrustMarkSpecStorage) Delete(ident string) error {
-	existing, err := s.findByIdent(ident)
-	if err != nil {
-		return err
-	}
-	if err = s.db.Delete(existing).Error; err != nil {
-		return errors.Wrap(err, "trust_mark_specs: delete failed")
-	}
-	return nil
+	return s.db.Transaction(
+		func(tx *gorm.DB) error {
+			ts := &TrustMarkSpecStorage{db: tx}
+			// Lock first, so the reads below do not fail on a lock upgrade.
+			if err := ts.LockSpec(ident); err != nil {
+				return err
+			}
+			existing, err := ts.findByIdent(ident)
+			if err != nil {
+				return err
+			}
+			var subjects []model.TrustMarkSubject
+			if err = tx.Where("trust_mark_spec_id = ?", existing.ID).Find(&subjects).Error; err != nil {
+				return errors.Wrap(err, "trust_mark_specs: list subjects for delete failed")
+			}
+			for i := range subjects {
+				if err = ts.revokeInstances(existing, &subjects[i], ident); err != nil {
+					return err
+				}
+			}
+			if err = tx.Delete(existing).Error; err != nil {
+				return errors.Wrap(err, "trust_mark_specs: delete failed")
+			}
+			return nil
+		},
+	)
 }
 
 // ListSubjects returns all TrustMarkSubjects for a TrustMarkSpec
@@ -1286,25 +1305,34 @@ func (s *TrustMarkSpecStorage) CreateSubject(specIdent string, subject *model.Ad
 
 // findSubjectByIdent finds a TrustMarkSubject by ID or entity_id within a spec
 func (s *TrustMarkSpecStorage) findSubjectByIdent(specIdent, subjectIdent string) (*model.TrustMarkSubject, error) {
+	_, subject, err := s.findSpecSubject(specIdent, subjectIdent)
+	return subject, err
+}
+
+// findSpecSubject finds a spec by ID or trust_mark_type and, within it, a
+// TrustMarkSubject by ID or entity_id.
+func (s *TrustMarkSpecStorage) findSpecSubject(specIdent, subjectIdent string) (
+	*model.TrustMarkSpec, *model.TrustMarkSubject, error,
+) {
 	spec, err := s.findByIdent(specIdent)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var subject model.TrustMarkSubject
 	// Try numeric ID first
 	if id, err := strconv.ParseUint(subjectIdent, 10, 64); err == nil {
 		if tx := s.db.Where("trust_mark_spec_id = ?", spec.ID).First(&subject, uint(id)); tx.Error == nil {
-			return &subject, nil
+			return spec, &subject, nil
 		}
 	}
 	// Fallback to entity_id
 	if err := s.db.Where("trust_mark_spec_id = ? AND entity_id = ?", spec.ID, subjectIdent).First(&subject).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, model.NotFoundError("trust mark subject not found")
+			return nil, nil, model.NotFoundError("trust mark subject not found")
 		}
-		return nil, errors.Wrap(err, "trust_mark_specs: get subject failed")
+		return nil, nil, errors.Wrap(err, "trust_mark_specs: get subject failed")
 	}
-	return &subject, nil
+	return spec, &subject, nil
 }
 
 // GetSubject returns a TrustMarkSubject by ID or entity_id
@@ -1312,118 +1340,228 @@ func (s *TrustMarkSpecStorage) GetSubject(specIdent, subjectIdent string) (*mode
 	return s.findSubjectByIdent(specIdent, subjectIdent)
 }
 
-// UpdateSubject updates an existing TrustMarkSubject
+// UpdateSubject updates an existing TrustMarkSubject. If the subject was
+// active and leaves active, or its entity ID changes while it was active, the
+// issued instances of the old entity are revoked in the same transaction; if
+// that fails nothing is updated.
 func (s *TrustMarkSpecStorage) UpdateSubject(specIdent, subjectIdent string, subject *model.AddTrustMarkSubject) (*model.TrustMarkSubject, error) {
-	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	var updated *model.TrustMarkSubject
+	err := s.db.Transaction(
+		func(tx *gorm.DB) error {
+			ts := &TrustMarkSpecStorage{db: tx}
+			// Lock first, so the reads below do not fail on a lock upgrade.
+			if err := ts.LockSubject(specIdent, subjectIdent); err != nil {
+				return err
+			}
+			spec, existing, err := ts.findSpecSubject(specIdent, subjectIdent)
+			if err != nil {
+				return err
+			}
+			before := *existing
+			existing.EntityID = subject.EntityID
+			existing.Status = subject.Status
+			existing.Description = subject.Description
+			existing.AdditionalClaims = subject.AdditionalClaims
+
+			if err = tx.Save(existing).Error; err != nil {
+				if isUniqueConstraintError(err) {
+					return model.AlreadyExistsError("subject already exists for this trust mark spec")
+				}
+				return errors.Wrap(err, "trust_mark_specs: update subject failed")
+			}
+			if before.Status == model.StatusActive &&
+				(existing.Status != model.StatusActive || existing.EntityID != before.EntityID) {
+				if err = ts.revokeInstances(spec, &before, specIdent); err != nil {
+					return err
+				}
+			}
+			updated = existing
+			return nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	existing.EntityID = subject.EntityID
-	existing.Status = subject.Status
-	existing.Description = subject.Description
-	existing.AdditionalClaims = subject.AdditionalClaims
-
-	if err = s.db.Save(existing).Error; err != nil {
-		if isUniqueConstraintError(err) {
-			return nil, model.AlreadyExistsError("subject already exists for this trust mark spec")
-		}
-		return nil, errors.Wrap(err, "trust_mark_specs: update subject failed")
-	}
-	return existing, nil
+	return updated, nil
 }
 
-// DeleteSubject deletes a TrustMarkSubject and revokes all associated trust mark instances.
+// DeleteSubject deletes a TrustMarkSubject and revokes all associated trust
+// mark instances, in one transaction: if revocation fails the subject is not
+// deleted.
 func (s *TrustMarkSpecStorage) DeleteSubject(specIdent, subjectIdent string) error {
-	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
-	if err != nil {
-		return err
-	}
-
-	// Revoke all issued trust mark instances for this subject before deletion
-	s.revokeInstancesForSubject(existing.ID, existing.EntityID, specIdent)
-
-	if err = s.db.Delete(existing).Error; err != nil {
-		return errors.Wrap(err, "trust_mark_specs: delete subject failed")
-	}
-	return nil
+	return s.db.Transaction(
+		func(tx *gorm.DB) error {
+			ts := &TrustMarkSpecStorage{db: tx}
+			// Lock first, so the reads below do not fail on a lock upgrade.
+			if err := ts.LockSubject(specIdent, subjectIdent); err != nil {
+				return err
+			}
+			spec, existing, err := ts.findSpecSubject(specIdent, subjectIdent)
+			if err != nil {
+				return err
+			}
+			// Revoke all issued trust mark instances for this subject before deletion
+			if err = ts.revokeInstances(spec, existing, specIdent); err != nil {
+				return err
+			}
+			if err = tx.Delete(existing).Error; err != nil {
+				return errors.Wrap(err, "trust_mark_specs: delete subject failed")
+			}
+			return nil
+		},
+	)
 }
 
-// ChangeSubjectStatus changes the status of a TrustMarkSubject.
-// If the new status is blocked or inactive, all associated trust mark instances are revoked.
+// ChangeSubjectStatus changes the status of a TrustMarkSubject. If the new
+// status is not active, all associated trust mark instances are revoked in
+// the same transaction; if that fails the status is not changed.
 func (s *TrustMarkSpecStorage) ChangeSubjectStatus(specIdent, subjectIdent string, status model.Status) (*model.TrustMarkSubject, error) {
-	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	var changed *model.TrustMarkSubject
+	err := s.db.Transaction(
+		func(tx *gorm.DB) error {
+			ts := &TrustMarkSpecStorage{db: tx}
+			// Lock first, so the reads below do not fail on a lock upgrade.
+			if err := ts.LockSubject(specIdent, subjectIdent); err != nil {
+				return err
+			}
+			spec, existing, err := ts.findSpecSubject(specIdent, subjectIdent)
+			if err != nil {
+				return err
+			}
+			existing.Status = status
+			if err = tx.Save(existing).Error; err != nil {
+				return errors.Wrap(err, "trust_mark_specs: change subject status failed")
+			}
+			if status != model.StatusActive {
+				if err = ts.revokeInstances(spec, existing, specIdent); err != nil {
+					return err
+				}
+			}
+			changed = existing
+			return nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	existing.Status = status
-	if err = s.db.Save(existing).Error; err != nil {
-		return nil, errors.Wrap(err, "trust_mark_specs: change subject status failed")
-	}
-
-	// Revoke all issued trust mark instances if status is blocked or inactive
-	if status == model.StatusBlocked || status == model.StatusInactive {
-		s.revokeInstancesForSubject(existing.ID, existing.EntityID, specIdent)
-	}
-
-	return existing, nil
+	return changed, nil
 }
 
 // TransitionSubjectStatus sets the status of a TrustMarkSubject to "to" only
 // if its current status is "from", in one conditional UPDATE, and reports
 // whether it changed. Concurrent transitions out of the same status therefore
-// cannot both succeed. An unknown subject reports false. Like
-// ChangeSubjectStatus, a transition to blocked or inactive revokes the
-// subject's issued trust mark instances.
+// cannot both succeed. An unknown subject reports false.
+//
+// The conditional UPDATE is the first statement, so inside a transaction the
+// write lock is taken before anything is read: two overlapping transitions
+// serialize instead of failing on a lock upgrade. Like ChangeSubjectStatus, a
+// transition to any status but active revokes the subject's issued
+// instances in the same transaction; if that fails the status is not
+// changed and the error is returned.
 func (s *TrustMarkSpecStorage) TransitionSubjectStatus(specIdent, subjectIdent string, from, to model.Status) (bool, error) {
-	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	changed := false
+	err := s.db.Transaction(
+		func(tx *gorm.DB) error {
+			specIDs := identWhere(
+				tx.Session(&gorm.Session{NewDB: true}).Model(&model.TrustMarkSpec{}).Select("id"),
+				specIdent, "trust_mark_type",
+			)
+			res := identWhere(
+				tx.Model(&model.TrustMarkSubject{}).
+					Where("status = ?", from).
+					Where("trust_mark_spec_id IN (?)", specIDs),
+				subjectIdent, "entity_id",
+			).Update("status", to)
+			if res.Error != nil {
+				return errors.Wrap(res.Error, "trust_mark_specs: transition subject status failed")
+			}
+			if res.RowsAffected == 0 || to == model.StatusActive {
+				changed = res.RowsAffected > 0
+				return nil
+			}
+			ts := &TrustMarkSpecStorage{db: tx}
+			spec, existing, err := ts.findSpecSubject(specIdent, subjectIdent)
+			if err != nil {
+				return err
+			}
+			if err = ts.revokeInstances(spec, existing, specIdent); err != nil {
+				return err
+			}
+			changed = true
+			return nil
+		},
+	)
 	if err != nil {
-		var notFound model.NotFoundError
-		if errors.As(err, &notFound) {
-			return false, nil
-		}
 		return false, err
 	}
-	res := s.db.Model(&model.TrustMarkSubject{}).
-		Where("id = ? AND status = ?", existing.ID, from).
-		Update("status", to)
-	if res.Error != nil {
-		return false, errors.Wrap(res.Error, "trust_mark_specs: transition subject status failed")
-	}
-	if res.RowsAffected == 0 {
-		return false, nil
-	}
-	if to == model.StatusBlocked || to == model.StatusInactive {
-		s.revokeInstancesForSubject(existing.ID, existing.EntityID, specIdent)
-	}
-	return true, nil
+	return changed, nil
 }
 
-// revokeInstancesForSubject revokes all issued trust mark instances for a subject.
-// This is called when a subject's status changes to blocked/inactive or when deleted.
-func (s *TrustMarkSpecStorage) revokeInstancesForSubject(subjectID uint, entityID, specIdent string) {
-	now := int(time.Now().Unix())
+// LockSpec takes the write lock on the row of the spec ident (ID or
+// trust_mark_type) with an UPDATE that changes nothing. Called first in a
+// transaction, it serializes the transaction with other writers of the spec
+// before anything is read. An unknown spec is not an error.
+func (s *TrustMarkSpecStorage) LockSpec(ident string) error {
+	res := identWhere(s.db.Model(&model.TrustMarkSpec{}), ident, "trust_mark_type").
+		UpdateColumn("updated_at", gorm.Expr("updated_at"))
+	if res.Error != nil {
+		return errors.Wrap(res.Error, "trust_mark_specs: lock spec failed")
+	}
+	return nil
+}
+
+// LockSubject takes the write lock on the row of the subject subjectIdent
+// (ID or entity_id) of spec specIdent with an UPDATE that changes nothing, as
+// LockSpec does for a spec. An unknown subject is not an error.
+func (s *TrustMarkSpecStorage) LockSubject(specIdent, subjectIdent string) error {
+	specIDs := identWhere(
+		s.db.Session(&gorm.Session{NewDB: true}).Model(&model.TrustMarkSpec{}).Select("id"),
+		specIdent, "trust_mark_type",
+	)
+	res := identWhere(
+		s.db.Model(&model.TrustMarkSubject{}).Where("trust_mark_spec_id IN (?)", specIDs),
+		subjectIdent, "entity_id",
+	).UpdateColumn("updated_at", gorm.Expr("updated_at"))
+	if res.Error != nil {
+		return errors.Wrap(res.Error, "trust_mark_specs: lock subject failed")
+	}
+	return nil
+}
+
+// identWhere narrows q to the rows named by ident: its numeric primary key,
+// or the value of column.
+func identWhere(q *gorm.DB, ident, column string) *gorm.DB {
+	if id, err := strconv.ParseUint(ident, 10, 64); err == nil {
+		return q.Where("(id = ? OR "+column+" = ?)", uint(id), ident)
+	}
+	return q.Where(column+" = ?", ident)
+}
+
+// revokeInstances revokes all unrevoked issued trust mark instances of a
+// subject: those linked to it and those of the spec's type issued to its
+// entity ID (issued before the subject existed, so unlinked).
+func (s *TrustMarkSpecStorage) revokeInstances(
+	spec *model.TrustMarkSpec, subject *model.TrustMarkSubject, specIdent string,
+) error {
 	result := s.db.Model(&model.IssuedTrustMarkInstance{}).
-		Where("trust_mark_subject_id = ? AND revoked = ?", subjectID, false).
+		Where(
+			"revoked = ? AND (trust_mark_subject_id = ? OR (trust_mark_type = ? AND subject = ?))",
+			false, subject.ID, spec.TrustMarkType, subject.EntityID,
+		).
 		Updates(map[string]any{
 			"revoked":    true,
-			"updated_at": now,
+			"updated_at": int(time.Now().Unix()),
 		})
-
 	if result.Error != nil {
-		log.Error().Err(result.Error).
-			Uint("subject_id", subjectID).
-			Str("entity_id", entityID).
-			Str("spec_ident", specIdent).
-			Msg("failed to revoke trust mark instances for subject")
-		return
+		return errors.Wrap(result.Error, "trust_mark_specs: revoking instances failed")
 	}
-
 	if result.RowsAffected > 0 {
 		log.Info().
-			Uint("subject_id", subjectID).
-			Str("entity_id", entityID).
+			Uint("subject_id", subject.ID).
+			Str("entity_id", subject.EntityID).
 			Str("spec_ident", specIdent).
 			Int64("revoked_count", result.RowsAffected).
 			Msg("automatically revoked trust mark instances due to subject status change")
 	}
+	return nil
 }

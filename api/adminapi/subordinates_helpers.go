@@ -37,6 +37,12 @@ func writeConflict(c fiber.Ctx, msg string) error {
 	return c.Status(fiber.StatusConflict).JSON(oidfed.ErrorInvalidRequest(msg))
 }
 
+// writeCodedError returns a JSON error response whose error is a
+// machine-readable code of the operation, such as already_held.
+func writeCodedError(c fiber.Ctx, status int, code, msg string) error {
+	return c.Status(status).JSON(&oidfed.Error{Error: code, ErrorDescription: msg})
+}
+
 // handleTxError handles errors from transactional operations.
 // It maps NotFoundError to 404 responses and other errors to 500 responses.
 func handleTxError(c fiber.Ctx, err error) error {

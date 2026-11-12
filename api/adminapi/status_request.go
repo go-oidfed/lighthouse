@@ -33,6 +33,18 @@ type statusRequest struct {
 	Message string
 	// JWKS replaces the keys of a subordinate.
 	JWKS *model.JWKS
+	// Issue issues the trust mark to a trust mark subject being activated.
+	Issue bool
+}
+
+// parseEventMessage trims a custom event message and refuses one longer than
+// maxStatusMessageLen characters.
+func parseEventMessage(message string) (string, error) {
+	message = strings.TrimSpace(message)
+	if utf8.RuneCountInString(message) > maxStatusMessageLen {
+		return "", fmt.Errorf("message is longer than %d characters", maxStatusMessageLen)
+	}
+	return message, nil
 }
 
 // statusTarget is the kind of entity a status change applies to. It decides
@@ -62,12 +74,16 @@ func parseStatusRequest(c fiber.Ctx, target statusTarget) (*statusRequest, error
 		ExpectedStatus string          `json:"expected_status"`
 		Message        string          `json:"message"`
 		JWKS           json.RawMessage `json:"jwks"`
+		Issue          *bool           `json:"issue"`
 	}
 	if err := json.Unmarshal(c.Body(), &body); err != nil {
 		return nil, errors.New("invalid body")
 	}
 	if body.JWKS != nil && target != subordinateStatus {
 		return nil, errors.New("jwks is not supported on a trust mark subject status change")
+	}
+	if body.Issue != nil && target != trustMarkSubjectStatus {
+		return nil, errors.New("issue is not supported on a subordinate status change (trust mark subjects only)")
 	}
 	var err error
 	if req.Status, err = parseStatusValue(body.Status); err != nil {
@@ -80,10 +96,10 @@ func parseStatusRequest(c fiber.Ctx, target statusTarget) (*statusRequest, error
 		}
 		req.ExpectedStatus = &expected
 	}
-	req.Message = strings.TrimSpace(body.Message)
-	if utf8.RuneCountInString(req.Message) > maxStatusMessageLen {
-		return nil, fmt.Errorf("message is longer than %d characters", maxStatusMessageLen)
+	if req.Message, err = parseEventMessage(body.Message); err != nil {
+		return nil, err
 	}
+	req.Issue = body.Issue != nil && *body.Issue
 	if len(body.JWKS) > 0 && string(body.JWKS) != "null" {
 		var jwks model.JWKS
 		if err = json.Unmarshal(body.JWKS, &jwks); err != nil {

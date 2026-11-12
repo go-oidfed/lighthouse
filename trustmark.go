@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
+	"github.com/go-oidfed/lib/unixtime"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 
+	"github.com/go-oidfed/lighthouse/api/adminapi"
 	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
@@ -362,20 +364,7 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 		}
 	}
 
-	// Generate JTI (JWT ID) for this issuance
-	jti := uuid.New().String()
-
-	// Copy the base claims into a fresh map so the stored models are not
-	// mutated, then add the JTI.
-	subjectClaims := make(map[string]any, len(baseClaims)+1)
-	maps.Copy(subjectClaims, baseClaims)
-	subjectClaims["jti"] = jti
-
-	tm, expiresAt, err := fed.IssueTrustMarkWithOptions(
-		trustMarkType, sub, oidfed.IssueTrustMarkOptions{
-			SubjectClaims: subjectClaims,
-		},
-	)
+	tm, jti, expiresAt, err := fed.signTrustMark(trustMarkType, sub, baseClaims)
 	if err != nil {
 		ctx.Status(fiber.StatusInternalServerError)
 		return ctx.JSON(oidfed.ErrorServerError(err.Error()))
@@ -411,18 +400,100 @@ func (fed *LightHouse) issueAndSendTrustMarkWithClaims(
 	}
 
 	// Cache the issued trust mark if caching is enabled for this trust mark type
-	if config.IssuedTrustMarkCache != nil && cacheTTLSeconds > 0 {
-		cacheTTL := time.Duration(cacheTTLSeconds) * time.Second
-		// If the trust mark has an expiration, don't cache longer than that
-		if expiresAt != nil {
-			timeUntilExpiry := time.Until(expiresAt.Time)
-			if timeUntilExpiry > 0 && timeUntilExpiry < cacheTTL {
-				cacheTTL = timeUntilExpiry
-			}
-		}
-		config.IssuedTrustMarkCache.Set(trustMarkType, sub, tm, cacheTTL)
+	var expiry time.Time
+	if expiresAt != nil {
+		expiry = expiresAt.Time
 	}
+	cacheIssuedTrustMark(
+		config.IssuedTrustMarkCache, trustMarkType, sub, tm, expiry, time.Duration(cacheTTLSeconds)*time.Second,
+	)
 
 	ctx.Set(fiber.HeaderContentType, oidfedconst.ContentTypeTrustMark)
 	return ctx.SendString(tm)
+}
+
+// signTrustMark signs a trust mark of trustMarkType for sub. The claims are a
+// copy of baseClaims (so the stored models are not mutated) with a new JTI
+// (JWT ID), which it returns with the trust mark and its expiry. It neither
+// records nor caches the trust mark.
+func (fed *LightHouse) signTrustMark(trustMarkType, sub string, baseClaims map[string]any) (
+	tm, jti string, expiresAt *unixtime.Unixtime, err error,
+) {
+	jti = uuid.New().String()
+	subjectClaims := make(map[string]any, len(baseClaims)+1)
+	maps.Copy(subjectClaims, baseClaims)
+	subjectClaims["jti"] = jti
+
+	tm, expiresAt, err = fed.IssueTrustMarkWithOptions(
+		trustMarkType, sub, oidfed.IssueTrustMarkOptions{
+			SubjectClaims: subjectClaims,
+		},
+	)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return tm, jti, expiresAt, nil
+}
+
+// cacheIssuedTrustMark caches the trust mark tm for cacheTTL, but not past
+// its expiry (zero when it has none). A nil cache or a cacheTTL of 0 caches
+// nothing.
+func cacheIssuedTrustMark(
+	cache *IssuedTrustMarkCache, trustMarkType, sub, tm string, expiry time.Time, cacheTTL time.Duration,
+) {
+	if cache == nil || cacheTTL <= 0 {
+		return
+	}
+	// If the trust mark has an expiration, don't cache longer than that
+	if !expiry.IsZero() {
+		timeUntilExpiry := time.Until(expiry)
+		if timeUntilExpiry > 0 && timeUntilExpiry < cacheTTL {
+			cacheTTL = timeUntilExpiry
+		}
+	}
+	cache.Set(trustMarkType, sub, tm, cacheTTL)
+}
+
+// adminTrustMarkSigner implements adminapi.TrustMarkSigner for the admin
+// API's immediate issuance.
+type adminTrustMarkSigner struct {
+	fed *LightHouse
+}
+
+// SignTrustMark signs a trust mark of trustMarkType for sub with claims as
+// the trust mark endpoint would, without eligibility checks, recording or
+// caching. It returns adminapi.ErrIssuanceUnavailable if this LightHouse does
+// not issue trust marks of the type.
+func (s adminTrustMarkSigner) SignTrustMark(trustMarkType, sub string, claims map[string]any) (
+	adminapi.SignedTrustMark, error,
+) {
+	if s.fed == nil || s.fed.TrustMarkIssuer == nil || !s.fed.TrustMarkIssuer.HasTrustMarkType(trustMarkType) {
+		return adminapi.SignedTrustMark{}, adminapi.ErrIssuanceUnavailable
+	}
+	tm, jti, expiresAt, err := s.fed.signTrustMark(trustMarkType, sub, claims)
+	if err != nil {
+		return adminapi.SignedTrustMark{}, err
+	}
+	signed := adminapi.SignedTrustMark{JWT: tm, JTI: jti}
+	if expiresAt != nil {
+		signed.ExpiresAt = expiresAt.Unix()
+	}
+	return signed, nil
+}
+
+// ServeTrustMark puts signed into the trust mark endpoint's issued trust mark
+// cache for cacheTTL, bounded by its expiry, so the endpoint serves the mark
+// the admin API recorded instead of signing a second instance.
+func (s adminTrustMarkSigner) ServeTrustMark(
+	trustMarkType, sub string, signed adminapi.SignedTrustMark, cacheTTL time.Duration,
+) {
+	if s.fed == nil {
+		return
+	}
+	_, issued := s.fed.trustMarkCaches.get()
+	var expiry time.Time
+	if signed.ExpiresAt != 0 {
+		expiry = time.Unix(signed.ExpiresAt, 0)
+	}
+	cacheIssuedTrustMark(issued, trustMarkType, sub, signed.JWT, expiry, cacheTTL)
 }

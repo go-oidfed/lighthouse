@@ -2267,11 +2267,37 @@ paths:
           description: Successful response - returns the created `TrustMarkSubject`.
         '400':
           $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
         '500':
           $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/IssueCodedError'
       operationId: createTrustMarkSubject
       summary: Create a TrustMarkSubject
-      description: Creates a new instance of a `TrustMarkSubject`.
+      description: |
+        Creates a new instance of a `TrustMarkSubject`. A subject created
+        active records a `trust_mark_granted` event; `message` replaces its
+        text.
+
+        With `"issue": true` the trust mark is also issued to the new subject,
+        which must then be active: it is signed and the issued instance is
+        recorded in the same transaction as the subject, with a
+        `trust_mark_issued` event. When the spec has a `cache_ttl`, the trust
+        mark endpoint then serves this mark from its cache; with `cache_ttl`
+        0 it signs a fresh mark on each request, so the eagerly issued
+        instance is recorded but not delivered, and stays live until it
+        expires or is revoked. Nothing is written, and the answer is an
+        error with a machine-readable `error` code, when:
+
+        - the entity already holds an active (unrevoked, unexpired) trust mark
+          of the type (409 `already_held`),
+        - this LightHouse cannot issue trust marks of the type (503
+          `issuance_unavailable`),
+        - signing fails (500).
+
+        A subject that already exists is a 409 `invalid_request`, as without
+        `issue`.
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}:
     summary: Manage a single TrustMarkSubject.
     description: Get, update, patch, or delete a single `TrustMarkSubject`.
@@ -2355,8 +2381,21 @@ paths:
         blocked, pending, inactive), or, with `Content-Type: application/json`,
         an object. In the object form `expected_status` makes the change
         conditional: if the subject is in another status the answer is 409
-        and nothing is written. `message` (at most 1000 characters) is
-        validated; a subject status change records no event that carries it.
+        and nothing is written.
+
+        A change records a trust mark event: `trust_mark_granted` when the
+        subject becomes active, `trust_mark_revoked` when it leaves active,
+        else `trust_mark_status_updated`. `message` (at most 1000 characters)
+        replaces its text. When the subject leaves active its issued
+        instances are revoked, in the same transaction as the change.
+
+        With `"issue": true` the status must be `active`, and the trust mark
+        is issued to the subject the way creating a subject with `issue`
+        does, in the same transaction as the change; without
+        `expected_status` the change is made from the status that was read.
+        The 409 `already_held` and 503 `issuance_unavailable` answers apply,
+        and nothing is written on any failure.
+
         A trust mark subject has no keys: a body with `jwks` is answered 400
         `invalid_request` and nothing is written.
       requestBody:
@@ -2390,9 +2429,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
         '409':
-          $ref: '#/components/responses/ConflictError'
+          $ref: '#/components/responses/IssueCodedError'
         '500':
           $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/IssueCodedError'
       operationId: changeTrustMarkSubjectStatus
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims:
     summary: Manage subject-specific additional custom claims.
@@ -2494,6 +2535,148 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TrustMarkSpecIDParam'
       - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+  /api/v1/admin/trust-marks/instances:
+    get:
+      tags:
+        - Trust Mark Issuance
+      summary: List issued trust mark instances
+      description: |
+        Lists the trust marks LightHouse has issued, newest first. The
+        `state` of an instance is `revoked` if it was revoked, else `expired`
+        once its `expires_at` (when not 0) has passed, else `active`.
+      operationId: listTrustMarkInstances
+      parameters:
+        - name: trust_mark_type
+          in: query
+          required: false
+          description: Only instances of this trust mark type.
+          schema:
+            type: string
+        - name: sub
+          in: query
+          required: false
+          description: Only instances issued to this entity ID.
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: Only instances in this state.
+          schema:
+            type: string
+            enum:
+              - active
+              - revoked
+              - expired
+        - name: limit
+          in: query
+          required: false
+          description: Page size (default 50, at most 100).
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          description: Number of instances to skip.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The matching instances.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - instances
+                  - pagination
+                properties:
+                  instances:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrustMarkInstance'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/trust-marks/instances/counts:
+    get:
+      tags:
+        - Trust Mark Issuance
+      summary: Count issued trust mark instances
+      description: |
+        Counts the active (unrevoked and unexpired) and the revoked
+        instances.
+      operationId: countTrustMarkInstances
+      responses:
+        '200':
+          description: The counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - active
+                  - revoked
+                properties:
+                  active:
+                    type: integer
+                  revoked:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/trust-marks/instances/revoke:
+    post:
+      tags:
+        - Trust Mark Issuance
+      summary: Revoke the instances of a trust mark held by an entity
+      description: |
+        Revokes every unrevoked instance of a trust mark type issued to an
+        entity, whether or not the entity is a subject of a spec. If any was
+        revoked, a `trust_mark_revoked` event is recorded and the caches are
+        cleared. If the entity is an active subject of a spec of the type, the
+        trust mark endpoint would issue the mark again: nothing is revoked and
+        the answer is 409 `subject_active`; change the subject's status
+        instead.
+      operationId: revokeTrustMarkInstances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trust_mark_type
+                - sub
+              properties:
+                trust_mark_type:
+                  type: string
+                sub:
+                  $ref: '#/components/schemas/EntityID'
+                message:
+                  type: string
+                  maxLength: 1000
+                  description: Replaces the text of the `trust_mark_revoked` event (400 if longer than 1000 characters).
+      responses:
+        '200':
+          description: The number of instances revoked (0 if there were none).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - revoked
+                properties:
+                  revoked:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/v1/admin/trust-marks/types/{trustMarkTypeID}/owner:
     summary: Path used to manage the single owner of a trust mark type.
     description: Manage the single TrustMarkOwner associated with a trust mark type (or none).
@@ -3008,6 +3191,7 @@ paths:
             - Attempting to set status to "active" when the subordinate has no keys
             - The message is longer than 1000 characters
             - The jwks is invalid
+            - The object body has `issue`, which applies to trust mark subjects only
           content:
             application/json:
               schema:
@@ -3066,6 +3250,10 @@ paths:
               - jwks_update_triggered
               - jwks_updated
               - join_requested
+              - trust_mark_granted
+              - trust_mark_revoked
+              - trust_mark_issued
+              - trust_mark_status_updated
         - name: from
           in: query
           description: Filter events with timestamp >= this value (unix seconds).
@@ -5977,6 +6165,10 @@ components:
             - jwks_update_triggered
             - jwks_updated
             - join_requested
+            - trust_mark_granted
+            - trust_mark_revoked
+            - trust_mark_issued
+            - trust_mark_status_updated
         status:
           type: string
           description: Subordinate status at the time of the event, if applicable.
@@ -6455,9 +6647,15 @@ components:
         message:
           type: string
           maxLength: 1000
-          description: Accepted and validated; a subject status change records no event that carries it.
+          description: Replaces the text of the trust mark events the change records.
+        issue:
+          type: boolean
+          description: Also issue the trust mark. Requires `status` active.
     SubordinateStatusChange:
-      description: Object body of a subordinate status change.
+      description: |
+        Object body of a subordinate status change. Unlike the trust mark
+        subject status change it takes no `issue`; a body with `issue` is
+        answered 400.
       type: object
       required:
         - status
@@ -6501,6 +6699,47 @@ components:
           type: object
           additionalProperties: true
           description: Per-subject additional claims that override general claims.
+        issue:
+          type: boolean
+          description: |
+            Also issue the trust mark to the new subject, which must be
+            active.
+        message:
+          type: string
+          maxLength: 1000
+          description: |
+            Replaces the text of the `trust_mark_granted` (and, with `issue`,
+            `trust_mark_issued`) event recorded for the new subject (400 if
+            longer than 1000 characters).
+    TrustMarkInstance:
+      description: A trust mark LightHouse issued.
+      type: object
+      required:
+        - jti
+        - trust_mark_type
+        - subject
+        - issued_at
+        - expires_at
+        - state
+      properties:
+        jti:
+          type: string
+        trust_mark_type:
+          type: string
+        subject:
+          $ref: '#/components/schemas/EntityID'
+        issued_at:
+          type: integer
+          description: Unix time the instance was recorded.
+        expires_at:
+          type: integer
+          description: Unix time the instance expires; 0 if it does not.
+        state:
+          type: string
+          enum:
+            - active
+            - revoked
+            - expired
 
     TrustMarkIssuer:
       description: A trust mark issuer object.
@@ -6733,6 +6972,24 @@ components:
                 error: invalid_request
                 error_description: resource already exists
       description: The request conflicts with existing data (e.g., duplicate claim name)
+    IssueCodedError:
+      description: |
+        An issuance or revocation was refused. `error` is a machine-readable
+        code: `already_held` (409, the entity already holds an active trust
+        mark of the type), `subject_active` (409, the entity is an active
+        subject of the type, so its instances are not revoked) or
+        `issuance_unavailable` (503, this LightHouse does not issue trust
+        marks of the type). Other refusals use the generic codes, such as
+        `invalid_request` for a status that is not the expected one.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            already held:
+              value:
+                error: already_held
+                error_description: the entity already holds an active trust mark of this type
   parameters:
     AdditionalClaimsID:
       name: additionalClaimsID

@@ -55,7 +55,8 @@ func (r *recordingCacheInvalidator) assert(t *testing.T, wantMarks, wantTypes []
 // a spec "type-a" holding the active subject "https://a.example.org".
 func setupCacheInvalidationApp(t *testing.T) (*fiber.App, *recordingCacheInvalidator, uint, uint) {
 	t.Helper()
-	store := newTestStorage(t).TrustMarkSpecStorage()
+	st := newTestStorage(t)
+	store := st.TrustMarkSpecStorage()
 	spec, err := store.Create(&model.AddTrustMarkSpec{TrustMarkType: "type-a"})
 	if err != nil {
 		t.Fatalf("create spec: %v", err)
@@ -71,7 +72,7 @@ func setupCacheInvalidationApp(t *testing.T) (*fiber.App, *recordingCacheInvalid
 	}
 	inv := &recordingCacheInvalidator{}
 	app := fiber.New()
-	registerTrustMarkIssuance(app, store, inv)
+	registerTrustMarkIssuance(app, testBackendsOf(t, st), inv, nil)
 	return app, inv, spec.ID, subject.ID
 }
 
@@ -295,9 +296,8 @@ func TestTrustMarkIssuance_CacheInvalidation(t *testing.T) {
 
 func TestTrustMarkIssuance_NilCacheInvalidator(t *testing.T) {
 	t.Parallel()
-	store := newTestStorage(t).TrustMarkSpecStorage()
 	app := fiber.New()
-	registerTrustMarkIssuance(app, store, nil)
+	registerTrustMarkIssuance(app, testBackendsOf(t, newTestStorage(t)), nil, nil)
 
 	req := httptest.NewRequest(
 		"POST", "/trust-marks/issuance-spec", strings.NewReader(`{"trust_mark_type":"type-a"}`),
@@ -480,7 +480,7 @@ func TestTrustMarkSubjectStatusConcurrent(t *testing.T) {
 		t.Fatalf("create spec: %v", err)
 	}
 	app := fiber.New()
-	registerTrustMarkIssuance(app, specs, nil)
+	registerTrustMarkIssuance(app, testBackendsOf(t, store), nil, nil)
 
 	for i := range 10 {
 		subject, err := specs.CreateSubject(
