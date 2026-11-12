@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
     
     
       
@@ -2133,6 +2133,10 @@ custom claims required by the trust scheme.</p>
 </tbody>
 </table>
 <p>Cache TTL is automatically capped by the trust mark's expiration time.</p>
+<p>Changes made through the Admin API invalidate both caches: a write to a trust
+mark subject (create, update, status change, delete, additional claims) drops
+the entries of that subject, and an update or deletion of a trust mark spec
+drops all entries of its trust mark type.</p>
 <h2 id="trust-mark-status-endpoint">Trust Mark Status Endpoint<a class="headerlink" href="#trust-mark-status-endpoint" title="Permanent link">&para;</a></h2>
 <p>The status endpoint allows verification of issued trust marks per the OIDC
 Federation specification.</p>
@@ -2461,7 +2465,7 @@ revoked.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.instant", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer", "toc.integrate", "content.code.copy", "content.code.annotate", "content.tooltips"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "main", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
         <script src="../../assets/_markdown_exec_pyodide.js"></script>
       
