@@ -3205,6 +3205,81 @@ paths:
       operationId: changeSubordinateStatus
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
+  /api/v1/admin/subordinates/{subordinateID}/enroll-check:
+    post:
+      tags:
+        - Enroll Check
+      summary: Run the enroll entity checker for a subordinate
+      description: |
+        Runs the entity checker the enroll endpoint is configured with on the
+        subordinate, so the checker step decides as the enroll endpoint's does.
+        (The enroll endpoint also answers for entities that are already
+        subordinates before it checks anything; this route does not, and it
+        checks the entity types registered for the subordinate.) The server
+        obtains the subordinate's entity configuration itself, the way
+        the enroll endpoint does, within a bounded time (20 seconds), and
+        checks the entity types registered for the subordinate (or, when none
+        are registered, the types guessed from its metadata). The request has
+        no body; a body is ignored, and a client can never supply the entity
+        configuration or the entity to check. The check changes nothing.
+
+        The check is rate-bounded: concurrent checks of the same subordinate
+        share one lookup, and at most 8 lookups run at once; beyond that the
+        answer is 503 `enroll_check_busy`. An externally hosted enroll
+        endpoint (empty path) registers no checker, so the answer is
+        `configured: false`.
+
+        The answer is always 200 for an existing subordinate:
+        - No enroll entity checker is configured: `configured` is `false`,
+          `ok` is `false`, `reason` is omitted, and the entity configuration is
+          not fetched.
+        - The entity configuration has no metadata and no entity types are
+          registered to check: `configured` is `true`, `ok` is `false`,
+          `reason` is `entity configuration has no metadata`.
+        - The entity configuration cannot be obtained or verified, or was not
+          served in time: `configured` is `true`, `ok` is `false` and `reason`
+          says so; the checker does not run.
+        - Otherwise `ok` is the checker's decision, and `reason` its
+          description when it refuses.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollCheckResult'
+              examples:
+                accepted:
+                  value:
+                    configured: true
+                    ok: true
+                    entity_types:
+                      - openid_provider
+                refused:
+                  value:
+                    configured: true
+                    ok: false
+                    reason: entity does not carry the required trust mark
+                    entity_types:
+                      - openid_provider
+                no checker:
+                  value:
+                    configured: false
+                    ok: false
+                    entity_types: []
+          description: The result of the check.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '503':
+          description: Too many enroll checks are running (`enroll_check_busy`); retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      operationId: checkSubordinateEnroll
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
   /api/v1/admin/subordinates/{subordinateID}/history:
     get:
       tags:
@@ -6651,6 +6726,29 @@ components:
         issue:
           type: boolean
           description: Also issue the trust mark. Requires `status` active.
+    EnrollCheckResult:
+      type: object
+      required:
+        - configured
+        - ok
+        - entity_types
+      properties:
+        configured:
+          type: boolean
+          description: Whether an enroll entity checker is configured.
+        ok:
+          type: boolean
+          description: |
+            Whether the enroll entity checker accepts the subordinate. Always
+            `false` when `configured` is `false`.
+        reason:
+          type: string
+          description: Why the check failed. Omitted when `ok` is `true` or nothing was checked.
+        entity_types:
+          type: array
+          items:
+            type: string
+          description: The entity types that were checked.
     SubordinateStatusChange:
       description: |
         Object body of a subordinate status change. Unlike the trust mark
@@ -7188,6 +7286,8 @@ tags:
     description: Manage metadata claims published in the entity configuration.
   - name: Subordinates
     description: Manage subordinate entities.
+  - name: Enroll Check
+    description: Ask whether the enroll entity checker accepts a subordinate.
   - name: Subordinate Keys
     description: Manage keys associated with subordinate entities.
   - name: Subordinate Metadata

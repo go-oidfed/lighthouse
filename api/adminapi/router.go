@@ -32,6 +32,10 @@ type Options struct {
 	// modified to invalidate the trust mark endpoint's cached eligibility
 	// results and issued trust marks. Can be nil if there are no such caches.
 	TrustMarkCacheInvalidator TrustMarkCacheInvalidator
+	// EnrollChecker runs the enroll endpoint's entity checker for
+	// POST /subordinates/{subordinateID}/enroll-check. Can be nil, in which
+	// case that route answers as if no checker were configured.
+	EnrollChecker EnrollChecker
 	// TrustMarkSigner signs the trust marks issued immediately when a subject
 	// is created or activated with "issue": true. Can be nil, in which case
 	// such requests are answered 503 issuance_unavailable.
@@ -60,6 +64,14 @@ func (o *Options) trustMarkSigner() TrustMarkSigner {
 		return nil
 	}
 	return o.TrustMarkSigner
+}
+
+// enrollChecker returns the configured enroll checker (nil-safe).
+func (o *Options) enrollChecker() EnrollChecker {
+	if o == nil {
+		return nil
+	}
+	return o.EnrollChecker
 }
 
 // jwksUpdateHookApplier returns the configured JWKS-sync hook applier (nil-safe).
@@ -181,6 +193,8 @@ func Register(
 	registerEntityTrustMarks(r, storages.PublishedTrustMarks, trustMarkInvalidator)
 	// Subordinates - all handlers registered via single entry point (with transaction support)
 	RegisterSubordinateHandlers(r, storages, fedEntity, ctrl)
+	// Enroll check of a subordinate
+	registerEnrollCheck(r, storages.Subordinates, opts.enrollChecker())
 	// Events of all entities
 	registerEvents(r, storages.SubordinateEvents)
 	// Trust Mark Types and Issuance (with transaction support)

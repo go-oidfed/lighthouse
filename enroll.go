@@ -58,6 +58,42 @@ func (fed *LightHouse) recordEnrollmentEvent(
 	}
 }
 
+// resolveEnrollEntityConfiguration obtains the entity configuration of
+// entityID the way the enroll endpoint does and returns it, or nil if it could
+// not be obtained or verified. It uses a TrustResolver with the entity as its
+// own trust anchor instead of simply fetching the entity configuration,
+// because this also verifies the signature.
+func resolveEnrollEntityConfiguration(entityID string, types []string) *oidfed.EntityStatement {
+	resolver := oidfed.TrustResolver{
+		TrustAnchors:   oidfed.NewTrustAnchorsFromEntityIDs(entityID),
+		StartingEntity: entityID,
+		Types:          types,
+	}
+	chains := resolver.ResolveToValidChainsWithoutVerifyingMetadata()
+	if len(chains) == 0 {
+		return nil
+	}
+	return chains[0][0]
+}
+
+// errMsgEnrollNoMetadata is why an entity without metadata cannot be checked
+// when no entity types are requested.
+const errMsgEnrollNoMetadata = "entity configuration has no metadata"
+
+// enrollEntityTypes returns the entity types the enroll endpoint checks:
+// requested, or the types guessed from the entity configuration's metadata
+// when none are requested. ok is false if types have to be guessed but the
+// entity configuration has no metadata to guess them from.
+func enrollEntityTypes(requested []string, entityConfig *oidfed.EntityStatement) (types []string, ok bool) {
+	if len(requested) > 0 {
+		return requested, true
+	}
+	if entityConfig.Metadata == nil {
+		return nil, false
+	}
+	return entityConfig.Metadata.GuessEntityTypes(), true
+}
+
 // AddEnrollEndpoint adds an endpoint to enroll to this IA/TA
 func (fed *LightHouse) AddEnrollEndpoint(
 	endpoint EndpointConf,
@@ -94,6 +130,7 @@ func (fed *LightHouse) AddEnrollEndpoint(
 		}
 	}
 	fed.fedMetadata.Extra["federation_enroll_endpoint"] = endpoint.ValidateURL(fed.FederationEntity.EntityID())
+	fed.setEnrollChecker(checker)
 	handler := func(ctx fiber.Ctx) error {
 		var req enrollRequest
 		if err := parseRequest(ctx, &req); err != nil {
@@ -135,22 +172,16 @@ func (fed *LightHouse) AddEnrollEndpoint(
 			default:
 			}
 		}
-		// We use a TrustResolver to obtain the entity configuration
-		// instead of simply fetching the entity configuration,
-		// because this will also verify the signature.
-		resolver := oidfed.TrustResolver{
-			TrustAnchors:   oidfed.NewTrustAnchorsFromEntityIDs(req.Subject),
-			StartingEntity: req.Subject,
-			Types:          req.EntityTypes,
-		}
-		chains := resolver.ResolveToValidChainsWithoutVerifyingMetadata()
-		if len(chains) == 0 {
+		entityConfig := resolveEnrollEntityConfiguration(req.Subject, req.EntityTypes)
+		if entityConfig == nil {
 			ctx.Status(fiber.StatusBadRequest)
 			return ctx.JSON(oidfed.ErrorInvalidRequest("could not obtain or verify entity configuration"))
 		}
-		entityConfig := chains[0][0]
-		if len(req.EntityTypes) == 0 {
-			req.EntityTypes = entityConfig.Metadata.GuessEntityTypes()
+		var typesOK bool
+		req.EntityTypes, typesOK = enrollEntityTypes(req.EntityTypes, entityConfig)
+		if !typesOK {
+			ctx.Status(fiber.StatusBadRequest)
+			return ctx.JSON(oidfed.ErrorInvalidRequest(errMsgEnrollNoMetadata))
 		}
 		if checker != nil {
 			ok, errStatus, errResponse := checker.Check(entityConfig, req.EntityTypes)
