@@ -122,6 +122,7 @@ type LightHouse struct {
 	statsAggregator          *stats.Aggregator
 	statsAggregatorCancel    context.CancelFunc
 	trustMarkConfigProvider  *storage.TrustMarkConfigProvider
+	trustMarkCaches          trustMarkEndpointCaches
 	trustAnchorRepo          *TrustAnchorRepo
 	taJWKSRefresher          *oidfed.TAJWKSRefresher
 	subordinateJWKSRefresher *oidfed.SubordinateJWKSRefresher
@@ -487,6 +488,7 @@ func initAdminAPI(
 			UsersEnabled:               admin.UsersEnabled,
 			Port:                       admin.Port,
 			TrustMarkConfigInvalidator: trustMarkConfigProvider,
+			TrustMarkCacheInvalidator:  &entity.trustMarkCaches,
 			JWKSUpdateHookApplier:      admin.JWKSUpdateHookApplier,
 			Actor: adminapi.ActorConfig{
 				Header: admin.ActorHeader,

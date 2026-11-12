@@ -28,6 +28,10 @@ type Options struct {
 	// TrustMarkConfigInvalidator is called when entity configuration trust marks are modified
 	// to invalidate any cached configurations. Can be nil if not using trust mark refresh.
 	TrustMarkConfigInvalidator TrustMarkConfigInvalidator
+	// TrustMarkCacheInvalidator is called after trust mark subjects or specs are
+	// modified to invalidate the trust mark endpoint's cached eligibility
+	// results and issued trust marks. Can be nil if there are no such caches.
+	TrustMarkCacheInvalidator TrustMarkCacheInvalidator
 	// JWKSUpdateHookApplier, when non-nil, is invoked after each authority-hint
 	// mutation so that outbound JWKS-sync hooks can be re-attached at runtime.
 	// A returned error is logged, not returned to the API client (the DB write
@@ -36,6 +40,14 @@ type Options struct {
 	// Actor holds configuration for actor extraction from requests.
 	// The actor is recorded in subordinate event history.
 	Actor ActorConfig
+}
+
+// trustMarkCacheInvalidator returns the configured trust mark cache invalidator (nil-safe).
+func (o *Options) trustMarkCacheInvalidator() TrustMarkCacheInvalidator {
+	if o == nil {
+		return nil
+	}
+	return o.TrustMarkCacheInvalidator
 }
 
 // jwksUpdateHookApplier returns the configured JWKS-sync hook applier (nil-safe).
@@ -162,7 +174,7 @@ func Register(
 	// Global Owners and Issuers
 	registerTrustMarkOwners(r, storages.TrustMarkOwners, storages.TrustMarkTypes)
 	registerTrustMarkIssuers(r, storages.TrustMarkIssuers, storages.TrustMarkTypes)
-	registerTrustMarkIssuance(r, storages.TrustMarkSpecs)
+	registerTrustMarkIssuance(r, storages.TrustMarkSpecs, opts.trustMarkCacheInvalidator())
 	// Trust Anchors (TA repository management)
 	registerTrustAnchors(r, storages.TrustAnchors, ctrl)
 	// Federation Endpoints (dynamic endpoint management)

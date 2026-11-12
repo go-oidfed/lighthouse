@@ -485,12 +485,20 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 		return fed.AddTrustMarkedEntitiesListingEndpoint(endpointConf, fed.storages.TrustMarkInstances)
 
 	case model.EndpointTypeTrustMark:
-		eligibilityCache := NewEligibilityCache()
-		stopEligibilityCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
-		_ = stopEligibilityCacheCleanup // TODO: manage lifecycle
-		issuedTrustMarkCache := NewIssuedTrustMarkCache()
-		stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
-		_ = stopIssuedCacheCleanup // TODO: manage lifecycle
+		// Reuse the caches across reloads, so that a legacy path still served
+		// by the previous handler shares them and admin API invalidations
+		// reach both.
+		eligibilityCache, issuedTrustMarkCache := fed.trustMarkCaches.get()
+		if eligibilityCache == nil {
+			eligibilityCache = NewEligibilityCache()
+			stopEligibilityCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
+			_ = stopEligibilityCacheCleanup // TODO: manage lifecycle
+		}
+		if issuedTrustMarkCache == nil {
+			issuedTrustMarkCache = NewIssuedTrustMarkCache()
+			stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
+			_ = stopIssuedCacheCleanup // TODO: manage lifecycle
+		}
 		return fed.AddTrustMarkEndpointWithConfig(
 			endpointConf, TrustMarkEndpointConfig{
 				Store:                fed.storages.TrustMarks,

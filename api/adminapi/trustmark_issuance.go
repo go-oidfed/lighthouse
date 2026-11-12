@@ -7,13 +7,25 @@ import (
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v3"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
+// TrustMarkCacheInvalidator is implemented by types that cache trust mark
+// endpoint results (eligibility check results and issued trust marks) and
+// need to be invalidated when trust mark subjects or specs change.
+type TrustMarkCacheInvalidator interface {
+	// InvalidateTrustMark drops the cached results for one entity and trust mark type.
+	InvalidateTrustMark(trustMarkType, entityID string)
+	// InvalidateTrustMarkType drops the cached results for all entities of a trust mark type.
+	InvalidateTrustMarkType(trustMarkType string)
+}
+
 // trustMarkSpecHandlers groups handlers for TrustMarkSpec CRUD endpoints.
 type trustMarkSpecHandlers struct {
-	store model.TrustMarkSpecStore
+	store            model.TrustMarkSpecStore
+	cacheInvalidator TrustMarkCacheInvalidator
 }
 
 func (h *trustMarkSpecHandlers) list(c fiber.Ctx) error {
@@ -55,10 +67,13 @@ func (h *trustMarkSpecHandlers) update(c fiber.Ctx) error {
 	if spec.TrustMarkType == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("trust_mark_type is required"))
 	}
-	updated, err := h.store.Update(c.Params("trustMarkSpecID"), &spec)
+	specID := c.Params("trustMarkSpecID")
+	oldType := h.trustMarkType(specID)
+	updated, err := h.store.Update(specID, &spec)
 	if err != nil {
 		return h.handleError(c, err)
 	}
+	h.invalidateTypes(oldType, updated.TrustMarkType)
 	return c.JSON(updated)
 }
 
@@ -67,18 +82,53 @@ func (h *trustMarkSpecHandlers) patch(c fiber.Ctx) error {
 	if err := c.Bind().Body(&updates); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
-	patched, err := h.store.Patch(c.Params("trustMarkSpecID"), updates)
+	specID := c.Params("trustMarkSpecID")
+	oldType := h.trustMarkType(specID)
+	patched, err := h.store.Patch(specID, updates)
 	if err != nil {
 		return h.handleError(c, err)
 	}
+	h.invalidateTypes(oldType, patched.TrustMarkType)
 	return c.JSON(patched)
 }
 
 func (h *trustMarkSpecHandlers) delete(c fiber.Ctx) error {
-	if err := h.store.Delete(c.Params("trustMarkSpecID")); err != nil {
+	specID := c.Params("trustMarkSpecID")
+	oldType := h.trustMarkType(specID)
+	if err := h.store.Delete(specID); err != nil {
 		return h.handleError(c, err)
 	}
+	h.invalidateTypes(oldType)
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// trustMarkType returns the trust mark type of the spec before it is changed,
+// or "" if there is no cache to invalidate or the spec cannot be read (the
+// write that follows then reports the error).
+func (h *trustMarkSpecHandlers) trustMarkType(specID string) string {
+	if h.cacheInvalidator == nil {
+		return ""
+	}
+	spec, err := h.store.Get(specID)
+	if err != nil || spec == nil {
+		return ""
+	}
+	return spec.TrustMarkType
+}
+
+// invalidateTypes drops the cached trust mark endpoint results of all
+// entities of the given trust mark types. A spec change can affect every
+// entity of its type (e.g. a changed eligibility config or lifetime), not only
+// the subjects stored in the database.
+func (h *trustMarkSpecHandlers) invalidateTypes(trustMarkTypes ...string) {
+	if h.cacheInvalidator == nil {
+		return
+	}
+	for _, trustMarkType := range trustMarkTypes {
+		if trustMarkType != "" {
+			h.cacheInvalidator.InvalidateTrustMarkType(trustMarkType)
+		}
+	}
 }
 
 func (*trustMarkSpecHandlers) handleError(c fiber.Ctx, err error) error {
@@ -93,7 +143,8 @@ func (*trustMarkSpecHandlers) handleError(c fiber.Ctx, err error) error {
 
 // trustMarkSubjectHandlers groups handlers for TrustMarkSubject CRUD endpoints.
 type trustMarkSubjectHandlers struct {
-	store model.TrustMarkSpecStore
+	store            model.TrustMarkSpecStore
+	cacheInvalidator TrustMarkCacheInvalidator
 }
 
 func (h *trustMarkSubjectHandlers) list(c fiber.Ctx) error {
@@ -129,6 +180,7 @@ func (h *trustMarkSubjectHandlers) create(c fiber.Ctx) error {
 	if err != nil {
 		return h.handleError(c, err)
 	}
+	h.invalidate(specID, created.EntityID)
 	return c.Status(fiber.StatusCreated).JSON(created)
 }
 
@@ -152,19 +204,23 @@ func (h *trustMarkSubjectHandlers) update(c fiber.Ctx) error {
 	if subject.EntityID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("entity_id is required"))
 	}
+	oldEntityID := h.entityID(specID, subjectID)
 	updated, err := h.store.UpdateSubject(specID, subjectID, &subject)
 	if err != nil {
 		return h.handleError(c, err)
 	}
+	h.invalidate(specID, oldEntityID, updated.EntityID)
 	return c.JSON(updated)
 }
 
 func (h *trustMarkSubjectHandlers) delete(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
+	oldEntityID := h.entityID(specID, subjectID)
 	if err := h.store.DeleteSubject(specID, subjectID); err != nil {
 		return h.handleError(c, err)
 	}
+	h.invalidate(specID, oldEntityID)
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -184,6 +240,7 @@ func (h *trustMarkSubjectHandlers) updateStatus(c fiber.Ctx) error {
 	if err != nil {
 		return h.handleError(c, err)
 	}
+	h.invalidate(specID, updated.EntityID)
 	return c.JSON(updated)
 }
 
@@ -221,6 +278,7 @@ func (h *trustMarkSubjectHandlers) putAdditionalClaims(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
+	h.invalidate(specID, updated.EntityID)
 	return c.JSON(updated.AdditionalClaims)
 }
 
@@ -255,7 +313,42 @@ func (h *trustMarkSubjectHandlers) copyAdditionalClaims(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(oidfed.ErrorServerError(err.Error()))
 	}
+	h.invalidate(specID, updated.EntityID)
 	return c.JSON(updated.AdditionalClaims)
+}
+
+// entityID returns the entity ID of the subject before it is changed, or ""
+// if there is no cache to invalidate or the subject cannot be read (the write
+// that follows then reports the error).
+func (h *trustMarkSubjectHandlers) entityID(specID, subjectID string) string {
+	if h.cacheInvalidator == nil {
+		return ""
+	}
+	subject, err := h.store.GetSubject(specID, subjectID)
+	if err != nil || subject == nil {
+		return ""
+	}
+	return subject.EntityID
+}
+
+// invalidate drops the cached trust mark endpoint results of the given
+// entities for the spec's trust mark type. It is called after a write
+// succeeded, so a failed write invalidates nothing.
+func (h *trustMarkSubjectHandlers) invalidate(specID string, entityIDs ...string) {
+	if h.cacheInvalidator == nil {
+		return
+	}
+	spec, err := h.store.Get(specID)
+	if err != nil || spec == nil {
+		log.Warn().Err(err).Str("spec", specID).
+			Msg("could not invalidate trust mark caches: failed to load trust mark spec")
+		return
+	}
+	for _, entityID := range entityIDs {
+		if entityID != "" {
+			h.cacheInvalidator.InvalidateTrustMark(spec.TrustMarkType, entityID)
+		}
+	}
 }
 
 func (*trustMarkSubjectHandlers) handleError(c fiber.Ctx, err error) error {
@@ -269,12 +362,12 @@ func (*trustMarkSubjectHandlers) handleError(c fiber.Ctx, err error) error {
 }
 
 // registerTrustMarkIssuance registers TrustMarkSpec and TrustMarkSubject endpoints.
-func registerTrustMarkIssuance(r fiber.Router, store model.TrustMarkSpecStore) {
+func registerTrustMarkIssuance(r fiber.Router, store model.TrustMarkSpecStore, cacheInvalidator TrustMarkCacheInvalidator) {
 	specBase := "/trust-marks/issuance-spec"
 	subjectBase := specBase + "/:trustMarkSpecID/subjects"
 
-	specH := &trustMarkSpecHandlers{store: store}
-	subjectH := &trustMarkSubjectHandlers{store: store}
+	specH := &trustMarkSpecHandlers{store: store, cacheInvalidator: cacheInvalidator}
+	subjectH := &trustMarkSubjectHandlers{store: store, cacheInvalidator: cacheInvalidator}
 
 	// TrustMarkSpec CRUD
 	r.Get(specBase, specH.list)

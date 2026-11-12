@@ -103,6 +103,7 @@ func (fed *LightHouse) AddTrustMarkEndpointWithConfig(
 	handler := func(ctx fiber.Ctx) error {
 		return fed.handleTrustMarkRequest(ctx, config)
 	}
+	fed.trustMarkCaches.set(config.Cache, config.IssuedTrustMarkCache)
 
 	if endpoint.AuthEnabled {
 		fed.registerEndpoint(model.EndpointTypeTrustMark, endpoint.Path, fiber.MethodPost, handler, auth.EndpointAuth())
