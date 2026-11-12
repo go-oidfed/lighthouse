@@ -119,7 +119,7 @@ func (m *mockTrustMarkSpecStore) ChangeSubjectStatus(specID, subjectID string, s
 func setupTrustMarkIssuanceApp(t *testing.T, store model.TrustMarkSpecStore) *fiber.App {
 	t.Helper()
 	app := fiber.New()
-	registerTrustMarkIssuance(app, store)
+	registerTrustMarkIssuance(app, store, nil)
 	return app
 }
 

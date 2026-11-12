@@ -5,6 +5,52 @@ import (
 	"time"
 )
 
+// trustMarkEndpointCaches holds the caches of the trust mark endpoint, so that
+// the admin API can invalidate them when trust mark subjects or specs change.
+// It implements adminapi.TrustMarkCacheInvalidator.
+type trustMarkEndpointCaches struct {
+	mu          sync.RWMutex
+	eligibility *EligibilityCache
+	issued      *IssuedTrustMarkCache
+}
+
+func (c *trustMarkEndpointCaches) get() (*EligibilityCache, *IssuedTrustMarkCache) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.eligibility, c.issued
+}
+
+func (c *trustMarkEndpointCaches) set(eligibility *EligibilityCache, issued *IssuedTrustMarkCache) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.eligibility = eligibility
+	c.issued = issued
+}
+
+// InvalidateTrustMark removes the cached eligibility result and issued trust
+// mark for a trust mark type and subject.
+func (c *trustMarkEndpointCaches) InvalidateTrustMark(trustMarkType, subject string) {
+	eligibility, issued := c.get()
+	if eligibility != nil {
+		eligibility.Invalidate(trustMarkType, subject)
+	}
+	if issued != nil {
+		issued.Invalidate(trustMarkType, subject)
+	}
+}
+
+// InvalidateTrustMarkType removes the cached eligibility results and issued
+// trust marks for all subjects of a trust mark type.
+func (c *trustMarkEndpointCaches) InvalidateTrustMarkType(trustMarkType string) {
+	eligibility, issued := c.get()
+	if eligibility != nil {
+		eligibility.InvalidateAll(trustMarkType)
+	}
+	if issued != nil {
+		issued.InvalidateAll(trustMarkType)
+	}
+}
+
 // IssuedTrustMarkCache caches issued trust mark JWTs to avoid repeated signing
 // and database writes for the same (trust_mark_type, subject) combination.
 type IssuedTrustMarkCache struct {

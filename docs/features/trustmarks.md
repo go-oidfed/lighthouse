@@ -105,6 +105,11 @@ Two levels of caching reduce load and improve performance:
 
 Cache TTL is automatically capped by the trust mark's expiration time.
 
+Changes made through the Admin API invalidate both caches: a write to a trust
+mark subject (create, update, status change, delete, additional claims) drops
+the entries of that subject, and an update or deletion of a trust mark spec
+drops all entries of its trust mark type.
+
 ## Trust Mark Status Endpoint
 
 The status endpoint allows verification of issued trust marks per the OIDC
