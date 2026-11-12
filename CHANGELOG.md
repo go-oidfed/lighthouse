@@ -1,3 +1,34 @@
+## LightHouse 0.24.1
+
+### Bugfixes
+
+- **Admin API trust mark writes now take effect immediately on the trust mark
+  endpoint.** The endpoint's eligibility and issued-trust-mark caches were only
+  ever dropped on TTL expiry, so a subject blocked (or a spec edited) through
+  the Admin API could keep being served a cached trust mark — or an eligibility
+  result — until the cache expired. Now every admin write invalidates the
+  affected entries:
+  - Subject writes (create, update, status change, delete, additional claims)
+    drop that subject's cached eligibility result and issued trust mark.
+  - Spec writes (update, patch, delete) drop the cached results of every
+    subject of the affected trust mark type, including on a trust mark type
+    rename (both the old and new type).
+  - Failed writes invalidate nothing.
+
+### Internal
+
+- **Trust mark endpoint caches are shared and reload-safe.** The eligibility
+  and issued-trust-mark caches now live on the `LightHouse` for the process
+  lifetime and are reused across endpoint reloads, so a legacy path still being
+  served by a previous handler shares the same caches the Admin API
+  invalidates. The caches are created under a lock (`trustMarkEndpointCaches`),
+  so concurrent endpoint loads converge on one pair, and a nil cache pair from
+  a legacy registration can no longer drop the live caches.
+- **Deprecated `AddTrustMarkEndpoint`** in favor of
+  `AddTrustMarkEndpointWithConfig`: the wrapper attaches no eligibility or
+  issued-trust-mark caches and does not share the DB-loaded endpoints' cache
+  pair. Existing callers keep working.
+
 ## LightHouse 0.24.0
 
 ### Features
