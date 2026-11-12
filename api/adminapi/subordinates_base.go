@@ -270,7 +270,14 @@ func (h *subordinatesBaseHandlers) delete(c fiber.Ctx) error {
 				return err
 			}
 			entityID = existing.EntityID
-			if err := tx.SubordinateEvents.DeleteBySubordinateID(existing.ID); err != nil {
+			// Keep the subordinate's history and record the removal in it.
+			if err := RecordEvent(
+				tx.SubordinateEvents, existing.ID, model.EventTypeDeleted,
+				WithStatus(existing.Status),
+				WithMessage(fmt.Sprintf("subordinate deleted: %s", existing.EntityID)),
+				WithActor(GetActor(c)),
+				WithEntityID(existing.EntityID),
+			); err != nil {
 				return err
 			}
 			return tx.Subordinates.DeleteByDBID(id)
@@ -412,11 +419,29 @@ type historyHandlers struct {
 }
 
 type eventResponse struct {
-	Timestamp int64   `json:"timestamp"`
-	Type      string  `json:"type"`
-	Status    *string `json:"status,omitempty"`
-	Message   *string `json:"message,omitempty"`
-	Actor     *string `json:"actor,omitempty"`
+	ID uint `json:"id"`
+	// EntityID is the entity the event is about; omitted when unknown.
+	EntityID string `json:"entity_id,omitempty"`
+	// SubordinateID is 0 for events of entities that are not subordinates.
+	SubordinateID uint    `json:"subordinate_id"`
+	Timestamp     int64   `json:"timestamp"`
+	Type          string  `json:"type"`
+	Status        *string `json:"status,omitempty"`
+	Message       *string `json:"message,omitempty"`
+	Actor         *string `json:"actor,omitempty"`
+}
+
+func newEventResponse(e model.SubordinateEvent) eventResponse {
+	return eventResponse{
+		ID:            e.ID,
+		EntityID:      e.EntityID,
+		SubordinateID: e.SubordinateID,
+		Timestamp:     e.Timestamp,
+		Type:          e.Type,
+		Status:        e.Status,
+		Message:       e.Message,
+		Actor:         e.Actor,
+	}
 }
 
 func (h *historyHandlers) getHistory(c fiber.Ctx) error {
@@ -442,13 +467,7 @@ func (h *historyHandlers) getHistory(c fiber.Ctx) error {
 
 	eventsResp := make([]eventResponse, len(eventsList))
 	for i, e := range eventsList {
-		eventsResp[i] = eventResponse{
-			Timestamp: e.Timestamp,
-			Type:      e.Type,
-			Status:    e.Status,
-			Message:   e.Message,
-			Actor:     e.Actor,
-		}
+		eventsResp[i] = newEventResponse(e)
 	}
 
 	limit := h.normalizeLimit(opts.Limit)

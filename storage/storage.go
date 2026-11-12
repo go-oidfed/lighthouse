@@ -84,6 +84,12 @@ func NewStorage(config Config) (*Storage, error) {
 		return nil, err
 	}
 
+	// Key existing subordinate events by entity ID, so they can be queried
+	// by entity. Events that earlier versions deleted stay deleted.
+	if _, err = migrateSubordinateEventEntityIDs(db); err != nil {
+		return nil, err
+	}
+
 	// Fill user hash params with defaults if zero values
 	params := config.UsersHash
 	if params.Time == 0 {

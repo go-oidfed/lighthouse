@@ -6,7 +6,8 @@ import (
 
 // Event type constants for subordinate events.
 const (
-	// EventTypeCreated is recorded when a subordinate is created.
+	// EventTypeCreated is recorded when a subordinate is created, including
+	// when an entity enrolls through the federation_enroll_endpoint.
 	EventTypeCreated = "created"
 	// EventTypeDeleted is recorded when a subordinate is deleted.
 	EventTypeDeleted = "deleted"
@@ -50,15 +51,22 @@ const (
 	// (approach C) accepts a signed JWK Set from the subordinate and updates
 	// the stored JWKS.
 	EventTypeJWKSUpdated = "jwks_updated"
+	// EventTypeJoinRequested is recorded when an entity asks to become a
+	// subordinate through the federation_enroll_request_endpoint.
+	EventTypeJoinRequested = "join_requested"
 )
 
-// SubordinateEvent stores an event related to a subordinate.
+// SubordinateEvent stores an event related to a subordinate or another entity.
+// EntityID identifies the entity the event is about: events are kept when a
+// subordinate is removed and stay findable by entity ID if it joins again.
+// SubordinateID is 0 when the entity is not a subordinate of this authority.
 type SubordinateEvent struct {
 	ID            uint           `gorm:"primarykey" json:"id"`
 	CreatedAt     int            `json:"created_at"`
 	UpdatedAt     int            `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 	SubordinateID uint           `gorm:"index" json:"subordinate_id"`
+	EntityID      string         `gorm:"size:255;index" json:"entity_id"`
 	Timestamp     int64          `gorm:"index" json:"timestamp"`
 	Type          string         `gorm:"index" json:"type"`
 	Status        *string        `json:"status,omitempty"`

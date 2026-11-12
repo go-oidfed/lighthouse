@@ -3062,6 +3062,10 @@ paths:
               - constraints_deleted
               - claims_updated
               - claim_deleted
+              - jwks_refreshed
+              - jwks_update_triggered
+              - jwks_updated
+              - join_requested
         - name: from
           in: query
           description: Filter events with timestamp >= this value (unix seconds).
@@ -3112,6 +3116,125 @@ paths:
         Supports pagination via `limit` and `offset` parameters, and filtering by event type and timestamp range.
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
+  /api/v1/admin/events:
+    get:
+      tags:
+        - Events
+      summary: Query events across the federation
+      description: |
+        Lists the events of all subordinates and other entities, newest first,
+        including the events of removed subordinates. Filters combine (AND);
+        repeated `type` parameters match any of the given types. Events of
+        entities that are not subordinates have `subordinate_id` 0.
+      operationId: queryEvents
+      parameters:
+        - name: entity_id
+          in: query
+          required: false
+          description: Only events about this entity ID.
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: Only events of this type. May be repeated; events of any given type match.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: actor
+          in: query
+          required: false
+          description: Only events recorded for this actor.
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          description: Only events with timestamp >= this value (unix seconds).
+          schema:
+            type: integer
+            format: int64
+        - name: to
+          in: query
+          required: false
+          description: Only events with timestamp <= this value (unix seconds).
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          required: false
+          description: Page size (default 50; values above 10000 are clamped to 10000).
+          schema:
+            type: integer
+            minimum: 0
+            default: 50
+            maximum: 10000
+        - name: offset
+          in: query
+          required: false
+          description: Number of events to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: The matching events with pagination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateHistory'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/events/removed-entities:
+    get:
+      tags:
+        - Events
+      summary: Search entities that have events but are not subordinates
+      description: |
+        Lists, sorted, the entity IDs that have events but are not a current
+        subordinate, such as removed subordinates.
+      operationId: searchRemovedEntities
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive text the entity ID must contain. Empty lists all.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of entity IDs (default 50; values above 500 are clamped to 500).
+          schema:
+            type: integer
+            minimum: 0
+            default: 50
+            maximum: 500
+      responses:
+        '200':
+          description: The matching entity IDs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - entity_ids
+                properties:
+                  entity_ids:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/v1/admin/subordinates/{subordinateID}/jwks:
     get:
       tags:
@@ -5814,9 +5937,20 @@ components:
       description: A single event in subordinate history.
       type: object
       required:
+        - id
+        - subordinate_id
         - timestamp
         - type
       properties:
+        id:
+          type: integer
+          description: The event's ID.
+        entity_id:
+          type: string
+          description: The entity the event is about. Omitted when unknown.
+        subordinate_id:
+          type: integer
+          description: The subordinate the event belongs to; 0 for entities that are not subordinates.
         timestamp:
           type: integer
           description: Unix timestamp (seconds since epoch) when the event occurred.
@@ -5839,6 +5973,10 @@ components:
             - constraints_deleted
             - claims_updated
             - claim_deleted
+            - jwks_refreshed
+            - jwks_update_triggered
+            - jwks_updated
+            - join_requested
         status:
           type: string
           description: Subordinate status at the time of the event, if applicable.
@@ -6807,6 +6945,8 @@ tags:
     description: Manage general constraints applied to subordinate entities.
   - name: Subordinate Constraints
     description: Manage constraints specific to subordinate entities.
+  - name: Events
+    description: Query events across the federation.
   - name: Federation Trust Marks
     description: Manage trust marks in the federation.
   - name: Trust Mark Issuance

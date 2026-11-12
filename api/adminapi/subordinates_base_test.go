@@ -915,10 +915,13 @@ func TestDeleteSubordinateByID(t *testing.T) {
 				t.Errorf("Expected subordinate to be deleted, but it still exists")
 			}
 
-			// Verify events were deleted
+			// Verify events were kept and the removal recorded
 			events, _, err := backends.SubordinateEvents.GetBySubordinateID(saved.ID, model.EventQueryOpts{})
-			if err == nil && len(events) > 0 {
-				t.Errorf("Expected subordinate events to be deleted, but found %d events", len(events))
+			if err != nil {
+				t.Fatalf("Failed to get subordinate events: %v", err)
+			}
+			if len(events) != 2 || events[0].Type != model.EventTypeDeleted {
+				t.Errorf("Expected the kept event and a removal event, but found %+v", events)
 			}
 
 			// Verify JWKS was permanently deleted (to allow re-registration without FK constraints)
