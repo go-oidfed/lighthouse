@@ -1,7 +1,11 @@
 package adminapi
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
 // ActorSource defines the preferred source for actor extraction.
@@ -106,4 +110,58 @@ func GetActor(c fiber.Ctx) string {
 // This should be called by the auth middleware after successful authentication.
 func SetAuthUsername(c fiber.Ctx, username string) {
 	c.Locals(localsKeyAuthUsername, username)
+}
+
+// serviceActorHeader names the user a service token with act_for_users acts
+// for on the service listener.
+const serviceActorHeader = "X-Actor"
+
+// serviceActorMiddleware sets the actor on the service listener. The actor is
+// the service token's name, unless the token may act for users and the
+// request names a user in X-Actor: that user must exist and be enabled, and
+// their stored username is recorded; otherwise the request is refused with
+// 400 invalid_actor before any handler runs. While there are no users no name
+// can be honoured, so X-Actor is always refused then. Tokens without
+// act_for_users ignore X-Actor. The admin port's actor configuration does not
+// apply here.
+func serviceActorMiddleware(users model.UsersStore) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		actor := getAuthUsername(c)
+		if token, _ := c.Locals(localsKeyServiceToken).(ServiceToken); token.ActForUsers {
+			if named := getHeaderValue(c, serviceActorHeader); named != "" {
+				canonical, ok, err := delegatedActor(users, named)
+				if err != nil {
+					return writeServerError(c, err)
+				}
+				if !ok {
+					return writeCodedError(
+						c, fiber.StatusBadRequest, "invalid_actor",
+						"X-Actor must name an existing, enabled user",
+					)
+				}
+				actor = canonical
+			}
+		}
+		if actor != "" {
+			c.Locals(localsKeyActor, actor)
+		}
+		return c.Next()
+	}
+}
+
+// delegatedActor reports whether a service token may act for the user name
+// and returns the actor to record: the stored user's username, which the
+// store may have matched case-insensitively.
+func delegatedActor(users model.UsersStore, name string) (string, bool, error) {
+	user, err := users.Get(name)
+	if err != nil {
+		if _, ok := errors.AsType[model.NotFoundError](err); ok {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	if user == nil || user.Disabled || user.Username == "" {
+		return "", false, nil
+	}
+	return user.Username, true, nil
 }

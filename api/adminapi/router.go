@@ -47,7 +47,31 @@ type Options struct {
 	JWKSUpdateHookApplier func() error
 	// Actor holds configuration for actor extraction from requests.
 	// The actor is recorded in subordinate event history.
+	// It applies to the admin port only, not to the service listener.
 	Actor ActorConfig
+	// ServiceTokens are the tokens of the service listener; empty when the
+	// service listener is off. They are accepted only where ServiceListener
+	// is set; the admin port never accepts them, but is given them too so
+	// that it can describe the service listener.
+	ServiceTokens ServiceTokens
+	// ServiceListener makes the routes the service listener's: they accept
+	// only ServiceTokens, never HTTP Basic, also while there are no users,
+	// and the actor is the token or the user it acts for.
+	ServiceListener bool
+}
+
+// serviceTokens returns the service listener's tokens (nil-safe).
+func (o *Options) serviceTokens() ServiceTokens {
+	if o == nil {
+		return nil
+	}
+	return o.ServiceTokens
+}
+
+// serviceListener reports whether the routes are the service listener's
+// (nil-safe).
+func (o *Options) serviceListener() bool {
+	return o != nil && o.ServiceListener
 }
 
 // trustMarkCacheInvalidator returns the configured trust mark cache invalidator (nil-safe).
@@ -87,6 +111,11 @@ func Register(
 	r fiber.Router, serverURL string, storages model.Backends, fedEntity oidfed.FederationEntity,
 	keyManagement KeyManagement, ctrl LighthouseController, opts *Options,
 ) error {
+	if opts.serviceListener() {
+		if err := opts.serviceTokens().check(); err != nil {
+			return errors.Wrap(err, "adminapi")
+		}
+	}
 	// If an admin port is provided in options, adapt the serverURL to include/override the port
 	if opts != nil && opts.Port > 0 {
 		serverURL = adaptServerURLPort(serverURL, opts.Port)
@@ -169,15 +198,22 @@ func Register(
 			return c.Send(html)
 		},
 	)
-	// Optional authentication middleware for all admin routes
-	r.Use(authMiddleware(storages.Users))
+	if opts.serviceListener() {
+		// The service listener: service tokens only, and the actor is the
+		// token or the user it acts for.
+		r.Use(serviceTokenAuthMiddleware(opts.serviceTokens()))
+		r.Use(serviceActorMiddleware(storages.Users))
+	} else {
+		// Optional authentication middleware for all admin routes
+		r.Use(authMiddleware(storages.Users))
 
-	// Actor extraction middleware (must come after auth middleware)
-	var actorCfg ActorConfig
-	if opts != nil {
-		actorCfg = opts.Actor
+		// Actor extraction middleware (must come after auth middleware)
+		var actorCfg ActorConfig
+		if opts != nil {
+			actorCfg = opts.Actor
+		}
+		r.Use(actorMiddleware(actorCfg))
 	}
-	r.Use(actorMiddleware(actorCfg))
 
 	// Entity Configuration
 	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV, fedEntity)

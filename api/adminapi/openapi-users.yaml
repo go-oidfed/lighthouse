@@ -2,7 +2,10 @@ openapi: 3.0.3
 info:
   title: Admin Users API
   version: 1.0.0
-  description: CRUD endpoints for admin users. When any user exists, Basic auth is required.
+  description: |-
+    CRUD endpoints for admin users. On the admin port, Basic auth is required
+    when any user exists. On the service listener (`api.admin.service_port`)
+    only service tokens are accepted, also while there are no users.
 servers:
   - url: /
 paths:
@@ -11,6 +14,7 @@ paths:
       summary: List users
       security:
         - basicAuth: []
+        - serviceToken: []
       responses:
         '200':
           description: OK
@@ -24,6 +28,7 @@ paths:
       summary: Create user
       security:
         - basicAuth: []
+        - serviceToken: []
       requestBody:
         required: true
         content:
@@ -44,6 +49,7 @@ paths:
       summary: Get user by username
       security:
         - basicAuth: []
+        - serviceToken: []
       parameters:
         - in: path
           name: username
@@ -63,6 +69,7 @@ paths:
       summary: Update user by username
       security:
         - basicAuth: []
+        - serviceToken: []
       parameters:
         - in: path
           name: username
@@ -88,6 +95,7 @@ paths:
       summary: Delete user by username
       security:
         - basicAuth: []
+        - serviceToken: []
       parameters:
         - in: path
           name: username
@@ -104,6 +112,13 @@ components:
     basicAuth:
       type: http
       scheme: basic
+      description: The username and password of an admin user; accepted on the admin port only.
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: |-
+        A service token from `api.admin.service_tokens`; accepted on the
+        service listener (`api.admin.service_port`) only.
   schemas:
     User:
       type: object
