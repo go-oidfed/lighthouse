@@ -20,7 +20,12 @@ func (c *trustMarkEndpointCaches) get() (*EligibilityCache, *IssuedTrustMarkCach
 	return c.eligibility, c.issued
 }
 
+// set stores an externally provided cache pair. A nil/nil pair is ignored, so
+// legacy registration paths without caches cannot drop the live caches.
 func (c *trustMarkEndpointCaches) set(eligibility *EligibilityCache, issued *IssuedTrustMarkCache) {
+	if eligibility == nil && issued == nil {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.eligibility = eligibility
@@ -49,6 +54,26 @@ func (c *trustMarkEndpointCaches) InvalidateTrustMarkType(trustMarkType string) 
 	if issued != nil {
 		issued.InvalidateAll(trustMarkType)
 	}
+}
+
+// getOrCreate returns the endpoint caches, creating any missing cache (and
+// starting its cleanup routine) under the write lock. Holding the lock during
+// creation makes concurrent endpoint loads return the same cache pair, so
+// every registered handler shares the caches the admin API invalidates.
+func (c *trustMarkEndpointCaches) getOrCreate() (*EligibilityCache, *IssuedTrustMarkCache) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.eligibility == nil {
+		c.eligibility = NewEligibilityCache()
+		stopEligibilityCacheCleanup := c.eligibility.StartCleanupRoutine(5 * time.Minute)
+		_ = stopEligibilityCacheCleanup // cleanup runs for the cache's process lifetime
+	}
+	if c.issued == nil {
+		c.issued = NewIssuedTrustMarkCache()
+		stopIssuedCacheCleanup := c.issued.StartCleanupRoutine(5 * time.Minute)
+		_ = stopIssuedCacheCleanup // cleanup runs for the cache's process lifetime
+	}
+	return c.eligibility, c.issued
 }
 
 // IssuedTrustMarkCache caches issued trust mark JWTs to avoid repeated signing

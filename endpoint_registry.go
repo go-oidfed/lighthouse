@@ -487,18 +487,9 @@ func (fed *LightHouse) loadEndpointFromDB(ep *model.FederationEndpoint) error {
 	case model.EndpointTypeTrustMark:
 		// Reuse the caches across reloads, so that a legacy path still served
 		// by the previous handler shares them and admin API invalidations
-		// reach both.
-		eligibilityCache, issuedTrustMarkCache := fed.trustMarkCaches.get()
-		if eligibilityCache == nil {
-			eligibilityCache = NewEligibilityCache()
-			stopEligibilityCacheCleanup := eligibilityCache.StartCleanupRoutine(5 * time.Minute)
-			_ = stopEligibilityCacheCleanup // TODO: manage lifecycle
-		}
-		if issuedTrustMarkCache == nil {
-			issuedTrustMarkCache = NewIssuedTrustMarkCache()
-			stopIssuedCacheCleanup := issuedTrustMarkCache.StartCleanupRoutine(5 * time.Minute)
-			_ = stopIssuedCacheCleanup // TODO: manage lifecycle
-		}
+		// reach both. getOrCreate creates missing caches under the lock, so
+		// concurrent loads share one pair.
+		eligibilityCache, issuedTrustMarkCache := fed.trustMarkCaches.getOrCreate()
 		return fed.AddTrustMarkEndpointWithConfig(
 			endpointConf, TrustMarkEndpointConfig{
 				Store:                fed.storages.TrustMarks,
