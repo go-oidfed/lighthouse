@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-oidfed/lib/jwx"
@@ -1567,4 +1568,450 @@ func TestGetSubordinateHistory(t *testing.T) {
 			assertErrorResponse(t, resp, respBody, http.StatusBadRequest, "invalid_request")
 		},
 	)
+}
+
+// --- PUT /subordinates/:subordinateID/status, OBJECT BODY ---
+
+// failingEventStore fails to record events of the types in failOn.
+type failingEventStore struct {
+	model.SubordinateEventStore
+	failOn string
+}
+
+func (s failingEventStore) Add(event model.SubordinateEvent) error {
+	if event.Type == s.failOn {
+		return errors.New("event store failure")
+	}
+	return s.SubordinateEventStore.Add(event)
+}
+
+// setupTransactionalStatusApp registers the base subordinate endpoints on real
+// storage whose transactions are real: a failing transaction rolls back. When
+// failOn is not empty, recording an event of that type fails.
+func setupTransactionalStatusApp(t *testing.T, failOn string) (*fiber.App, model.Backends) {
+	t.Helper()
+	backends, err := newSubordinateTestStorage(t).Backends(storage.JTIStorageDB)
+	if err != nil {
+		t.Fatalf("Failed to create backends: %v", err)
+	}
+	registered := backends
+	if failOn != "" {
+		registered.Transaction = func(fn model.TransactionFunc) error {
+			return backends.Transaction(
+				func(tx *model.Backends) error {
+					tx.SubordinateEvents = failingEventStore{SubordinateEventStore: tx.SubordinateEvents, failOn: failOn}
+					return fn(tx)
+				},
+			)
+		}
+	}
+	app := fiber.New()
+	registerSubordinatesBase(app, registered, nil)
+	return app, backends
+}
+
+func addSubordinate(t *testing.T, backends model.Backends, entityID string, status model.Status, keys ...string) uint {
+	t.Helper()
+	info := model.ExtendedSubordinateInfo{
+		BasicSubordinateInfo: model.BasicSubordinateInfo{EntityID: entityID, Status: status},
+	}
+	if len(keys) > 0 {
+		set := jwk.NewSet()
+		for _, kid := range keys {
+			_ = set.AddKey(createTestKey(kid))
+		}
+		info.JWKS = model.JWKS{Keys: jwx.JWKS{Set: set}}
+	}
+	if err := backends.Subordinates.Add(info); err != nil {
+		t.Fatalf("Failed to add subordinate: %v", err)
+	}
+	saved, err := backends.Subordinates.Get(entityID)
+	if err != nil {
+		t.Fatalf("Failed to get subordinate: %v", err)
+	}
+	return saved.ID
+}
+
+func putSubordinateStatus(t *testing.T, app *fiber.App, id uint, contentType, body string) (*http.Response, []byte) {
+	t.Helper()
+	req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/status", id), strings.NewReader(body))
+	req.Header.Set("Content-Type", contentType)
+	return doRequest(t, app, req)
+}
+
+func statusEventMessages(t *testing.T, backends model.Backends, id uint) []string {
+	t.Helper()
+	events, _, err := backends.SubordinateEvents.GetBySubordinateID(id, model.EventQueryOpts{})
+	if err != nil {
+		t.Fatalf("Failed to get events: %v", err)
+	}
+	var messages []string
+	for _, e := range events {
+		if e.Type == model.EventTypeStatusUpdated && e.Message != nil {
+			messages = append(messages, *e.Message)
+		}
+	}
+	return messages
+}
+
+func TestUpdateSubordinateStatusObjectBody(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"PlainBodyUnderJSONContentTypeStaysPlain", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://plain.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(t, app, id, fiber.MIMEApplicationJSON, "blocked")
+			requireStatus(t, resp, body, http.StatusOK)
+			saved, _ := backends.Subordinates.Get("https://plain.example.org")
+			if saved.Status != model.StatusBlocked {
+				t.Errorf("Expected status blocked, got %s", saved.Status)
+			}
+		},
+	)
+
+	t.Run(
+		"StatusOnly", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://obj.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(t, app, id, fiber.MIMEApplicationJSON, `{"status":"blocked"}`)
+			requireStatus(t, resp, body, http.StatusOK)
+			saved, _ := backends.Subordinates.Get("https://obj.example.org")
+			if saved.Status != model.StatusBlocked {
+				t.Errorf("Expected status blocked, got %s", saved.Status)
+			}
+			if got := statusEventMessages(t, backends, id); len(got) != 1 || got[0] != "status changed from pending to blocked" {
+				t.Errorf("Expected the default event message, got %v", got)
+			}
+		},
+	)
+
+	t.Run(
+		"ExpectedStatusMatchesAndMessageIsRecorded", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://msg.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON,
+				`{"status":"blocked","expected_status":"pending","message":"policy violation"}`,
+			)
+			requireStatus(t, resp, body, http.StatusOK)
+			if got := statusEventMessages(t, backends, id); len(got) != 1 || got[0] != "policy violation" {
+				t.Errorf("Expected the custom event message, got %v", got)
+			}
+		},
+	)
+
+	t.Run(
+		"ExpectedStatusMismatchIsConflictAndChangesNothing", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://conflict.example.org", model.StatusActive, "k1")
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON,
+				`{"status":"blocked","expected_status":"pending","message":"x"}`,
+			)
+			assertStatus(t, resp, body, http.StatusConflict)
+			saved, _ := backends.Subordinates.Get("https://conflict.example.org")
+			if saved.Status != model.StatusActive {
+				t.Errorf("Expected status active to stay, got %s", saved.Status)
+			}
+			if got := statusEventMessages(t, backends, id); len(got) != 0 {
+				t.Errorf("Expected no event, got %v", got)
+			}
+		},
+	)
+
+	t.Run(
+		"MessageTooLong", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://long.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON,
+				fmt.Sprintf(`{"status":"blocked","message":%q}`, strings.Repeat("x", 1001)),
+			)
+			assertErrorResponse(t, resp, body, http.StatusBadRequest, "invalid_request")
+		},
+	)
+
+	t.Run(
+		"InvalidExpectedStatus", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://badexp.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON, `{"status":"blocked","expected_status":"bogus"}`,
+			)
+			assertErrorResponse(t, resp, body, http.StatusBadRequest, "invalid_request")
+		},
+	)
+
+	t.Run(
+		"JWKSAndStatusAreStoredTogether", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://keys.example.org", model.StatusPending)
+			keyJSON, _ := json.Marshal(createTestKey("new-key"))
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON,
+				fmt.Sprintf(`{"status":"active","expected_status":"pending","jwks":{"keys":[%s]}}`, keyJSON),
+			)
+			requireStatus(t, resp, body, http.StatusOK)
+			saved, _ := backends.Subordinates.Get("https://keys.example.org")
+			if saved.Status != model.StatusActive {
+				t.Errorf("Expected status active, got %s", saved.Status)
+			}
+			if saved.JWKS.Keys.Set == nil || saved.JWKS.Keys.Len() != 1 {
+				t.Errorf("Expected the JWKS to be stored")
+			}
+		},
+	)
+
+	t.Run(
+		"ActivationWithoutKeysIsRefused", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://nokeys.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON, `{"status":"active","jwks":{"keys":[]}}`,
+			)
+			assertErrorResponse(t, resp, body, http.StatusBadRequest, "invalid_request")
+			saved, _ := backends.Subordinates.Get("https://nokeys.example.org")
+			if saved.Status != model.StatusPending {
+				t.Errorf("Expected status pending to stay, got %s", saved.Status)
+			}
+		},
+	)
+
+	t.Run(
+		"FailureStoresNeitherKeysNorStatus", func(t *testing.T) {
+			t.Parallel()
+			// The keys are written first; the status event then fails, and the
+			// transaction takes the keys back with it.
+			app, backends := setupTransactionalStatusApp(t, model.EventTypeStatusUpdated)
+			id := addSubordinate(t, backends, "https://rollback.example.org", model.StatusPending)
+			keyJSON, _ := json.Marshal(createTestKey("rolled-back"))
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON,
+				fmt.Sprintf(`{"status":"active","jwks":{"keys":[%s]}}`, keyJSON),
+			)
+			assertErrorResponse(t, resp, body, http.StatusInternalServerError, "server_error")
+			saved, _ := backends.Subordinates.Get("https://rollback.example.org")
+			if saved.Status != model.StatusPending {
+				t.Errorf("Expected status pending to stay, got %s", saved.Status)
+			}
+			if saved.JWKS.Keys.Set != nil && saved.JWKS.Keys.Len() != 0 {
+				t.Errorf("Expected no keys to be stored, got %d", saved.JWKS.Keys.Len())
+			}
+			events, _, err := backends.SubordinateEvents.GetBySubordinateID(id, model.EventQueryOpts{})
+			if err != nil {
+				t.Fatalf("Failed to get events: %v", err)
+			}
+			for _, e := range events {
+				if e.Type == model.EventTypeJWKSReplaced || e.Type == model.EventTypeStatusUpdated {
+					t.Errorf("Expected no %s event to be stored", e.Type)
+				}
+			}
+		},
+	)
+
+	t.Run(
+		"WhitespaceMessageKeepsDefault", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://blank.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON, `{"status":"blocked","message":"   "}`,
+			)
+			requireStatus(t, resp, body, http.StatusOK)
+			if got := statusEventMessages(t, backends, id); len(got) != 1 || got[0] != "status changed from pending to blocked" {
+				t.Errorf("Expected the default event message, got %v", got)
+			}
+		},
+	)
+
+	t.Run(
+		"ChangeWithoutExpectedStatusIsNeverConflict", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://noexp.example.org", model.StatusPending)
+			for _, status := range []string{"blocked", "inactive"} {
+				resp, body := putSubordinateStatus(
+					t, app, id, fiber.MIMEApplicationJSON, fmt.Sprintf(`{"status":%q}`, status),
+				)
+				requireStatus(t, resp, body, http.StatusOK)
+			}
+		},
+	)
+
+	t.Run(
+		"InvalidJWKS", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://badjwks.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON, `{"status":"blocked","jwks":{"keys":[{"kty":"bogus"}]}}`,
+			)
+			assertErrorResponse(t, resp, body, http.StatusBadRequest, "invalid_request")
+		},
+	)
+
+	t.Run(
+		"SecondChangeFromTheSameStatusIsConflict", func(t *testing.T) {
+			t.Parallel()
+			app, backends := setupTransactionalStatusApp(t, "")
+			id := addSubordinate(t, backends, "https://race.example.org", model.StatusPending)
+			resp, body := putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON, `{"status":"blocked","expected_status":"pending"}`,
+			)
+			requireStatus(t, resp, body, http.StatusOK)
+			resp, body = putSubordinateStatus(
+				t, app, id, fiber.MIMEApplicationJSON, `{"status":"inactive","expected_status":"pending"}`,
+			)
+			assertStatus(t, resp, body, http.StatusConflict)
+			saved, _ := backends.Subordinates.Get("https://race.example.org")
+			if saved.Status != model.StatusBlocked {
+				t.Errorf("Expected status blocked to stay, got %s", saved.Status)
+			}
+		},
+	)
+}
+
+// TestUpdateSubordinateStatusConcurrent starts two overlapping conditional
+// changes from the same status on a file-backed SQLite database (the default
+// driver): exactly one succeeds, the other is answered 409, never a lock
+// error, and the status is the winner's.
+func TestUpdateSubordinateStatusConcurrent(t *testing.T) {
+	t.Parallel()
+	store, err := storage.NewStorage(storage.Config{Driver: storage.DriverSQLite, DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("Failed to create storage: %v", err)
+	}
+	backends, err := store.Backends(storage.JTIStorageDB)
+	if err != nil {
+		t.Fatalf("Failed to create backends: %v", err)
+	}
+	app := fiber.New()
+	registerSubordinatesBase(app, backends, nil)
+
+	for i := range 10 {
+		entityID := fmt.Sprintf("https://race%d.example.org", i)
+		id := addSubordinate(t, backends, entityID, model.StatusPending)
+		targets := []string{"blocked", "inactive"}
+		codes := make([]int, len(targets))
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		for j, target := range targets {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				req := httptest.NewRequest(
+					"PUT", fmt.Sprintf("/subordinates/%d/status", id),
+					strings.NewReader(fmt.Sprintf(`{"status":%q,"expected_status":"pending"}`, target)),
+				)
+				req.Header.Set("Content-Type", fiber.MIMEApplicationJSON)
+				resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+				if err != nil {
+					codes[j] = -1
+					return
+				}
+				resp.Body.Close()
+				codes[j] = resp.StatusCode
+			}()
+		}
+		close(start)
+		wg.Wait()
+
+		winner := -1
+		for j, code := range codes {
+			switch code {
+			case http.StatusOK:
+				if winner != -1 {
+					t.Fatalf("round %d: both changes succeeded", i)
+				}
+				winner = j
+			case http.StatusConflict:
+			default:
+				t.Fatalf("round %d: unexpected status %d (codes %v)", i, code, codes)
+			}
+		}
+		if winner == -1 {
+			t.Fatalf("round %d: no change succeeded (codes %v)", i, codes)
+		}
+		saved, _ := backends.Subordinates.Get(entityID)
+		if saved.Status.String() != targets[winner] {
+			t.Errorf("round %d: status = %s, want %s", i, saved.Status, targets[winner])
+		}
+	}
+}
+
+// TestUpdateSubordinateStatusConcurrentSameStatus overlaps a status change
+// with a keys-only change that expects (and keeps) the status it started in,
+// on a file-backed SQLite database. Neither may fail with a lock error and the
+// first change is never lost: the status change always applies, and the keys
+// are stored exactly when their request was answered 200.
+func TestUpdateSubordinateStatusConcurrentSameStatus(t *testing.T) {
+	t.Parallel()
+	store, err := storage.NewStorage(storage.Config{Driver: storage.DriverSQLite, DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("Failed to create storage: %v", err)
+	}
+	backends, err := store.Backends(storage.JTIStorageDB)
+	if err != nil {
+		t.Fatalf("Failed to create backends: %v", err)
+	}
+	app := fiber.New()
+	registerSubordinatesBase(app, backends, nil)
+	keyJSON, _ := json.Marshal(createTestKey("same-status"))
+
+	for i := range 10 {
+		entityID := fmt.Sprintf("https://same%d.example.org", i)
+		id := addSubordinate(t, backends, entityID, model.StatusPending)
+		bodies := []string{
+			`{"status":"blocked","expected_status":"pending"}`,
+			fmt.Sprintf(`{"status":"pending","expected_status":"pending","jwks":{"keys":[%s]}}`, keyJSON),
+		}
+		codes := make([]int, len(bodies))
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		for j, b := range bodies {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				req := httptest.NewRequest(
+					"PUT", fmt.Sprintf("/subordinates/%d/status", id), strings.NewReader(b),
+				)
+				req.Header.Set("Content-Type", fiber.MIMEApplicationJSON)
+				resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+				if err != nil {
+					codes[j] = -1
+					return
+				}
+				resp.Body.Close()
+				codes[j] = resp.StatusCode
+			}()
+		}
+		close(start)
+		wg.Wait()
+
+		if codes[0] != http.StatusOK {
+			t.Fatalf("round %d: the status change was answered %d, want 200", i, codes[0])
+		}
+		if codes[1] != http.StatusOK && codes[1] != http.StatusConflict {
+			t.Fatalf("round %d: the keys change was answered %d, want 200 or 409", i, codes[1])
+		}
+		saved, _ := backends.Subordinates.Get(entityID)
+		if saved.Status != model.StatusBlocked {
+			t.Errorf("round %d: status = %s, want blocked", i, saved.Status)
+		}
+		hasKeys := saved.JWKS.Keys.Set != nil && saved.JWKS.Keys.Len() == 1
+		if hasKeys != (codes[1] == http.StatusOK) {
+			t.Errorf("round %d: keys stored = %v with the keys change answered %d", i, hasKeys, codes[1])
+		}
+	}
 }

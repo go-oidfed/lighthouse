@@ -1362,6 +1362,36 @@ func (s *TrustMarkSpecStorage) ChangeSubjectStatus(specIdent, subjectIdent strin
 	return existing, nil
 }
 
+// TransitionSubjectStatus sets the status of a TrustMarkSubject to "to" only
+// if its current status is "from", in one conditional UPDATE, and reports
+// whether it changed. Concurrent transitions out of the same status therefore
+// cannot both succeed. An unknown subject reports false. Like
+// ChangeSubjectStatus, a transition to blocked or inactive revokes the
+// subject's issued trust mark instances.
+func (s *TrustMarkSpecStorage) TransitionSubjectStatus(specIdent, subjectIdent string, from, to model.Status) (bool, error) {
+	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	if err != nil {
+		var notFound model.NotFoundError
+		if errors.As(err, &notFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	res := s.db.Model(&model.TrustMarkSubject{}).
+		Where("id = ? AND status = ?", existing.ID, from).
+		Update("status", to)
+	if res.Error != nil {
+		return false, errors.Wrap(res.Error, "trust_mark_specs: transition subject status failed")
+	}
+	if res.RowsAffected == 0 {
+		return false, nil
+	}
+	if to == model.StatusBlocked || to == model.StatusInactive {
+		s.revokeInstancesForSubject(existing.ID, existing.EntityID, specIdent)
+	}
+	return true, nil
+}
+
 // revokeInstancesForSubject revokes all issued trust mark instances for a subject.
 // This is called when a subject's status changes to blocked/inactive or when deleted.
 func (s *TrustMarkSpecStorage) revokeInstancesForSubject(subjectID uint, entityID, specIdent string) {
