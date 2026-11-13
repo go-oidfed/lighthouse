@@ -396,3 +396,27 @@ func TestSubordinateJWKDelete(t *testing.T) {
 		assertStatus(t, resp, bodyBytes, http.StatusNoContent)
 	})
 }
+
+func TestPutJWKS_RecordsFingerprintMessage(t *testing.T) {
+	t.Parallel()
+	app, backends := setupSubordinateKeysApp(t)
+	id := addSubordinate(t, backends, "https://jwks-fp.example.org", model.StatusPending)
+	a, b, c := newECKey(t, "a"), newECKey(t, "b"), newECKey(t, "c")
+
+	put := func(keys ...jwk.Key) {
+		t.Helper()
+		raw, err := json.Marshal(model.JWKS{Keys: keySet(t, keys...)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest("PUT", fmt.Sprintf("/subordinates/%d/jwks", id), strings.NewReader(string(raw)))
+		req.Header.Set("Content-Type", "application/json")
+		resp, body := doRequest(t, app, req)
+		requireStatus(t, resp, body, http.StatusOK)
+	}
+	put(a, b)
+	put(b, a)
+	put(a, c)
+
+	checkReplacementSequence(t, jwksReplacedMessages(t, backends, id), []string{"2", "2", "2"})
+}

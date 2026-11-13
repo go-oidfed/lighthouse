@@ -489,6 +489,7 @@ func initAdminAPI(
 			Port:                       admin.Port,
 			TrustMarkConfigInvalidator: trustMarkConfigProvider,
 			TrustMarkCacheInvalidator:  &entity.trustMarkCaches,
+			TrustMarkSigner:            adminTrustMarkSigner{fed: entity},
 			JWKSUpdateHookApplier:      admin.JWKSUpdateHookApplier,
 			Actor: adminapi.ActorConfig{
 				Header: admin.ActorHeader,

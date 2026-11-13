@@ -71,6 +71,7 @@ Full lifecycle management of subordinate entities in your federation.
 - **Additional Claims** - Add custom claims to subordinate statements
 - **Statement Preview** - Preview the subordinate statement that would be issued
 - **Event History** - View the history of changes for a subordinate
+- **Events** - Query the events of all entities, including removed subordinates, by entity, type, actor and time
 
 ### Federation Trust Marks
 
@@ -79,7 +80,8 @@ Configure trust mark issuance for your federation.
 - **Trust Mark Types** - Define the types of trust marks your entity can issue
 - **Owners & Issuers** - Configure trust mark delegation (owners and authorized issuers)
 - **Issuance Specifications** - Define issuance parameters for each trust mark type
-- **Subjects** - Manage which entities are entitled to receive specific trust marks
+- **Subjects** - Manage which entities are entitled to receive specific trust marks, optionally issuing the trust mark immediately
+- **Issued Instances** - List, count and revoke the trust marks your entity has issued
 
 ### Trust Anchors
 

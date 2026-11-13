@@ -2267,11 +2267,37 @@ paths:
           description: Successful response - returns the created `TrustMarkSubject`.
         '400':
           $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
         '500':
           $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/IssueCodedError'
       operationId: createTrustMarkSubject
       summary: Create a TrustMarkSubject
-      description: Creates a new instance of a `TrustMarkSubject`.
+      description: |
+        Creates a new instance of a `TrustMarkSubject`. A subject created
+        active records a `trust_mark_granted` event; `message` replaces its
+        text.
+
+        With `"issue": true` the trust mark is also issued to the new subject,
+        which must then be active: it is signed and the issued instance is
+        recorded in the same transaction as the subject, with a
+        `trust_mark_issued` event. When the spec has a `cache_ttl`, the trust
+        mark endpoint then serves this mark from its cache; with `cache_ttl`
+        0 it signs a fresh mark on each request, so the eagerly issued
+        instance is recorded but not delivered, and stays live until it
+        expires or is revoked. Nothing is written, and the answer is an
+        error with a machine-readable `error` code, when:
+
+        - the entity already holds an active (unrevoked, unexpired) trust mark
+          of the type (409 `already_held`),
+        - this LightHouse cannot issue trust marks of the type (503
+          `issuance_unavailable`),
+        - signing fails (500).
+
+        A subject that already exists is a 409 `invalid_request`, as without
+        `issue`.
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}:
     summary: Manage a single TrustMarkSubject.
     description: Get, update, patch, or delete a single `TrustMarkSubject`.
@@ -2350,7 +2376,28 @@ paths:
       summary: Change TrustMarkSubject status
       description: |
         Change the status of a TrustMarkSubject.
-        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
+
+        The request body is either a plain text status value (one of: active,
+        blocked, pending, inactive), or, with `Content-Type: application/json`,
+        an object. In the object form `expected_status` makes the change
+        conditional: if the subject is in another status the answer is 409
+        and nothing is written.
+
+        A change records a trust mark event: `trust_mark_granted` when the
+        subject becomes active, `trust_mark_revoked` when it leaves active,
+        else `trust_mark_status_updated`. `message` (at most 1000 characters)
+        replaces its text. When the subject leaves active its issued
+        instances are revoked, in the same transaction as the change.
+
+        With `"issue": true` the status must be `active`, and the trust mark
+        is issued to the subject the way creating a subject with `issue`
+        does, in the same transaction as the change; without
+        `expected_status` the change is made from the status that was read.
+        The 409 `already_held` and 503 `issuance_unavailable` answers apply,
+        and nothing is written on any failure.
+
+        A trust mark subject has no keys: a body with `jwks` is answered 400
+        `invalid_request` and nothing is written.
       requestBody:
         content:
           text/plain:
@@ -2363,6 +2410,9 @@ paths:
                 - inactive
               description: The status value to set.
               example: active
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectStatusChange'
         required: true
       parameters:
         - $ref: '#/components/parameters/TrustMarkSpecIDParam'
@@ -2378,8 +2428,12 @@ paths:
           $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
         '500':
           $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/IssueCodedError'
       operationId: changeTrustMarkSubjectStatus
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims:
     summary: Manage subject-specific additional custom claims.
@@ -2481,6 +2535,148 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TrustMarkSpecIDParam'
       - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+  /api/v1/admin/trust-marks/instances:
+    get:
+      tags:
+        - Trust Mark Issuance
+      summary: List issued trust mark instances
+      description: |
+        Lists the trust marks LightHouse has issued, newest first. The
+        `state` of an instance is `revoked` if it was revoked, else `expired`
+        once its `expires_at` (when not 0) has passed, else `active`.
+      operationId: listTrustMarkInstances
+      parameters:
+        - name: trust_mark_type
+          in: query
+          required: false
+          description: Only instances of this trust mark type.
+          schema:
+            type: string
+        - name: sub
+          in: query
+          required: false
+          description: Only instances issued to this entity ID.
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: Only instances in this state.
+          schema:
+            type: string
+            enum:
+              - active
+              - revoked
+              - expired
+        - name: limit
+          in: query
+          required: false
+          description: Page size (default 50, at most 100).
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          description: Number of instances to skip.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The matching instances.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - instances
+                  - pagination
+                properties:
+                  instances:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrustMarkInstance'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/trust-marks/instances/counts:
+    get:
+      tags:
+        - Trust Mark Issuance
+      summary: Count issued trust mark instances
+      description: |
+        Counts the active (unrevoked and unexpired) and the revoked
+        instances.
+      operationId: countTrustMarkInstances
+      responses:
+        '200':
+          description: The counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - active
+                  - revoked
+                properties:
+                  active:
+                    type: integer
+                  revoked:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/trust-marks/instances/revoke:
+    post:
+      tags:
+        - Trust Mark Issuance
+      summary: Revoke the instances of a trust mark held by an entity
+      description: |
+        Revokes every unrevoked instance of a trust mark type issued to an
+        entity, whether or not the entity is a subject of a spec. If any was
+        revoked, a `trust_mark_revoked` event is recorded and the caches are
+        cleared. If the entity is an active subject of a spec of the type, the
+        trust mark endpoint would issue the mark again: nothing is revoked and
+        the answer is 409 `subject_active`; change the subject's status
+        instead.
+      operationId: revokeTrustMarkInstances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trust_mark_type
+                - sub
+              properties:
+                trust_mark_type:
+                  type: string
+                sub:
+                  $ref: '#/components/schemas/EntityID'
+                message:
+                  type: string
+                  maxLength: 1000
+                  description: Replaces the text of the `trust_mark_revoked` event (400 if longer than 1000 characters).
+      responses:
+        '200':
+          description: The number of instances revoked (0 if there were none).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - revoked
+                properties:
+                  revoked:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/v1/admin/trust-marks/types/{trustMarkTypeID}/owner:
     summary: Path used to manage the single owner of a trust mark type.
     description: Manage the single TrustMarkOwner associated with a trust mark type (or none).
@@ -2953,8 +3149,18 @@ paths:
       description: |
         Change the status of a subordinate entity.
         Note: Setting status to "active" requires the subordinate to have at least one key in its JWKS.
-        
-        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
+
+        The request body is either a plain text status value (one of: active,
+        blocked, pending, inactive), or, with `Content-Type: application/json`,
+        an object. In the object form `expected_status` makes the change
+        conditional: if the subordinate is in another status the answer is 409
+        and nothing is written. `message` (at most 1000 characters) replaces
+        the default message of the status event. `jwks` replaces all of the
+        subordinate's keys (an empty `keys` list stores an empty set), as
+        `PUT .../jwks` does, in the same transaction (recorded as a
+        `jwks_replaced` event before the status event, with the message
+        described at `PUT .../jwks`); the keys in the body count when
+        activating.
       requestBody:
         content:
           text/plain:
@@ -2967,6 +3173,9 @@ paths:
                 - inactive
               description: The status value to set.
               example: active
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubordinateStatusChange'
         required: true
       responses:
         '200':
@@ -2980,12 +3189,17 @@ paths:
             Bad request. This can occur if:
             - The status value is invalid
             - Attempting to set status to "active" when the subordinate has no keys
+            - The message is longer than 1000 characters
+            - The jwks is invalid
+            - The object body has `issue`, which applies to trust mark subjects only
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: changeSubordinateStatus
@@ -3032,6 +3246,14 @@ paths:
               - constraints_deleted
               - claims_updated
               - claim_deleted
+              - jwks_refreshed
+              - jwks_update_triggered
+              - jwks_updated
+              - join_requested
+              - trust_mark_granted
+              - trust_mark_revoked
+              - trust_mark_issued
+              - trust_mark_status_updated
         - name: from
           in: query
           description: Filter events with timestamp >= this value (unix seconds).
@@ -3082,6 +3304,125 @@ paths:
         Supports pagination via `limit` and `offset` parameters, and filtering by event type and timestamp range.
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
+  /api/v1/admin/events:
+    get:
+      tags:
+        - Events
+      summary: Query events across the federation
+      description: |
+        Lists the events of all subordinates and other entities, newest first,
+        including the events of removed subordinates. Filters combine (AND);
+        repeated `type` parameters match any of the given types. Events of
+        entities that are not subordinates have `subordinate_id` 0.
+      operationId: queryEvents
+      parameters:
+        - name: entity_id
+          in: query
+          required: false
+          description: Only events about this entity ID.
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: Only events of this type. May be repeated; events of any given type match.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: actor
+          in: query
+          required: false
+          description: Only events recorded for this actor.
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          description: Only events with timestamp >= this value (unix seconds).
+          schema:
+            type: integer
+            format: int64
+        - name: to
+          in: query
+          required: false
+          description: Only events with timestamp <= this value (unix seconds).
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          required: false
+          description: Page size (default 50; values above 10000 are clamped to 10000).
+          schema:
+            type: integer
+            minimum: 0
+            default: 50
+            maximum: 10000
+        - name: offset
+          in: query
+          required: false
+          description: Number of events to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: The matching events with pagination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateHistory'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/events/removed-entities:
+    get:
+      tags:
+        - Events
+      summary: Search entities that have events but are not subordinates
+      description: |
+        Lists, sorted, the entity IDs that have events but are not a current
+        subordinate, such as removed subordinates.
+      operationId: searchRemovedEntities
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive text the entity ID must contain. Empty lists all.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of entity IDs (default 50; values above 500 are clamped to 500).
+          schema:
+            type: integer
+            minimum: 0
+            default: 50
+            maximum: 500
+      responses:
+        '200':
+          description: The matching entity IDs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - entity_ids
+                properties:
+                  entity_ids:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/v1/admin/subordinates/{subordinateID}/jwks:
     get:
       tags:
@@ -3099,6 +3440,16 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: getSubordinateJWKS
     put:
+      description: |
+        Replaces the subordinate's keys and records a `jwks_replaced` event
+        with the message `stored N keys (fingerprint <12 hex digits>,
+        changed|unchanged)` (`stored 1 key (...)` for one key; `stored 0 keys
+        (no fingerprint, ...)` for an empty set): the start of the fingerprint
+        of the stored set and whether it differs from the keys stored before (a
+        subordinate without keys counts as changed, unless the new set is empty
+        too). The fingerprint covers the public key material only and does not
+        depend on the order of the keys, their IDs, `alg` or `use`: it is the
+        SHA-256 over the sorted RFC 7638 thumbprints of the keys.
       requestBody:
         content:
           application/json:
@@ -5774,9 +6125,20 @@ components:
       description: A single event in subordinate history.
       type: object
       required:
+        - id
+        - subordinate_id
         - timestamp
         - type
       properties:
+        id:
+          type: integer
+          description: The event's ID.
+        entity_id:
+          type: string
+          description: The entity the event is about. Omitted when unknown.
+        subordinate_id:
+          type: integer
+          description: The subordinate the event belongs to; 0 for entities that are not subordinates.
         timestamp:
           type: integer
           description: Unix timestamp (seconds since epoch) when the event occurred.
@@ -5799,6 +6161,14 @@ components:
             - constraints_deleted
             - claims_updated
             - claim_deleted
+            - jwks_refreshed
+            - jwks_update_triggered
+            - jwks_updated
+            - join_requested
+            - trust_mark_granted
+            - trust_mark_revoked
+            - trust_mark_issued
+            - trust_mark_status_updated
         status:
           type: string
           description: Subordinate status at the time of the event, if applicable.
@@ -6258,6 +6628,56 @@ components:
           description: |
             Per-subject additional claims (simple key-value map) that override general claims.
             Example: {"level": "premium"} would override a general {"level": "standard"}
+    SubjectStatusChange:
+      description: |
+        Object body of a TrustMarkSubject status change. Unlike the
+        subordinate status change it takes no `jwks`; a body with `jwks` is
+        answered 400.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+        expected_status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+          description: Only change the status if the subject is in this status (else 409).
+        message:
+          type: string
+          maxLength: 1000
+          description: Replaces the text of the trust mark events the change records.
+        issue:
+          type: boolean
+          description: Also issue the trust mark. Requires `status` active.
+    SubordinateStatusChange:
+      description: |
+        Object body of a subordinate status change. Unlike the trust mark
+        subject status change it takes no `issue`; a body with `issue` is
+        answered 400.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+        expected_status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+          description: Only change the status if the subordinate is in this status (else 409).
+        message:
+          type: string
+          maxLength: 1000
+          description: Replaces the default message of the status event.
+        jwks:
+          allOf:
+            - $ref: '#/components/schemas/Jwks'
+          description: |
+            A JWKS that replaces the subordinate's keys, in the same
+            transaction as the status change. Like `PUT .../jwks`, it replaces
+            all keys: an empty `keys` list stores an empty set.
     AddTrustMarkSubject:
       description: Data to create or update a TrustMarkSubject.
       type: object
@@ -6279,6 +6699,47 @@ components:
           type: object
           additionalProperties: true
           description: Per-subject additional claims that override general claims.
+        issue:
+          type: boolean
+          description: |
+            Also issue the trust mark to the new subject, which must be
+            active.
+        message:
+          type: string
+          maxLength: 1000
+          description: |
+            Replaces the text of the `trust_mark_granted` (and, with `issue`,
+            `trust_mark_issued`) event recorded for the new subject (400 if
+            longer than 1000 characters).
+    TrustMarkInstance:
+      description: A trust mark LightHouse issued.
+      type: object
+      required:
+        - jti
+        - trust_mark_type
+        - subject
+        - issued_at
+        - expires_at
+        - state
+      properties:
+        jti:
+          type: string
+        trust_mark_type:
+          type: string
+        subject:
+          $ref: '#/components/schemas/EntityID'
+        issued_at:
+          type: integer
+          description: Unix time the instance was recorded.
+        expires_at:
+          type: integer
+          description: Unix time the instance expires; 0 if it does not.
+        state:
+          type: string
+          enum:
+            - active
+            - revoked
+            - expired
 
     TrustMarkIssuer:
       description: A trust mark issuer object.
@@ -6511,6 +6972,24 @@ components:
                 error: invalid_request
                 error_description: resource already exists
       description: The request conflicts with existing data (e.g., duplicate claim name)
+    IssueCodedError:
+      description: |
+        An issuance or revocation was refused. `error` is a machine-readable
+        code: `already_held` (409, the entity already holds an active trust
+        mark of the type), `subject_active` (409, the entity is an active
+        subject of the type, so its instances are not revoked) or
+        `issuance_unavailable` (503, this LightHouse does not issue trust
+        marks of the type). Other refusals use the generic codes, such as
+        `invalid_request` for a status that is not the expected one.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            already held:
+              value:
+                error: already_held
+                error_description: the entity already holds an active trust mark of this type
   parameters:
     AdditionalClaimsID:
       name: additionalClaimsID
@@ -6723,6 +7202,8 @@ tags:
     description: Manage general constraints applied to subordinate entities.
   - name: Subordinate Constraints
     description: Manage constraints specific to subordinate entities.
+  - name: Events
+    description: Query events across the federation.
   - name: Federation Trust Marks
     description: Manage trust marks in the federation.
   - name: Trust Mark Issuance
