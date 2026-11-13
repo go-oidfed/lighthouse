@@ -292,3 +292,27 @@ constraint/policy/claim modifications, etc.):
 | Tool      | Command                                                                  |
 |-----------|--------------------------------------------------------------------------|
 | Admin API | `GET /api/v1/admin/subordinates/{subordinateID}/history`                 |
+
+Every event carries its `id`, the `entity_id` it is about and the
+`subordinate_id` (0 for entities that are not subordinates). Deleting a
+subordinate keeps its events and records a `deleted` event.
+
+### Federation-wide Events
+
+Query the events of all subordinates and other entities, including removed
+subordinates, newest first. Filters combine: `entity_id`, `actor`, `from` and
+`to` (unix seconds) and `type`, which may be repeated to match any of several
+types. `limit` defaults to 50 (at most 10000, larger values are clamped);
+`offset` skips events.
+
+| Tool      | Command                                                                  |
+|-----------|--------------------------------------------------------------------------|
+| Admin API | `GET /api/v1/admin/events?entity_id=&type=&type=&actor=&from=&to=`       |
+
+Search the entity IDs that have events but are not a current subordinate
+(such as removed subordinates), sorted, with `q` as a case-insensitive
+substring (empty lists all) and `limit` (default 50, at most 500):
+
+| Tool      | Command                                                                  |
+|-----------|--------------------------------------------------------------------------|
+| Admin API | `GET /api/v1/admin/events/removed-entities?q=&limit=`                    |

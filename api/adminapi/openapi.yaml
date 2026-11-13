@@ -18,12 +18,47 @@ info:
     `PATCH` partially updates a resource: only fields present in the body
     change, omitted fields are left untouched, and `null` clears a field.
     Identity cannot be changed via `PATCH`; use `PUT` to rename.
+
+    ## Authentication
+
+    The API is served on the admin port (`api.admin.port`, or the main server
+    port) and, when `api.admin.service_port` is set, a second time on the
+    service listener. Each accepts one kind of credential:
+
+    - On the admin port the API uses HTTP Basic with the credentials of an
+      admin user (`basicAuth`). While there are no users the admin port is
+      open and checks no credentials. Once there is a user it requires HTTP
+      Basic and refuses bearer tokens.
+    - On the service listener the API accepts only the service tokens
+      configured in `api.admin.service_tokens` (`serviceToken`), as
+      `Authorization: Bearer <token>`, also while there are no users. HTTP
+      Basic is refused there.
+
+    A missing or unknown credential returns **401** `invalid_client`.
+
+    ## Acting for an operator
+
+    On the service listener, the actor recorded in event history is the
+    service token's name. A token configured with `act_for_users: true` may
+    instead name the user it acts for in the `X-Actor` header. That user must
+    exist and be enabled, and their stored username is recorded; otherwise the
+    request returns **400** `invalid_actor` and nothing is written. While
+    there are no users no name can be honoured, so `X-Actor` is refused then.
+    Tokens without `act_for_users` ignore `X-Actor`.
+
+    Every write operation (`POST`, `PUT`, `PATCH`, `DELETE`) lists the
+    `X-Actor` header parameter (`#/components/parameters/XActor`). Its **400**
+    `invalid_actor` answer is `#/components/responses/InvalidActor`; operations
+    that already document another **400** answer can also return this one.
   license:
     name: MIT License
     url: https://opensource.org/licenses/MIT
 servers:
   - url: http://localhost:8765
     description: Local development server
+security:
+  - basicAuth: []
+  - serviceToken: []
 externalDocs:
   description: OpenID Federation 1.0 specification
   url: https://openid.net/specs/openid-federation-1_0.html
@@ -69,6 +104,8 @@ paths:
       operationId: listPublicKeys
       summary: List API-managed public keys
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -102,6 +139,7 @@ paths:
       tags:
         - Keys
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - name: revoke
           in: query
           description: If true, marks the key as revoked instead of hard delete.
@@ -127,6 +165,8 @@ paths:
       operationId: deletePublicKey
       summary: Remove a public key
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -157,6 +197,8 @@ paths:
       operationId: updatePublicKeyMetadata
       summary: Update public key metadata
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -198,6 +240,8 @@ paths:
       description: Returns which KMS is active and which signing algorithm is configured.
   /api/v1/admin/kms/alg:
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           text/plain:
@@ -222,6 +266,8 @@ paths:
       description: Change the active signing algorithm.
   /api/v1/admin/kms/rsa-key-len:
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           text/plain:
@@ -261,6 +307,8 @@ paths:
       operationId: getKMSRotationOptions
       summary: Get KMS rotation options
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the rotation options (full replacement PUT): omitted
@@ -287,6 +335,8 @@ paths:
       operationId: updateKMSRotationOptions
       summary: Update KMS rotation options
     patch:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -313,6 +363,7 @@ paths:
       tags:
         - Keys
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - name: revoke
           in: query
           description: If true, mark the old key as revoked instead of just expiring it.
@@ -367,6 +418,8 @@ paths:
       summary: List subordinates
       description: Get a list of subordinates, optionally filtered by entity_type and/or status.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -450,6 +503,8 @@ paths:
       operationId: getAdditionalClaims
       summary: List all additional claims
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -475,6 +530,8 @@ paths:
       summary: Replace the complete additional claims
       description: Use with care!
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: Additional claim to be added to the entity configuration.
         content:
@@ -519,6 +576,8 @@ paths:
       operationId: getAdditionalClaim
       summary: Get an additional claim row
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the additional claim row (full replacement PUT). `claim`
@@ -548,9 +607,13 @@ paths:
       operationId: updateAdditionalClaim
       summary: Update an additional claim row
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Entity Configuration
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted the additional claim.
         '404':
@@ -586,6 +649,8 @@ paths:
       operationId: listEntityConfigurationTrustMarks
       summary: List trust marks in the entity configuration
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Create a trust mark. Provide one of:
@@ -670,6 +735,8 @@ paths:
       operationId: getEntityConfigurationTrustMark
       summary: Get a trust mark
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replace a trust mark configuration entirely. All fields should be provided;
@@ -713,6 +780,8 @@ paths:
       operationId: replaceEntityConfigurationTrustMark
       summary: Replace a trust mark
     patch:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Partially update a trust mark configuration. Only provided fields will be updated.
@@ -761,9 +830,13 @@ paths:
       operationId: patchEntityConfigurationTrustMark
       summary: Partially update a trust mark
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Entity Configuration Trust Marks
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successful response. Trust mark deleted.
         '404':
@@ -790,6 +863,8 @@ paths:
       operationId: getGeneralSubordinateLifetime
       summary: Get general subordinate lifetime
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           text/plain:
@@ -827,6 +902,8 @@ paths:
       operationId: getEntityConfigurationLifetime
       summary: Get entity configuration lifetime
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           text/plain:
@@ -871,6 +948,8 @@ paths:
       summary: List all AuthorityHints
       description: Gets a list of all `AuthorityHint` entities.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: A new `AuthorityHint` to be created.
         content:
@@ -918,6 +997,8 @@ paths:
       summary: Get an AuthorityHint
       description: Gets the details of a single instance of an `AuthorityHint`.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the authority hint (full replacement PUT). `entity_id` is a
@@ -951,6 +1032,8 @@ paths:
       summary: Update an AuthorityHint
       description: Replaces an `AuthorityHint` (full replacement PUT).
     patch:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Partially updates an authority hint: only fields present in the body
@@ -981,9 +1064,13 @@ paths:
       summary: Patch an AuthorityHint
       description: Partially updates an existing `AuthorityHint`.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Authority Hints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successful response.
         '500':
@@ -1013,6 +1100,8 @@ paths:
       operationId: getMetadataClaim
       summary: Gets the value of a single metadata claim for an entity type.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -1046,9 +1135,13 @@ paths:
       operationId: changeMetadataClaim
       summary: Create or update a metadata claim.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Entity Configuration Metadata
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted claim.
         '500':
@@ -1084,6 +1177,8 @@ paths:
       operationId: getEntityTypedMetadata
       summary: Get all Metadata claims for an entity type
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -1106,6 +1201,8 @@ paths:
       operationId: changeEntityTypedMetadata
       summary: Create or update (all) metadata for an entity type.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -1128,9 +1225,13 @@ paths:
       operationId: addMetadataClaims
       summary: Adds the posted metadata claims to the entity type's metadata.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Entity Configuration Metadata
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted metadata for entity type.
         '500':
@@ -1168,6 +1269,8 @@ paths:
       operationId: getEntityConfigurationMetadata
       summary: Gets the metadata published in the entity configuration
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -1235,6 +1338,8 @@ paths:
       operationId: getGeneralAdditionalClaims
       summary: List all general additional claims
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -1260,6 +1365,8 @@ paths:
       summary: Update the complete general additional claims structure
       description: Use with care!
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: A single additional claim to be added to the general subordinate claims.
         content:
@@ -1306,6 +1413,8 @@ paths:
       operationId: getGeneralAdditionalClaim
       summary: Get a general additional claim row
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the additional claim row (full replacement PUT). `claim`
@@ -1335,9 +1444,13 @@ paths:
       operationId: updateGeneralAdditionalClaim
       summary: Update a general additional claim row
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinates
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted the general additional claim.
         '404':
@@ -1368,6 +1481,8 @@ paths:
       operationId: getSubordinateAdditionalClaims
       summary: List subordinate-specific additional claims
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -1395,6 +1510,8 @@ paths:
       summary: Update subordinate-specific additional claims
       description: Use with care!
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinates
       requestBody:
@@ -1445,6 +1562,8 @@ paths:
       operationId: getSubordinateAdditionalClaim
       summary: Get a subordinate additional claim row
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the additional claim row (full replacement PUT). `claim`
@@ -1475,9 +1594,13 @@ paths:
       operationId: updateSubordinateAdditionalClaim
       summary: Update a subordinate additional claim row
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinates
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted the subordinate additional claim.
         '404':
@@ -1562,6 +1685,8 @@ paths:
       summary: List all TrustMarkTypes
       description: Gets a list of all `TrustMarkType` entities.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: A new `TrustMarkType` to be created.
         content:
@@ -1609,6 +1734,8 @@ paths:
       summary: Get a TrustMarkType
       description: Gets the details of a single instance of a `TrustMarkType`.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the trust mark type (full replacement PUT).
@@ -1637,9 +1764,13 @@ paths:
       summary: Update a TrustMarkType
       description: Updates an existing `TrustMarkType`.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successful response.
         '404':
@@ -1674,6 +1805,8 @@ paths:
       operationId: getTrustMarkTypeIssuers
       summary: List all issuers for a TrustMarkType
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1702,6 +1835,8 @@ paths:
       operationId: setTrustMarkTypeIssuers
       summary: Set issuers list for a TrustMarkType
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1744,9 +1879,12 @@ paths:
       tags:
         - Federation Trust Marks
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - $ref: '#/components/parameters/TrustMarkTypeIDParam'
         - $ref: '#/components/parameters/IssuerIDParam'
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -1778,6 +1916,8 @@ paths:
                   $ref: '#/components/schemas/TrustMarkOwner'
           description: Successful response - returns all owners.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1787,6 +1927,8 @@ paths:
               $ref: '#/components/schemas/AddTrustMarkOwnerCreate'
           required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           content:
             application/json:
@@ -1808,6 +1950,8 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1820,6 +1964,8 @@ paths:
               $ref: '#/components/schemas/UpdateTrustMarkOwner'
         required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -1829,9 +1975,13 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Deleted.
         '404':
@@ -1854,6 +2004,8 @@ paths:
       operationId: listOwnerTypes
       summary: List trust mark types linked to owner
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1865,6 +2017,8 @@ paths:
                 $ref: '#/components/schemas/InternalID'
         required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -1876,6 +2030,8 @@ paths:
       operationId: setOwnerTypes
       summary: Replace owner’s trust mark type links
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1885,6 +2041,8 @@ paths:
               $ref: '#/components/schemas/InternalID'
         required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           content:
             application/json:
@@ -1899,9 +2057,13 @@ paths:
       - $ref: '#/components/parameters/OwnerIDParam'
   /api/v1/admin/trust-marks/owners/{ownerID}/types/{trustMarkTypeID}:
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully unlinked the TrustMarkType from the owner.
       operationId: unlinkOwnerType
@@ -1923,6 +2085,8 @@ paths:
                 items:
                   $ref: '#/components/schemas/TrustMarkIssuer'
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1932,6 +2096,8 @@ paths:
               $ref: '#/components/schemas/AddTrustMarkIssuerCreate'
         required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           content:
             application/json:
@@ -1950,6 +2116,8 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -1963,6 +2131,8 @@ paths:
               $ref: '#/components/schemas/UpdateTrustMarkIssuer'
         required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -1971,9 +2141,13 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Deleted.
         '404':
@@ -2003,6 +2177,8 @@ paths:
       operationId: listIssuerTypes
       summary: List trust mark types linked to issuer
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -2014,6 +2190,8 @@ paths:
                 $ref: '#/components/schemas/InternalID'
         required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -2025,6 +2203,8 @@ paths:
       operationId: setIssuerTypes
       summary: Replace issuer’s trust mark type links
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       requestBody:
@@ -2034,6 +2214,8 @@ paths:
               $ref: '#/components/schemas/InternalID'
         required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           content:
             application/json:
@@ -2055,9 +2237,13 @@ paths:
             value: f4b493bc-a5af-11f0-99ee-a71e7c554cad
   /api/v1/admin/trust-marks/issuers/{issuerID}/types/{trustMarkTypeID}:
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully unlinked the TrustMarkType from the issuer.
       operationId: unlinkIssuerType
@@ -2095,6 +2281,8 @@ paths:
       summary: List all TrustMarkSpecs
       description: Gets a list of all `TrustMarkSpec` entities.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: A new `TrustMarkSpec` to be created.
         content:
@@ -2142,6 +2330,8 @@ paths:
       summary: Get a TrustMarkSpec
       description: Gets the details of a single instance of a `TrustMarkSpec`.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the TrustMarkSpec (full replacement PUT). `trust_mark_type`
@@ -2171,6 +2361,8 @@ paths:
       summary: Update a TrustMarkSpec
       description: Updates an existing `TrustMarkSpec`.
     patch:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: Partial `TrustMarkSpec` fields to update.
         content:
@@ -2197,9 +2389,13 @@ paths:
       summary: Patch a TrustMarkSpec
       description: Partially updates fields of an existing `TrustMarkSpec`.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Trust Mark Issuance
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successful response.
         '404':
@@ -2257,6 +2453,7 @@ paths:
       tags:
         - Trust Mark Issuance
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - $ref: '#/components/parameters/TrustMarkSpecIDParam'
       responses:
         '201':
@@ -2267,11 +2464,37 @@ paths:
           description: Successful response - returns the created `TrustMarkSubject`.
         '400':
           $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
         '500':
           $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/IssueCodedError'
       operationId: createTrustMarkSubject
       summary: Create a TrustMarkSubject
-      description: Creates a new instance of a `TrustMarkSubject`.
+      description: |
+        Creates a new instance of a `TrustMarkSubject`. A subject created
+        active records a `trust_mark_granted` event; `message` replaces its
+        text.
+
+        With `"issue": true` the trust mark is also issued to the new subject,
+        which must then be active: it is signed and the issued instance is
+        recorded in the same transaction as the subject, with a
+        `trust_mark_issued` event. When the spec has a `cache_ttl`, the trust
+        mark endpoint then serves this mark from its cache; with `cache_ttl`
+        0 it signs a fresh mark on each request, so the eagerly issued
+        instance is recorded but not delivered, and stays live until it
+        expires or is revoked. Nothing is written, and the answer is an
+        error with a machine-readable `error` code, when:
+
+        - the entity already holds an active (unrevoked, unexpired) trust mark
+          of the type (409 `already_held`),
+        - this LightHouse cannot issue trust marks of the type (503
+          `issuance_unavailable`),
+        - signing fails (500).
+
+        A subject that already exists is a 409 `invalid_request`, as without
+        `issue`.
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}:
     summary: Manage a single TrustMarkSubject.
     description: Get, update, patch, or delete a single `TrustMarkSubject`.
@@ -2309,6 +2532,7 @@ paths:
       tags:
         - Trust Mark Issuance
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - $ref: '#/components/parameters/TrustMarkSpecIDParam'
         - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
       responses:
@@ -2331,9 +2555,12 @@ paths:
       tags:
         - Trust Mark Issuance
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - $ref: '#/components/parameters/TrustMarkSpecIDParam'
         - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successful response.
         '404':
@@ -2350,7 +2577,28 @@ paths:
       summary: Change TrustMarkSubject status
       description: |
         Change the status of a TrustMarkSubject.
-        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
+
+        The request body is either a plain text status value (one of: active,
+        blocked, pending, inactive), or, with `Content-Type: application/json`,
+        an object. In the object form `expected_status` makes the change
+        conditional: if the subject is in another status the answer is 409
+        and nothing is written.
+
+        A change records a trust mark event: `trust_mark_granted` when the
+        subject becomes active, `trust_mark_revoked` when it leaves active,
+        else `trust_mark_status_updated`. `message` (at most 1000 characters)
+        replaces its text. When the subject leaves active its issued
+        instances are revoked, in the same transaction as the change.
+
+        With `"issue": true` the status must be `active`, and the trust mark
+        is issued to the subject the way creating a subject with `issue`
+        does, in the same transaction as the change; without
+        `expected_status` the change is made from the status that was read.
+        The 409 `already_held` and 503 `issuance_unavailable` answers apply,
+        and nothing is written on any failure.
+
+        A trust mark subject has no keys: a body with `jwks` is answered 400
+        `invalid_request` and nothing is written.
       requestBody:
         content:
           text/plain:
@@ -2363,8 +2611,12 @@ paths:
                 - inactive
               description: The status value to set.
               example: active
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectStatusChange'
         required: true
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - $ref: '#/components/parameters/TrustMarkSpecIDParam'
         - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
       responses:
@@ -2378,8 +2630,12 @@ paths:
           $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
         '500':
           $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/IssueCodedError'
       operationId: changeTrustMarkSubjectStatus
   /api/v1/admin/trust-marks/issuance-spec/{trustMarkSpecID}/subjects/{trustMarkSubjectID}/additional-claims:
     summary: Manage subject-specific additional custom claims.
@@ -2414,6 +2670,8 @@ paths:
       operationId: getTrustMarkSubjectAdditionalClaims
       summary: Get subject additional claims
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -2448,9 +2706,13 @@ paths:
       operationId: updateTrustMarkSubjectAdditionalClaims
       summary: Replace subject additional claims
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Trust Mark Issuance
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -2481,6 +2743,150 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TrustMarkSpecIDParam'
       - $ref: '#/components/parameters/TrustMarkSubjectIDParam'
+  /api/v1/admin/trust-marks/instances:
+    get:
+      tags:
+        - Trust Mark Issuance
+      summary: List issued trust mark instances
+      description: |
+        Lists the trust marks LightHouse has issued, newest first. The
+        `state` of an instance is `revoked` if it was revoked, else `expired`
+        once its `expires_at` (when not 0) has passed, else `active`.
+      operationId: listTrustMarkInstances
+      parameters:
+        - name: trust_mark_type
+          in: query
+          required: false
+          description: Only instances of this trust mark type.
+          schema:
+            type: string
+        - name: sub
+          in: query
+          required: false
+          description: Only instances issued to this entity ID.
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: Only instances in this state.
+          schema:
+            type: string
+            enum:
+              - active
+              - revoked
+              - expired
+        - name: limit
+          in: query
+          required: false
+          description: Page size (default 50, at most 100).
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          description: Number of instances to skip.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The matching instances.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - instances
+                  - pagination
+                properties:
+                  instances:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TrustMarkInstance'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/trust-marks/instances/counts:
+    get:
+      tags:
+        - Trust Mark Issuance
+      summary: Count issued trust mark instances
+      description: |
+        Counts the active (unrevoked and unexpired) and the revoked
+        instances.
+      operationId: countTrustMarkInstances
+      responses:
+        '200':
+          description: The counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - active
+                  - revoked
+                properties:
+                  active:
+                    type: integer
+                  revoked:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/trust-marks/instances/revoke:
+    post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+      tags:
+        - Trust Mark Issuance
+      summary: Revoke the instances of a trust mark held by an entity
+      description: |
+        Revokes every unrevoked instance of a trust mark type issued to an
+        entity, whether or not the entity is a subject of a spec. If any was
+        revoked, a `trust_mark_revoked` event is recorded and the caches are
+        cleared. If the entity is an active subject of a spec of the type, the
+        trust mark endpoint would issue the mark again: nothing is revoked and
+        the answer is 409 `subject_active`; change the subject's status
+        instead.
+      operationId: revokeTrustMarkInstances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trust_mark_type
+                - sub
+              properties:
+                trust_mark_type:
+                  type: string
+                sub:
+                  $ref: '#/components/schemas/EntityID'
+                message:
+                  type: string
+                  maxLength: 1000
+                  description: Replaces the text of the `trust_mark_revoked` event (400 if longer than 1000 characters).
+      responses:
+        '200':
+          description: The number of instances revoked (0 if there were none).
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - revoked
+                properties:
+                  revoked:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/IssueCodedError'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/v1/admin/trust-marks/types/{trustMarkTypeID}/owner:
     summary: Path used to manage the single owner of a trust mark type.
     description: Manage the single TrustMarkOwner associated with a trust mark type (or none).
@@ -2501,6 +2907,8 @@ paths:
       operationId: getTrustMarkOwner
       summary: Get trust mark type owner
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: >-
           Replaces the trust mark type owner (full replacement PUT).
@@ -2528,6 +2936,8 @@ paths:
       operationId: updateTrustMarkOwner
       summary: Update trust mark type owner
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         description: A new `TrustMarkOwner` to be created.
         content:
@@ -2570,9 +2980,13 @@ paths:
       operationId: createTrustMarkOwner
       summary: Create trust mark type owner
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Trust Marks
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successful response. Owner deleted.
         '404':
@@ -2606,6 +3020,8 @@ paths:
       operationId: getGeneralMetadataPolicyOperator
       summary: Gets the value of a single metadata policy operator for a claim.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -2636,9 +3052,13 @@ paths:
       operationId: changeGeneralMetadataPolicyOperator
       summary: Create or update a metadata policy operator value.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - General Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted operator value.
         '500':
@@ -2667,6 +3087,8 @@ paths:
       operationId: getGeneralMetadataPolicyClaim
       summary: Get all metadata policy operators for a claim for an entity type.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -2689,6 +3111,8 @@ paths:
       operationId: changeGeneralMetadataPolicyClaim
       summary: Create or update the metadata policy entry for a claim.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -2711,9 +3135,13 @@ paths:
       operationId: addGeneralMetadataPolicyOperators
       summary: Adds the posted operators to the claim's metadata policy entry.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - General Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted metadata policy entry for claim.
         '500':
@@ -2741,6 +3169,8 @@ paths:
       operationId: getGeneralEntityTypedMetadataPolicy
       summary: Get all metadata policy claims for an entity type
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -2763,6 +3193,8 @@ paths:
       operationId: changeGeneralEntityTypedMetadataPolicy
       summary: Create or update all metadata policies for an entity type.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -2785,9 +3217,13 @@ paths:
       operationId: addGeneralMetadataPolicyClaims
       summary: Adds the posted metadata policy claims to the entity type's policies.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - General Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted metadata policies for entity type.
         '500':
@@ -2820,6 +3256,8 @@ paths:
       operationId: getGeneralMetadataPolicies
       summary: Get general metadata policies published in the entity statement
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -2860,6 +3298,8 @@ paths:
       operationId: getSubordinateDetails
       summary: Get subordinate details
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinates
       requestBody:
@@ -2895,6 +3335,8 @@ paths:
         expiration time). This is the full-replacement variant of the partial
         `PATCH` operation (`patchSubordinateDetails`).
     patch:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinates
       requestBody:
@@ -2927,9 +3369,13 @@ paths:
         This is the preferred verb for partial updates; `PUT` is the full-replacement
         variant (`updateSubordinateDetails`).
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinates
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Subordinate deleted successfully.
         '404':
@@ -2947,14 +3393,26 @@ paths:
         required: true
   /api/v1/admin/subordinates/{subordinateID}/status:
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinates
       summary: Change subordinate status
       description: |
         Change the status of a subordinate entity.
         Note: Setting status to "active" requires the subordinate to have at least one key in its JWKS.
-        
-        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
+
+        The request body is either a plain text status value (one of: active,
+        blocked, pending, inactive), or, with `Content-Type: application/json`,
+        an object. In the object form `expected_status` makes the change
+        conditional: if the subordinate is in another status the answer is 409
+        and nothing is written. `message` (at most 1000 characters) replaces
+        the default message of the status event. `jwks` replaces all of the
+        subordinate's keys (an empty `keys` list stores an empty set), as
+        `PUT .../jwks` does, in the same transaction (recorded as a
+        `jwks_replaced` event before the status event, with the message
+        described at `PUT .../jwks`); the keys in the body count when
+        activating.
       requestBody:
         content:
           text/plain:
@@ -2967,6 +3425,9 @@ paths:
                 - inactive
               description: The status value to set.
               example: active
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubordinateStatusChange'
         required: true
       responses:
         '200':
@@ -2980,15 +3441,99 @@ paths:
             Bad request. This can occur if:
             - The status value is invalid
             - Attempting to set status to "active" when the subordinate has no keys
+            - The message is longer than 1000 characters
+            - The jwks is invalid
+            - The object body has `issue`, which applies to trust mark subjects only
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: changeSubordinateStatus
+    parameters:
+      - $ref: '#/components/parameters/SubordinateIDParam'
+  /api/v1/admin/subordinates/{subordinateID}/enroll-check:
+    post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+      tags:
+        - Enroll Check
+      summary: Run the enroll entity checker for a subordinate
+      description: |
+        Runs the entity checker the enroll endpoint is configured with on the
+        subordinate, so the checker step decides as the enroll endpoint's does.
+        (The enroll endpoint also answers for entities that are already
+        subordinates before it checks anything; this route does not, and it
+        checks the entity types registered for the subordinate.) The server
+        obtains the subordinate's entity configuration itself, the way
+        the enroll endpoint does, within a bounded time (20 seconds), and
+        checks the entity types registered for the subordinate (or, when none
+        are registered, the types guessed from its metadata). The request has
+        no body; a body is ignored, and a client can never supply the entity
+        configuration or the entity to check. The check changes nothing.
+
+        The check is rate-bounded: concurrent checks of the same subordinate
+        share one lookup, and at most 8 lookups run at once; beyond that the
+        answer is 503 `enroll_check_busy`. An externally hosted enroll
+        endpoint (empty path) registers no checker, so the answer is
+        `configured: false`.
+
+        The answer is always 200 for an existing subordinate:
+        - No enroll entity checker is configured: `configured` is `false`,
+          `ok` is `false`, `reason` is omitted, and the entity configuration is
+          not fetched.
+        - The entity configuration has no metadata and no entity types are
+          registered to check: `configured` is `true`, `ok` is `false`,
+          `reason` is `entity configuration has no metadata`.
+        - The entity configuration cannot be obtained or verified, or was not
+          served in time: `configured` is `true`, `ok` is `false` and `reason`
+          says so; the checker does not run.
+        - Otherwise `ok` is the checker's decision, and `reason` its
+          description when it refuses.
+      responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollCheckResult'
+              examples:
+                accepted:
+                  value:
+                    configured: true
+                    ok: true
+                    entity_types:
+                      - openid_provider
+                refused:
+                  value:
+                    configured: true
+                    ok: false
+                    reason: entity does not carry the required trust mark
+                    entity_types:
+                      - openid_provider
+                no checker:
+                  value:
+                    configured: false
+                    ok: false
+                    entity_types: []
+          description: The result of the check.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '503':
+          description: Too many enroll checks are running (`enroll_check_busy`); retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      operationId: checkSubordinateEnroll
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
   /api/v1/admin/subordinates/{subordinateID}/history:
@@ -3032,6 +3577,14 @@ paths:
               - constraints_deleted
               - claims_updated
               - claim_deleted
+              - jwks_refreshed
+              - jwks_update_triggered
+              - jwks_updated
+              - join_requested
+              - trust_mark_granted
+              - trust_mark_revoked
+              - trust_mark_issued
+              - trust_mark_status_updated
         - name: from
           in: query
           description: Filter events with timestamp >= this value (unix seconds).
@@ -3082,6 +3635,125 @@ paths:
         Supports pagination via `limit` and `offset` parameters, and filtering by event type and timestamp range.
     parameters:
       - $ref: '#/components/parameters/SubordinateIDParam'
+  /api/v1/admin/events:
+    get:
+      tags:
+        - Events
+      summary: Query events across the federation
+      description: |
+        Lists the events of all subordinates and other entities, newest first,
+        including the events of removed subordinates. Filters combine (AND);
+        repeated `type` parameters match any of the given types. Events of
+        entities that are not subordinates have `subordinate_id` 0.
+      operationId: queryEvents
+      parameters:
+        - name: entity_id
+          in: query
+          required: false
+          description: Only events about this entity ID.
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: Only events of this type. May be repeated; events of any given type match.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: actor
+          in: query
+          required: false
+          description: Only events recorded for this actor.
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          description: Only events with timestamp >= this value (unix seconds).
+          schema:
+            type: integer
+            format: int64
+        - name: to
+          in: query
+          required: false
+          description: Only events with timestamp <= this value (unix seconds).
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          required: false
+          description: Page size (default 50; values above 10000 are clamped to 10000).
+          schema:
+            type: integer
+            minimum: 0
+            default: 50
+            maximum: 10000
+        - name: offset
+          in: query
+          required: false
+          description: Number of events to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: The matching events with pagination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubordinateHistory'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/v1/admin/events/removed-entities:
+    get:
+      tags:
+        - Events
+      summary: Search entities that have events but are not subordinates
+      description: |
+        Lists, sorted, the entity IDs that have events but are not a current
+        subordinate, such as removed subordinates.
+      operationId: searchRemovedEntities
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive text the entity ID must contain. Empty lists all.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of entity IDs (default 50; values above 500 are clamped to 500).
+          schema:
+            type: integer
+            minimum: 0
+            default: 50
+            maximum: 500
+      responses:
+        '200':
+          description: The matching entity IDs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - entity_ids
+                properties:
+                  entity_ids:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/ServerError'
   /api/v1/admin/subordinates/{subordinateID}/jwks:
     get:
       tags:
@@ -3099,6 +3771,18 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: getSubordinateJWKS
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+      description: |
+        Replaces the subordinate's keys and records a `jwks_replaced` event
+        with the message `stored N keys (fingerprint <12 hex digits>,
+        changed|unchanged)` (`stored 1 key (...)` for one key; `stored 0 keys
+        (no fingerprint, ...)` for an empty set): the start of the fingerprint
+        of the stored set and whether it differs from the keys stored before (a
+        subordinate without keys counts as changed, unless the new set is empty
+        too). The fingerprint covers the public key material only and does not
+        depend on the order of the keys, their IDs, `alg` or `use`: it is the
+        SHA-256 over the sorted RFC 7638 thumbprints of the keys.
       requestBody:
         content:
           application/json:
@@ -3123,6 +3807,8 @@ paths:
       operationId: setSubordinateJWKS
       summary: Create or update the subordinate's jwks
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Keys
       requestBody:
@@ -3164,6 +3850,8 @@ paths:
       operationId: getGeneralConstraints
       summary: Get general constraints published in the entity statement
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3204,6 +3892,8 @@ paths:
       operationId: getSubordinateConstraints
       summary: Get subordinate-specific constraints published in the entity statement
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3228,9 +3918,13 @@ paths:
       operationId: updateSubordinateConstraints
       summary: Update the subordinate-specific constraints structure.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Constraints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           content:
             application/json:
@@ -3245,9 +3939,13 @@ paths:
       summary: Copy general constraints to this subordinate.
       description: Copies the general constraints and sets them specifically for this subordinate.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Constraints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted all constraints for the subordinate.
         '404':
@@ -3276,6 +3974,8 @@ paths:
       operationId: getGeneralMaxPathLength
       summary: Get general max_path_length constraint
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3299,9 +3999,13 @@ paths:
       operationId: setGeneralMaxPathLength
       summary: Set general max_path_length constraint
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - General Constraints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted max_path_length constraint.
         '500':
@@ -3326,6 +4030,8 @@ paths:
       operationId: getGeneralNamingConstraints
       summary: Get general naming_constraints
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3348,9 +4054,13 @@ paths:
       operationId: setGeneralNamingConstraints
       summary: Set general naming_constraints
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - General Constraints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted naming_constraints.
         '500':
@@ -3375,6 +4085,8 @@ paths:
       operationId: getGeneralAllowedEntityTypes
       summary: Get general allowed entity types
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3397,6 +4109,8 @@ paths:
       operationId: setGeneralAllowedEntityTypes
       summary: Set general allowed entity types
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3423,6 +4137,7 @@ paths:
       tags:
         - General Constraints
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - name: entityType
           description: The entity type to remove
           schema:
@@ -3430,6 +4145,8 @@ paths:
           in: path
           required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -3463,6 +4180,8 @@ paths:
       operationId: getSubordinateMaxPathLength
       summary: Get subordinate max_path_length constraint
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3488,9 +4207,13 @@ paths:
       operationId: setSubordinateMaxPathLength
       summary: Set subordinate max_path_length constraint
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Constraints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted subordinate max_path_length constraint.
         '404':
@@ -3524,6 +4247,8 @@ paths:
       operationId: getSubordinateNamingConstraints
       summary: Get subordinate naming_constraints
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3548,9 +4273,13 @@ paths:
       operationId: setSubordinateNamingConstraints
       summary: Set subordinate naming_constraints
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Constraints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted subordinate naming_constraints.
         '404':
@@ -3584,6 +4313,8 @@ paths:
       operationId: getSubordinateAllowedEntityTypes
       summary: Get subordinate allowed entity types
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3610,6 +4341,8 @@ paths:
       operationId: setSubordinateAllowedEntityTypes
       summary: Set subordinate allowed entity types
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3645,6 +4378,7 @@ paths:
       tags:
         - Subordinate Constraints
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - name: subordinateID
           description: The id of the subordinate
           schema:
@@ -3658,6 +4392,8 @@ paths:
           in: path
           required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -3694,6 +4430,8 @@ paths:
       operationId: getSubordinateMetadataClaim
       summary: Gets the value of a single subordinate specific metadata claim for an entity type.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3727,9 +4465,13 @@ paths:
       operationId: changeSubordinateMetadataClaim
       summary: Create or update a subordinate specific metadata claim.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Metadata
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted claim.
         '500':
@@ -3766,6 +4508,8 @@ paths:
       operationId: getSubordinateEntityTypedMetadata
       summary: Get all subordinate-specific metadata claims for an entity type
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3788,6 +4532,8 @@ paths:
       operationId: changeSubordinateEntityTypedMetadata
       summary: Create or update all subordinate-specific metadata for an entity type.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3810,9 +4556,13 @@ paths:
       operationId: addSubordinateMetadataClaims
       summary: Adds the posted metadata claims to the subordinate specific entity type's metadata.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Metadata
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted metadata for entity type.
         '500':
@@ -3851,6 +4601,8 @@ paths:
       operationId: getSubordinateMetadata
       summary: Get subordinate-specific metadata published in the entity statement
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3924,6 +4676,8 @@ paths:
       operationId: getSubordinateMetadataPolicyOperator
       summary: Gets the value of a single metadata policy operator for a subordinate-specific claim.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -3954,9 +4708,13 @@ paths:
       operationId: changeSubordinateMetadataPolicyOperator
       summary: Create or update a subordinate-specific metadata policy operator value.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted operator value.
         '500':
@@ -3986,6 +4744,8 @@ paths:
       operationId: getSubordinateMetadataPolicyClaim
       summary: Get all metadata policy operators for a subordinate-specific claim for an entity type.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -4008,6 +4768,8 @@ paths:
       operationId: changeSubordinateMetadataPolicyClaim
       summary: Create or update the subordinate-specific metadata policy entry for a claim.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -4030,9 +4792,13 @@ paths:
       operationId: addSubordinateMetadataPolicyOperators
       summary: Adds the posted operators to the subordinate-specific claim's metadata policy entry.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted metadata policy entry for claim.
         '500':
@@ -4082,6 +4848,8 @@ paths:
       operationId: getSubordinateEntityTypedMetadataPolicy
       summary: Get all subordinate-specific metadata policy claims for an entity type
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -4104,6 +4872,8 @@ paths:
       operationId: changeSubordinateEntityTypedMetadataPolicy
       summary: Create or update all subordinate-specific metadata policies for an entity type.
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -4126,9 +4896,13 @@ paths:
       operationId: addSubordinateMetadataPolicyClaims
       summary: Adds the posted metadata policy claims to the subordinate-specific entity type's policies.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted metadata policies for entity type.
         '500':
@@ -4154,6 +4928,8 @@ paths:
       operationId: getSubordinateMetadataPolicies
       summary: Get subordinate-specific metadata policies published in the entity statement
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       requestBody:
         content:
           application/json:
@@ -4177,9 +4953,13 @@ paths:
       summary: Update the complete subordinate-specific metadata policies structure.
       description: Use with care!
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           content:
             application/json:
@@ -4194,9 +4974,13 @@ paths:
       summary: Copy general metadata policies to this subordinate.
       description: Copies the general metadata policies and sets them specifically for this subordinate.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successfully deleted all metadata policies for the subordinate.
         '404':
@@ -4217,6 +5001,7 @@ paths:
       tags:
         - Subordinate Keys
       parameters:
+        - $ref: '#/components/parameters/XActor'
         - name: subordinateID
           description: The id of the subordinate
           in: path
@@ -4228,6 +5013,8 @@ paths:
           in: path
           required: true
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           content:
             application/json:
@@ -4263,6 +5050,8 @@ paths:
       summary: List all critical metadata policy operators
       description: Gets a list of all critical metadata policy operator names.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Critical Metadata Policies
       requestBody:
@@ -4287,6 +5076,8 @@ paths:
       operationId: setCriticalMetadataPolicyOperators
       summary: Create or Update critical metadata policy operators
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Critical Metadata Policies
       requestBody:
@@ -4308,9 +5099,13 @@ paths:
     summary: Path used to manage a single critical metadata policy operator.
     description: Manage a single critical metadata policy operator entry.
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Subordinate Critical Metadata Policies
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Successful response.
       operationId: deleteCriticalMetadataPolicyOperator
@@ -4335,9 +5130,13 @@ paths:
       operationId: listTrustAnchors
       summary: List trust anchors
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Trust Anchors
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           description: Trust anchor created.
         '409':
@@ -4363,9 +5162,13 @@ paths:
       operationId: getTrustAnchor
       summary: Get a trust anchor
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Trust Anchors
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           description: Trust anchor updated.
         '404':
@@ -4382,9 +5185,13 @@ paths:
             schema:
               $ref: '#/components/schemas/UpdateTrustAnchor'
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Trust Anchors
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Trust anchor deleted.
         '404':
@@ -4410,9 +5217,13 @@ paths:
       operationId: listFederationEndpoints
       summary: List federation endpoints
     post:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Endpoints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '201':
           description: Federation endpoint created.
         '409':
@@ -4438,9 +5249,13 @@ paths:
       operationId: getFederationEndpoint
       summary: Get a federation endpoint
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Endpoints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           description: Federation endpoint updated.
         '404':
@@ -4458,9 +5273,13 @@ paths:
             schema:
               $ref: '#/components/schemas/UpdateFederationEndpoint'
     delete:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Endpoints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '204':
           description: Federation endpoint deleted.
         '404':
@@ -4482,9 +5301,13 @@ paths:
     summary: Set auth trust anchors for an endpoint.
     description: Replace the trust anchors used for endpoint authentication.
     put:
+      parameters:
+        - $ref: '#/components/parameters/XActor'
       tags:
         - Federation Endpoints
       responses:
+        '400':
+          $ref: '#/components/responses/InvalidActor'
         '200':
           description: Auth trust anchors updated.
         '404':
@@ -4509,6 +5332,18 @@ paths:
         in: path
         required: true
 components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: The username and password of an admin user; accepted on the admin port only.
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: |-
+        A service token from `api.admin.service_tokens`; accepted on the
+        service listener (`api.admin.service_port`) only. A token with
+        `act_for_users: true` may name the user it acts for in `X-Actor`.
   schemas:
     AddTrustAnchor:
       description: Request payload to create/update a trust anchor.
@@ -5774,9 +6609,20 @@ components:
       description: A single event in subordinate history.
       type: object
       required:
+        - id
+        - subordinate_id
         - timestamp
         - type
       properties:
+        id:
+          type: integer
+          description: The event's ID.
+        entity_id:
+          type: string
+          description: The entity the event is about. Omitted when unknown.
+        subordinate_id:
+          type: integer
+          description: The subordinate the event belongs to; 0 for entities that are not subordinates.
         timestamp:
           type: integer
           description: Unix timestamp (seconds since epoch) when the event occurred.
@@ -5799,6 +6645,14 @@ components:
             - constraints_deleted
             - claims_updated
             - claim_deleted
+            - jwks_refreshed
+            - jwks_update_triggered
+            - jwks_updated
+            - join_requested
+            - trust_mark_granted
+            - trust_mark_revoked
+            - trust_mark_issued
+            - trust_mark_status_updated
         status:
           type: string
           description: Subordinate status at the time of the event, if applicable.
@@ -6258,6 +7112,79 @@ components:
           description: |
             Per-subject additional claims (simple key-value map) that override general claims.
             Example: {"level": "premium"} would override a general {"level": "standard"}
+    SubjectStatusChange:
+      description: |
+        Object body of a TrustMarkSubject status change. Unlike the
+        subordinate status change it takes no `jwks`; a body with `jwks` is
+        answered 400.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+        expected_status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+          description: Only change the status if the subject is in this status (else 409).
+        message:
+          type: string
+          maxLength: 1000
+          description: Replaces the text of the trust mark events the change records.
+        issue:
+          type: boolean
+          description: Also issue the trust mark. Requires `status` active.
+    EnrollCheckResult:
+      type: object
+      required:
+        - configured
+        - ok
+        - entity_types
+      properties:
+        configured:
+          type: boolean
+          description: Whether an enroll entity checker is configured.
+        ok:
+          type: boolean
+          description: |
+            Whether the enroll entity checker accepts the subordinate. Always
+            `false` when `configured` is `false`.
+        reason:
+          type: string
+          description: Why the check failed. Omitted when `ok` is `true` or nothing was checked.
+        entity_types:
+          type: array
+          items:
+            type: string
+          description: The entity types that were checked.
+    SubordinateStatusChange:
+      description: |
+        Object body of a subordinate status change. Unlike the trust mark
+        subject status change it takes no `issue`; a body with `issue` is
+        answered 400.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+        expected_status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+          description: Only change the status if the subordinate is in this status (else 409).
+        message:
+          type: string
+          maxLength: 1000
+          description: Replaces the default message of the status event.
+        jwks:
+          allOf:
+            - $ref: '#/components/schemas/Jwks'
+          description: |
+            A JWKS that replaces the subordinate's keys, in the same
+            transaction as the status change. Like `PUT .../jwks`, it replaces
+            all keys: an empty `keys` list stores an empty set.
     AddTrustMarkSubject:
       description: Data to create or update a TrustMarkSubject.
       type: object
@@ -6279,6 +7206,47 @@ components:
           type: object
           additionalProperties: true
           description: Per-subject additional claims that override general claims.
+        issue:
+          type: boolean
+          description: |
+            Also issue the trust mark to the new subject, which must be
+            active.
+        message:
+          type: string
+          maxLength: 1000
+          description: |
+            Replaces the text of the `trust_mark_granted` (and, with `issue`,
+            `trust_mark_issued`) event recorded for the new subject (400 if
+            longer than 1000 characters).
+    TrustMarkInstance:
+      description: A trust mark LightHouse issued.
+      type: object
+      required:
+        - jti
+        - trust_mark_type
+        - subject
+        - issued_at
+        - expires_at
+        - state
+      properties:
+        jti:
+          type: string
+        trust_mark_type:
+          type: string
+        subject:
+          $ref: '#/components/schemas/EntityID'
+        issued_at:
+          type: integer
+          description: Unix time the instance was recorded.
+        expires_at:
+          type: integer
+          description: Unix time the instance expires; 0 if it does not.
+        state:
+          type: string
+          enum:
+            - active
+            - revoked
+            - expired
 
     TrustMarkIssuer:
       description: A trust mark issuer object.
@@ -6455,6 +7423,20 @@ components:
                     - entity_id: https://trust-anchor.example.org
 
   responses:
+    InvalidActor:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalid actor:
+              value:
+                error: invalid_actor
+                error_description: X-Actor must name an existing, enabled user
+      description: |-
+        On the service listener, a token with `act_for_users: true` sent an
+        `X-Actor` that does not name an existing, enabled user (or there are no
+        users). Nothing was written.
     BadRequestError:
       content:
         application/json:
@@ -6511,7 +7493,39 @@ components:
                 error: invalid_request
                 error_description: resource already exists
       description: The request conflicts with existing data (e.g., duplicate claim name)
+    IssueCodedError:
+      description: |
+        An issuance or revocation was refused. `error` is a machine-readable
+        code: `already_held` (409, the entity already holds an active trust
+        mark of the type), `subject_active` (409, the entity is an active
+        subject of the type, so its instances are not revoked) or
+        `issuance_unavailable` (503, this LightHouse does not issue trust
+        marks of the type). Other refusals use the generic codes, such as
+        `invalid_request` for a status that is not the expected one.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            already held:
+              value:
+                error: already_held
+                error_description: the entity already holds an active trust mark of this type
   parameters:
+    XActor:
+      name: X-Actor
+      in: header
+      required: false
+      description: |-
+        The user a service token acts for; the user's stored username is
+        recorded as the actor in event history. Honoured only on the service
+        listener and only for tokens with `act_for_users: true`; it must name an
+        existing, enabled user, otherwise the request is refused with **400**
+        `invalid_actor` and nothing is written. Ignored for other tokens. On the
+        admin port the `actor_source` and `actor_header` options apply instead.
+      schema:
+        type: string
+      example: alice
     AdditionalClaimsID:
       name: additionalClaimsID
       description: The ID of the additional claim.
@@ -6709,6 +7723,8 @@ tags:
     description: Manage metadata claims published in the entity configuration.
   - name: Subordinates
     description: Manage subordinate entities.
+  - name: Enroll Check
+    description: Ask whether the enroll entity checker accepts a subordinate.
   - name: Subordinate Keys
     description: Manage keys associated with subordinate entities.
   - name: Subordinate Metadata
@@ -6723,6 +7739,8 @@ tags:
     description: Manage general constraints applied to subordinate entities.
   - name: Subordinate Constraints
     description: Manage constraints specific to subordinate entities.
+  - name: Events
+    description: Query events across the federation.
   - name: Federation Trust Marks
     description: Manage trust marks in the federation.
   - name: Trust Mark Issuance

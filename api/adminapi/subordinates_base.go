@@ -1,10 +1,10 @@
 package adminapi
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v3"
@@ -270,7 +270,14 @@ func (h *subordinatesBaseHandlers) delete(c fiber.Ctx) error {
 				return err
 			}
 			entityID = existing.EntityID
-			if err := tx.SubordinateEvents.DeleteBySubordinateID(existing.ID); err != nil {
+			// Keep the subordinate's history and record the removal in it.
+			if err := RecordEvent(
+				tx.SubordinateEvents, existing.ID, model.EventTypeDeleted,
+				WithStatus(existing.Status),
+				WithMessage(fmt.Sprintf("subordinate deleted: %s", existing.EntityID)),
+				WithActor(GetActor(c)),
+				WithEntityID(existing.EntityID),
+			); err != nil {
 				return err
 			}
 			return tx.Subordinates.DeleteByDBID(id)
@@ -291,32 +298,79 @@ func (h *subordinatesBaseHandlers) delete(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+var errActiveWithoutKeys = errors.New("status cannot be active without keys")
+
+// updateStatus changes the status of a subordinate. An object body may name
+// the status the subordinate must be in, a message for the status event and
+// a JWKS to store with it; the status then changes only from the status that
+// was read, in the transaction that stores the keys and records the events.
 func (h *subordinatesBaseHandlers) updateStatus(c fiber.Ctx) error {
 	id := c.Params("subordinateID")
 
-	statusStr := strings.TrimSpace(string(c.Body()))
-	if statusStr == "" {
-		return writeBadRequest(c, "status is required")
-	}
-	status, err := model.ParseStatus(statusStr)
+	req, err := parseStatusRequest(c, subordinateStatus)
 	if err != nil {
 		return writeBadRequest(c, err.Error())
 	}
+	status := req.Status
 
 	var result *model.ExtendedSubordinateInfo
 	err = h.storages.InTransaction(
 		func(tx *model.Backends) error {
+			// A conditional change starts with its compare-and-swap, so the
+			// transaction takes the write lock before it reads anything: two
+			// overlapping changes then serialize (one gets the 409) instead
+			// of failing on a lock upgrade or overwriting each other. Later
+			// failures roll the swap back. When the status is to stay the
+			// same the swap is a no-op UPDATE that only takes the lock (its
+			// row count is ignored: MySQL reports 0 for a same-value
+			// UPDATE); the expected status is then checked on the row read
+			// under that lock.
+			sameStatus := req.ExpectedStatus != nil && *req.ExpectedStatus == status
+			if req.ExpectedStatus != nil {
+				changed, err := tx.Subordinates.TransitionStatusByDBID(id, *req.ExpectedStatus, status)
+				if err != nil {
+					return err
+				}
+				if !changed && !sameStatus {
+					if _, err = getSubordinateByDBID(tx.Subordinates, id); err != nil {
+						return err
+					}
+					return errStatusConflict
+				}
+			}
 			existing, err := getSubordinateByDBID(tx.Subordinates, id)
 			if err != nil {
 				return err
 			}
 			oldStatus := existing.Status
-
-			if status == model.StatusActive && !subordinateHasKeys(existing) {
-				return fmt.Errorf("status cannot be active without keys")
+			if req.ExpectedStatus != nil && !sameStatus {
+				oldStatus = *req.ExpectedStatus
+			} else if !req.expects(oldStatus) {
+				return errStatusConflict
 			}
-			if err := tx.Subordinates.UpdateStatusByDBID(id, status); err != nil {
-				return err
+
+			hasKeys := subordinateHasKeys(existing)
+			if req.JWKS != nil {
+				hasKeys = jwksHasKeys(req.JWKS)
+			}
+			if status == model.StatusActive && !hasKeys {
+				return errActiveWithoutKeys
+			}
+			if req.JWKS != nil {
+				if _, err = tx.Subordinates.UpdateJWKSByDBID(id, *req.JWKS); err != nil {
+					return err
+				}
+				if err = RecordEvent(
+					tx.SubordinateEvents, existing.ID, model.EventTypeJWKSReplaced, WithActor(GetActor(c)),
+					WithMessage(keysStoredMessage(existing.JWKS.Keys, req.JWKS.Keys)),
+				); err != nil {
+					return err
+				}
+			}
+			if req.ExpectedStatus == nil || sameStatus {
+				if err = tx.Subordinates.UpdateStatusByDBID(id, status); err != nil {
+					return err
+				}
 			}
 
 			info, err := tx.Subordinates.GetByDBID(id)
@@ -332,7 +386,7 @@ func (h *subordinatesBaseHandlers) updateStatus(c fiber.Ctx) error {
 				info.ID,
 				model.EventTypeStatusUpdated,
 				WithStatus(status),
-				WithMessage(fmt.Sprintf("status changed from %s to %s", oldStatus, status)),
+				WithMessage(cmp.Or(req.Message, fmt.Sprintf("status changed from %s to %s", oldStatus, status))),
 				WithActor(GetActor(c)),
 			); err != nil {
 				return err
@@ -343,11 +397,14 @@ func (h *subordinatesBaseHandlers) updateStatus(c fiber.Ctx) error {
 	)
 
 	if err != nil {
+		switch {
+		case errors.Is(err, errStatusConflict):
+			return writeConflict(c, err.Error())
+		case errors.Is(err, errActiveWithoutKeys):
+			return writeBadRequest(c, err.Error())
+		}
 		if _, ok := errors.AsType[model.NotFoundError](err); ok {
 			return writeNotFound(c, err.Error())
-		}
-		if err.Error() == "status cannot be active without keys" {
-			return writeBadRequest(c, err.Error())
 		}
 		return writeServerError(c, err)
 	}
@@ -362,11 +419,29 @@ type historyHandlers struct {
 }
 
 type eventResponse struct {
-	Timestamp int64   `json:"timestamp"`
-	Type      string  `json:"type"`
-	Status    *string `json:"status,omitempty"`
-	Message   *string `json:"message,omitempty"`
-	Actor     *string `json:"actor,omitempty"`
+	ID uint `json:"id"`
+	// EntityID is the entity the event is about; omitted when unknown.
+	EntityID string `json:"entity_id,omitempty"`
+	// SubordinateID is 0 for events of entities that are not subordinates.
+	SubordinateID uint    `json:"subordinate_id"`
+	Timestamp     int64   `json:"timestamp"`
+	Type          string  `json:"type"`
+	Status        *string `json:"status,omitempty"`
+	Message       *string `json:"message,omitempty"`
+	Actor         *string `json:"actor,omitempty"`
+}
+
+func newEventResponse(e model.SubordinateEvent) eventResponse {
+	return eventResponse{
+		ID:            e.ID,
+		EntityID:      e.EntityID,
+		SubordinateID: e.SubordinateID,
+		Timestamp:     e.Timestamp,
+		Type:          e.Type,
+		Status:        e.Status,
+		Message:       e.Message,
+		Actor:         e.Actor,
+	}
 }
 
 func (h *historyHandlers) getHistory(c fiber.Ctx) error {
@@ -392,13 +467,7 @@ func (h *historyHandlers) getHistory(c fiber.Ctx) error {
 
 	eventsResp := make([]eventResponse, len(eventsList))
 	for i, e := range eventsList {
-		eventsResp[i] = eventResponse{
-			Timestamp: e.Timestamp,
-			Type:      e.Type,
-			Status:    e.Status,
-			Message:   e.Message,
-			Actor:     e.Actor,
-		}
+		eventsResp[i] = newEventResponse(e)
 	}
 
 	limit := h.normalizeLimit(opts.Limit)

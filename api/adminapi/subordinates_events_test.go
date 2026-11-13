@@ -20,8 +20,12 @@ func (*mockSubordinateEventStore) GetBySubordinateID(_ uint, _ smodel.EventQuery
 	return nil, 0, nil
 }
 
-func (*mockSubordinateEventStore) DeleteBySubordinateID(_ uint) error {
-	return nil
+func (*mockSubordinateEventStore) Query(_ smodel.EventQueryOpts) ([]smodel.SubordinateEvent, int64, error) {
+	return nil, 0, nil
+}
+
+func (*mockSubordinateEventStore) RemovedEntityIDs(_ string, _ int) ([]string, error) {
+	return nil, nil
 }
 
 func TestEventOptions(t *testing.T) {
@@ -31,7 +35,11 @@ func TestEventOptions(t *testing.T) {
 	WithMessage("updated subordinate")(event)
 	WithStatus(smodel.StatusActive)(event)
 	WithActor("admin@example.com")(event)
+	WithEntityID("https://sub.example.com")(event)
 
+	if event.EntityID != "https://sub.example.com" {
+		t.Fatalf("unexpected entity ID option result: %+v", event)
+	}
 	if event.Message == nil || *event.Message != "updated subordinate" {
 		t.Fatalf("unexpected message option result: %+v", event)
 	}

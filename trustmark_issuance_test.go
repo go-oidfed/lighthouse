@@ -2,10 +2,12 @@ package lighthouse
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
@@ -17,6 +19,8 @@ import (
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 
+	"github.com/go-oidfed/lighthouse/api/adminapi"
+	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -223,4 +227,89 @@ func TestTrustMarkIssuance_NoSubjectRecordUsesSpecClaims(t *testing.T) {
 
 	assert.Equal(t, "g", tm.Extra["general"], "spec's general claims should be present")
 	assert.NotEmpty(t, tm.Extra["jti"], "jti should always be present")
+}
+
+// TestAdminTrustMarkSigner signs a trust mark for the admin API's immediate
+// issuance with the given claims and a new jti, and refuses a type this
+// LightHouse does not issue.
+func TestAdminTrustMarkSigner(t *testing.T) {
+	t.Parallel()
+	spec, _ := trustMarkIssuanceTestSpec(nil)
+	fed := newTrustMarkIssuanceTestLightHouse(t, &trustMarkIssuanceSpecStore{spec: spec})
+	signer := adminTrustMarkSigner{fed: fed}
+
+	signed, err := signer.SignTrustMark(
+		trustMarkIssuanceTestType, trustMarkIssuanceTestSubject, map[string]any{"level": "premium"},
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, signed.JTI)
+	tm, err := oidfed.ParseTrustMark([]byte(signed.JWT))
+	require.NoError(t, err)
+	assert.Equal(t, trustMarkIssuanceTestSubject, tm.Subject)
+	assert.Equal(t, "premium", tm.Extra["level"])
+	assert.Equal(t, signed.JTI, tm.Extra["jti"])
+	if tm.ExpiresAt != nil {
+		assert.Equal(t, tm.ExpiresAt.Unix(), signed.ExpiresAt)
+	}
+
+	_, err = signer.SignTrustMark("unknown-type", trustMarkIssuanceTestSubject, nil)
+	require.ErrorIs(t, err, adminapi.ErrIssuanceUnavailable)
+	_, err = adminTrustMarkSigner{fed: &LightHouse{}}.SignTrustMark(trustMarkIssuanceTestType, "x", nil)
+	require.ErrorIs(t, err, adminapi.ErrIssuanceUnavailable)
+}
+
+// TestAdminEagerIssuanceServedByEndpoint issues a trust mark through the
+// admin API ("issue": true) and then requests it from the trust mark
+// endpoint: the endpoint serves the same trust mark from its cache, and only
+// that one instance is recorded.
+func TestAdminEagerIssuanceServedByEndpoint(t *testing.T) {
+	t.Parallel()
+	store, err := storage.NewStorage(
+		storage.Config{
+			Driver: storage.DriverSQLite,
+			DSN:    "file:" + url.PathEscape(t.Name()) + "?mode=memory&cache=shared",
+		},
+	)
+	require.NoError(t, err)
+	backends, err := store.Backends(storage.JTIStorageDB)
+	require.NoError(t, err)
+	spec, err := backends.TrustMarkSpecs.Create(
+		&model.AddTrustMarkSpec{TrustMarkType: trustMarkIssuanceTestType, CacheTTL: 300},
+	)
+	require.NoError(t, err)
+
+	// The endpoint and the admin API are wired as at startup.
+	fed := newTrustMarkIssuanceTestLightHouse(t, backends.TrustMarkSpecs)
+	fed.storages = backends
+	path := "/tm"
+	require.NoError(
+		t, fed.loadEndpointFromDB(&model.FederationEndpoint{Type: model.EndpointTypeTrustMark, Path: &path}),
+	)
+	app := fiber.New()
+	_, err = initAdminAPI(
+		AdminAPIOptions{Enabled: true}, ServerConf{}, app, fed, trustMarkIssuanceTestEntityID, backends,
+		fed.FederationEntity, adminapi.KeyManagement{}, nil,
+	)
+	require.NoError(t, err)
+	app.All("/*", fed.dispatch)
+
+	req := httptest.NewRequest(
+		fiber.MethodPost, fmt.Sprintf("/api/v1/admin/trust-marks/issuance-spec/%d/subjects", spec.ID),
+		strings.NewReader(`{"entity_id":"`+trustMarkIssuanceTestSubject+`","issue":true}`),
+	)
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	instances, err := backends.TrustMarkInstances.ListBySubject(trustMarkIssuanceTestType, trustMarkIssuanceTestSubject)
+	require.NoError(t, err)
+	require.Len(t, instances, 1)
+
+	tm := issueAndParseTrustMark(t, app, trustMarkIssuanceTestType, trustMarkIssuanceTestSubject)
+	assert.Equal(t, instances[0].JTI, tm.Extra["jti"], "the endpoint serves the eagerly issued trust mark")
+	instances, err = backends.TrustMarkInstances.ListBySubject(trustMarkIssuanceTestType, trustMarkIssuanceTestSubject)
+	require.NoError(t, err)
+	assert.Len(t, instances, 1, "no second instance is recorded")
 }

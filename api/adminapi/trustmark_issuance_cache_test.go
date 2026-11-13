@@ -1,6 +1,7 @@
 package adminapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/go-oidfed/lighthouse/storage"
 	"github.com/go-oidfed/lighthouse/storage/model"
 )
 
@@ -53,7 +55,8 @@ func (r *recordingCacheInvalidator) assert(t *testing.T, wantMarks, wantTypes []
 // a spec "type-a" holding the active subject "https://a.example.org".
 func setupCacheInvalidationApp(t *testing.T) (*fiber.App, *recordingCacheInvalidator, uint, uint) {
 	t.Helper()
-	store := newTestStorage(t).TrustMarkSpecStorage()
+	st := newTestStorage(t)
+	store := st.TrustMarkSpecStorage()
 	spec, err := store.Create(&model.AddTrustMarkSpec{TrustMarkType: "type-a"})
 	if err != nil {
 		t.Fatalf("create spec: %v", err)
@@ -69,7 +72,7 @@ func setupCacheInvalidationApp(t *testing.T) (*fiber.App, *recordingCacheInvalid
 	}
 	inv := &recordingCacheInvalidator{}
 	app := fiber.New()
-	registerTrustMarkIssuance(app, store, inv)
+	registerTrustMarkIssuance(app, testBackendsOf(t, st), inv, nil)
 	return app, inv, spec.ID, subject.ID
 }
 
@@ -293,9 +296,8 @@ func TestTrustMarkIssuance_CacheInvalidation(t *testing.T) {
 
 func TestTrustMarkIssuance_NilCacheInvalidator(t *testing.T) {
 	t.Parallel()
-	store := newTestStorage(t).TrustMarkSpecStorage()
 	app := fiber.New()
-	registerTrustMarkIssuance(app, store, nil)
+	registerTrustMarkIssuance(app, testBackendsOf(t, newTestStorage(t)), nil, nil)
 
 	req := httptest.NewRequest(
 		"POST", "/trust-marks/issuance-spec", strings.NewReader(`{"trust_mark_type":"type-a"}`),
@@ -318,4 +320,222 @@ func TestTrustMarkIssuance_NilCacheInvalidator(t *testing.T) {
 	req = httptest.NewRequest("DELETE", "/trust-marks/issuance-spec/type-a", http.NoBody)
 	resp, body = doRequest(t, app, req)
 	requireStatus(t, resp, body, http.StatusNoContent)
+}
+
+// TestTrustMarkSubjectStatusObjectBody covers the object form of the subject
+// status change: expected_status makes it conditional, and message is
+// accepted.
+func TestTrustMarkSubjectStatusObjectBody(t *testing.T) {
+	t.Parallel()
+
+	put := func(t *testing.T, app *fiber.App, specID, subjectID uint, contentType, body string) (*http.Response, []byte) {
+		t.Helper()
+		req := httptest.NewRequest(
+			"PUT", fmt.Sprintf("/trust-marks/issuance-spec/%d/subjects/%d/status", specID, subjectID),
+			strings.NewReader(body),
+		)
+		req.Header.Set("Content-Type", contentType)
+		return doRequest(t, app, req)
+	}
+	statusOf := func(t *testing.T, app *fiber.App, specID, subjectID uint) model.Status {
+		t.Helper()
+		req := httptest.NewRequest(
+			"GET", fmt.Sprintf("/trust-marks/issuance-spec/%d/subjects/%d", specID, subjectID), http.NoBody,
+		)
+		resp, body := doRequest(t, app, req)
+		requireStatus(t, resp, body, http.StatusOK)
+		var subject model.TrustMarkSubject
+		if err := json.Unmarshal(body, &subject); err != nil {
+			t.Fatalf("parse subject: %v", err)
+		}
+		return subject.Status
+	}
+
+	t.Run(
+		"PlainBodyUnderJSONContentTypeStaysPlain", func(t *testing.T) {
+			t.Parallel()
+			app, inv, specID, subjectID := setupCacheInvalidationApp(t)
+			resp, body := put(t, app, specID, subjectID, fiber.MIMEApplicationJSON, "blocked")
+			requireStatus(t, resp, body, http.StatusOK)
+			if got := statusOf(t, app, specID, subjectID); got != model.StatusBlocked {
+				t.Errorf("status = %s, want blocked", got)
+			}
+			inv.assert(t, []string{"type-a|https://a.example.org"}, nil)
+		},
+	)
+
+	t.Run(
+		"ExpectedStatusAndMessage", func(t *testing.T) {
+			t.Parallel()
+			app, inv, specID, subjectID := setupCacheInvalidationApp(t)
+			resp, body := put(
+				t, app, specID, subjectID, fiber.MIMEApplicationJSON,
+				`{"status":"blocked","expected_status":"active","message":"no longer a member"}`,
+			)
+			requireStatus(t, resp, body, http.StatusOK)
+			if got := statusOf(t, app, specID, subjectID); got != model.StatusBlocked {
+				t.Errorf("status = %s, want blocked", got)
+			}
+			inv.assert(t, []string{"type-a|https://a.example.org"}, nil)
+		},
+	)
+
+	t.Run(
+		"ExpectedStatusMismatchIsConflictAndChangesNothing", func(t *testing.T) {
+			t.Parallel()
+			app, inv, specID, subjectID := setupCacheInvalidationApp(t)
+			resp, body := put(
+				t, app, specID, subjectID, fiber.MIMEApplicationJSON,
+				`{"status":"blocked","expected_status":"pending","message":"x"}`,
+			)
+			assertErrorResponse(t, resp, body, http.StatusConflict, "invalid_request")
+			if got := statusOf(t, app, specID, subjectID); got != model.StatusActive {
+				t.Errorf("status = %s, want active", got)
+			}
+			inv.assert(t, nil, nil)
+		},
+	)
+
+	t.Run(
+		"MessageTooLong", func(t *testing.T) {
+			t.Parallel()
+			app, _, specID, subjectID := setupCacheInvalidationApp(t)
+			resp, body := put(
+				t, app, specID, subjectID, fiber.MIMEApplicationJSON,
+				fmt.Sprintf(`{"status":"blocked","message":%q}`, strings.Repeat("x", 1001)),
+			)
+			assertErrorResponse(t, resp, body, http.StatusBadRequest, "invalid_request")
+			if got := statusOf(t, app, specID, subjectID); got != model.StatusActive {
+				t.Errorf("status = %s, want active", got)
+			}
+		},
+	)
+
+	t.Run(
+		"JWKSIsRefusedAndChangesNothing", func(t *testing.T) {
+			t.Parallel()
+			for name, jwks := range map[string]string{"Set": `{"keys":[]}`, "Null": `null`} {
+				t.Run(
+					name, func(t *testing.T) {
+						t.Parallel()
+						app, inv, specID, subjectID := setupCacheInvalidationApp(t)
+						resp, body := put(
+							t, app, specID, subjectID, fiber.MIMEApplicationJSON,
+							fmt.Sprintf(`{"status":"blocked","jwks":%s}`, jwks),
+						)
+						assertErrorResponse(t, resp, body, http.StatusBadRequest, "invalid_request")
+						if !strings.Contains(string(body), "jwks is not supported") {
+							t.Errorf("error does not name jwks: %s", body)
+						}
+						if got := statusOf(t, app, specID, subjectID); got != model.StatusActive {
+							t.Errorf("status = %s, want active", got)
+						}
+						inv.assert(t, nil, nil)
+					},
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"UnknownSubject", func(t *testing.T) {
+			t.Parallel()
+			app, _, specID, _ := setupCacheInvalidationApp(t)
+			resp, body := put(t, app, specID, 999, fiber.MIMEApplicationJSON, `{"status":"blocked"}`)
+			assertErrorResponse(t, resp, body, http.StatusNotFound, "not_found")
+		},
+	)
+
+	t.Run(
+		"SecondChangeFromTheSameStatusIsConflict", func(t *testing.T) {
+			t.Parallel()
+			app, _, specID, subjectID := setupCacheInvalidationApp(t)
+			resp, body := put(
+				t, app, specID, subjectID, fiber.MIMEApplicationJSON, `{"status":"blocked","expected_status":"active"}`,
+			)
+			requireStatus(t, resp, body, http.StatusOK)
+			resp, body = put(
+				t, app, specID, subjectID, fiber.MIMEApplicationJSON, `{"status":"inactive","expected_status":"active"}`,
+			)
+			assertStatus(t, resp, body, http.StatusConflict)
+			if got := statusOf(t, app, specID, subjectID); got != model.StatusBlocked {
+				t.Errorf("status = %s, want blocked", got)
+			}
+		},
+	)
+}
+
+// TestTrustMarkSubjectStatusConcurrent starts two overlapping conditional
+// changes from the same status on a file-backed SQLite database: exactly one
+// succeeds and the other is answered 409.
+func TestTrustMarkSubjectStatusConcurrent(t *testing.T) {
+	t.Parallel()
+	store, err := storage.NewStorage(storage.Config{Driver: storage.DriverSQLite, DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("Failed to create storage: %v", err)
+	}
+	specs := store.TrustMarkSpecStorage()
+	spec, err := specs.Create(&model.AddTrustMarkSpec{TrustMarkType: "type-a"})
+	if err != nil {
+		t.Fatalf("create spec: %v", err)
+	}
+	app := fiber.New()
+	registerTrustMarkIssuance(app, testBackendsOf(t, store), nil, nil)
+
+	for i := range 10 {
+		subject, err := specs.CreateSubject(
+			"type-a", &model.AddTrustMarkSubject{
+				EntityID: fmt.Sprintf("https://race%d.example.org", i), Status: model.StatusActive,
+			},
+		)
+		if err != nil {
+			t.Fatalf("create subject: %v", err)
+		}
+		targets := []string{"blocked", "inactive"}
+		codes := make([]int, len(targets))
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		for j, target := range targets {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				req := httptest.NewRequest(
+					"PUT", fmt.Sprintf("/trust-marks/issuance-spec/%d/subjects/%d/status", spec.ID, subject.ID),
+					strings.NewReader(fmt.Sprintf(`{"status":%q,"expected_status":"active"}`, target)),
+				)
+				req.Header.Set("Content-Type", fiber.MIMEApplicationJSON)
+				resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
+				if err != nil {
+					codes[j] = -1
+					return
+				}
+				resp.Body.Close()
+				codes[j] = resp.StatusCode
+			}()
+		}
+		close(start)
+		wg.Wait()
+
+		winner := -1
+		for j, code := range codes {
+			switch code {
+			case http.StatusOK:
+				if winner != -1 {
+					t.Fatalf("round %d: both changes succeeded", i)
+				}
+				winner = j
+			case http.StatusConflict:
+			default:
+				t.Fatalf("round %d: unexpected status %d (codes %v)", i, code, codes)
+			}
+		}
+		if winner == -1 {
+			t.Fatalf("round %d: no change succeeded (codes %v)", i, codes)
+		}
+		got, _ := specs.GetSubject("type-a", fmt.Sprint(subject.ID))
+		if got.Status.String() != targets[winner] {
+			t.Errorf("round %d: status = %s, want %s", i, got.Status, targets[winner])
+		}
+	}
 }
