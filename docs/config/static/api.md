@@ -138,13 +138,119 @@ Path to the TLS certificate file for the Admin API.
 
 Path to the TLS private key file for the Admin API.
 
+### `service_port`
+<span class="badge badge-purple" title="Value Type">integer</span>
+<span class="badge badge-blue" title="Default Value">`0`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_SERVICE_PORT`</span>
+
+The port of the service listener. When set, LightHouse serves the Admin API
+(under `/api/v1/admin`) a second time on this port, accepting only the bearer
+tokens in [`service_tokens`](#service_tokens), never HTTP Basic, also while
+there are no users. Service tokens are not accepted on the admin port. See
+[Service Listener and Service Tokens](../../features/admin_api.md#service-listener-and-service-tokens).
+
+- `0` (default) - No service listener
+- Any other value - Serve the service listener on this port. It must differ
+  from the ports of the main server (`server.port`, or 443 and, with
+  `redirect_http`, 80 when `server.tls` is enabled) and from `api.admin.port`,
+  and needs at least one entry in [`service_tokens`](#service_tokens) and an
+  enabled Admin API.
+
+The service listener serves plain HTTP on
+[`service_ip_listen`](#service_ip_listen), or on `server.ip_listen` when that
+is not set. Expose it only on an internal network. LightHouse logs a warning
+at start-up when the service listener binds to all interfaces (for example
+when neither `service_ip_listen` nor `server.ip_listen` is set).
+
+??? file "config.yaml"
+
+    ```yaml
+    api:
+        admin:
+            enabled: true
+            port: 8443
+            service_port: 7700
+            service_ip_listen: 127.0.0.1
+            service_tokens:
+                - name: operator-ui
+                  token_file: /run/secrets/lighthouse-operator-ui-token
+                  act_for_users: true
+    ```
+
+### `service_ip_listen`
+<span class="badge badge-purple" title="Value Type">IP address</span>
+<span class="badge badge-blue" title="Default Value">`server.ip_listen`</span>
+<span class="badge badge-green" title="If this option is required or optional">optional</span>
+<span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_SERVICE_IP_LISTEN`</span>
+
+The IP address the [service listener](#service_port) binds to, for example
+`127.0.0.1` or an address on a container network, so that it is internal
+whatever `server.ip_listen` is. When empty (default), the service listener
+binds to `server.ip_listen`. A value that is not an IP address (a host name, or
+an address with a port) is refused at start-up.
+
+??? file "config.yaml"
+
+    ```yaml
+    server:
+        ip_listen: 0.0.0.0
+    api:
+        admin:
+            service_port: 7700
+            service_ip_listen: 10.89.0.2
+    ```
+
+### `service_tokens`
+<span class="badge badge-purple" title="Value Type">list of objects</span>
+<span class="badge badge-blue" title="Default Value">empty</span>
+<span class="badge badge-green" title="If this option is required or optional">required with `service_port`</span>
+
+The bearer tokens accepted on the [service listener](#service_port). Setting
+tokens requires `service_port`. This option can be set in the config file only,
+not with environment variables.
+
+Each entry has:
+
+- `name` (required, unique) - Identifies the token; it is the actor recorded
+  in event history for requests made with it. Choose a name that is not a
+  username.
+- `token_file` (required) - File holding the token. Trailing newlines are
+  removed; the rest must be at least 32 bytes, and no two tokens may have the
+  same value. Generate one with, for example, `openssl rand -base64 48`.
+  LightHouse reads the file at start-up, keeps only the token's SHA-256 hash
+  and never logs it. It logs a warning when the file is readable by its group
+  or others; make it readable by its owner only (`chmod 600`).
+- `act_for_users` (default `false`) - Lets requests made with the token name,
+  in the `X-Actor` header, the user they act for. That user must be an
+  existing, enabled user; otherwise the request is refused with
+  `400 invalid_actor` and nothing is written. While there are no users, any
+  `X-Actor` is refused. Tokens without `act_for_users` ignore `X-Actor`.
+
+Clients send the token as `Authorization: Bearer <token>`.
+
+??? file "config.yaml"
+
+    ```yaml
+    api:
+        admin:
+            service_port: 7700
+            service_tokens:
+                - name: operator-ui
+                  token_file: /run/secrets/lighthouse-operator-ui-token
+                  act_for_users: true
+                - name: automation
+                  token_file: /run/secrets/lighthouse-automation-token
+    ```
+
 ### `actor_source`
 <span class="badge badge-purple" title="Value Type">string</span>
 <span class="badge badge-blue" title="Default Value">`basic_auth`</span>
 <span class="badge badge-green" title="If this option is required or optional">optional</span>
 <span class="badge badge-cyan" title="Environment Variable">`LH_API_ADMIN_ACTOR_SOURCE`</span>
 
-Specifies the source for extracting the actor (user identity) for audit logging in Admin API requests.
+Specifies the source for extracting the actor (user identity) for audit logging in Admin API requests
+on the admin port. It does not apply to the [service listener](#service_port).
 
 Available options:
 
@@ -437,6 +543,7 @@ Default is 3600 (1 hour).
     - **Network isolation**: Use a separate port and firewall rules to restrict access
     - **TLS**: Always use HTTPS for admin API traffic
     - **Strong passwords**: Use strong, unique passwords for admin users
+    - **Service listener**: Bind `service_port` to an internal network only (`service_ip_listen`); it serves plain HTTP
 
 ## Admin API Endpoints
 

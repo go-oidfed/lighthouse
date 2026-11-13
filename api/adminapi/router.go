@@ -32,6 +32,14 @@ type Options struct {
 	// modified to invalidate the trust mark endpoint's cached eligibility
 	// results and issued trust marks. Can be nil if there are no such caches.
 	TrustMarkCacheInvalidator TrustMarkCacheInvalidator
+	// EnrollChecker runs the enroll endpoint's entity checker for
+	// POST /subordinates/{subordinateID}/enroll-check. Can be nil, in which
+	// case that route answers as if no checker were configured.
+	EnrollChecker EnrollChecker
+	// TrustMarkSigner signs the trust marks issued immediately when a subject
+	// is created or activated with "issue": true. Can be nil, in which case
+	// such requests are answered 503 issuance_unavailable.
+	TrustMarkSigner TrustMarkSigner
 	// JWKSUpdateHookApplier, when non-nil, is invoked after each authority-hint
 	// mutation so that outbound JWKS-sync hooks can be re-attached at runtime.
 	// A returned error is logged, not returned to the API client (the DB write
@@ -39,7 +47,31 @@ type Options struct {
 	JWKSUpdateHookApplier func() error
 	// Actor holds configuration for actor extraction from requests.
 	// The actor is recorded in subordinate event history.
+	// It applies to the admin port only, not to the service listener.
 	Actor ActorConfig
+	// ServiceTokens are the tokens of the service listener; empty when the
+	// service listener is off. They are accepted only where ServiceListener
+	// is set; the admin port never accepts them, but is given them too so
+	// that it can describe the service listener.
+	ServiceTokens ServiceTokens
+	// ServiceListener makes the routes the service listener's: they accept
+	// only ServiceTokens, never HTTP Basic, also while there are no users,
+	// and the actor is the token or the user it acts for.
+	ServiceListener bool
+}
+
+// serviceTokens returns the service listener's tokens (nil-safe).
+func (o *Options) serviceTokens() ServiceTokens {
+	if o == nil {
+		return nil
+	}
+	return o.ServiceTokens
+}
+
+// serviceListener reports whether the routes are the service listener's
+// (nil-safe).
+func (o *Options) serviceListener() bool {
+	return o != nil && o.ServiceListener
 }
 
 // trustMarkCacheInvalidator returns the configured trust mark cache invalidator (nil-safe).
@@ -48,6 +80,22 @@ func (o *Options) trustMarkCacheInvalidator() TrustMarkCacheInvalidator {
 		return nil
 	}
 	return o.TrustMarkCacheInvalidator
+}
+
+// trustMarkSigner returns the configured trust mark signer (nil-safe).
+func (o *Options) trustMarkSigner() TrustMarkSigner {
+	if o == nil {
+		return nil
+	}
+	return o.TrustMarkSigner
+}
+
+// enrollChecker returns the configured enroll checker (nil-safe).
+func (o *Options) enrollChecker() EnrollChecker {
+	if o == nil {
+		return nil
+	}
+	return o.EnrollChecker
 }
 
 // jwksUpdateHookApplier returns the configured JWKS-sync hook applier (nil-safe).
@@ -63,6 +111,11 @@ func Register(
 	r fiber.Router, serverURL string, storages model.Backends, fedEntity oidfed.FederationEntity,
 	keyManagement KeyManagement, ctrl LighthouseController, opts *Options,
 ) error {
+	if opts.serviceListener() {
+		if err := opts.serviceTokens().check(); err != nil {
+			return errors.Wrap(err, "adminapi")
+		}
+	}
 	// If an admin port is provided in options, adapt the serverURL to include/override the port
 	if opts != nil && opts.Port > 0 {
 		serverURL = adaptServerURLPort(serverURL, opts.Port)
@@ -145,16 +198,25 @@ func Register(
 			return c.Send(html)
 		},
 	)
-	// Optional authentication middleware for all admin routes
-	r.Use(authMiddleware(storages.Users))
+	if opts.serviceListener() {
+		// The service listener: service tokens only, and the actor is the
+		// token or the user it acts for.
+		r.Use(serviceTokenAuthMiddleware(opts.serviceTokens()))
+		r.Use(serviceActorMiddleware(storages.Users))
+	} else {
+		// Optional authentication middleware for all admin routes
+		r.Use(authMiddleware(storages.Users))
 
-	// Actor extraction middleware (must come after auth middleware)
-	var actorCfg ActorConfig
-	if opts != nil {
-		actorCfg = opts.Actor
+		// Actor extraction middleware (must come after auth middleware)
+		var actorCfg ActorConfig
+		if opts != nil {
+			actorCfg = opts.Actor
+		}
+		r.Use(actorMiddleware(actorCfg))
 	}
-	r.Use(actorMiddleware(actorCfg))
 
+	// Version and supported features
+	registerInfo(r, opts, fedEntity, storages.TrustMarkInstances != nil)
 	// Entity Configuration
 	registerEntityConfiguration(r, storages.AdditionalClaims, storages.KV, fedEntity)
 	// Authority Hints
@@ -169,12 +231,17 @@ func Register(
 	registerEntityTrustMarks(r, storages.PublishedTrustMarks, trustMarkInvalidator)
 	// Subordinates - all handlers registered via single entry point (with transaction support)
 	RegisterSubordinateHandlers(r, storages, fedEntity, ctrl)
+	// Enroll check of a subordinate
+	registerEnrollCheck(r, storages.Subordinates, opts.enrollChecker())
+	// Events of all entities
+	registerEvents(r, storages.SubordinateEvents)
 	// Trust Mark Types and Issuance (with transaction support)
 	registerTrustMarkTypes(r, storages)
 	// Global Owners and Issuers
 	registerTrustMarkOwners(r, storages.TrustMarkOwners, storages.TrustMarkTypes)
 	registerTrustMarkIssuers(r, storages.TrustMarkIssuers, storages.TrustMarkTypes)
-	registerTrustMarkIssuance(r, storages.TrustMarkSpecs, opts.trustMarkCacheInvalidator())
+	registerTrustMarkIssuance(r, storages, opts.trustMarkCacheInvalidator(), opts.trustMarkSigner())
+	registerTrustMarkInstances(r, storages, opts.trustMarkCacheInvalidator())
 	// Trust Anchors (TA repository management)
 	registerTrustAnchors(r, storages.TrustAnchors, ctrl)
 	// Federation Endpoints (dynamic endpoint management)

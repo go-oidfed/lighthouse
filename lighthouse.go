@@ -8,8 +8,10 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -26,6 +28,8 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/api/adminapi"
@@ -112,6 +116,9 @@ type LightHouse struct {
 	*jwx.GeneralJWTSigner
 	server                   *fiber.App
 	adminAPIServer           *fiber.App
+	serviceAPIServer         *fiber.App // the service listener; nil when off
+	serviceAPIAddr           string     // host:port of the service listener
+	serviceTokens            adminapi.ServiceTokens
 	serverConf               ServerConf
 	fedMetadata              oidfed.FederationEntityMetadata
 	keyManagement            adminapi.KeyManagement
@@ -129,6 +136,10 @@ type LightHouse struct {
 	endpointRegistry         *EndpointRegistry
 	backgroundStops          []func()
 	jtiCleanupStop           func()
+	enrollCheckerMu          sync.RWMutex
+	enrollChecker            EntityChecker
+	stagedEnrollChecker      EntityChecker
+	enrollCheckerLoading     bool
 }
 
 // FiberServerConfig is the fiber.Config that is used to init the http fiber.App
@@ -230,6 +241,20 @@ func NewLightHouse(
 	// precedence in Fiber's radix tree; all other paths are dispatched via
 	// the endpoint registry.
 	server.All("/*", entity.dispatch)
+
+	serviceAPIServer, serviceTokens, err := initServiceAPI(
+		admin, serverConf, entity, entityID, storages,
+		entity.FederationEntity, keyManagement, trustMarkConfigProvider,
+	)
+	if err != nil {
+		return nil, err
+	}
+	entity.serviceAPIServer = serviceAPIServer
+	entity.serviceTokens = serviceTokens
+	entity.serviceAPIAddr = serviceListenAddress(serverConf.IPListen, admin.ServiceIPListen, admin.ServicePort)
+	if serviceAPIServer != nil {
+		warnServiceListenerOnAllInterfaces(log.Logger, entity.serviceAPIAddr)
+	}
 
 	adminAPIServer, err := initAdminAPI(
 		admin, serverConf, server, entity, entityID, storages,
@@ -489,11 +514,16 @@ func initAdminAPI(
 			Port:                       admin.Port,
 			TrustMarkConfigInvalidator: trustMarkConfigProvider,
 			TrustMarkCacheInvalidator:  &entity.trustMarkCaches,
+			TrustMarkSigner:            adminTrustMarkSigner{fed: entity},
+			EnrollChecker:              adminEnrollChecker{fed: entity},
 			JWKSUpdateHookApplier:      admin.JWKSUpdateHookApplier,
 			Actor: adminapi.ActorConfig{
 				Header: admin.ActorHeader,
 				Source: adminapi.ActorSource(admin.ActorSource),
 			},
+			// Given so that the admin port can describe the service
+			// listener; never accepted on the admin port.
+			ServiceTokens: entity.serviceTokens,
 		},
 	)
 	if err != nil {
@@ -501,6 +531,118 @@ func initAdminAPI(
 	}
 
 	return adminAPIServer, nil
+}
+
+// initServiceAPI builds the service listener: the admin API on
+// admin.ServicePort, accepting only the configured service tokens. It returns
+// the listener's app and its tokens, or nil and no tokens when the admin API
+// is disabled or no service port is set. Token values are read from their
+// files here and never logged.
+func initServiceAPI(
+	admin AdminAPIOptions,
+	serverConf ServerConf,
+	entity *LightHouse,
+	entityID string,
+	storages model.Backends,
+	fedEntity oidfed.FederationEntity,
+	keyManagement adminapi.KeyManagement,
+	trustMarkConfigProvider *storage.TrustMarkConfigProvider,
+) (*fiber.App, adminapi.ServiceTokens, error) {
+	if !admin.Enabled || admin.ServicePort == 0 {
+		return nil, nil, nil
+	}
+	if err := checkServicePort(admin, serverConf); err != nil {
+		return nil, nil, err
+	}
+	if len(admin.ServiceTokens) == 0 {
+		return nil, nil, errors.New("api.admin.service_port requires at least one api.admin.service_tokens entry")
+	}
+	tokens := make(adminapi.ServiceTokens, 0, len(admin.ServiceTokens))
+	for _, t := range admin.ServiceTokens {
+		token, err := adminapi.LoadServiceToken(t.Name, t.TokenFile, t.ActForUsers)
+		if err != nil {
+			return nil, nil, err
+		}
+		tokens = append(tokens, token)
+	}
+
+	app := fiber.New(FiberServerConfig)
+	app.Use(recover.New())
+	app.Use(compress.New())
+	app.Use(fiberlogger.New(fiberlogger.Config{Stream: serverConf.AccessLogWriter}))
+	app.Use(requestid.New())
+
+	if err := adminapi.Register(
+		app.Group("/api/v1/admin"), entityID, storages,
+		fedEntity,
+		keyManagement,
+		entity,
+		&adminapi.Options{
+			UsersEnabled:               admin.UsersEnabled,
+			Port:                       admin.ServicePort,
+			TrustMarkConfigInvalidator: trustMarkConfigProvider,
+			TrustMarkCacheInvalidator:  &entity.trustMarkCaches,
+			TrustMarkSigner:            adminTrustMarkSigner{fed: entity},
+			EnrollChecker:              adminEnrollChecker{fed: entity},
+			JWKSUpdateHookApplier:      admin.JWKSUpdateHookApplier,
+			ServiceTokens:              tokens,
+			ServiceListener:            true,
+		},
+	); err != nil {
+		return nil, nil, err
+	}
+	log.Info().Int("tokens", len(tokens)).Msg("admin API service listener enabled")
+	return app, tokens, nil
+}
+
+// checkServicePort makes sure the service port is a valid port that no other
+// listener of LightHouse uses.
+func checkServicePort(admin AdminAPIOptions, serverConf ServerConf) error {
+	port := admin.ServicePort
+	if port < 1 || port > 65535 {
+		return errors.Errorf("api.admin.service_port %d is not a valid port", port)
+	}
+	used := []int{admin.Port}
+	if serverConf.TLS.Enabled {
+		used = append(used, 443)
+		if serverConf.TLS.RedirectHTTP {
+			used = append(used, 80)
+		}
+	} else {
+		used = append(used, serverConf.Port)
+	}
+	if slices.Contains(used, port) {
+		return errors.Errorf(
+			"api.admin.service_port %d must differ from the ports of the main server and api.admin.port", port,
+		)
+	}
+	return nil
+}
+
+// warnServiceListenerOnAllInterfaces logs a warning when the service
+// listener's address addr binds to all interfaces, so that the listener for
+// bearer tokens is reachable on every network of the host.
+func warnServiceListenerOnAllInterfaces(logger zerolog.Logger, addr string) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return
+	}
+	if ip := net.ParseIP(host); host != "" && (ip == nil || !ip.IsUnspecified()) {
+		return
+	}
+	logger.Warn().Str("addr", addr).Msg(
+		"the admin API service listener (bearer service tokens, plain HTTP) is reachable on all interfaces; " +
+			"set api.admin.service_ip_listen to an internal address",
+	)
+}
+
+// serviceListenAddress is the host:port of the service listener: serviceIP
+// when set, else the server's ipListen.
+func serviceListenAddress(ipListen, serviceIP string, port int) string {
+	if serviceIP == "" {
+		serviceIP = ipListen
+	}
+	return net.JoinHostPort(serviceIP, strconv.Itoa(port))
 }
 
 // HttpHandlerFunc returns an http.HandlerFunc for serving all the necessary endpoints
@@ -645,6 +787,18 @@ func (fed *LightHouse) Start() {
 			}()
 		}
 	}
+	// Service listener (plain HTTP)
+	if fed.serviceAPIServer != nil {
+		log.Info().Str("addr", fed.serviceAPIAddr).Msg("starting admin api service listener")
+		go func() {
+			// "tcp" so that service_ip_listen may be an IPv6 address.
+			if err := fed.serviceAPIServer.Listen(
+				fed.serviceAPIAddr, fiber.ListenConfig{ListenerNetwork: "tcp"},
+			); err != nil {
+				log.Fatal().Err(err).Send()
+			}
+		}()
+	}
 	if !conf.TLS.Enabled {
 		log.Info().Int("port", conf.Port).Msg("TLS is disabled starting http server")
 		if err := fed.server.Listen(net.JoinHostPort(conf.IPListen, strconv.Itoa(conf.Port)), fiber.ListenConfig{ListenerNetwork: "tcp"}); err != nil {
@@ -718,6 +872,12 @@ func (fed *LightHouse) Stop() error {
 
 	if fed.adminAPIServer != nil && fed.adminAPIServer != fed.server {
 		if err := fed.adminAPIServer.Shutdown(); err != nil {
+			return err
+		}
+	}
+
+	if fed.serviceAPIServer != nil {
+		if err := fed.serviceAPIServer.Shutdown(); err != nil {
 			return err
 		}
 	}
@@ -876,6 +1036,27 @@ type AdminAPIOptions struct {
 	// JWKS-sync hooks after authority-hint mutations so changes take effect at
 	// runtime without a restart.
 	JWKSUpdateHookApplier func() error
+	// ServicePort, when not 0, starts the service listener: the admin API a
+	// second time on this port (plain HTTP), accepting only ServiceTokens. It
+	// must differ from the ports of the main server and the admin API.
+	ServicePort int
+	// ServiceIPListen is the IP address the service listener binds to. Empty
+	// means ServerConf.IPListen.
+	ServiceIPListen string
+	// ServiceTokens are the bearer tokens accepted on the service listener.
+	ServiceTokens []ServiceTokenConf
+}
+
+// ServiceTokenConf configures a bearer token of the admin API's service
+// listener.
+type ServiceTokenConf struct {
+	// Name identifies the token and is the actor of its requests.
+	Name string `yaml:"name"`
+	// TokenFile holds the token (at least 32 bytes; trailing newlines are
+	// removed).
+	TokenFile string `yaml:"token_file"`
+	// ActForUsers lets the token name, in X-Actor, the user it acts for.
+	ActForUsers bool `yaml:"act_for_users"`
 }
 
 // corsConfigFromConf converts a CORSConf to a Fiber CORS middleware configuration.

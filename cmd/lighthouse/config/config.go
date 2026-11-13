@@ -1,8 +1,10 @@
 package config
 
 import (
+	"net"
 	"os"
 	"reflect"
+	"slices"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pkg/errors"
@@ -89,6 +91,58 @@ func (c *Config) Validate() error {
 
 	if c.EntityID == "" {
 		return errors.New("entity_id must be specified")
+	}
+	return c.validateServiceListener()
+}
+
+// validateServiceListener makes sure that service tokens come with a service
+// port, that the service port is valid, used by no other listener and comes
+// with complete, uniquely named tokens, and that the service bind address is
+// an IP address.
+func (c *Config) validateServiceListener() error {
+	admin := c.API.Admin
+	if admin.ServicePort == 0 {
+		if len(admin.ServiceTokens) > 0 {
+			return errors.New("api.admin.service_tokens requires api.admin.service_port")
+		}
+		return nil
+	}
+	if admin.ServicePort < 1 || admin.ServicePort > 65535 {
+		return errors.Errorf("api.admin.service_port %d is not a valid port", admin.ServicePort)
+	}
+	if !admin.Enabled {
+		return errors.New("api.admin.service_port requires api.admin.enabled")
+	}
+	used := []int{admin.Port}
+	if c.Server.TLS.Enabled {
+		used = append(used, 443)
+		if c.Server.TLS.RedirectHTTP {
+			used = append(used, 80)
+		}
+	} else {
+		used = append(used, c.Server.Port)
+	}
+	if slices.Contains(used, admin.ServicePort) {
+		return errors.Errorf(
+			"api.admin.service_port %d must differ from the ports of the main server and api.admin.port",
+			admin.ServicePort,
+		)
+	}
+	if admin.ServiceIPListen != "" && net.ParseIP(admin.ServiceIPListen) == nil {
+		return errors.Errorf("api.admin.service_ip_listen %q is not an IP address", admin.ServiceIPListen)
+	}
+	if len(admin.ServiceTokens) == 0 {
+		return errors.New("api.admin.service_port requires at least one api.admin.service_tokens entry")
+	}
+	names := make(map[string]bool, len(admin.ServiceTokens))
+	for i, t := range admin.ServiceTokens {
+		if t.Name == "" || t.TokenFile == "" {
+			return errors.Errorf("api.admin.service_tokens[%d] needs a name and a token_file", i)
+		}
+		if names[t.Name] {
+			return errors.Errorf("api.admin.service_tokens: duplicate name %q", t.Name)
+		}
+		names[t.Name] = true
 	}
 	return nil
 }

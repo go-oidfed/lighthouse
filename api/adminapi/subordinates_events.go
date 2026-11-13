@@ -30,10 +30,19 @@ func WithActor(actor string) EventOption {
 	}
 }
 
+// WithEntityID sets the entity the event is about. Without it, the entity ID
+// is taken from the subordinate; set it for an entity that is not a
+// subordinate (subordinate ID 0).
+func WithEntityID(entityID string) EventOption {
+	return func(e *model.SubordinateEvent) {
+		e.EntityID = entityID
+	}
+}
+
 // RecordEvent records an event using the provided event store and returns any error.
 // This is designed for use within transactions where event recording failure
 // should cause the entire transaction to roll back.
-// Use the EventOption functions (WithStatus, WithMessage, WithActor) to configure the event.
+// Use the EventOption functions (WithStatus, WithMessage, WithActor, WithEntityID) to configure the event.
 func RecordEvent(
 	store model.SubordinateEventStore,
 	subordinateID uint,
