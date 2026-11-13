@@ -2350,7 +2350,15 @@ paths:
       summary: Change TrustMarkSubject status
       description: |
         Change the status of a TrustMarkSubject.
-        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
+
+        The request body is either a plain text status value (one of: active,
+        blocked, pending, inactive), or, with `Content-Type: application/json`,
+        an object. In the object form `expected_status` makes the change
+        conditional: if the subject is in another status the answer is 409
+        and nothing is written. `message` (at most 1000 characters) is
+        validated; a subject status change records no event that carries it.
+        A trust mark subject has no keys: a body with `jwks` is answered 400
+        `invalid_request` and nothing is written.
       requestBody:
         content:
           text/plain:
@@ -2363,6 +2371,9 @@ paths:
                 - inactive
               description: The status value to set.
               example: active
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectStatusChange'
         required: true
       parameters:
         - $ref: '#/components/parameters/TrustMarkSpecIDParam'
@@ -2378,6 +2389,8 @@ paths:
           $ref: '#/components/responses/BadRequestError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: changeTrustMarkSubjectStatus
@@ -2953,8 +2966,18 @@ paths:
       description: |
         Change the status of a subordinate entity.
         Note: Setting status to "active" requires the subordinate to have at least one key in its JWKS.
-        
-        The request body should be a plain text status value (one of: active, blocked, pending, inactive).
+
+        The request body is either a plain text status value (one of: active,
+        blocked, pending, inactive), or, with `Content-Type: application/json`,
+        an object. In the object form `expected_status` makes the change
+        conditional: if the subordinate is in another status the answer is 409
+        and nothing is written. `message` (at most 1000 characters) replaces
+        the default message of the status event. `jwks` replaces all of the
+        subordinate's keys (an empty `keys` list stores an empty set), as
+        `PUT .../jwks` does, in the same transaction (recorded as a
+        `jwks_replaced` event before the status event, with the message
+        described at `PUT .../jwks`); the keys in the body count when
+        activating.
       requestBody:
         content:
           text/plain:
@@ -2967,6 +2990,9 @@ paths:
                 - inactive
               description: The status value to set.
               example: active
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubordinateStatusChange'
         required: true
       responses:
         '200':
@@ -2980,12 +3006,16 @@ paths:
             Bad request. This can occur if:
             - The status value is invalid
             - Attempting to set status to "active" when the subordinate has no keys
+            - The message is longer than 1000 characters
+            - The jwks is invalid
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
           $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
         '500':
           $ref: '#/components/responses/ServerError'
       operationId: changeSubordinateStatus
@@ -3099,6 +3129,16 @@ paths:
           $ref: '#/components/responses/ServerError'
       operationId: getSubordinateJWKS
     put:
+      description: |
+        Replaces the subordinate's keys and records a `jwks_replaced` event
+        with the message `stored N keys (fingerprint <12 hex digits>,
+        changed|unchanged)` (`stored 1 key (...)` for one key; `stored 0 keys
+        (no fingerprint, ...)` for an empty set): the start of the fingerprint
+        of the stored set and whether it differs from the keys stored before (a
+        subordinate without keys counts as changed, unless the new set is empty
+        too). The fingerprint covers the public key material only and does not
+        depend on the order of the keys, their IDs, `alg` or `use`: it is the
+        SHA-256 over the sorted RFC 7638 thumbprints of the keys.
       requestBody:
         content:
           application/json:
@@ -6258,6 +6298,50 @@ components:
           description: |
             Per-subject additional claims (simple key-value map) that override general claims.
             Example: {"level": "premium"} would override a general {"level": "standard"}
+    SubjectStatusChange:
+      description: |
+        Object body of a TrustMarkSubject status change. Unlike the
+        subordinate status change it takes no `jwks`; a body with `jwks` is
+        answered 400.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+        expected_status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+          description: Only change the status if the subject is in this status (else 409).
+        message:
+          type: string
+          maxLength: 1000
+          description: Accepted and validated; a subject status change records no event that carries it.
+    SubordinateStatusChange:
+      description: Object body of a subordinate status change.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+        expected_status:
+          type: string
+          enum: [active, blocked, pending, inactive]
+          description: Only change the status if the subordinate is in this status (else 409).
+        message:
+          type: string
+          maxLength: 1000
+          description: Replaces the default message of the status event.
+        jwks:
+          allOf:
+            - $ref: '#/components/schemas/Jwks'
+          description: |
+            A JWKS that replaces the subordinate's keys, in the same
+            transaction as the status change. Like `PUT .../jwks`, it replaces
+            all keys: an empty `keys` list stores an empty set.
     AddTrustMarkSubject:
       description: Data to create or update a TrustMarkSubject.
       type: object
