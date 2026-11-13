@@ -3,7 +3,6 @@ package adminapi
 import (
 	"errors"
 	"maps"
-	"strings"
 
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/gofiber/fiber/v3"
@@ -224,23 +223,61 @@ func (h *trustMarkSubjectHandlers) delete(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// updateStatus changes the status of a subject. An object body may name the
+// status the subject must be in; the status then changes only from the status
+// that was read. A message in the object body is validated; a subject status
+// change records no event that carries it.
 func (h *trustMarkSubjectHandlers) updateStatus(c fiber.Ctx) error {
 	specID := c.Params("trustMarkSpecID")
 	subjectID := c.Params("trustMarkSubjectID")
 
-	statusStr := strings.TrimSpace(string(c.Body()))
-	if statusStr == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest("status is required"))
-	}
-	status, err := model.ParseStatus(statusStr)
+	req, err := parseStatusRequest(c, trustMarkSubjectStatus)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(oidfed.ErrorInvalidRequest(err.Error()))
 	}
-	updated, err := h.store.ChangeSubjectStatus(specID, subjectID, status)
+	if req.ExpectedStatus != nil {
+		return h.changeStatusConditionally(c, specID, subjectID, req)
+	}
+	updated, err := h.store.ChangeSubjectStatus(specID, subjectID, req.Status)
 	if err != nil {
 		return h.handleError(c, err)
 	}
 	h.invalidate(specID, updated.EntityID)
+	return c.JSON(updated)
+}
+
+// changeStatusConditionally sets the status of the subject to that of req
+// only if the subject is in the status req expects, in one conditional UPDATE,
+// and answers 409 if it is not: of two overlapping changes from the same
+// status exactly one succeeds. The caches are dropped as soon as the status
+// has changed.
+func (h *trustMarkSubjectHandlers) changeStatusConditionally(
+	c fiber.Ctx, specID, subjectID string, req *statusRequest,
+) error {
+	before, err := h.store.GetSubject(specID, subjectID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	if *req.ExpectedStatus == req.Status {
+		// The status stays the same: nothing to swap, only to check. The
+		// result is a snapshot; this writes nothing.
+		if before.Status != req.Status {
+			return writeConflict(c, errStatusConflict.Error())
+		}
+		return c.JSON(before)
+	}
+	changed, err := h.store.TransitionSubjectStatus(specID, subjectID, *req.ExpectedStatus, req.Status)
+	if err != nil {
+		return h.handleError(c, err)
+	}
+	if !changed {
+		return writeConflict(c, errStatusConflict.Error())
+	}
+	h.invalidate(specID, before.EntityID)
+	updated, err := h.store.GetSubject(specID, subjectID)
+	if err != nil {
+		return h.handleError(c, err)
+	}
 	return c.JSON(updated)
 }
 

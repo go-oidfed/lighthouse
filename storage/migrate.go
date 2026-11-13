@@ -2,6 +2,7 @@ package storage
 
 import (
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -39,4 +40,43 @@ func migrateIssuedTrustMarkInstanceSubject(db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// migrateSubordinateEventEntityIDs brings subordinate events written by
+// earlier versions in line with events keyed by entity ID. AutoMigrate adds
+// the entity_id column; this migration then fills entity_id of events that
+// have none from their subordinate row, including a removed (soft-deleted)
+// subordinate. Events of subordinates that no longer exist at all keep an
+// empty entity_id. Soft-deleted events get an entity_id too but stay
+// deleted: events that earlier versions deleted with their subordinate are
+// not restored. Subordinate rows are never touched.
+//
+// It only changes rows with an empty entity_id, so it is idempotent and safe
+// to run on every boot regardless of the database driver.
+func migrateSubordinateEventEntityIDs(db *gorm.DB) (filled int64, err error) {
+	stmt := &gorm.Statement{DB: db}
+	if err = stmt.Parse(&model.SubordinateEvent{}); err != nil {
+		return 0, errors.Wrap(err, "migration: parse subordinate_events schema failed")
+	}
+	eventsTable := stmt.Schema.Table
+	subordinatesTable := model.ExtendedSubordinateInfo{}.TableName()
+	subordinateEntityID := db.Unscoped().Model(&model.ExtendedSubordinateInfo{}).
+		Select(subordinatesTable + ".entity_id").
+		Where(subordinatesTable + ".id = " + eventsTable + ".subordinate_id")
+
+	result := db.Unscoped().Model(&model.SubordinateEvent{}).
+		Where("(entity_id = '' OR entity_id IS NULL) AND subordinate_id <> 0").
+		Where("EXISTS (?)", subordinateEntityID).
+		UpdateColumn("entity_id", subordinateEntityID)
+	if result.Error != nil {
+		return 0, errors.Wrap(result.Error, "migration: fill subordinate_events entity_id failed")
+	}
+	filled = result.RowsAffected
+
+	if filled > 0 {
+		log.Info().
+			Int64("filled", filled).
+			Msg("migration: subordinate events keyed by entity ID")
+	}
+	return filled, nil
 }

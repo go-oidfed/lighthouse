@@ -71,6 +71,7 @@ Full lifecycle management of subordinate entities in your federation.
 - **Additional Claims** - Add custom claims to subordinate statements
 - **Statement Preview** - Preview the subordinate statement that would be issued
 - **Event History** - View the history of changes for a subordinate
+- **Events** - Query the events of all entities, including removed subordinates, by entity, type, actor and time
 
 ### Federation Trust Marks
 
