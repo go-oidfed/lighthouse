@@ -32,6 +32,14 @@ type Options struct {
 	// modified to invalidate the trust mark endpoint's cached eligibility
 	// results and issued trust marks. Can be nil if there are no such caches.
 	TrustMarkCacheInvalidator TrustMarkCacheInvalidator
+	// EnrollChecker runs the enroll endpoint's entity checker for
+	// POST /subordinates/{subordinateID}/enroll-check. Can be nil, in which
+	// case that route answers as if no checker were configured.
+	EnrollChecker EnrollChecker
+	// TrustMarkSigner signs the trust marks issued immediately when a subject
+	// is created or activated with "issue": true. Can be nil, in which case
+	// such requests are answered 503 issuance_unavailable.
+	TrustMarkSigner TrustMarkSigner
 	// JWKSUpdateHookApplier, when non-nil, is invoked after each authority-hint
 	// mutation so that outbound JWKS-sync hooks can be re-attached at runtime.
 	// A returned error is logged, not returned to the API client (the DB write
@@ -48,6 +56,22 @@ func (o *Options) trustMarkCacheInvalidator() TrustMarkCacheInvalidator {
 		return nil
 	}
 	return o.TrustMarkCacheInvalidator
+}
+
+// trustMarkSigner returns the configured trust mark signer (nil-safe).
+func (o *Options) trustMarkSigner() TrustMarkSigner {
+	if o == nil {
+		return nil
+	}
+	return o.TrustMarkSigner
+}
+
+// enrollChecker returns the configured enroll checker (nil-safe).
+func (o *Options) enrollChecker() EnrollChecker {
+	if o == nil {
+		return nil
+	}
+	return o.EnrollChecker
 }
 
 // jwksUpdateHookApplier returns the configured JWKS-sync hook applier (nil-safe).
@@ -169,12 +193,17 @@ func Register(
 	registerEntityTrustMarks(r, storages.PublishedTrustMarks, trustMarkInvalidator)
 	// Subordinates - all handlers registered via single entry point (with transaction support)
 	RegisterSubordinateHandlers(r, storages, fedEntity, ctrl)
+	// Enroll check of a subordinate
+	registerEnrollCheck(r, storages.Subordinates, opts.enrollChecker())
+	// Events of all entities
+	registerEvents(r, storages.SubordinateEvents)
 	// Trust Mark Types and Issuance (with transaction support)
 	registerTrustMarkTypes(r, storages)
 	// Global Owners and Issuers
 	registerTrustMarkOwners(r, storages.TrustMarkOwners, storages.TrustMarkTypes)
 	registerTrustMarkIssuers(r, storages.TrustMarkIssuers, storages.TrustMarkTypes)
-	registerTrustMarkIssuance(r, storages.TrustMarkSpecs, opts.trustMarkCacheInvalidator())
+	registerTrustMarkIssuance(r, storages, opts.trustMarkCacheInvalidator(), opts.trustMarkSigner())
+	registerTrustMarkInstances(r, storages, opts.trustMarkCacheInvalidator())
 	// Trust Anchors (TA repository management)
 	registerTrustAnchors(r, storages.TrustAnchors, ctrl)
 	// Federation Endpoints (dynamic endpoint management)

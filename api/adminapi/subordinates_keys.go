@@ -54,18 +54,10 @@ func handlePutSubordinateJWKS(storages model.Backends) fiber.Handler {
 		if err := c.Bind().Body(&body); err != nil {
 			return writeBadBody(c)
 		}
-		if body.Keys.Set != nil {
-			for _, k := range body.Keys.All() {
-				if jwk.IsUnsupportedKey(k) {
-					msg := "invalid JWK in set"
-					if uk, ok := k.(jwk.UnsupportedKey); ok {
-						msg = "invalid JWK: " + uk.Reason().Error()
-					}
-					return c.Status(fiber.StatusBadRequest).JSON(
-						oidfed.ErrorInvalidRequest(msg),
-					)
-				}
-			}
+		if msg := unsupportedKeyMessage(&body); msg != "" {
+			return c.Status(fiber.StatusBadRequest).JSON(
+				oidfed.ErrorInvalidRequest(msg),
+			)
 		}
 
 		var result *model.JWKS
@@ -79,13 +71,17 @@ func handlePutSubordinateJWKS(storages model.Backends) fiber.Handler {
 				return model.NotFoundError("subordinate not found")
 			}
 
+			old := info.JWKS.Keys
 			updatedJWKS, err := tx.Subordinates.UpdateJWKSByDBID(id, body)
 			if err != nil {
 				return err
 			}
 			result = updatedJWKS
 			// Record JWKS replaced event
-			return RecordEvent(tx.SubordinateEvents, info.ID, model.EventTypeJWKSReplaced, WithActor(GetActor(c)))
+			return RecordEvent(
+				tx.SubordinateEvents, info.ID, model.EventTypeJWKSReplaced, WithActor(GetActor(c)),
+				WithMessage(keysStoredMessage(old, body.Keys)),
+			)
 		})
 		if err != nil {
 			return handleTxError(c, err)

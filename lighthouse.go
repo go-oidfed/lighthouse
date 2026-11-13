@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	oidfed "github.com/go-oidfed/lib"
@@ -129,6 +130,10 @@ type LightHouse struct {
 	endpointRegistry         *EndpointRegistry
 	backgroundStops          []func()
 	jtiCleanupStop           func()
+	enrollCheckerMu          sync.RWMutex
+	enrollChecker            EntityChecker
+	stagedEnrollChecker      EntityChecker
+	enrollCheckerLoading     bool
 }
 
 // FiberServerConfig is the fiber.Config that is used to init the http fiber.App
@@ -489,6 +494,8 @@ func initAdminAPI(
 			Port:                       admin.Port,
 			TrustMarkConfigInvalidator: trustMarkConfigProvider,
 			TrustMarkCacheInvalidator:  &entity.trustMarkCaches,
+			TrustMarkSigner:            adminTrustMarkSigner{fed: entity},
+			EnrollChecker:              adminEnrollChecker{fed: entity},
 			JWKSUpdateHookApplier:      admin.JWKSUpdateHookApplier,
 			Actor: adminapi.ActorConfig{
 				Header: admin.ActorHeader,
