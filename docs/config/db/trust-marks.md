@@ -275,6 +275,51 @@ the trust mark. Each subject has a status (`active`, `blocked`, `pending`,
 The `POST` on `additional-claims` copies the spec-level additional claims into
 the subject, merging with any existing subject-level claims.
 
+When a subject leaves `active` (status change, update, delete, or deletion of
+its spec), its issued trust mark instances are revoked in the same
+transaction: those linked to the subject and those of the spec's type issued
+to its entity ID. Subject writes record trust mark events in the
+[events](subordinates.md) of the entity: `trust_mark_granted` when a subject
+becomes active, `trust_mark_revoked` when it leaves active, and
+`trust_mark_status_updated` for other status changes. A `message` in the body
+of a subject create or status change replaces the event text.
+
+#### Issuing immediately
+
+Creating a subject, or changing its status to `active`, with `"issue": true`
+also issues the trust mark to it, so the operator does not have to wait for
+the entity to request it. The trust mark is signed as the trust mark endpoint
+would sign it (subject claims, else the spec's claims), and the issued
+instance is recorded in the same transaction as the subject, with a
+`trust_mark_issued` event. When the spec has a `cache_ttl`, the trust mark
+endpoint then serves this mark from its cache, as it does for the marks it
+signs itself. With `cache_ttl` 0 the endpoint signs a fresh mark on each
+request, so the eagerly issued instance is recorded but not delivered, and
+stays live until it expires or is revoked. Concurrent issues for the same trust mark type and entity are
+serialized. The call writes nothing and answers an error code
+instead when:
+
+| Status | `error`                | Cause                                                          |
+|--------|------------------------|----------------------------------------------------------------|
+| 409    | `already_held`         | The entity already holds an active trust mark of the type.     |
+| 503    | `issuance_unavailable` | This LightHouse does not issue trust marks of the type.        |
+
+#### Issued instances
+
+| Tool | Command |
+|------|---------|
+| Admin API | `GET /api/v1/admin/trust-marks/instances` (filters `trust_mark_type`, `sub`, `state`, `limit`, `offset`) |
+| Admin API | `GET /api/v1/admin/trust-marks/instances/counts` |
+| Admin API | `POST /api/v1/admin/trust-marks/instances/revoke` with `{"trust_mark_type", "sub", "message"?}` |
+
+An instance's `state` is `revoked`, `expired` (its `expires_at` has passed), or
+`active`. The revoke route revokes every unrevoked instance of the type issued
+to the entity, even when the entity is not a subject of any spec, records a
+`trust_mark_revoked` event and answers how many it revoked. For an entity that
+is an active subject of the type it answers 409 `subject_active` and revokes
+nothing: the trust mark endpoint would issue the mark again, so change the
+subject's status instead.
+
 ## Federation Trust Marks
 
 This section covers trust mark **types**, **issuers**, and **owners** — the

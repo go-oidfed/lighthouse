@@ -174,3 +174,72 @@ func (s *IssuedTrustMarkInstanceStorage) FindSubjectID(trustMarkType, entityID s
 	}
 	return subject.ID, nil
 }
+
+// RevokeByTypeAndSubject revokes every unrevoked instance of a trust mark
+// type issued to an entity, whether or not it is linked to a subject.
+// Returns the number of revoked instances.
+func (s *IssuedTrustMarkInstanceStorage) RevokeByTypeAndSubject(trustMarkType, entityID string) (int64, error) {
+	result := s.db.Model(&model.IssuedTrustMarkInstance{}).
+		Where("trust_mark_type = ? AND subject = ? AND revoked = ?", trustMarkType, entityID, false).
+		Updates(map[string]any{
+			"revoked":    true,
+			"updated_at": int(time.Now().Unix()),
+		})
+	if result.Error != nil {
+		return 0, errors.Wrap(result.Error, "issued_trust_mark_instances: revoke by type and subject failed")
+	}
+	return result.RowsAffected, nil
+}
+
+// List returns the instances matching q, newest first, and the total number
+// matching it before Limit and Offset apply.
+func (s *IssuedTrustMarkInstanceStorage) List(q model.InstanceQuery) ([]model.IssuedTrustMarkInstance, int64, error) {
+	tx := s.db.Model(&model.IssuedTrustMarkInstance{})
+	if q.TrustMarkType != "" {
+		tx = tx.Where("trust_mark_type = ?", q.TrustMarkType)
+	}
+	if q.Subject != "" {
+		tx = tx.Where("subject = ?", q.Subject)
+	}
+	switch q.State {
+	case model.TrustMarkStatusActive:
+		tx = tx.Where("revoked = ? AND (expires_at = 0 OR expires_at > ?)", false, q.Now)
+	case model.TrustMarkStatusExpired:
+		tx = tx.Where("revoked = ? AND expires_at > 0 AND expires_at <= ?", false, q.Now)
+	case model.TrustMarkStatusRevoked:
+		tx = tx.Where("revoked = ?", true)
+	}
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, errors.Wrap(err, "issued_trust_mark_instances: count failed")
+	}
+	tx = tx.Order("created_at DESC, jti")
+	if q.Limit > 0 {
+		tx = tx.Limit(q.Limit)
+	}
+	if q.Offset > 0 {
+		tx = tx.Offset(q.Offset)
+	}
+	var instances []model.IssuedTrustMarkInstance
+	if err := tx.Find(&instances).Error; err != nil {
+		return nil, 0, errors.Wrap(err, "issued_trust_mark_instances: list failed")
+	}
+	return instances, total, nil
+}
+
+// CountByState counts the active and the revoked instances at unix time now:
+// active ones are not revoked and unexpired (expires_at 0 or after now);
+// revoked ones are revoked regardless of expiry.
+func (s *IssuedTrustMarkInstanceStorage) CountByState(now int64) (active, revoked int64, err error) {
+	if err = s.db.Model(&model.IssuedTrustMarkInstance{}).
+		Where("revoked = ? AND (expires_at = 0 OR expires_at > ?)", false, now).
+		Count(&active).Error; err != nil {
+		return 0, 0, errors.Wrap(err, "issued_trust_mark_instances: count active failed")
+	}
+	if err = s.db.Model(&model.IssuedTrustMarkInstance{}).
+		Where("revoked = ?", true).
+		Count(&revoked).Error; err != nil {
+		return 0, 0, errors.Wrap(err, "issued_trust_mark_instances: count revoked failed")
+	}
+	return active, revoked, nil
+}

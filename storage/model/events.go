@@ -6,7 +6,8 @@ import (
 
 // Event type constants for subordinate events.
 const (
-	// EventTypeCreated is recorded when a subordinate is created.
+	// EventTypeCreated is recorded when a subordinate is created, including
+	// when an entity enrolls through the federation_enroll_endpoint.
 	EventTypeCreated = "created"
 	// EventTypeDeleted is recorded when a subordinate is deleted.
 	EventTypeDeleted = "deleted"
@@ -50,15 +51,35 @@ const (
 	// (approach C) accepts a signed JWK Set from the subordinate and updates
 	// the stored JWKS.
 	EventTypeJWKSUpdated = "jwks_updated"
+	// EventTypeJoinRequested is recorded when an entity asks to become a
+	// subordinate through the federation_enroll_request_endpoint.
+	EventTypeJoinRequested = "join_requested"
+	// EventTypeTrustMarkGranted is recorded when a trust mark subject becomes
+	// active through the admin API, so the entity is eligible for the mark.
+	EventTypeTrustMarkGranted = "trust_mark_granted"
+	// EventTypeTrustMarkRevoked is recorded when a trust mark subject leaves
+	// active or is deleted through the admin API, or when the admin API
+	// revokes the issued instances of a trust mark.
+	EventTypeTrustMarkRevoked = "trust_mark_revoked"
+	// EventTypeTrustMarkIssued is recorded when the admin API issues a trust
+	// mark immediately ("issue": true).
+	EventTypeTrustMarkIssued = "trust_mark_issued"
+	// EventTypeTrustMarkStatusUpdated is recorded when a trust mark subject
+	// changes between statuses other than active (e.g. pending to blocked).
+	EventTypeTrustMarkStatusUpdated = "trust_mark_status_updated"
 )
 
-// SubordinateEvent stores an event related to a subordinate.
+// SubordinateEvent stores an event related to a subordinate or another entity.
+// EntityID identifies the entity the event is about: events are kept when a
+// subordinate is removed and stay findable by entity ID if it joins again.
+// SubordinateID is 0 when the entity is not a subordinate of this authority.
 type SubordinateEvent struct {
 	ID            uint           `gorm:"primarykey" json:"id"`
 	CreatedAt     int            `json:"created_at"`
 	UpdatedAt     int            `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 	SubordinateID uint           `gorm:"index" json:"subordinate_id"`
+	EntityID      string         `gorm:"size:255;index" json:"entity_id"`
 	Timestamp     int64          `gorm:"index" json:"timestamp"`
 	Type          string         `gorm:"index" json:"type"`
 	Status        *string        `json:"status,omitempty"`

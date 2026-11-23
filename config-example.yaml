@@ -135,6 +135,18 @@ api:
     
     # HTTP header name for actor extraction (when actor_source includes header)
     # actor_header: "X-Actor"
+
+    # Service listener: the Admin API a second time on this port (plain HTTP),
+    # accepting only the bearer tokens below. Keep it on an internal network.
+    # service_port: 7700
+    # IP address the service listener binds to (default: server.ip_listen)
+    # service_ip_listen: "127.0.0.1"
+    # service_tokens:
+    #   - name: operator-ui
+    #     # File with the token (at least 32 bytes), e.g. openssl rand -base64 48
+    #     token_file: /run/secrets/lighthouse-operator-ui-token
+    #     # May name the user it acts for in X-Actor
+    #     act_for_users: true
     
     # Password hashing parameters (Argon2id)
     # These are secure defaults - only change if you understand the implications

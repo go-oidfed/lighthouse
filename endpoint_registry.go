@@ -193,6 +193,7 @@ func (fed *LightHouse) ReloadEndpointsFromDB() error {
 	var oldActive []*registeredEndpoint
 	var oldLegacy []*legacyEntry
 	oldRegistry := fed.endpointRegistry
+	oldEnrollChecker := fed.currentEnrollChecker()
 	if oldRegistry != nil {
 		oldActive = oldRegistry.activeEntries()
 		oldLegacy = oldRegistry.legacyEntries()
@@ -204,6 +205,7 @@ func (fed *LightHouse) ReloadEndpointsFromDB() error {
 	if err := fed.LoadEndpointsFromDB(); err != nil {
 		// On error, restore the old registry.
 		fed.endpointRegistry = oldRegistry
+		fed.setEnrollChecker(oldEnrollChecker)
 		return err
 	}
 
@@ -398,6 +400,10 @@ func (fed *LightHouse) LoadEndpointsFromDB() error {
 	if err != nil {
 		return fmt.Errorf("failed to list federation endpoints: %w", err)
 	}
+	// The checker of the enroll endpoint loaded below, if any, replaces the
+	// current one when the load is done, so no reload shows "no checker".
+	fed.beginEnrollCheckerLoad()
+	defer fed.endEnrollCheckerLoad()
 
 	loaded := 0
 	for _, ep := range endpoints {

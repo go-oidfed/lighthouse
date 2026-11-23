@@ -78,3 +78,51 @@ func parseBasicAuth(c fiber.Ctx) (username, password string, ok bool) {
 	}
 	return before, after, true
 }
+
+// localsKeyServiceToken is the key used to store, in Fiber's Locals, the
+// service token a request on the service listener was authenticated with.
+const localsKeyServiceToken = "service_token"
+
+// serviceTokenAuthMiddleware enforces service token authentication on the
+// service listener. Only an "Authorization: Bearer <token>" header matching
+// one of tokens is accepted, also while there are no users; HTTP Basic and
+// requests without credentials are refused with 401 invalid_client. The
+// token's name becomes the authenticated username.
+func serviceTokenAuthMiddleware(tokens ServiceTokens) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		presented, ok := parseBearerToken(c)
+		if !ok {
+			c.Set("WWW-Authenticate", "Bearer realm=admin")
+			return c.Status(fiber.StatusUnauthorized).JSON(
+				fiber.Map{
+					"error":             "invalid_client",
+					"error_description": "missing credentials",
+				},
+			)
+		}
+		token, ok := tokens.find(presented)
+		if !ok {
+			c.Set("WWW-Authenticate", "Bearer realm=admin")
+			return c.Status(fiber.StatusUnauthorized).JSON(
+				fiber.Map{
+					"error":             "invalid_client",
+					"error_description": "invalid credentials",
+				},
+			)
+		}
+		SetAuthUsername(c, token.Name)
+		c.Locals(localsKeyServiceToken, token)
+		return c.Next()
+	}
+}
+
+// parseBearerToken extracts a bearer token from the Authorization header. The
+// scheme name is matched case-insensitively.
+func parseBearerToken(c fiber.Ctx) ([]byte, bool) {
+	auth := c.Request().Header.Peek("Authorization")
+	const prefix = "bearer "
+	if len(auth) <= len(prefix) || !strings.EqualFold(string(auth[:len(prefix)]), prefix) {
+		return nil, false
+	}
+	return auth[len(prefix):], true
+}

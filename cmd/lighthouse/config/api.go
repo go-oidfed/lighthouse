@@ -35,6 +35,10 @@ type apiConf struct {
 //   - LH_API_ADMIN_TLS_ENABLED: Enable TLS for admin API
 //   - LH_API_ADMIN_TLS_CERT: Path to TLS certificate for admin API
 //   - LH_API_ADMIN_TLS_KEY: Path to TLS private key for admin API
+//   - LH_API_ADMIN_SERVICE_PORT: Port of the service listener (0 = off)
+//   - LH_API_ADMIN_SERVICE_IP_LISTEN: IP address of the service listener (empty = server.ip_listen)
+//
+// The service tokens (service_tokens) can be set in the config file only.
 type adminAPIConf struct {
 	// Enabled enables the admin API.
 	// Env: LH_API_ADMIN_ENABLED
@@ -63,6 +67,17 @@ type adminAPIConf struct {
 	// When enabled with a custom port, the admin API will serve HTTPS instead of HTTP.
 	// Env prefix: LH_API_ADMIN_TLS_
 	TLS lighthouse.TLSConf `yaml:"tls" envconfig:"TLS"`
+	// ServicePort, when not 0, starts the service listener: the admin API a
+	// second time on this port (plain HTTP), accepting only service tokens.
+	// Env: LH_API_ADMIN_SERVICE_PORT
+	ServicePort int `yaml:"service_port" envconfig:"SERVICE_PORT"`
+	// ServiceIPListen is the IP address the service listener binds to. Empty
+	// means server.ip_listen.
+	// Env: LH_API_ADMIN_SERVICE_IP_LISTEN
+	ServiceIPListen string `yaml:"service_ip_listen" envconfig:"SERVICE_IP_LISTEN"`
+	// ServiceTokens are the bearer tokens accepted on the service listener.
+	// Config file only.
+	ServiceTokens []lighthouse.ServiceTokenConf `yaml:"service_tokens" ignored:"true"`
 }
 
 var defaultAPIConf = apiConf{

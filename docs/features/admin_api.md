@@ -71,6 +71,7 @@ Full lifecycle management of subordinate entities in your federation.
 - **Additional Claims** - Add custom claims to subordinate statements
 - **Statement Preview** - Preview the subordinate statement that would be issued
 - **Event History** - View the history of changes for a subordinate
+- **Events** - Query the events of all entities, including removed subordinates, by entity, type, actor and time
 
 ### Federation Trust Marks
 
@@ -79,7 +80,8 @@ Configure trust mark issuance for your federation.
 - **Trust Mark Types** - Define the types of trust marks your entity can issue
 - **Owners & Issuers** - Configure trust mark delegation (owners and authorized issuers)
 - **Issuance Specifications** - Define issuance parameters for each trust mark type
-- **Subjects** - Manage which entities are entitled to receive specific trust marks
+- **Subjects** - Manage which entities are entitled to receive specific trust marks, optionally issuing the trust mark immediately
+- **Issued Instances** - List, count and revoke the trust marks your entity has issued
 
 ### Trust Anchors
 
@@ -133,7 +135,62 @@ Manage admin users for API access. This functionality is available at a separate
     
     - **No users exist**: The API does not require authentication, allowing you to create the first admin user
     - **At least one user exists**: All API requests require HTTP Basic Authentication with valid credentials
-    
+
+    This applies to the admin port. Bearer tokens are refused there once at
+    least one user exists; while no user exists the admin port checks no
+    credentials, so a bearer token sent there is neither checked nor used as
+    the actor. The [service listener](#service-listener-and-service-tokens)
+    behaves differently.
+
+### Service Listener and Service Tokens
+
+A service, such as an operator UI or an automation running as its own
+service, can call the Admin API on a separate listener,
+`api.admin.service_port`, with a bearer service token:
+
+```
+Authorization: Bearer <token>
+```
+
+- The service listener serves the same Admin API under `/api/v1/admin`, but
+  accepts **only** the service tokens configured in
+  `api.admin.service_tokens`, also while no users exist. HTTP Basic is
+  refused there.
+- Service tokens are **not** accepted on the admin port.
+- A missing or unknown token returns `401` with error `invalid_client`.
+- Tokens are read from files (at least 32 bytes), kept only as SHA-256 hashes
+  and compared in constant time. They are never logged or echoed.
+- The service listener serves plain HTTP. Bind it to an internal network only,
+  for example with `api.admin.service_ip_listen`.
+
+Why not HTTP Basic: a UI makes many calls per page, and each Basic call runs an
+Argon2id password check. Keeping the tokens on a listener of their own keeps
+them off an admin port that may be reachable from outside.
+
+**Acting for an operator.** The actor recorded in event history for a request
+on the service listener is the token's `name`. A token configured with
+`act_for_users: true` may instead name, in the `X-Actor` header, the signed-in
+user it acts for:
+
+- `X-Actor` must name an existing, enabled user; the user's stored username is
+  recorded. Otherwise the request is refused with `400` and error
+  `invalid_actor`, and nothing is written.
+- While no users exist, no name can be honoured, so any `X-Actor` is refused
+  with `400 invalid_actor`. Requests without `X-Actor` are recorded as the
+  token's name, so a service can still create the first user.
+- Without `X-Actor`, the actor is the token's name.
+- Tokens without `act_for_users` ignore `X-Actor`.
+
+The admin port's `actor_source` and `actor_header` options do not apply to the
+service listener.
+
+Give tokens names that are not usernames, so that the actor in history tells a
+service's own requests apart from a user's.
+
+See the [`service_port`](../config/static/api.md#service_port),
+[`service_ip_listen`](../config/static/api.md#service_ip_listen) and
+[`service_tokens`](../config/static/api.md#service_tokens) options.
+
 ## Security Considerations
 
 !!! warning "Production Deployments"
