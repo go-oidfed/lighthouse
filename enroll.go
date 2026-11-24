@@ -1,11 +1,14 @@
 package lighthouse
 
 import (
+	"strings"
+
 	oidfed "github.com/go-oidfed/lib"
 	"github.com/go-oidfed/lib/jwx"
 	"github.com/go-oidfed/lib/oidfedconst"
 	"github.com/gofiber/fiber/v3"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/go-oidfed/lighthouse/middleware"
 	"github.com/go-oidfed/lighthouse/storage/model"
@@ -14,6 +17,45 @@ import (
 type enrollRequest struct {
 	Subject     string   `json:"sub" form:"sub" query:"sub"`
 	EntityTypes []string `json:"entity_type" form:"entity_type" query:"entity_type"`
+}
+
+// enrollmentMessage is action, followed by " as " and the entity types when
+// any are known.
+func enrollmentMessage(action string, entityTypes []string) string {
+	if len(entityTypes) == 0 {
+		return action
+	}
+	return action + " as " + strings.Join(entityTypes, ", ")
+}
+
+// recordEnrollmentEvent records an event about entityID, which just enrolled
+// or asked to, with no actor: the entity itself acted. The enrollment
+// endpoints are public, so this is best-effort: a failure is logged and does
+// not change the answer.
+func (fed *LightHouse) recordEnrollmentEvent(
+	store model.SubordinateStorageBackend, entityID, eventType string, status model.Status, message string,
+) {
+	if fed.storages.SubordinateEvents == nil {
+		return
+	}
+	event := model.SubordinateEvent{
+		EntityID:  entityID,
+		Timestamp: nowUnix(),
+		Type:      eventType,
+		Status:    new(status.String()),
+		Message:   &message,
+	}
+	sub, err := store.Get(entityID)
+	if err != nil {
+		log.Error().Err(err).Str("entity_id", entityID).Str("event_type", eventType).
+			Msg("failed to look up subordinate for event")
+	} else if sub != nil {
+		event.SubordinateID = sub.ID
+	}
+	if err = fed.storages.SubordinateEvents.Add(event); err != nil {
+		log.Error().Err(err).Str("entity_id", entityID).Str("event_type", eventType).
+			Msg("failed to record subordinate event")
+	}
 }
 
 // AddEnrollEndpoint adds an endpoint to enroll to this IA/TA
@@ -134,6 +176,10 @@ func (fed *LightHouse) AddEnrollEndpoint(
 			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 		}
+		fed.recordEnrollmentEvent(
+			store, entityConfig.Subject, model.EventTypeCreated, model.StatusActive,
+			enrollmentMessage("enrolled", req.EntityTypes),
+		)
 		fed.notifySubordinateJWKSRefresher(entityConfig.Subject)
 		// This is not necessarily needed, but we return a fetch response
 		payload := fed.CreateSubordinateStatement(&info)

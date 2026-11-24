@@ -31,6 +31,9 @@ type SubordinateStorageBackend interface {
 	DeleteByDBID(id string) error
 	UpdateStatus(entityID string, status Status) error
 	UpdateStatusByDBID(id string, status Status) error
+	// TransitionStatusByDBID sets the status to "to" only if it is currently
+	// "from", atomically, and reports whether the row changed.
+	TransitionStatusByDBID(id string, from, to Status) (bool, error)
 	UpdateJWKSByDBID(id string, jwks JWKS) (*JWKS, error)
 	// UpdateJWKSByEntityID updates the JWKS for a subordinate by entity ID.
 	UpdateJWKSByEntityID(entityID string, jwks JWKS) error

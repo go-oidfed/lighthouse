@@ -84,6 +84,12 @@ func NewStorage(config Config) (*Storage, error) {
 		return nil, err
 	}
 
+	// Key existing subordinate events by entity ID, so they can be queried
+	// by entity. Events that earlier versions deleted stay deleted.
+	if _, err = migrateSubordinateEventEntityIDs(db); err != nil {
+		return nil, err
+	}
+
 	// Fill user hash params with defaults if zero values
 	params := config.UsersHash
 	if params.Time == 0 {
@@ -1360,6 +1366,36 @@ func (s *TrustMarkSpecStorage) ChangeSubjectStatus(specIdent, subjectIdent strin
 	}
 
 	return existing, nil
+}
+
+// TransitionSubjectStatus sets the status of a TrustMarkSubject to "to" only
+// if its current status is "from", in one conditional UPDATE, and reports
+// whether it changed. Concurrent transitions out of the same status therefore
+// cannot both succeed. An unknown subject reports false. Like
+// ChangeSubjectStatus, a transition to blocked or inactive revokes the
+// subject's issued trust mark instances.
+func (s *TrustMarkSpecStorage) TransitionSubjectStatus(specIdent, subjectIdent string, from, to model.Status) (bool, error) {
+	existing, err := s.findSubjectByIdent(specIdent, subjectIdent)
+	if err != nil {
+		var notFound model.NotFoundError
+		if errors.As(err, &notFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	res := s.db.Model(&model.TrustMarkSubject{}).
+		Where("id = ? AND status = ?", existing.ID, from).
+		Update("status", to)
+	if res.Error != nil {
+		return false, errors.Wrap(res.Error, "trust_mark_specs: transition subject status failed")
+	}
+	if res.RowsAffected == 0 {
+		return false, nil
+	}
+	if to == model.StatusBlocked || to == model.StatusInactive {
+		s.revokeInstancesForSubject(existing.ID, existing.EntityID, specIdent)
+	}
+	return true, nil
 }
 
 // revokeInstancesForSubject revokes all issued trust mark instances for a subject.

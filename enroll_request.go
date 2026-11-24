@@ -109,6 +109,10 @@ func (fed *LightHouse) AddEnrollRequestEndpoint(
 			ctx.Status(fiber.StatusInternalServerError)
 			return ctx.JSON(oidfed.ErrorServerError(err.Error()))
 		}
+		fed.recordEnrollmentEvent(
+			store, entityConfig.Subject, model.EventTypeJoinRequested, model.StatusPending,
+			enrollmentMessage("requested to join", req.EntityTypes),
+		)
 		fed.notifySubordinateJWKSRefresher(entityConfig.Subject)
 		ctx.Status(fiber.StatusAccepted)
 		return nil
