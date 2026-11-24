@@ -146,6 +146,10 @@ type TrustMarkSpecStore interface {
 	UpdateSubject(specIdent, subjectIdent string, subject *AddTrustMarkSubject) (*TrustMarkSubject, error)
 	DeleteSubject(specIdent, subjectIdent string) error
 	ChangeSubjectStatus(specIdent, subjectIdent string, status Status) (*TrustMarkSubject, error)
+	// TransitionSubjectStatus sets a subject's status to "to" only if it is
+	// currently "from" and reports whether it changed; a transition to blocked
+	// or inactive revokes the subject's issued instances.
+	TransitionSubjectStatus(specIdent, subjectIdent string, from, to Status) (bool, error)
 }
 
 // AddTrustMarkSpec represents the payload for creating or updating a TrustMarkSpec.
