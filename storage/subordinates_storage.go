@@ -414,6 +414,20 @@ func (s *SubordinateStorage) UpdateStatusByDBID(id string, status model.Status) 
 	)
 }
 
+// TransitionStatusByDBID sets the status of the subordinate with DB primary
+// key id to "to" only if its current status is "from", in one conditional
+// UPDATE, and reports whether a row changed. Concurrent transitions out of
+// the same status therefore cannot both succeed.
+func (s *SubordinateStorage) TransitionStatusByDBID(id string, from, to model.Status) (bool, error) {
+	res := s.db.Model(&model.ExtendedSubordinateInfo{}).
+		Where("id = ? AND status = ?", id, from).
+		Update("status", to)
+	if res.Error != nil {
+		return false, errors.Wrap(res.Error, "failed to transition subordinate status")
+	}
+	return res.RowsAffected > 0, nil
+}
+
 // UpdateJWKSByDBID updates the JWKS for a subordinate by DB primary key.
 // If the subordinate has no JWKS yet, one is created and linked.
 // Returns the updated JWKS with correct ID.
